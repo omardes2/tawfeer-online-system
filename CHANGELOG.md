@@ -7,10 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 1.5 (Business Analysis & Design)
+- `docs/DECISIONS.md`: 22 architecture decision records + canonical status
+  vocabularies (single source of truth) — WAC costing, stock buckets,
+  reservation/revenue timing, commission model, permission scheme, etc.
+- `docs/BUSINESS_RULES.md`, `USER_JOURNEYS.md` (11 roles), `EVENTS.md`
+  (25 domain events), `AUTOMATIONS.md`, `REPORTS.md` (25 reports),
+  `API_CONTRACT.md`, `UI_NAVIGATION.md`, `APPROVAL_WORKFLOWS.md`,
+  `NOTIFICATION_MATRIX.md`.
+- `docs/PHASE_2_DESIGN.md` + `docs/DATA_DICTIONARY.md`: detailed schema for
+  27 Phase 2 entities (+6 supporting tables) with a dependency-safe order.
+- `docs/DESIGN_REVIEW.md`: consistency review, resolved conflicts, open
+  questions, risks, Phase 2 batch sequence, and effort estimates.
+- No application code, migrations, models, controllers, APIs, or UI created.
+
 ### Planned — Phase 2 (Catalog & Inventory)
-- Categories, products, variants (SKU/barcode), units
-- Multi-warehouse stock levels and inventory movements (atomic)
-- Reorder-level alerts
+- 27 entities across 6 batches (2A geography → 2F inventory)
+- Multi-warehouse stock (buckets), WAC costing, ledger, reservations,
+  transfers, adjustments — all atomic and audited
+- Reorder-level / low-stock alerts
 
 ## [0.1.0-foundation] — 2026-07-11
 

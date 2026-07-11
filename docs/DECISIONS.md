@@ -157,6 +157,30 @@
 ### حالات الطلب / الدفع / الشحن / العمولة / الإرجاع
 معرّفة في ADR-010 / الأساس / ADR-009 / ADR-012 / ADR-011 على التوالي.
 
+### حالات تحويل المستودعات (Warehouse Transfer) — مُرسّمة في مراجعة التصميم
+`draft → pending_approval → approved → dispatched(in_transit) → received` + `cancelled`.
+> `dispatched` يحرّك الكمية إلى دلو `in_transit` (ADR-007)؛ `received` يودعها في مستودع الوجهة. توقيعان منفصلان (إرسال/استلام).
+
+### حالات تسوية الجرد (Stock Adjustment) — مُرسّمة في مراجعة التصميم
+`draft → pending_approval → approved(applied)` + `cancelled`.
+> التطبيق (`applied`) ينتج حركة `adjustment_in`/`adjustment_out` وقيد دفتر، داخل معاملة.
+
+### حالات حجز المخزون (Stock Reservation) — مُرسّمة في مراجعة التصميم
+`active → released` | `active → fulfilled` | `active → expired`.
+> `active` = محجوز (`reserved`)؛ `fulfilled` عند الشحن (خصم نهائي)؛ `released`/`expired` يعيدان الكمية للمتاح (ADR-009).
+
+---
+
+## ADR-021 — تسمية الصلاحيات (Permission Naming) [مُعتمد في مراجعة التصميم]
+- **السياق:** أنتجت وثائق التصميم مخططًا دقيقًا `{module}.{resource}.{action}` (مثل `catalog.products.view`, `inventory.transfer.approve`) بينما زرعت Phase 1 مجموعة **أخشن** من 27 صلاحية (`catalog.view`, `inventory.manage`...).
+- **القرار:** المخطط الدقيق **`{module}.{resource}.{action}`** هو **القانوني** للنظام. صلاحيات Phase 1 الأخشن تبقى كـ **مجموعات/أسماء مستعارة انتقالية** تُوسَّع إلى الصلاحيات الدقيقة **عند بناء كل وحدة** (تُضاف عبر seed لكل مرحلة). لا يُعتمد على أي صلاحية أخشن في كود جديد.
+- **صلاحيات حسّاسة مُرسّمة:** `pricing.view_cost` (رؤية التكلفة/الربح — ADR-013)، `pricing.override_min_price` (تجاوز أدنى سعر — ADR-006a)، `reports.view_financial` (تقارير الربحية). تُزرع مع وحداتها.
+- **الأثر:** تحديث `RolePermissionSeeder` تدريجيًا لكل وحدة؛ الأدوار السبعة تبقى ثابتة (المبدأ 12).
+
+## ADR-022 — الجداول الداعمة والكيانات المؤجلة [مُعتمد في مراجعة التصميم]
+- **الجداول الداعمة (Pivots/Children)** خارج الـ27 لكنها جزء طبيعي من Phase 2: `shipping_zone_city`, `shipping_zone_area`, `variant_attribute_value`, `product_tag_links`, `stock_adjustment_items`, `warehouse_transfer_items`. مقبولة ولا تُعدّ توسّعًا للنطاق.
+- **كيان `approval_requests`** (طلبات الاعتماد العامة) و**مفاتيح إعدادات مقترحة** (`pricing.discount_approval_threshold`, `purchasing.po_approval_threshold`, `inventory.adjustment_value_threshold`, `affiliate.min_payout`, `notifications.quiet_hours`): **مقبولة كتصميم**، تُنشأ في مرحلتها المناسبة (الاعتمادات في Phase 3+، لا في Phase 2). لا حاجة لتعديل نطاق Phase 2.
+
 ---
 
 ## قائمة كيانات Phase 2 القانونية (27)

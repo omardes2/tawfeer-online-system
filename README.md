@@ -55,11 +55,29 @@
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | المبادئ المعمارية المُلزِمة (14 مبدأ) |
 | [`PROJECT_PLAN.md`](PROJECT_PLAN.md) | خطة التنفيذ على مراحل |
 | [`REQUIREMENTS.md`](REQUIREMENTS.md) | المتطلبات الوظيفية وغير الوظيفية |
-| [`DATABASE_DESIGN.md`](DATABASE_DESIGN.md) | تصميم قاعدة البيانات والعلاقات |
-| [`docs/FOUNDATION_REPORT.md`](docs/FOUNDATION_REPORT.md) | تقرير تجميد الأساس (v0.1.0) |
+| [`DATABASE_DESIGN.md`](DATABASE_DESIGN.md) | تصميم قاعدة البيانات عالي المستوى |
 | [`CHANGELOG.md`](CHANGELOG.md) | سجلّ التغييرات |
 | [`CLAUDE.md`](CLAUDE.md) | إرشادات العمل داخل المستودع |
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | خطوات النشر والتشغيل |
+
+### وثائق التحليل والتصميم (`docs/`)
+
+| الملف | الوصف |
+|-------|-------|
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | القرارات المعمارية المركزية (SSOT) |
+| [`docs/BUSINESS_RULES.md`](docs/BUSINESS_RULES.md) | قواعد العمل المرقّمة |
+| [`docs/USER_JOURNEYS.md`](docs/USER_JOURNEYS.md) | رحلات المستخدمين (11 دورًا) |
+| [`docs/EVENTS.md`](docs/EVENTS.md) | كتالوج أحداث الدومين |
+| [`docs/AUTOMATIONS.md`](docs/AUTOMATIONS.md) | الأتمتة المستقبلية |
+| [`docs/REPORTS.md`](docs/REPORTS.md) | تصميم التقارير والتحليلات |
+| [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) | عقد REST API |
+| [`docs/UI_NAVIGATION.md`](docs/UI_NAVIGATION.md) | معمارية التنقّل والواجهة |
+| [`docs/APPROVAL_WORKFLOWS.md`](docs/APPROVAL_WORKFLOWS.md) | مسارات الاعتماد وانتقال الحالات |
+| [`docs/NOTIFICATION_MATRIX.md`](docs/NOTIFICATION_MATRIX.md) | مصفوفة الإشعارات |
+| [`docs/PHASE_2_DESIGN.md`](docs/PHASE_2_DESIGN.md) | تصميم قاعدة بيانات Phase 2 |
+| [`docs/DATA_DICTIONARY.md`](docs/DATA_DICTIONARY.md) | قاموس البيانات |
+| [`docs/DESIGN_REVIEW.md`](docs/DESIGN_REVIEW.md) | خلاصة مراجعة التصميم |
+| [`docs/FOUNDATION_REPORT.md`](docs/FOUNDATION_REPORT.md) | تقرير تجميد الأساس (v0.1.0) |
 
 ---
 
