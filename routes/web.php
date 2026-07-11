@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\Catalog\BrandController;
 use App\Http\Controllers\Admin\Catalog\CategoryController;
 use App\Http\Controllers\Admin\Catalog\ProductAttributeController;
+use App\Http\Controllers\Admin\Catalog\ProductController;
 use App\Http\Controllers\Admin\Catalog\ProductTagController;
 use App\Http\Controllers\Admin\Catalog\UnitController;
 use App\Http\Controllers\ProfileController;
@@ -33,6 +34,12 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::resource('attributes', ProductAttributeController::class)->except('show');
     Route::post('attributes/{attribute}/values', [ProductAttributeController::class, 'storeValue'])->name('attributes.values.store');
     Route::delete('attributes/{attribute}/values/{value}', [ProductAttributeController::class, 'destroyValue'])->name('attributes.values.destroy');
+
+    // المنتجات ووسائطها (Phase 2.3)
+    Route::resource('products', ProductController::class)->except('show');
+    Route::post('products/{product}/images', [ProductController::class, 'storeImage'])->name('products.images.store');
+    Route::post('products/{product}/images/{image}/primary', [ProductController::class, 'setPrimaryImage'])->name('products.images.primary');
+    Route::delete('products/{product}/images/{image}', [ProductController::class, 'destroyImage'])->name('products.images.destroy');
 });
 
 require __DIR__.'/auth.php';

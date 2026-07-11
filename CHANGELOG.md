@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.3 (Products & Media)
+- Tables: `products` (design §16 + ADR-023 extensions), `product_images`,
+  `product_tag_links`, `product_attribute_links` — FKs, composite uniques,
+  indexes; `tax_id`/`variant_id` FKs deferred per the dependency plan.
+- ADR-023: product catalog fields extension — bilingual name/description,
+  editorial `status` (draft/active/archived), `visibility`, `is_featured`,
+  `sort_order`, SEO fields, and search metadata; `is_active` derived from
+  status by the service. Price columns exist per design but no pricing
+  engine is implemented in 2.3 (cost fields read-gated by pricing.view_cost).
+- Models `Product` (uuid, soft-delete, audited) and `ProductImage`, with
+  category/brand/unit belongs-to, tags/attributes many-to-many, images
+  has-many; factories.
+- Services: `ProductService` (slug, is_active sync, tag/attribute sync,
+  transactions) and `ProductImageService` (upload to public disk, single
+  primary enforcement, promote-on-delete).
+- API under `/api/v1/products` + nested images (upload / set-primary /
+  delete, scoped binding); filter/search/sort/paginate; ProductResource
+  with ADR-013 cost-field gating.
+- RBAC: `catalog.products.*` + `pricing.view_cost` via Policies;
+  `ProductPermissionSeeder`.
+- Admin UI (Arabic RTL, responsive): product list + full bilingual form
+  (classification, tags/attributes, status/visibility/featured, SEO) and
+  image gallery with upload/set-primary/delete; products nav link.
+- Tests: 33 new (product API, image API, admin web, ProductService unit) →
+  136 passing total.
+
 ### Added — Phase 2.2 (Catalog: Categories, Brands, Units, Attributes, Values, Tags)
 - New `Catalog` module (`app/Modules/Catalog`): 6 models, 6 services,
   policies, and a service provider registering the policies.

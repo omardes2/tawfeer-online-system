@@ -4,12 +4,14 @@ namespace App\Modules\Catalog\Providers;
 
 use App\Modules\Catalog\Models\Brand;
 use App\Modules\Catalog\Models\Category;
+use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductAttribute;
 use App\Modules\Catalog\Models\ProductTag;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Catalog\Policies\BrandPolicy;
 use App\Modules\Catalog\Policies\CategoryPolicy;
 use App\Modules\Catalog\Policies\ProductAttributePolicy;
+use App\Modules\Catalog\Policies\ProductPolicy;
 use App\Modules\Catalog\Policies\ProductTagPolicy;
 use App\Modules\Catalog\Policies\UnitPolicy;
 use Illuminate\Support\Facades\Gate;
@@ -27,6 +29,7 @@ class CatalogServiceProvider extends ServiceProvider
         Unit::class => UnitPolicy::class,
         ProductAttribute::class => ProductAttributePolicy::class,
         ProductTag::class => ProductTagPolicy::class,
+        Product::class => ProductPolicy::class,
     ];
 
     public function boot(): void

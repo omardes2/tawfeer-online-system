@@ -26,6 +26,8 @@ class DatabaseSeeder extends Seeder
             // Phase 2.2 — الكتالوج
             CatalogPermissionSeeder::class,
             UnitSeeder::class,
+            // Phase 2.3 — المنتجات
+            ProductPermissionSeeder::class,
         ]);
     }
 }

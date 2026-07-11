@@ -177,6 +177,18 @@
 - **صلاحيات حسّاسة مُرسّمة:** `pricing.view_cost` (رؤية التكلفة/الربح — ADR-013)، `pricing.override_min_price` (تجاوز أدنى سعر — ADR-006a)، `reports.view_financial` (تقارير الربحية). تُزرع مع وحداتها.
 - **الأثر:** تحديث `RolePermissionSeeder` تدريجيًا لكل وحدة؛ الأدوار السبعة تبقى ثابتة (المبدأ 12).
 
+## ADR-023 — توسعة حقول المنتج الكتالوجي (Product Catalog Fields) [مُعتمد في Phase 2.3]
+- **السياق:** يتطلّب المالك في Phase 2.3 حقولًا تتجاوز `products` §16: تسمية/وصف **ثنائيا اللغة**، **حالة تحريرية** (draft/active/archived)، **ظهور** (visible/hidden)، **مميّز (featured)**، **ترتيب**، **حقول SEO**، و**بيانات بحث**.
+- **القرار:** إضافة هذه الأعمدة إلى `products` دون المساس بأعمدة التصميم §16:
+  - `name_en`, `short_description_en`, `description_en` (إنجليزي ثانوي؛ العربي أساسي).
+  - `status` (`draft` افتراضي / `active` / `archived`) — دورة الحياة التحريرية.
+  - `visibility` (`visible` افتراضي / `hidden`) — ظهور المتجر.
+  - `is_featured` (bool)، `sort_order` (int)، `meta_title`/`meta_description`/`meta_keywords` (SEO)، `search_keywords` (بيانات بحث).
+- **`is_active` (من §16) يبقى** ويُشتقّ آليًا من الحالة: `is_active = (status === 'active')` — تحافظ عليه `ProductService` ليخدم فهرس `(is_active, type)` واستعلامات المتجر السريعة.
+- **الأسعار (§16):** الأعمدة موجودة للوفاء بالتصميم، لكن **لا محرّك تسعير في Phase 2.3** (تُترك بقيمها الافتراضية ولا تُدار في نماذج هذه المرحلة). حقول التكلفة محجوبة بـ `pricing.view_cost` (ADR-013).
+- **FK مؤجّلة:** `tax_id` (جدول taxes غير مُنشأ)، و`product_images.variant_id` (المتغيّرات غير مُنشأة) — أعمدة nullable بلا قيد الآن، تُربط في مرحلتها.
+- **الأثر:** لا إعادة تصميم؛ إضافة أعمدة فقط تتبع كل الأعراف (uuid، soft-delete، auditable، RBAC).
+
 ## ADR-022 — الجداول الداعمة والكيانات المؤجلة [مُعتمد في مراجعة التصميم]
 - **الجداول الداعمة (Pivots/Children)** خارج الـ27 لكنها جزء طبيعي من Phase 2: `shipping_zone_city`, `shipping_zone_area`, `variant_attribute_value`, `product_tag_links`, `stock_adjustment_items`, `warehouse_transfer_items`. مقبولة ولا تُعدّ توسّعًا للنطاق.
 - **كيان `approval_requests`** (طلبات الاعتماد العامة) و**مفاتيح إعدادات مقترحة** (`pricing.discount_approval_threshold`, `purchasing.po_approval_threshold`, `inventory.adjustment_value_threshold`, `affiliate.min_payout`, `notifications.quiet_hours`): **مقبولة كتصميم**، تُنشأ في مرحلتها المناسبة (الاعتمادات في Phase 3+، لا في Phase 2). لا حاجة لتعديل نطاق Phase 2.

@@ -15,8 +15,11 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('app.dashboard') }}
                     </x-nav-link>
+                    @can('viewAny', \App\Modules\Catalog\Models\Product::class)
+                        <x-nav-link :href="route('admin.products.index')" :active="request()->routeIs('admin.products.*')">{{ __('المنتجات') }}</x-nav-link>
+                    @endcan
                     @can('viewAny', \App\Modules\Catalog\Models\Category::class)
-                        <x-nav-link :href="route('admin.categories.index')" :active="request()->routeIs('admin.categories.*')">{{ __('app.modules.catalog') }}</x-nav-link>
+                        <x-nav-link :href="route('admin.categories.index')" :active="request()->routeIs('admin.categories.*')">{{ __('الفئات') }}</x-nav-link>
                     @endcan
                     @can('viewAny', \App\Modules\Catalog\Models\Brand::class)
                         <x-nav-link :href="route('admin.brands.index')" :active="request()->routeIs('admin.brands.*')">{{ __('العلامات') }}</x-nav-link>

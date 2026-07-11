@@ -1,0 +1,112 @@
+<?php
+
+namespace App\Modules\Catalog\Models;
+
+use App\Modules\Foundation\Models\Branch;
+use App\Support\Concerns\Auditable;
+use App\Support\Concerns\HasUuid;
+use Database\Factories\Catalog\ProductFactory;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+/**
+ * المنتج الكتالوجي (PHASE_2_DESIGN §16 + ADR-023).
+ *
+ * `is_active` مُشتقّ من `status` عبر ProductService (ADR-023). حقول التكلفة
+ * حسّاسة وتُحجب في الـResource بلا صلاحية `pricing.view_cost` (ADR-013).
+ */
+class Product extends Model
+{
+    use Auditable, HasFactory, HasUuid, SoftDeletes;
+
+    protected $fillable = [
+        'branch_id', 'category_id', 'brand_id', 'unit_id', 'tax_id',
+        'name', 'name_en', 'slug', 'sku', 'barcode', 'type',
+        'short_description', 'short_description_en', 'description', 'description_en',
+        'cost_price', 'average_cost', 'retail_price', 'wholesale_price', 'marketer_price',
+        'min_price', 'promo_price', 'promo_starts_at', 'promo_ends_at', 'target_margin',
+        'weight', 'reorder_level', 'track_inventory',
+        'status', 'visibility', 'is_featured', 'sort_order', 'is_active',
+        'meta_title', 'meta_description', 'meta_keywords', 'search_keywords',
+    ];
+
+    protected $casts = [
+        'cost_price' => 'decimal:4',
+        'average_cost' => 'decimal:4',
+        'retail_price' => 'decimal:2',
+        'wholesale_price' => 'decimal:2',
+        'marketer_price' => 'decimal:2',
+        'min_price' => 'decimal:2',
+        'promo_price' => 'decimal:2',
+        'target_margin' => 'decimal:4',
+        'weight' => 'decimal:3',
+        'reorder_level' => 'decimal:3',
+        'promo_starts_at' => 'datetime',
+        'promo_ends_at' => 'datetime',
+        'track_inventory' => 'boolean',
+        'is_featured' => 'boolean',
+        'is_active' => 'boolean',
+        'sort_order' => 'integer',
+    ];
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+
+    public function brand(): BelongsTo
+    {
+        return $this->belongsTo(Brand::class);
+    }
+
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(Unit::class);
+    }
+
+    public function images(): HasMany
+    {
+        return $this->hasMany(ProductImage::class)->orderBy('sort_order');
+    }
+
+    public function primaryImage(): HasOne
+    {
+        return $this->hasOne(ProductImage::class)->where('is_primary', true);
+    }
+
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(ProductTag::class, 'product_tag_links', 'product_id', 'product_tag_id')->withTimestamps();
+    }
+
+    public function attributes(): BelongsToMany
+    {
+        return $this->belongsToMany(ProductAttribute::class, 'product_attribute_links', 'product_id', 'attribute_id')->withTimestamps();
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    public function scopeVisible($query)
+    {
+        return $query->where('visibility', 'visible');
+    }
+
+    protected static function newFactory(): Factory
+    {
+        return ProductFactory::new();
+    }
+}

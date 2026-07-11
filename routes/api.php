@@ -5,6 +5,8 @@ use App\Http\Controllers\Api\V1\Catalog\BrandController;
 use App\Http\Controllers\Api\V1\Catalog\CategoryController;
 use App\Http\Controllers\Api\V1\Catalog\ProductAttributeController;
 use App\Http\Controllers\Api\V1\Catalog\ProductAttributeValueController;
+use App\Http\Controllers\Api\V1\Catalog\ProductController;
+use App\Http\Controllers\Api\V1\Catalog\ProductImageController;
 use App\Http\Controllers\Api\V1\Catalog\ProductTagController;
 use App\Http\Controllers\Api\V1\Catalog\UnitController;
 use App\Http\Controllers\Api\V1\WarehouseController;
@@ -79,6 +81,17 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('attributes', ProductAttributeController::class);
         Route::apiResource('attributes.values', ProductAttributeValueController::class)->scoped();
         Route::apiResource('tags', ProductTagController::class);
+
+        /*
+        | Phase 2.3 — المنتجات ووسائطها
+        */
+        Route::apiResource('products', ProductController::class);
+        Route::scopeBindings()->group(function () {
+            Route::get('products/{product}/images', [ProductImageController::class, 'index']);
+            Route::post('products/{product}/images', [ProductImageController::class, 'store']);
+            Route::post('products/{product}/images/{image}/primary', [ProductImageController::class, 'setPrimary']);
+            Route::delete('products/{product}/images/{image}', [ProductImageController::class, 'destroy']);
+        });
 
     });
 });
