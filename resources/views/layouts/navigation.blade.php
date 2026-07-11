@@ -13,8 +13,23 @@
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
-                        {{ __('Dashboard') }}
+                        {{ __('app.dashboard') }}
                     </x-nav-link>
+                    @can('viewAny', \App\Modules\Catalog\Models\Category::class)
+                        <x-nav-link :href="route('admin.categories.index')" :active="request()->routeIs('admin.categories.*')">{{ __('app.modules.catalog') }}</x-nav-link>
+                    @endcan
+                    @can('viewAny', \App\Modules\Catalog\Models\Brand::class)
+                        <x-nav-link :href="route('admin.brands.index')" :active="request()->routeIs('admin.brands.*')">{{ __('العلامات') }}</x-nav-link>
+                    @endcan
+                    @can('viewAny', \App\Modules\Catalog\Models\Unit::class)
+                        <x-nav-link :href="route('admin.units.index')" :active="request()->routeIs('admin.units.*')">{{ __('الوحدات') }}</x-nav-link>
+                    @endcan
+                    @can('viewAny', \App\Modules\Catalog\Models\ProductAttribute::class)
+                        <x-nav-link :href="route('admin.attributes.index')" :active="request()->routeIs('admin.attributes.*')">{{ __('السمات') }}</x-nav-link>
+                    @endcan
+                    @can('viewAny', \App\Modules\Catalog\Models\ProductTag::class)
+                        <x-nav-link :href="route('admin.tags.index')" :active="request()->routeIs('admin.tags.*')">{{ __('الوسوم') }}</x-nav-link>
+                    @endcan
                 </div>
             </div>
 

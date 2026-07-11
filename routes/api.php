@@ -1,6 +1,12 @@
 <?php
 
 use App\Http\Controllers\Api\V1\BranchController;
+use App\Http\Controllers\Api\V1\Catalog\BrandController;
+use App\Http\Controllers\Api\V1\Catalog\CategoryController;
+use App\Http\Controllers\Api\V1\Catalog\ProductAttributeController;
+use App\Http\Controllers\Api\V1\Catalog\ProductAttributeValueController;
+use App\Http\Controllers\Api\V1\Catalog\ProductTagController;
+use App\Http\Controllers\Api\V1\Catalog\UnitController;
 use App\Http\Controllers\Api\V1\WarehouseController;
 use App\Http\Controllers\Api\V1\WarehouseLocationController;
 use App\Http\Resources\UserResource;
@@ -53,7 +59,7 @@ Route::prefix('v1')->group(function () {
         Route::match(['put', 'patch'], 'warehouses/{warehouse}', [WarehouseController::class, 'update'])->middleware('can:settings.warehouses.update');
         Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->middleware('can:settings.warehouses.delete');
 
-        // مواقع التخزين (متداخلة تحت المستودع، ربط مُنطاق)
+        // مواقع التخزين (متداخلة تحت المستودع, ربط مُنطاق)
         Route::scopeBindings()->group(function () {
             Route::get('warehouses/{warehouse}/locations', [WarehouseLocationController::class, 'index'])->middleware('can:settings.warehouse_locations.view');
             Route::post('warehouses/{warehouse}/locations', [WarehouseLocationController::class, 'store'])->middleware('can:settings.warehouse_locations.create');
@@ -61,6 +67,18 @@ Route::prefix('v1')->group(function () {
             Route::match(['put', 'patch'], 'warehouses/{warehouse}/locations/{location}', [WarehouseLocationController::class, 'update'])->middleware('can:settings.warehouse_locations.update');
             Route::delete('warehouses/{warehouse}/locations/{location}', [WarehouseLocationController::class, 'destroy'])->middleware('can:settings.warehouse_locations.delete');
         });
+
+        /*
+        | Phase 2.2 — الكتالوج (الفئات/العلامات/الوحدات/السمات/الوسوم)
+        | الصلاحيات عبر Policies (authorizeResource) — ADR-021، المبدأ 12.
+        | الفئات/العلامات تُربط بـ uuid؛ المراجع (وحدات/سمات/وسوم) بـ id (ADR-002).
+        */
+        Route::apiResource('categories', CategoryController::class);
+        Route::apiResource('brands', BrandController::class);
+        Route::apiResource('units', UnitController::class);
+        Route::apiResource('attributes', ProductAttributeController::class);
+        Route::apiResource('attributes.values', ProductAttributeValueController::class)->scoped();
+        Route::apiResource('tags', ProductTagController::class);
 
     });
 });

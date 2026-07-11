@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.2 (Catalog: Categories, Brands, Units, Attributes, Values, Tags)
+- New `Catalog` module (`app/Modules/Catalog`): 6 models, 6 services,
+  policies, and a service provider registering the policies.
+- Migrations: `categories` (tree, uuid, soft-delete, audited), `brands`
+  (uuid, soft-delete, audited), `units` (self base-unit + conversion),
+  `product_attributes`, `product_attribute_values` (unique per attribute),
+  `product_tags` — with FKs, composite uniques, and indexes per design.
+- Business logic in services: unique slug generation, category tree
+  cycle-prevention, and safe deletes (block deleting a category with
+  children or a unit referenced as a base).
+- REST API under `/api/v1` for all six (filter/search/sort/paginate,
+  nested attribute values with scoped binding); categories/brands by uuid,
+  reference entities by id (ADR-002). Cost-free reference data.
+- RBAC: 20 granular `catalog.{resource}.{action}` permissions (ADR-021)
+  plus authorization Policies; `CatalogPermissionSeeder` + `UnitSeeder`.
+- Admin UI (Arabic RTL, responsive, English-localizable): list + create/edit
+  pages for all entities, inline attribute-value management, catalog nav.
+- Tests: 43 new (API + admin web incl. RTL render) → 103 passing total.
+
 ### Added — Phase 2.1 (Branches, Warehouses, Storage Locations)
 - Migrations: extend `branches` (email, tax_number, default_currency_id,
   default_warehouse_id, timezone); new `branch_settings`, `warehouses`,

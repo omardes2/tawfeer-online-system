@@ -23,6 +23,9 @@ class DatabaseSeeder extends Seeder
             // Phase 2.1 — البنية التنظيمية
             StructurePermissionSeeder::class,
             WarehouseSeeder::class,
+            // Phase 2.2 — الكتالوج
+            CatalogPermissionSeeder::class,
+            UnitSeeder::class,
         ]);
     }
 }
