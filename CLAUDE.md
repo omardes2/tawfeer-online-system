@@ -8,7 +8,7 @@
 
 ## التقنيات
 
-- **الخلفية:** Laravel 11 (PHP 8.2+)
+- **الخلفية:** Laravel 13 (PHP 8.3+)
 - **قاعدة البيانات:** MySQL 8
 - **الواجهة:** Blade + Livewire/Alpine.js + Tailwind CSS (RTL)
 - **الصلاحيات:** spatie/laravel-permission

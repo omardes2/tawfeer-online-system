@@ -1,0 +1,45 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo, pdo_sqlite, bcmath, gd, zip
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare application
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Install NPM dependencies & build
+        run: |
+          npm ci
+          npm run build
+
+      - name: Run tests (SQLite in-memory)
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ':memory:'
+        run: php artisan test

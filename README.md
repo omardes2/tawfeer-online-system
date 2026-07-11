@@ -35,7 +35,7 @@
 
 | الطبقة | التقنية |
 |--------|---------|
-| الإطار الخلفي | **Laravel 11** (PHP 8.2+) |
+| الإطار الخلفي | **Laravel 13** (PHP 8.3+) |
 | قاعدة البيانات | **MySQL 8** |
 | الواجهة | Blade + Livewire / Alpine.js + Tailwind CSS (RTL) |
 | المصادقة | Laravel Breeze/Fortify + Sanctum (API) |
