@@ -3,9 +3,37 @@
 # تصميم قاعدة البيانات — Tawfeer Online
 
 > قاعدة البيانات: **MySQL 8** — محرك InnoDB، ترميز `utf8mb4_unicode_ci`.
-> جميع الجداول تحوي `id` (BIGINT، مفتاح أساسي)، و`created_at` / `updated_at`، و`deleted_at` عند الحاجة للحذف الناعم (Soft Delete).
+> جميع الجداول تحوي `id` (BIGINT، مفتاح أساسي داخلي)، و`created_at` / `updated_at`، و`deleted_at` عند الحاجة للحذف الناعم (Soft Delete).
 
 هذا تصميم مبدئي عالي المستوى يُفصَّل جدولًا-جدولًا داخل الترحيلات (migrations) في كل مرحلة.
+
+> **ملاحظة معمارية:** هذا المخطط يلتزم بمبادئ `ARCHITECTURE.md`:
+> - **`branch_id`** على الكيانات التشغيلية (جاهزية تعدد الفروع).
+> - **`uuid`** (فريد، مفهرس) على الكيانات المكشوفة خارجيًا (`orders`, `invoices`, `shipments`...).
+> - **جاهزية Multi-Tenant:** الجداول مصمّمة بحيث يمكن إضافة `tenant_id` لاحقًا دون كسر العلاقات (غير مُضاف الآن).
+> - **المبالغ** `decimal(15,2)` والكميات `decimal(15,3)` — لا `float`.
+> - **الحالات** (طلب/دفع/شحن) في جداول مستقلة قابلة للإدارة، لا `enum` مغلق.
+
+---
+
+## 0. الأساس (Foundation)
+
+### `branches` (الفروع)
+`uuid` · `name` · `code` (فريد) · `address` · `phone` · `is_default` · `is_active`
+> يُنشأ فرع افتراضي واحد عند التنصيب. كل كيان تشغيلي يشير إلى `branch_id`.
+
+### `settings` (الإعدادات الديناميكية)
+`key` (فريد) · `value (json)` · `group` · `type`
+> تُقرأ عبر طبقة `Settings` مع تخزين مؤقت. لا قيم ثابتة في الكود.
+
+### `audit_logs` (سجلّ التدقيق المركزي — append-only)
+`user_id` → users · `action` · `auditable_type` · `auditable_id` · `old_values (json)` · `new_values (json)` · `ip` · `user_agent`
+> غير قابل للتعديل/الحذف. يُملأ آليًا عبر تريتة `Auditable`.
+
+### جداول الحالات القابلة للإدارة
+- `order_statuses` · `payment_statuses` · `shipment_statuses`
+- كل منها: `key` (فريد) · `name` · `color` · `sort_order` · `is_final` · `is_active`
+> تُزرع حالات افتراضية وتبقى قابلة للإدارة من لوحة التحكم.
 
 ---
 
@@ -24,8 +52,7 @@
 ### جداول الصلاحيات (من spatie/laravel-permission)
 `roles` · `permissions` · `model_has_roles` · `model_has_permissions` · `role_has_permissions`
 
-### `audit_logs`
-`user_id` → users · `action` · `model_type` · `model_id` · `changes (json)` · `ip`
+> سجلّ التدقيق `audit_logs` مُعرّف مركزيًا في **قسم الأساس (0)** لكل الوحدات.
 
 ---
 
@@ -44,7 +71,8 @@
 `name` · `symbol` (قطعة، كرتون، كجم...)
 
 ### `warehouses`
-`name` · `code` · `branch_id` (nullable — تعدد الفروع مستقبلًا) · `is_active`
+`name` · `code` · `branch_id` → branches · `is_active`
+> كل مستودع مرتبط بفرع (جاهزية Multi-Warehouse/Multi-Branch).
 
 ### `inventory_stocks`
 `variant_id` → product_variants · `warehouse_id` → warehouses · `quantity` · `reorder_level`
@@ -210,14 +238,17 @@ customers ──< loyalty_transactions
 
 ---
 
-## مبادئ التصميم
+## مبادئ التصميم (متوافقة مع `ARCHITECTURE.md`)
 
+- **مفاتيح داخلية** `BIGINT auto-increment` + **`uuid`** فريد مفهرس للكيانات المكشوفة خارجيًا.
 - **مفاتيح أجنبية صريحة** مع قيود سلامة مرجعية.
-- **فهارس** على الأعمدة كثيرة الاستعلام (`slug`, `sku`, `order_number`, حقول الحالة، المفاتيح الأجنبية).
-- **حذف ناعم** للكيانات المهمة (المنتجات، الطلبات، العملاء).
-- **مبالغ مالية** بنوع `decimal(15,2)`.
-- **حقول JSON** للبيانات المرنة (attributes، config، rules).
-- **جاهزية تعدد الفروع** عبر `branch_id` في الجداول ذات الصلة.
+- **فهارس** على الأعمدة كثيرة الاستعلام (`uuid`, `slug`, `sku`, `order_number`, حقول الحالة، المفاتيح الأجنبية، `branch_id`).
+- **حذف ناعم** للكيانات المهمة؛ السجلّات الثابتة (`audit_logs`, `inventory_movements`, `journal_lines`) بلا Soft Delete.
+- **مبالغ مالية** `decimal(15,2)` والكميات `decimal(15,3)` — **يُمنع `float`**.
+- **حقول JSON** للبيانات المرنة (attributes، config، rules، settings).
+- **جاهزية تعدد الفروع** عبر `branch_id`، وتعدد المستودعات عبر رصيد لكل مستودع.
+- **جاهزية Multi-Tenant:** لا `tenant_id` الآن، لكن لا مفاتيح فريدة عامة تمنع إضافته لاحقًا (نستخدم فرادة مركّبة عند الحاجة).
+- **الحالات** في جداول قابلة للإدارة، لا `enum` مغلق.
 - التفاصيل الدقيقة (أطوال، قيم افتراضية، فهارس مركّبة) تُحسم داخل ملفات الترحيل في كل مرحلة.
 
 </div>

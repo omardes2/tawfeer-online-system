@@ -52,6 +52,7 @@
 
 | الملف | الوصف |
 |-------|-------|
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | المبادئ المعمارية المُلزِمة (14 مبدأ) |
 | [`PROJECT_PLAN.md`](PROJECT_PLAN.md) | خطة التنفيذ على مراحل |
 | [`REQUIREMENTS.md`](REQUIREMENTS.md) | المتطلبات الوظيفية وغير الوظيفية |
 | [`DATABASE_DESIGN.md`](DATABASE_DESIGN.md) | تصميم قاعدة البيانات والعلاقات |
