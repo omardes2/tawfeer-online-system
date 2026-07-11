@@ -20,7 +20,7 @@ class UpdateProductAttributeRequest extends FormRequest
             'name' => ['sometimes', 'required', 'string', 'max:100'],
             'slug' => ['nullable', 'string', 'max:120', Rule::unique('product_attributes', 'slug')->ignore($attribute->id)],
             'type' => ['sometimes', Rule::in(['select', 'color', 'text', 'number'])],
-            'sort_order' => ['nullable', 'integer', 'min:0'],
+            'sort_order' => ['integer', 'min:0'],
             'is_active' => ['boolean'],
         ];
     }

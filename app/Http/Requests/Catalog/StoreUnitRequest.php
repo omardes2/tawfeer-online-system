@@ -19,7 +19,7 @@ class StoreUnitRequest extends FormRequest
             'code' => ['required', 'string', 'max:20', 'unique:units,code'],
             'symbol' => ['nullable', 'string', 'max:20'],
             'base_unit_id' => ['nullable', 'integer', 'exists:units,id'],
-            'conversion_factor' => ['nullable', 'numeric', 'gt:0'],
+            'conversion_factor' => ['numeric', 'gt:0'],
             'is_active' => ['boolean'],
         ];
     }

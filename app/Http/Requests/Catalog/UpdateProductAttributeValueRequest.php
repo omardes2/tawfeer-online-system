@@ -24,7 +24,7 @@ class UpdateProductAttributeValueRequest extends FormRequest
             ],
             'label' => ['nullable', 'string', 'max:120'],
             'color_hex' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'sort_order' => ['nullable', 'integer', 'min:0'],
+            'sort_order' => ['integer', 'min:0'],
             'is_active' => ['boolean'],
         ];
     }

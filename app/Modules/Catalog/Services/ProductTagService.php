@@ -11,7 +11,8 @@ class ProductTagService
     public function create(array $data): ProductTag
     {
         return DB::transaction(function () use ($data) {
-            $data['slug'] = SlugGenerator::make(ProductTag::class, $data['slug'] ?? $data['name']);
+            $source = filled($data['slug'] ?? null) ? $data['slug'] : $data['name'];
+            $data['slug'] = SlugGenerator::make(ProductTag::class, $source);
 
             return ProductTag::create($data);
         });
@@ -21,7 +22,8 @@ class ProductTagService
     {
         return DB::transaction(function () use ($tag, $data) {
             if (isset($data['name']) || isset($data['slug'])) {
-                $data['slug'] = SlugGenerator::make(ProductTag::class, $data['slug'] ?? $data['name'] ?? $tag->name, $tag->id);
+                $source = filled($data['slug'] ?? null) ? $data['slug'] : ($data['name'] ?? $tag->name);
+                $data['slug'] = SlugGenerator::make(ProductTag::class, $source, $tag->id);
             }
 
             $tag->update($data);

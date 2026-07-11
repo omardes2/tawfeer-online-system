@@ -22,7 +22,7 @@ class UpdateCategoryRequest extends FormRequest
             'parent_id' => ['nullable', 'integer', 'exists:categories,id'],
             'description' => ['nullable', 'string'],
             'image' => ['nullable', 'string', 'max:255'],
-            'sort_order' => ['nullable', 'integer', 'min:0'],
+            'sort_order' => ['integer', 'min:0'],
             'is_active' => ['boolean'],
         ];
     }

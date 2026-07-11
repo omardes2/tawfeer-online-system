@@ -17,8 +17,8 @@ class StoreProductAttributeRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:100'],
             'slug' => ['nullable', 'string', 'max:120', 'unique:product_attributes,slug'],
-            'type' => ['nullable', Rule::in(['select', 'color', 'text', 'number'])],
-            'sort_order' => ['nullable', 'integer', 'min:0'],
+            'type' => [Rule::in(['select', 'color', 'text', 'number'])],
+            'sort_order' => ['integer', 'min:0'],
             'is_active' => ['boolean'],
         ];
     }

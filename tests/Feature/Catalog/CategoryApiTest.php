@@ -86,6 +86,26 @@ class CategoryApiTest extends TestCase
         $this->assertNotSame($a, $b);
     }
 
+    public function test_empty_slug_string_is_derived_from_name(): void
+    {
+        // واجهة الإدارة ترسل slug فارغًا دائمًا؛ يجب اشتقاقه من الاسم لا أن يصير "item".
+        Sanctum::actingAs($this->admin());
+
+        $slug = $this->postJson('/api/v1/categories', ['name' => 'إلكترونيات', 'slug' => ''])
+            ->assertCreated()->json('data.slug');
+
+        $this->assertNotSame('item', $slug);
+        $this->assertNotEmpty($slug);
+    }
+
+    public function test_null_sort_order_is_rejected_cleanly_not_500(): void
+    {
+        // sort_order عمود NOT NULL بافتراضي 0؛ null صريح يُرفض بـ 422 لا 500.
+        Sanctum::actingAs($this->admin());
+        $this->postJson('/api/v1/categories', ['name' => 'x', 'sort_order' => null])
+            ->assertUnprocessable()->assertJsonValidationErrors('sort_order');
+    }
+
     public function test_can_create_nested_category(): void
     {
         Sanctum::actingAs($this->admin());

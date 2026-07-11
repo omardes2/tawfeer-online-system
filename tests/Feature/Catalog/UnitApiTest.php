@@ -69,4 +69,19 @@ class UnitApiTest extends TestCase
         $this->postJson('/api/v1/units', ['name' => 'x', 'code' => 'NEG', 'conversion_factor' => 0])
             ->assertUnprocessable()->assertJsonValidationErrors('conversion_factor');
     }
+
+    public function test_null_not_null_field_is_rejected_cleanly_not_500(): void
+    {
+        // الحقول NOT NULL ذات الافتراضي (conversion_factor) لا تقبل null صراحةً → 422 لا 500.
+        Sanctum::actingAs($this->admin());
+        $this->postJson('/api/v1/units', ['name' => 'x', 'code' => 'NULLCF', 'conversion_factor' => null])
+            ->assertUnprocessable()->assertJsonValidationErrors('conversion_factor');
+    }
+
+    public function test_omitting_conversion_factor_uses_default_one(): void
+    {
+        Sanctum::actingAs($this->admin());
+        $this->postJson('/api/v1/units', ['name' => 'x', 'code' => 'DEFCF'])->assertCreated();
+        $this->assertDatabaseHas('units', ['code' => 'DEFCF', 'conversion_factor' => 1]);
+    }
 }

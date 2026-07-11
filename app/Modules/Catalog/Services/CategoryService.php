@@ -51,7 +51,10 @@ class CategoryService
 
     private function resolveSlug(array $data, ?Category $category = null): string
     {
-        $source = $data['slug'] ?? $data['name'] ?? ($category?->name ?? '');
+        // slug فارغ من النموذج يُعامل كغائب فيُشتقّ من الاسم.
+        $source = filled($data['slug'] ?? null)
+            ? $data['slug']
+            : ($data['name'] ?? $category?->name ?? '');
 
         return SlugGenerator::make(Category::class, $source, $category?->id);
     }

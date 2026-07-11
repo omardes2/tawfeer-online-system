@@ -11,7 +11,8 @@ class BrandService
     public function create(array $data): Brand
     {
         return DB::transaction(function () use ($data) {
-            $data['slug'] = SlugGenerator::make(Brand::class, $data['slug'] ?? $data['name']);
+            $source = filled($data['slug'] ?? null) ? $data['slug'] : $data['name'];
+            $data['slug'] = SlugGenerator::make(Brand::class, $source);
 
             return Brand::create($data);
         });
@@ -21,7 +22,8 @@ class BrandService
     {
         return DB::transaction(function () use ($brand, $data) {
             if (isset($data['name']) || isset($data['slug'])) {
-                $data['slug'] = SlugGenerator::make(Brand::class, $data['slug'] ?? $data['name'] ?? $brand->name, $brand->id);
+                $source = filled($data['slug'] ?? null) ? $data['slug'] : ($data['name'] ?? $brand->name);
+                $data['slug'] = SlugGenerator::make(Brand::class, $source, $brand->id);
             }
 
             $brand->update($data);
