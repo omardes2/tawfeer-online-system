@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.1 (Branches, Warehouses, Storage Locations)
+- Migrations: extend `branches` (email, tax_number, default_currency_id,
+  default_warehouse_id, timezone); new `branch_settings`, `warehouses`,
+  `warehouse_locations` (deferred FKs for geography/currency per design).
+- Models: `Warehouse`, `WarehouseLocation`, `BranchSetting` (Foundation
+  module) + `Branch` relations; UUID, SoftDeletes, Auditable as applicable.
+- API (`/api/v1`): full CRUD for branches, warehouses, and nested
+  warehouse locations — UUID route binding, scoped nested binding, atomic
+  transactions, single-default enforcement per scope.
+- RBAC: 12 granular `settings.{branches,warehouses,warehouse_locations}.*`
+  permissions (ADR-021), seeded and granted to admin/manager/warehouse.
+- Seeders: `StructurePermissionSeeder`, `WarehouseSeeder` (default warehouse
+  linked to the default branch).
+- Tests: 25 feature tests (58 total passing); verified live via the server.
+
 ### Added — Phase 1.5 (Business Analysis & Design)
 - `docs/DECISIONS.md`: 22 architecture decision records + canonical status
   vocabularies (single source of truth) — WAC costing, stock buckets,

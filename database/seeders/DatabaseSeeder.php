@@ -10,7 +10,7 @@ class DatabaseSeeder extends Seeder
      * Seed the application's database.
      *
      * ترتيب مقصود: الفرع أولًا، ثم الأدوار/الصلاحيات، ثم الحالات والإعدادات،
-     * ثم مستخدم المدير (يعتمد على الفرع والدور).
+     * ثم مستخدم المدير (يعتمد على الفرع والدور)، ثم أسس Phase 2.1.
      */
     public function run(): void
     {
@@ -20,6 +20,9 @@ class DatabaseSeeder extends Seeder
             StatusSeeder::class,
             SettingsSeeder::class,
             AdminUserSeeder::class,
+            // Phase 2.1 — البنية التنظيمية
+            StructurePermissionSeeder::class,
+            WarehouseSeeder::class,
         ]);
     }
 }
