@@ -5,6 +5,7 @@ namespace Tests\Feature\Admin;
 use App\Models\User;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\ProductTag;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Foundation\Models\Branch;
 use Database\Seeders\DatabaseSeeder;
@@ -64,6 +65,20 @@ class ProductAdminWebTest extends TestCase
         $res = $this->actingAs($this->admin())->post('/admin/products', $this->fields());
         $res->assertRedirect();
         $this->assertDatabaseHas('products', ['sku' => 'WEB-1', 'is_active' => true]);
+    }
+
+    public function test_admin_form_can_clear_all_tags(): void
+    {
+        $product = Product::factory()->create();
+        $tag = ProductTag::factory()->create();
+        $product->tags()->attach($tag->id);
+
+        // النموذج بلا tag_ids (أُلغي تحديد الكل) يجب أن يمسح الوسوم.
+        $this->actingAs($this->admin())->put('/admin/products/'.$product->uuid, $this->fields([
+            'sku' => $product->sku,
+        ]))->assertRedirect();
+
+        $this->assertSame(0, $product->fresh()->tags()->count());
     }
 
     public function test_admin_uploads_image_via_web(): void

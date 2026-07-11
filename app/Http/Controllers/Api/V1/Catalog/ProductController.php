@@ -22,7 +22,7 @@ class ProductController extends Controller
     {
         $this->authorize('viewAny', Product::class);
 
-        $query = Product::query()->with(['category', 'brand', 'unit', 'primaryImage']);
+        $query = Product::query()->with(['category', 'brand', 'unit']);
 
         if ($request->filled('category')) {
             $query->where('category_id', Category::where('uuid', $request->input('category'))->value('id'));

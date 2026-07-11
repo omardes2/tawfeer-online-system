@@ -48,7 +48,7 @@ class ProductController extends Controller
     public function store(StoreProductRequest $request): RedirectResponse
     {
         $this->authorize('create', Product::class);
-        $product = $this->service->create($request->validated());
+        $product = $this->service->create($this->withRelationSets($request));
 
         return redirect()->route('admin.products.edit', $product)->with('success', __('تم إنشاء المنتج. يمكنك الآن رفع الصور.'));
     }
@@ -63,9 +63,21 @@ class ProductController extends Controller
     public function update(UpdateProductRequest $request, Product $product): RedirectResponse
     {
         $this->authorize('update', $product);
-        $this->service->update($product, $request->validated());
+        $this->service->update($product, $this->withRelationSets($request));
 
         return redirect()->route('admin.products.index')->with('success', __('تم تحديث المنتج.'));
+    }
+
+    /**
+     * النموذج يمثّل المجموعة الكاملة للوسوم/السمات؛ نمرّرها دائمًا (حتى فارغة)
+     * ليتمكّن المستخدم من إزالة الكل — بخلاف دلالة الـAPI الجزئية.
+     */
+    private function withRelationSets(Request $request): array
+    {
+        return array_merge($request->validated(), [
+            'tag_ids' => $request->input('tag_ids', []),
+            'attribute_ids' => $request->input('attribute_ids', []),
+        ]);
     }
 
     public function destroy(Product $product): RedirectResponse
