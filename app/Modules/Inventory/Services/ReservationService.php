@@ -59,4 +59,27 @@ class ReservationService
             return $reservation;
         });
     }
+
+    /**
+     * استهلاك الحجز عند الشحن (ADR-009): يخفّض دلو reserved ويضع الحجز في حالة consumed.
+     * الخصم النهائي من on_hand (sale_out/COGS) يجريه المستهلك (OrderService) عبر issue().
+     */
+    public function consume(StockReservation $reservation): StockReservation
+    {
+        if ($reservation->status !== 'active') {
+            throw ValidationException::withMessages(['status' => __('لا يمكن استهلاك حجز غير نشط.')]);
+        }
+
+        return DB::transaction(function () use ($reservation) {
+            $this->inventory->release($reservation->variant, $reservation->warehouse, (float) $reservation->qty, [
+                'reference_type' => StockReservation::class,
+                'reference_id' => $reservation->id,
+                'reason' => 'consume',
+            ]);
+
+            $reservation->update(['status' => 'consumed', 'released_at' => now()]);
+
+            return $reservation;
+        });
+    }
 }

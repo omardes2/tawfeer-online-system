@@ -19,6 +19,8 @@ use App\Http\Controllers\Api\V1\Purchasing\GoodsReceiptController;
 use App\Http\Controllers\Api\V1\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\Purchasing\SupplierController;
 use App\Http\Controllers\Api\V1\Purchasing\SupplierReturnController;
+use App\Http\Controllers\Api\V1\Sales\OrderController;
+use App\Http\Controllers\Api\V1\Sales\OrderTransitionController;
 use App\Http\Controllers\Api\V1\WarehouseController;
 use App\Http\Controllers\Api\V1\WarehouseLocationController;
 use App\Http\Resources\UserResource;
@@ -155,6 +157,26 @@ Route::prefix('v1')->group(function () {
             Route::get('returns/{supplierReturn}', [SupplierReturnController::class, 'show']);
             Route::post('returns/{supplierReturn}/approve', [SupplierReturnController::class, 'approve']);
             Route::post('returns/{supplierReturn}/post', [SupplierReturnController::class, 'post']);
+        });
+
+        /*
+        | Phase 2.6 — المبيعات (طلبات البيع)
+        | آلة حالات ADR-010؛ الحجز/الاستهلاك/التحرير حصريًا عبر محرّك المخزون (ADR-009).
+        */
+        Route::prefix('sales')->group(function () {
+            Route::get('orders', [OrderController::class, 'index']);
+            Route::post('orders', [OrderController::class, 'store']);
+            Route::get('orders/{order}', [OrderController::class, 'show']);
+            Route::match(['put', 'patch'], 'orders/{order}', [OrderController::class, 'update']);
+            Route::delete('orders/{order}', [OrderController::class, 'destroy']);
+
+            Route::post('orders/{order}/confirm', [OrderTransitionController::class, 'confirm']);
+            Route::post('orders/{order}/reserve', [OrderTransitionController::class, 'reserve']);
+            Route::post('orders/{order}/prepare', [OrderTransitionController::class, 'prepare']);
+            Route::post('orders/{order}/ready', [OrderTransitionController::class, 'ready']);
+            Route::post('orders/{order}/ship', [OrderTransitionController::class, 'ship']);
+            Route::post('orders/{order}/deliver', [OrderTransitionController::class, 'deliver']);
+            Route::post('orders/{order}/cancel', [OrderTransitionController::class, 'cancel']);
         });
 
     });

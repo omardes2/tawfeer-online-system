@@ -200,6 +200,18 @@
 - **التكلفة المُحمّلة (Landed Cost — BR-PUR-06):** `goods_receipts.additional_cost` تُوزَّع على البنود بنسبة قيمة السطر قبل احتساب WAC.
 - **FK مؤجّلة:** `suppliers.governorate_id/city_id/currency_id` (جداولها غير مُنشأة) — أعمدة nullable بلا قيد الآن.
 
+## ADR-026 — مخطط طلبات البيع (Sales Orders Schema) [مُعتمد في Phase 2.6]
+- **السياق:** وثائق التصميم المجمّدة (`PHASE_2_DESIGN`, `DATA_DICTIONARY`, `DESIGN_REVIEW §9`) تحصر Phase 2 في 6 دفعات تنتهي عند المخزون وتؤجّل الطلبات إلى "Phase 3" دون مخطط جداول؛ **قواعد الطلب مجمّدة** (ADR-009/010/010a، BR-ORD-01…18، مفردات الحالات). يُنزِل هذا القرار تلك القواعد إلى مخطط تنفيذي (وثيقة `PHASE_2_6_SALES_ORDERS_DESIGN.md`) — لا إعادة تصميم.
+- **الكيانات:** `orders` (+`order_items`) + `order_status_history` (append-only). الرأس: uuid + soft-delete + Auditable؛ البنود بلا uuid/soft-delete؛ السجلّ بلا updated_at/soft-delete.
+- **الترقيم (ADR-002):** `SO-{YYYY}-{seq}`.
+- **العميل:** **لقطة مضمّنة** (`customer_name/phone/email/shipping_address`) + عمود `customer_id` **مؤجّل بلا FK** (يُربط بكيان CRM في 2.10) — تفاديًا لبناء CRM قبل أوانه.
+- **آلة الحالات:** تقرأ مفاتيح الحالات من `order_statuses` القابل للإدارة (ADR-017)؛ المنفَّذ: `draft → confirmed → stock_reserved → preparing → ready_to_ship → shipped → delivered` + `cancelled`. الحالات التشغيلية/المرتجعات (`out_for_delivery`/`delayed`/`returned`…) **مُعرّفة في القاموس وممنوعة تنفيذيًا** حتى مراحلها (الشحن/المرتجعات).
+- **توقيت المخزون (ADR-009، إلزامي عبر خدمات المخزون فقط):** حجز عند `stock_reserved` (`reserve`)؛ استهلاك + خصم نهائي بـ WAC عند `shipped` (`consume` + `sale_out`/COGS)؛ تحرير عند الإلغاء قبل الشحن (`release`). لا مسّ مباشر لجداول المخزون.
+- **إضافة `ReservationService::consume`:** تنفيذٌ لمفردة الحجز المجمّدة `active → consumed` ("عند الشحن") — لا ميزة جديدة.
+- **تجميد سعر البند (BR-ORD-18):** `order_items.unit_price` لقطة وقت الإنشاء (لا محرّك تسعير بعد — مُدخل يدويًا).
+- **تسجيل الانتقالات (BR-ORD-09):** كل انتقال يكتب صفًّا في `order_status_history` (from/to/by/note) داخل معاملة.
+- **مؤجّل بخُطّافات:** التسعير/الضريبة/الشحن (2.7)/المدفوعات (2.8)/الاعتراف بالإيراد وCOGS محاسبيًا (2.9)/العمولة/المرتجعات/CRM (2.10)/قنوات web/POS. الأعمدة والمعالم الزمنية جاهزة للربط دون إعادة تصميم؛ **إطلاق أحداث الدومين مؤجّل** إلى مراحلها (تفاديًا لمستمعين فارغين).
+
 ## ADR-024 — المتغيّرات كأساس للمخزون (Variants as Inventory Substrate) [مُعتمد في Phase 2.4]
 - **السياق:** يُمسك المخزون في التصميم لكل **(متغيّر × مستودع)** (§22)، وكل كيانات المخزون تشير إلى `variant_id`→`product_variants` (§17). لكن `product_variants` لم يُبنَ في 2.2/2.3، والمخزون (2.4) يحتاجه. الربط على `product_id` بدلًا منه = **إعادة تصميم** (مرفوض).
 - **القرار:** إنشاء `product_variants` (§17) كأساس أدنى للمخزون:

@@ -32,6 +32,8 @@ class DatabaseSeeder extends Seeder
             InventoryPermissionSeeder::class,
             // Phase 2.5 — المشتريات
             PurchasingPermissionSeeder::class,
+            // Phase 2.6 — المبيعات
+            SalesPermissionSeeder::class,
         ]);
     }
 }

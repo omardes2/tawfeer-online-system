@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\Purchasing\GoodsReceiptController as AdminGoodsRe
 use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController as AdminPurchaseOrderController;
 use App\Http\Controllers\Admin\Purchasing\SupplierController as AdminSupplierController;
 use App\Http\Controllers\Admin\Purchasing\SupplierReturnController as AdminSupplierReturnController;
+use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -78,6 +79,18 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::resource('returns', AdminSupplierReturnController::class)->only(['index', 'create', 'store', 'show']);
         Route::post('returns/{return}/approve', [AdminSupplierReturnController::class, 'approve'])->name('returns.approve');
         Route::post('returns/{return}/post', [AdminSupplierReturnController::class, 'post'])->name('returns.post');
+    });
+
+    // المبيعات (Phase 2.6)
+    Route::prefix('sales')->name('sales.')->group(function () {
+        Route::resource('orders', AdminOrderController::class)->only(['index', 'create', 'store', 'show']);
+        Route::post('orders/{order}/confirm', [AdminOrderController::class, 'confirm'])->name('orders.confirm');
+        Route::post('orders/{order}/reserve', [AdminOrderController::class, 'reserve'])->name('orders.reserve');
+        Route::post('orders/{order}/prepare', [AdminOrderController::class, 'prepare'])->name('orders.prepare');
+        Route::post('orders/{order}/ready', [AdminOrderController::class, 'ready'])->name('orders.ready');
+        Route::post('orders/{order}/ship', [AdminOrderController::class, 'ship'])->name('orders.ship');
+        Route::post('orders/{order}/deliver', [AdminOrderController::class, 'deliver'])->name('orders.deliver');
+        Route::post('orders/{order}/cancel', [AdminOrderController::class, 'cancel'])->name('orders.cancel');
     });
 });
 

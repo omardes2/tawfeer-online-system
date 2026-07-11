@@ -39,6 +39,9 @@
                     @can('purchasing.suppliers.view')
                         <x-nav-link :href="route('admin.purchasing.suppliers.index')" :active="request()->routeIs('admin.purchasing.*')">{{ __('المشتريات') }}</x-nav-link>
                     @endcan
+                    @can('sales.orders.view')
+                        <x-nav-link :href="route('admin.sales.orders.index')" :active="request()->routeIs('admin.sales.*')">{{ __('المبيعات') }}</x-nav-link>
+                    @endcan
                 </div>
             </div>
 

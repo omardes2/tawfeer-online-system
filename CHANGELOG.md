@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.6 (Sales Orders)
+- Design-first: `docs/PHASE_2_6_SALES_ORDERS_DESIGN.md` + ADR-026 lower the
+  frozen order rules (ADR-009/010/010a, BR-ORD-01..18, status vocabulary) into
+  a concrete schema — orders had no frozen table design (deferred to "Phase 3").
+- New `Sales` module (`app/Modules/Sales`): 3 models, `OrderService`, policy,
+  service provider.
+- Tables (3): `orders` (uuid, soft-delete, audited; inline customer snapshot +
+  deferred `customer_id` with no FK), `order_items` (frozen unit_price snapshot
+  per BR-ORD-18; `qty_reserved`/`qty_shipped`), `order_status_history`
+  (append-only transition log per BR-ORD-09). FKs, indexes, composite unique.
+- `OrderService` state machine: draft → confirmed → stock_reserved → preparing
+  → ready_to_ship → shipped → delivered (+cancelled); illegal transitions
+  rejected; every transition recorded, inside `DB::transaction`.
+- Inventory timing per ADR-009, routed **exclusively** through the existing
+  Reservation/Inventory services: reserve on `stock_reserved`, consume + issue
+  (COGS at WAC) on `shipped`, release on cancel-before-ship. Added
+  `ReservationService::consume` implementing the frozen `active → consumed`
+  reservation state.
+- Order statuses extended (`StatusSeeder`) to the full ADR-010 18-state
+  vocabulary (manageable, ADR-017).
+- API `/api/v1/sales/orders`: CRUD + confirm/reserve/prepare/ready/ship/
+  deliver/cancel.
+- RBAC: 9 granular `sales.orders.*` permissions + Policy; `SalesPermissionSeeder`
+  (manager full, sales up to reserve/cancel, warehouse ship/deliver, accountant
+  read-only).
+- Admin UI (Arabic RTL): orders list, create form (dynamic line items), and a
+  detail page with lifecycle action buttons + status history; sales nav link and
+  a shared order status-badge component.
+- Deferred with hooks (no code now): pricing engine, tax, shipping (2.7),
+  payments (2.8), revenue/COGS accounting (2.9), commission, returns, full CRM
+  (2.10), web/POS channels; domain-event emission deferred to its phases.
+- Tests: 17 new (lifecycle inventory effects per ADR-009, cancel releases
+  reservation, illegal-transition guards, price snapshot, authorization, admin
+  RTL render) → 206 passing total.
+
 ### Added — Phase 2.5 (Purchasing: Suppliers, Purchase Orders, Goods Receipts, Supplier Returns)
 - New `Purchasing` module (`app/Modules/Purchasing`): 8 models, 4 services,
   4 policies, and a service provider registering the policies.
