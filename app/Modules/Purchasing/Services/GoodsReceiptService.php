@@ -31,6 +31,14 @@ class GoodsReceiptService
             throw ValidationException::withMessages(['purchase_order' => __('لا يمكن الاستلام قبل اعتماد أمر الشراء.')]);
         }
 
+        // منع ربط بند الاستلام ببند أمر شراء لا يخصّ هذا الأمر (سلامة البيانات).
+        $poItemIds = $po->items()->pluck('id')->all();
+        foreach ($items as $item) {
+            if (! empty($item['purchase_order_item_id']) && ! in_array($item['purchase_order_item_id'], $poItemIds, true)) {
+                throw ValidationException::withMessages(['items' => __('بند أمر شراء غير صالح لهذا الأمر.')]);
+            }
+        }
+
         return DB::transaction(function () use ($po, $data, $items, $year) {
             $receipt = GoodsReceipt::create([
                 'number' => NumberGenerator::next('goods_receipts', 'number', 'GRN', $year),

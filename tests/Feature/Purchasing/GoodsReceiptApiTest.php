@@ -122,6 +122,23 @@ class GoodsReceiptApiTest extends TestCase
         $this->assertEquals('received', $po->fresh()->status);
     }
 
+    public function test_rejects_po_item_from_a_different_order(): void
+    {
+        $po = $this->approvedOrder(50, 8);
+        $otherPo = $this->approvedOrder(50, 8);
+        $foreignItemId = $otherPo->items()->first()->id;
+
+        $this->postJson('/api/v1/purchasing/receipts', [
+            'purchase_order' => $po->uuid,
+            'items' => [[
+                'variant' => $this->variant->uuid,
+                'purchase_order_item_id' => $foreignItemId,
+                'qty_received' => 10,
+                'unit_cost' => 8,
+            ]],
+        ])->assertUnprocessable();
+    }
+
     public function test_cannot_post_twice(): void
     {
         $po = $this->approvedOrder(10, 5);
