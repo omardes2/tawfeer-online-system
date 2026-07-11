@@ -56,33 +56,73 @@
 | [`PROJECT_PLAN.md`](PROJECT_PLAN.md) | خطة التنفيذ على مراحل |
 | [`REQUIREMENTS.md`](REQUIREMENTS.md) | المتطلبات الوظيفية وغير الوظيفية |
 | [`DATABASE_DESIGN.md`](DATABASE_DESIGN.md) | تصميم قاعدة البيانات والعلاقات |
+| [`docs/FOUNDATION_REPORT.md`](docs/FOUNDATION_REPORT.md) | تقرير تجميد الأساس (v0.1.0) |
+| [`CHANGELOG.md`](CHANGELOG.md) | سجلّ التغييرات |
 | [`CLAUDE.md`](CLAUDE.md) | إرشادات العمل داخل المستودع |
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | خطوات النشر والتشغيل |
 
 ---
 
-## البدء السريع (بعد بدء التطوير)
+## متطلبات التشغيل
 
-> ⚠️ المشروع حاليًا في **مرحلة التخطيط** — لم تُكتب أكواد بعد.
+| الأداة | الإصدار |
+|--------|---------|
+| PHP | 8.3+ (مُختبَر على 8.4) |
+| Composer | 2.x |
+| Node.js | 20+ (مُختبَر على 22) |
+| MySQL | 8.x (الإنتاج) |
+
+---
+
+## خطوات التثبيت (Installation)
 
 ```bash
-# استنساخ المشروع
+# 1) استنساخ المشروع
 git clone https://github.com/omardes2/tawfeer-online-system.git
 cd tawfeer-online-system
 
-# تثبيت الاعتماديات (بعد إنشاء مشروع Laravel)
+# 2) تثبيت اعتماديات PHP و JavaScript
 composer install
 npm install
 
-# الإعداد
+# 3) إعداد ملف البيئة ومفتاح التطبيق
 cp .env.example .env
 php artisan key:generate
+
+# 4) ضبط اتصال قاعدة البيانات في .env
+#    الافتراضي MySQL — عدّل DB_DATABASE / DB_USERNAME / DB_PASSWORD
+#    (للتجربة السريعة يمكن استخدام SQLite: DB_CONNECTION=sqlite
+#     ثم:  touch database/database.sqlite )
+
+# 5) تشغيل الهجرات وزرع البيانات الأساسية
 php artisan migrate --seed
 
-# التشغيل
-php artisan serve
-npm run dev
+# 6) بناء الأصول
+npm run build        # أو: npm run dev  (أثناء التطوير)
+
+# 7) تشغيل الخادم
+php artisan serve     # http://127.0.0.1:8000
 ```
+
+### حساب المدير الافتراضي (للتطوير)
+| الحقل | القيمة |
+|------|--------|
+| البريد | `admin@tawfeer.online` |
+| كلمة المرور | `password` |
+
+> ⚠️ غيّر كلمة المرور فورًا في أي بيئة غير تطويرية.
+
+### التحقّق السريع
+```bash
+php artisan test                       # 33 اختبارًا يجب أن تنجح
+curl http://127.0.0.1:8000/api/v1/health   # {"status":"ok",...}
+```
+
+### نقاط API الأساسية
+| الطريقة | المسار | الوصف | الحماية |
+|:------:|--------|-------|:------:|
+| GET | `/api/v1/health` | فحص صحّة الخدمة | عام |
+| GET | `/api/v1/me` | المستخدم الحالي + أدواره وصلاحياته | Sanctum |
 
 ---
 
@@ -108,9 +148,11 @@ npm run dev
 
 ## الحالة الحالية
 
-🟡 **مرحلة التخطيط والتوثيق** — يتم إعداد الوثائق قبل بدء البرمجة.
+🟢 **الأساس مُجمَّد — `v0.1.0-foundation`** (المرحلة 1 مكتملة).
 
-راجع [`PROJECT_PLAN.md`](PROJECT_PLAN.md) لمعرفة المراحل القادمة.
+المرحلة 1 (التأسيس) منجزة ومُختبَرة (33 اختبارًا ناجحًا). التالي: **المرحلة 2 — الكتالوج والمخزون**.
+
+راجع [`docs/FOUNDATION_REPORT.md`](docs/FOUNDATION_REPORT.md) لتقرير التأسيس، و[`PROJECT_PLAN.md`](PROJECT_PLAN.md) للمراحل القادمة.
 
 ---
 
