@@ -33,7 +33,7 @@ class WarehouseController extends Controller
             $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"));
         }
 
-        return WarehouseResource::collection($query->latest('id')->paginate($request->integer('per_page', 15)));
+        return WarehouseResource::collection($query->latest('id')->paginate($this->perPage()));
     }
 
     public function store(StoreWarehouseRequest $request): WarehouseResource

@@ -27,7 +27,7 @@ class BranchController extends Controller
             $query->where(fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"));
         }
 
-        return BranchResource::collection($query->latest('id')->paginate($request->integer('per_page', 15)));
+        return BranchResource::collection($query->latest('id')->paginate($this->perPage()));
     }
 
     public function store(StoreBranchRequest $request): BranchResource

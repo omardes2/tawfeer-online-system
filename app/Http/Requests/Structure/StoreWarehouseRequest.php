@@ -28,11 +28,12 @@ class StoreWarehouseRequest extends FormRequest
             'branch' => ['required', 'string', 'exists:branches,uuid'],
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
             'name' => ['required', 'string', 'max:120'],
+            // الفرادة تشمل الصفوف المحذوفة ناعمًا لتطابق قيد قاعدة البيانات
+            // unique(branch_id, code) وتفادي انتهاكه وقت الإدراج (Soft Delete).
             'code' => [
                 'required', 'string', 'max:30',
                 Rule::unique('warehouses', 'code')
-                    ->where('branch_id', $this->input('branch_id'))
-                    ->whereNull('deleted_at'),
+                    ->where('branch_id', $this->input('branch_id')),
             ],
             'type' => ['nullable', Rule::in(['main', 'transit', 'virtual', 'damaged'])],
             'address' => ['nullable', 'string', 'max:255'],

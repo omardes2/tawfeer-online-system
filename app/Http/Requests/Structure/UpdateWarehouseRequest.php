@@ -18,11 +18,11 @@ class UpdateWarehouseRequest extends FormRequest
 
         return [
             'name' => ['sometimes', 'required', 'string', 'max:120'],
+            // الفرادة تشمل الصفوف المحذوفة ناعمًا لتطابق قيد قاعدة البيانات.
             'code' => [
                 'sometimes', 'required', 'string', 'max:30',
                 Rule::unique('warehouses', 'code')
                     ->where('branch_id', $warehouse->branch_id)
-                    ->whereNull('deleted_at')
                     ->ignore($warehouse->id),
             ],
             'type' => ['sometimes', Rule::in(['main', 'transit', 'virtual', 'damaged'])],

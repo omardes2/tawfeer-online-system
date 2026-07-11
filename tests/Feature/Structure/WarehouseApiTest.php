@@ -175,4 +175,28 @@ class WarehouseApiTest extends TestCase
             'code' => 'WH-NO',
         ])->assertForbidden();
     }
+
+    public function test_per_page_is_capped_to_prevent_memory_exhaustion(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        $response = $this->getJson('/api/v1/warehouses?per_page=100000')->assertOk();
+
+        $this->assertLessThanOrEqual(100, $response->json('meta.per_page'));
+    }
+
+    public function test_soft_deleted_code_conflict_returns_validation_error_not_500(): void
+    {
+        Sanctum::actingAs($this->admin());
+        $branch = Branch::default();
+        $warehouse = Warehouse::factory()->create(['branch_id' => $branch->id, 'code' => 'SOFT-DUP']);
+        $warehouse->delete(); // حذف ناعم — الصف يبقى محجوزًا للكود في قاعدة البيانات
+
+        // يجب أن ترفض بـ 422 (تطابق التحقّق مع قيد الفرادة) لا أن تنهار بـ 500.
+        $this->postJson('/api/v1/warehouses', [
+            'branch' => $branch->uuid,
+            'name' => 'إعادة استخدام',
+            'code' => 'SOFT-DUP',
+        ])->assertUnprocessable()->assertJsonValidationErrors('code');
+    }
 }

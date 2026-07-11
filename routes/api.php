@@ -20,9 +20,9 @@ Route::prefix('v1')->group(function () {
     // فحص صحّة الخدمة — عام.
     Route::get('/health', function () {
         return response()->json([
-            'status'  => 'ok',
+            'status' => 'ok',
             'service' => config('app.name'),
-            'time'    => now()->toIso8601String(),
+            'time' => now()->toIso8601String(),
         ]);
     })->name('api.health');
 

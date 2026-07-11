@@ -26,7 +26,7 @@ class WarehouseLocationController extends Controller
             $query->whereNull('parent_id');
         }
 
-        return WarehouseLocationResource::collection($query->orderBy('code')->paginate($request->integer('per_page', 50)));
+        return WarehouseLocationResource::collection($query->orderBy('code')->paginate($this->perPage(50)));
     }
 
     public function store(StoreWarehouseLocationRequest $request, Warehouse $warehouse): WarehouseLocationResource
