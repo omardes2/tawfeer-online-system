@@ -1,0 +1,78 @@
+<x-app-layout>
+    <x-slot name="header"><h2 class="font-semibold text-xl text-gray-800">{{ $supplier->exists ? __('تعديل مورد') : __('مورد جديد') }}</h2></x-slot>
+    <div class="py-8 max-w-4xl mx-auto sm:px-6 lg:px-8">
+        <div class="bg-white shadow-sm sm:rounded-lg p-6">
+            <x-admin.flash />
+            @php
+                $existingContacts = old('contacts', $supplier->relationLoaded('contacts')
+                    ? $supplier->contacts->map(fn ($c) => ['name' => $c->name, 'position' => $c->position, 'email' => $c->email, 'phone' => $c->phone, 'is_primary' => (bool) $c->is_primary])->all()
+                    : []);
+            @endphp
+            <form method="POST" action="{{ $supplier->exists ? route('admin.purchasing.suppliers.update', $supplier) : route('admin.purchasing.suppliers.store') }}"
+                  class="space-y-5" x-data="{ contacts: @js(array_values($existingContacts)) }">
+                @csrf
+                @if ($supplier->exists) @method('PUT') @endif
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <x-admin.field :label="__('الرمز')" name="code">
+                        <input type="text" name="code" value="{{ old('code', $supplier->code) }}" required class="w-full rounded-md border-gray-300 text-sm" />
+                    </x-admin.field>
+                    <x-admin.field :label="__('الاسم')" name="name">
+                        <input type="text" name="name" value="{{ old('name', $supplier->name) }}" required class="w-full rounded-md border-gray-300 text-sm" />
+                    </x-admin.field>
+                    <x-admin.field :label="__('الاسم القانوني')" name="legal_name">
+                        <input type="text" name="legal_name" value="{{ old('legal_name', $supplier->legal_name) }}" class="w-full rounded-md border-gray-300 text-sm" />
+                    </x-admin.field>
+                    <x-admin.field :label="__('الرقم الضريبي')" name="tax_number">
+                        <input type="text" name="tax_number" value="{{ old('tax_number', $supplier->tax_number) }}" class="w-full rounded-md border-gray-300 text-sm" />
+                    </x-admin.field>
+                    <x-admin.field :label="__('البريد')" name="email">
+                        <input type="email" name="email" value="{{ old('email', $supplier->email) }}" class="w-full rounded-md border-gray-300 text-sm" />
+                    </x-admin.field>
+                    <x-admin.field :label="__('الهاتف')" name="phone">
+                        <input type="text" name="phone" value="{{ old('phone', $supplier->phone) }}" class="w-full rounded-md border-gray-300 text-sm" />
+                    </x-admin.field>
+                    <x-admin.field :label="__('مهلة السداد (أيام)')" name="payment_terms_days">
+                        <input type="number" min="0" name="payment_terms_days" value="{{ old('payment_terms_days', $supplier->payment_terms_days) }}" class="w-full rounded-md border-gray-300 text-sm" />
+                    </x-admin.field>
+                    <x-admin.field :label="__('حدّ الائتمان')" name="credit_limit">
+                        <input type="number" step="0.01" min="0" name="credit_limit" value="{{ old('credit_limit', $supplier->credit_limit) }}" class="w-full rounded-md border-gray-300 text-sm" />
+                    </x-admin.field>
+                </div>
+
+                <x-admin.field :label="__('العنوان')" name="address">
+                    <textarea name="address" rows="2" class="w-full rounded-md border-gray-300 text-sm">{{ old('address', $supplier->address) }}</textarea>
+                </x-admin.field>
+
+                <label class="inline-flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $supplier->exists ? $supplier->is_active : true)) class="rounded border-gray-300" />
+                    {{ __('نشط') }}
+                </label>
+
+                <div class="border-t pt-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-sm font-medium text-gray-700">{{ __('جهات الاتصال') }}</label>
+                        <button type="button" @click="contacts.push({ is_primary: false })" class="text-sm text-indigo-600 hover:underline">+ {{ __('إضافة جهة') }}</button>
+                    </div>
+                    <template x-for="(c, i) in contacts" :key="i">
+                        <div class="flex flex-wrap gap-2 mb-2 items-center">
+                            <input type="text" :name="`contacts[${i}][name]`" x-model="c.name" placeholder="{{ __('الاسم') }}" class="rounded-md border-gray-300 text-sm" />
+                            <input type="text" :name="`contacts[${i}][position]`" x-model="c.position" placeholder="{{ __('المنصب') }}" class="rounded-md border-gray-300 text-sm" />
+                            <input type="text" :name="`contacts[${i}][phone]`" x-model="c.phone" placeholder="{{ __('الهاتف') }}" class="rounded-md border-gray-300 text-sm" />
+                            <input type="email" :name="`contacts[${i}][email]`" x-model="c.email" placeholder="{{ __('البريد') }}" class="rounded-md border-gray-300 text-sm" />
+                            <label class="inline-flex items-center gap-1 text-xs">
+                                <input type="checkbox" :name="`contacts[${i}][is_primary]`" value="1" x-model="c.is_primary" class="rounded border-gray-300" /> {{ __('أساسية') }}
+                            </label>
+                            <button type="button" @click="contacts.splice(i, 1)" class="text-rose-500 text-sm">&times;</button>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('حفظ') }}</button>
+                    <a href="{{ route('admin.purchasing.suppliers.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</x-app-layout>

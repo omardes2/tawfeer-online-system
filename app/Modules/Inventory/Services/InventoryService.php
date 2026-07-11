@@ -66,6 +66,14 @@ class InventoryService
         });
     }
 
+    /** مرتجع مشتريات صادر (purchase_return_out) — يخفّض on_hand بتكلفة WAC (ADR-025). */
+    public function purchaseReturn(ProductVariant $variant, Warehouse $warehouse, float $qty, array $opts = []): InventoryMovement
+    {
+        $this->assertPositive($qty);
+
+        return $this->tx(fn () => $this->record($variant, $warehouse, 'purchase_return_out', 'on_hand', -$qty, null, false, $opts));
+    }
+
     /** حجز — يزيد دلو reserved (لا يمسّ on_hand). */
     public function reserve(ProductVariant $variant, Warehouse $warehouse, float $qty, array $opts = []): InventoryMovement
     {

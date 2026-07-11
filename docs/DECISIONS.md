@@ -152,7 +152,7 @@
 `draft → pending_approval → approved → partially_paid → paid` + `cancelled` (يُعكَس لا يُحذف).
 
 ### حالات المخزون-الحركة (Movement Types)
-`purchase_in` · `sale_out` · `transfer_out` · `transfer_in` · `adjustment_in` · `adjustment_out` · `reserve` · `release` · `return_in` · `damage_out`.
+`purchase_in` · `sale_out` · `transfer_out` · `transfer_in` · `adjustment_in` · `adjustment_out` · `reserve` · `release` · `return_in` · `damage_out` · `purchase_return_out` (مُضاف — ADR-025).
 
 ### حالات الطلب / الدفع / الشحن / العمولة / الإرجاع
 معرّفة في ADR-010 / الأساس / ADR-009 / ADR-012 / ADR-011 على التوالي.
@@ -188,6 +188,17 @@
 - **الأسعار (§16):** الأعمدة موجودة للوفاء بالتصميم، لكن **لا محرّك تسعير في Phase 2.3** (تُترك بقيمها الافتراضية ولا تُدار في نماذج هذه المرحلة). حقول التكلفة محجوبة بـ `pricing.view_cost` (ADR-013).
 - **FK مؤجّلة:** `tax_id` (جدول taxes غير مُنشأ)، و`product_images.variant_id` (المتغيّرات غير مُنشأة) — أعمدة nullable بلا قيد الآن، تُربط في مرحلتها.
 - **الأثر:** لا إعادة تصميم؛ إضافة أعمدة فقط تتبع كل الأعراف (uuid، soft-delete، auditable، RBAC).
+
+## ADR-025 — تفصيل مخطط المشتريات (Purchasing Schema Detail) [مُعتمد في Phase 2.5]
+- **السياق:** `PHASE_2_DESIGN` يفصّل الموردين وجهات الاتصال (§9/§10) فقط؛ أوامر الشراء والاستلام والمرتجعات موصوفة عاليًا في `DATABASE_DESIGN §4` + `BR-PUR`. هذا الـADR يثبّت تفصيلها متّبعًا كل الأعراف (لا إعادة تصميم).
+- **الكيانات:** `purchase_orders` (+`purchase_order_items`)، `goods_receipts` (+`goods_receipt_items`)، `supplier_returns` (+`supplier_return_items`). كلها: رأس بـ uuid + soft-delete + Auditable؛ البنود بلا uuid/soft-delete.
+- **الترقيم (ADR-002):** `PO-{YYYY}-{seq}` · `GRN-{YYYY}-{seq}` · `PRET-{YYYY}-{seq}`.
+- **حالات الاستلام (GRN):** `draft → posted` + `cancelled`. الترحيل يطبّق `purchase_in` عبر `InventoryService` (BR-PUR-04).
+- **حالات مرتجع المشتريات:** `draft → approved → posted` + `cancelled`. الترحيل يطبّق حركة صادرة.
+- **نوع حركة جديد `purchase_return_out`:** مرتجع المشتريات صادر يخفّض `on_hand` (BR-PUR-11)؛ أُضيف إلى مفردات ADR-008 (لم تكن تغطّي مرتجع المورد صراحةً). يُخصم بتكلفة WAC الحالية.
+- **التكامل مع المخزون (إلزامي):** الاستلام والمرتجع **يمرّان حصريًا عبر `InventoryService`** (لا تحديث مباشر لجداول المخزون)، داخل معاملات ذرّية، ويكتبان حركة + قيد دفتر (BR-PUR-13).
+- **التكلفة المُحمّلة (Landed Cost — BR-PUR-06):** `goods_receipts.additional_cost` تُوزَّع على البنود بنسبة قيمة السطر قبل احتساب WAC.
+- **FK مؤجّلة:** `suppliers.governorate_id/city_id/currency_id` (جداولها غير مُنشأة) — أعمدة nullable بلا قيد الآن.
 
 ## ADR-024 — المتغيّرات كأساس للمخزون (Variants as Inventory Substrate) [مُعتمد في Phase 2.4]
 - **السياق:** يُمسك المخزون في التصميم لكل **(متغيّر × مستودع)** (§22)، وكل كيانات المخزون تشير إلى `variant_id`→`product_variants` (§17). لكن `product_variants` لم يُبنَ في 2.2/2.3، والمخزون (2.4) يحتاجه. الربط على `product_id` بدلًا منه = **إعادة تصميم** (مرفوض).

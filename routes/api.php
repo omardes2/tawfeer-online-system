@@ -15,6 +15,10 @@ use App\Http\Controllers\Api\V1\Inventory\InventoryOperationController;
 use App\Http\Controllers\Api\V1\Inventory\InventoryStockController;
 use App\Http\Controllers\Api\V1\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Api\V1\Inventory\StockReservationController;
+use App\Http\Controllers\Api\V1\Purchasing\GoodsReceiptController;
+use App\Http\Controllers\Api\V1\Purchasing\PurchaseOrderController;
+use App\Http\Controllers\Api\V1\Purchasing\SupplierController;
+use App\Http\Controllers\Api\V1\Purchasing\SupplierReturnController;
 use App\Http\Controllers\Api\V1\WarehouseController;
 use App\Http\Controllers\Api\V1\WarehouseLocationController;
 use App\Http\Resources\UserResource;
@@ -122,6 +126,35 @@ Route::prefix('v1')->group(function () {
             Route::delete('adjustments/{adjustment}', [StockAdjustmentController::class, 'destroy']);
             Route::post('adjustments/{adjustment}/approve', [StockAdjustmentController::class, 'approve']);
             Route::post('adjustments/{adjustment}/post', [StockAdjustmentController::class, 'post']);
+        });
+
+        /*
+        | Phase 2.5 — المشتريات (الموردون/أوامر الشراء/الاستلام/المرتجعات)
+        | الصلاحيات عبر Policies؛ الاستلام والمرتجع يمرّان حصريًا عبر محرّك المخزون.
+        */
+        Route::prefix('purchasing')->group(function () {
+            Route::apiResource('suppliers', SupplierController::class);
+
+            Route::get('orders', [PurchaseOrderController::class, 'index']);
+            Route::post('orders', [PurchaseOrderController::class, 'store']);
+            Route::get('orders/{purchaseOrder}', [PurchaseOrderController::class, 'show']);
+            Route::match(['put', 'patch'], 'orders/{purchaseOrder}', [PurchaseOrderController::class, 'update']);
+            Route::delete('orders/{purchaseOrder}', [PurchaseOrderController::class, 'destroy']);
+            Route::post('orders/{purchaseOrder}/submit', [PurchaseOrderController::class, 'submit']);
+            Route::post('orders/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve']);
+            Route::post('orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel']);
+            Route::post('orders/{purchaseOrder}/close', [PurchaseOrderController::class, 'close']);
+
+            Route::get('receipts', [GoodsReceiptController::class, 'index']);
+            Route::post('receipts', [GoodsReceiptController::class, 'store']);
+            Route::get('receipts/{goodsReceipt}', [GoodsReceiptController::class, 'show']);
+            Route::post('receipts/{goodsReceipt}/post', [GoodsReceiptController::class, 'post']);
+
+            Route::get('returns', [SupplierReturnController::class, 'index']);
+            Route::post('returns', [SupplierReturnController::class, 'store']);
+            Route::get('returns/{supplierReturn}', [SupplierReturnController::class, 'show']);
+            Route::post('returns/{supplierReturn}/approve', [SupplierReturnController::class, 'approve']);
+            Route::post('returns/{supplierReturn}/post', [SupplierReturnController::class, 'post']);
         });
 
     });

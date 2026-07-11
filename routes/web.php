@@ -8,6 +8,10 @@ use App\Http\Controllers\Admin\Catalog\ProductTagController;
 use App\Http\Controllers\Admin\Catalog\UnitController;
 use App\Http\Controllers\Admin\Inventory\InventoryController;
 use App\Http\Controllers\Admin\Inventory\StockAdjustmentController as AdminStockAdjustmentController;
+use App\Http\Controllers\Admin\Purchasing\GoodsReceiptController as AdminGoodsReceiptController;
+use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController as AdminPurchaseOrderController;
+use App\Http\Controllers\Admin\Purchasing\SupplierController as AdminSupplierController;
+use App\Http\Controllers\Admin\Purchasing\SupplierReturnController as AdminSupplierReturnController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -56,6 +60,24 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::resource('adjustments', AdminStockAdjustmentController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
         Route::post('adjustments/{adjustment}/approve', [AdminStockAdjustmentController::class, 'approve'])->name('adjustments.approve');
         Route::post('adjustments/{adjustment}/post', [AdminStockAdjustmentController::class, 'post'])->name('adjustments.post');
+    });
+
+    // المشتريات (Phase 2.5)
+    Route::prefix('purchasing')->name('purchasing.')->group(function () {
+        Route::resource('suppliers', AdminSupplierController::class)->except('show');
+
+        Route::resource('orders', AdminPurchaseOrderController::class)->only(['index', 'create', 'store', 'show']);
+        Route::post('orders/{order}/submit', [AdminPurchaseOrderController::class, 'submit'])->name('orders.submit');
+        Route::post('orders/{order}/approve', [AdminPurchaseOrderController::class, 'approve'])->name('orders.approve');
+        Route::post('orders/{order}/cancel', [AdminPurchaseOrderController::class, 'cancel'])->name('orders.cancel');
+        Route::post('orders/{order}/close', [AdminPurchaseOrderController::class, 'close'])->name('orders.close');
+
+        Route::resource('receipts', AdminGoodsReceiptController::class)->only(['index', 'create', 'store', 'show']);
+        Route::post('receipts/{receipt}/post', [AdminGoodsReceiptController::class, 'post'])->name('receipts.post');
+
+        Route::resource('returns', AdminSupplierReturnController::class)->only(['index', 'create', 'store', 'show']);
+        Route::post('returns/{return}/approve', [AdminSupplierReturnController::class, 'approve'])->name('returns.approve');
+        Route::post('returns/{return}/post', [AdminSupplierReturnController::class, 'post'])->name('returns.post');
     });
 });
 

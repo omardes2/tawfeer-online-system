@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.5 (Purchasing: Suppliers, Purchase Orders, Goods Receipts, Supplier Returns)
+- New `Purchasing` module (`app/Modules/Purchasing`): 8 models, 4 services,
+  4 policies, and a service provider registering the policies.
+- Tables (8): `suppliers` (uuid, soft-delete, audited), `supplier_contacts`,
+  `purchase_orders` (+ `purchase_order_items`), `goods_receipts`
+  (+ `goods_receipt_items`), `supplier_returns` (+ `supplier_return_items`);
+  FKs, composite uniques, indexes; geography/currency FKs deferred (ADR-025).
+- ADR-025 (Purchasing schema): PO/GRN/PRET-{YYYY}-{seq} numbering; GRN
+  draft→posted, return draft→approved→posted; new movement type
+  `purchase_return_out`; landed cost allocated by line value before WAC.
+- `PurchaseOrderService`: draft → pending_approval → approved →
+  partially_received → received → closed (+cancelled); editable until
+  approval (BR-PUR-02); cancel blocked once any receipt is posted (BR-PUR-12).
+- `GoodsReceiptService`: no receipt before PO approval (BR-PUR-03); **posting
+  raises stock exclusively through `InventoryService::receive`**, allocating
+  landed cost (`additional_cost`) by line value (BR-PUR-06), incrementing PO
+  line `qty_received` and recomputing PO status (BR-PUR-05).
+- `SupplierReturnService`: **posting reduces stock exclusively through
+  `InventoryService::purchaseReturn`** (`purchase_return_out`, BR-PUR-11);
+  returns exceeding available stock are rejected by the engine.
+- `SupplierService`: single-primary-contact enforcement; contact sync.
+- API `/api/v1/purchasing/*`: suppliers (CRUD), orders (CRUD + submit/approve/
+  cancel/close), receipts (index/show/store/post), returns (index/show/store/
+  approve/post); cost fields gated by `pricing.view_cost` (ADR-013).
+- RBAC: 18 granular `purchasing.*` permissions (ADR-021) + Policies;
+  `PurchasingPermissionSeeder` (admin/manager full, warehouse operational,
+  accountant read-only).
+- Admin UI (Arabic RTL): suppliers list/form (with contacts), purchase orders
+  list/form (dynamic line items)/show (full lifecycle), goods receipts
+  (pick order → receive → post), supplier returns (create/approve/post);
+  purchasing nav link and a shared status-badge component.
+- Tests: 24 new (supplier CRUD/authz, PO lifecycle + state guards, receipt
+  posting raises inventory with landed cost, return posting reduces inventory,
+  cost gating, admin RTL render) → 188 passing total.
+
 ### Added — Phase 2.4 (Inventory, Movements, Reservations, Adjustments)
 - Prerequisite (ADR-024): `product_variants` (§17) as the inventory
   substrate; `ProductService` auto-creates one default variant per product.
