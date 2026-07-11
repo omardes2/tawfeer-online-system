@@ -21,7 +21,7 @@ class InventoryService
     {
         $this->assertPositive($qty);
 
-        return DB::transaction(fn () => $this->record($variant, $warehouse, 'purchase_in', 'on_hand', $qty, $unitCost, true, $opts));
+        return $this->tx(fn () => $this->record($variant, $warehouse, 'purchase_in', 'on_hand', $qty, $unitCost, true, $opts));
     }
 
     /** صرف/بيع (sale_out) — يخصم on_hand بتكلفة WAC (COGS). */
@@ -29,7 +29,7 @@ class InventoryService
     {
         $this->assertPositive($qty);
 
-        return DB::transaction(fn () => $this->record($variant, $warehouse, 'sale_out', 'on_hand', -$qty, null, false, $opts));
+        return $this->tx(fn () => $this->record($variant, $warehouse, 'sale_out', 'on_hand', -$qty, null, false, $opts));
     }
 
     /** تسوية زيادة (adjustment_in). */
@@ -37,7 +37,7 @@ class InventoryService
     {
         $this->assertPositive($qty);
 
-        return DB::transaction(fn () => $this->record($variant, $warehouse, 'adjustment_in', 'on_hand', $qty, $unitCost, $unitCost !== null, $opts));
+        return $this->tx(fn () => $this->record($variant, $warehouse, 'adjustment_in', 'on_hand', $qty, $unitCost, $unitCost !== null, $opts));
     }
 
     /** تسوية نقص (adjustment_out). */
@@ -45,7 +45,7 @@ class InventoryService
     {
         $this->assertPositive($qty);
 
-        return DB::transaction(fn () => $this->record($variant, $warehouse, 'adjustment_out', 'on_hand', -$qty, null, false, $opts));
+        return $this->tx(fn () => $this->record($variant, $warehouse, 'adjustment_out', 'on_hand', -$qty, null, false, $opts));
     }
 
     /** تحويل بين مستودعين — حركتان ذرّيتان (transfer_out ثم transfer_in). */
@@ -57,7 +57,7 @@ class InventoryService
             throw ValidationException::withMessages(['warehouse' => __('لا يمكن التحويل إلى المستودع نفسه.')]);
         }
 
-        return DB::transaction(function () use ($variant, $from, $to, $qty, $opts) {
+        return $this->tx(function () use ($variant, $from, $to, $qty, $opts) {
             $sourceWac = (float) $this->lockedStock($variant->id, $from)->average_cost;
             $out = $this->record($variant, $from, 'transfer_out', 'on_hand', -$qty, null, false, $opts + ['to_warehouse_id' => $to->id]);
             $in = $this->record($variant, $to, 'transfer_in', 'on_hand', $qty, $sourceWac, true, $opts);
@@ -71,7 +71,7 @@ class InventoryService
     {
         $this->assertPositive($qty);
 
-        return DB::transaction(fn () => $this->record($variant, $warehouse, 'reserve', 'reserved', $qty, null, false, $opts));
+        return $this->tx(fn () => $this->record($variant, $warehouse, 'reserve', 'reserved', $qty, null, false, $opts));
     }
 
     /** تحرير حجز — يخصم دلو reserved. */
@@ -79,7 +79,7 @@ class InventoryService
     {
         $this->assertPositive($qty);
 
-        return DB::transaction(fn () => $this->record($variant, $warehouse, 'release', 'reserved', -$qty, null, false, $opts));
+        return $this->tx(fn () => $this->record($variant, $warehouse, 'release', 'reserved', -$qty, null, false, $opts));
     }
 
     /**
@@ -189,5 +189,13 @@ class InventoryService
         if ($qty <= 0) {
             throw ValidationException::withMessages(['qty' => __('الكمية يجب أن تكون أكبر من صفر.')]);
         }
+    }
+
+    /**
+     * معاملة مع إعادة محاولة عند التزاحم/الجمود (deadlock) — مهم للتحويلات المتوازية.
+     */
+    private function tx(callable $callback): mixed
+    {
+        return DB::transaction($callback, 3);
     }
 }
