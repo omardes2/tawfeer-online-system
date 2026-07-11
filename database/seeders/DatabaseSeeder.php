@@ -28,6 +28,8 @@ class DatabaseSeeder extends Seeder
             UnitSeeder::class,
             // Phase 2.3 — المنتجات
             ProductPermissionSeeder::class,
+            // Phase 2.4 — المخزون
+            InventoryPermissionSeeder::class,
         ]);
     }
 }

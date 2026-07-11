@@ -9,6 +9,12 @@ use App\Http\Controllers\Api\V1\Catalog\ProductController;
 use App\Http\Controllers\Api\V1\Catalog\ProductImageController;
 use App\Http\Controllers\Api\V1\Catalog\ProductTagController;
 use App\Http\Controllers\Api\V1\Catalog\UnitController;
+use App\Http\Controllers\Api\V1\Inventory\InventoryLedgerController;
+use App\Http\Controllers\Api\V1\Inventory\InventoryMovementController;
+use App\Http\Controllers\Api\V1\Inventory\InventoryOperationController;
+use App\Http\Controllers\Api\V1\Inventory\InventoryStockController;
+use App\Http\Controllers\Api\V1\Inventory\StockAdjustmentController;
+use App\Http\Controllers\Api\V1\Inventory\StockReservationController;
 use App\Http\Controllers\Api\V1\WarehouseController;
 use App\Http\Controllers\Api\V1\WarehouseLocationController;
 use App\Http\Resources\UserResource;
@@ -91,6 +97,31 @@ Route::prefix('v1')->group(function () {
             Route::post('products/{product}/images', [ProductImageController::class, 'store']);
             Route::post('products/{product}/images/{image}/primary', [ProductImageController::class, 'setPrimary']);
             Route::delete('products/{product}/images/{image}', [ProductImageController::class, 'destroy']);
+        });
+
+        /*
+        | Phase 2.4 — المخزون (أرصدة/حركات/دفتر/عمليات/حجوزات/تسويات)
+        | الصلاحيات عبر Policies وسلاسل صلاحيات دقيقة (ADR-021).
+        */
+        Route::prefix('inventory')->group(function () {
+            Route::get('stocks', [InventoryStockController::class, 'index']);
+            Route::get('movements', [InventoryMovementController::class, 'index']);
+            Route::get('ledger', [InventoryLedgerController::class, 'index']);
+
+            Route::post('receive', [InventoryOperationController::class, 'receive']);
+            Route::post('issue', [InventoryOperationController::class, 'issue']);
+            Route::post('transfer', [InventoryOperationController::class, 'transfer']);
+
+            Route::get('reservations', [StockReservationController::class, 'index']);
+            Route::post('reservations', [StockReservationController::class, 'store']);
+            Route::post('reservations/{reservation}/release', [StockReservationController::class, 'release']);
+
+            Route::get('adjustments', [StockAdjustmentController::class, 'index']);
+            Route::post('adjustments', [StockAdjustmentController::class, 'store']);
+            Route::get('adjustments/{adjustment}', [StockAdjustmentController::class, 'show']);
+            Route::delete('adjustments/{adjustment}', [StockAdjustmentController::class, 'destroy']);
+            Route::post('adjustments/{adjustment}/approve', [StockAdjustmentController::class, 'approve']);
+            Route::post('adjustments/{adjustment}/post', [StockAdjustmentController::class, 'post']);
         });
 
     });

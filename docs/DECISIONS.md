@@ -161,13 +161,13 @@
 `draft → pending_approval → approved → dispatched(in_transit) → received` + `cancelled`.
 > `dispatched` يحرّك الكمية إلى دلو `in_transit` (ADR-007)؛ `received` يودعها في مستودع الوجهة. توقيعان منفصلان (إرسال/استلام).
 
-### حالات تسوية الجرد (Stock Adjustment) — مُرسّمة في مراجعة التصميم
-`draft → pending_approval → approved(applied)` + `cancelled`.
-> التطبيق (`applied`) ينتج حركة `adjustment_in`/`adjustment_out` وقيد دفتر، داخل معاملة.
+### حالات تسوية الجرد (Stock Adjustment) — مُرسّمة (متوافقة مع §26)
+`draft → pending_approval → approved → posted` + `cancelled`.
+> `approved` اعتماد إداري (لا أثر على المخزون بعد)؛ `posted` يطبّق الأثر: حركات `adjustment_in`/`adjustment_out` + قيود دفتر، داخل معاملة. لا حذف بعد `posted` (عكس فقط — ADR-016).
 
-### حالات حجز المخزون (Stock Reservation) — مُرسّمة في مراجعة التصميم
-`active → released` | `active → fulfilled` | `active → expired`.
-> `active` = محجوز (`reserved`)؛ `fulfilled` عند الشحن (خصم نهائي)؛ `released`/`expired` يعيدان الكمية للمتاح (ADR-009).
+### حالات حجز المخزون (Stock Reservation) — مُرسّمة (متوافقة مع §25)
+`active → released` | `active → consumed` | `active → expired`.
+> `active` = محجوز (`reserved`)؛ `consumed` عند الشحن (خصم نهائي — Phase 3)؛ `released`/`expired` يعيدان الكمية للمتاح (ADR-009).
 
 ---
 
@@ -188,6 +188,15 @@
 - **الأسعار (§16):** الأعمدة موجودة للوفاء بالتصميم، لكن **لا محرّك تسعير في Phase 2.3** (تُترك بقيمها الافتراضية ولا تُدار في نماذج هذه المرحلة). حقول التكلفة محجوبة بـ `pricing.view_cost` (ADR-013).
 - **FK مؤجّلة:** `tax_id` (جدول taxes غير مُنشأ)، و`product_images.variant_id` (المتغيّرات غير مُنشأة) — أعمدة nullable بلا قيد الآن، تُربط في مرحلتها.
 - **الأثر:** لا إعادة تصميم؛ إضافة أعمدة فقط تتبع كل الأعراف (uuid، soft-delete، auditable، RBAC).
+
+## ADR-024 — المتغيّرات كأساس للمخزون (Variants as Inventory Substrate) [مُعتمد في Phase 2.4]
+- **السياق:** يُمسك المخزون في التصميم لكل **(متغيّر × مستودع)** (§22)، وكل كيانات المخزون تشير إلى `variant_id`→`product_variants` (§17). لكن `product_variants` لم يُبنَ في 2.2/2.3، والمخزون (2.4) يحتاجه. الربط على `product_id` بدلًا منه = **إعادة تصميم** (مرفوض).
+- **القرار:** إنشاء `product_variants` (§17) كأساس أدنى للمخزون:
+  - **متغيّر افتراضي واحد** يُنشأ تلقائيًا لكل منتج عبر `ProductService` (`is_default=true`، يعكس sku المنتج)؛ المنتج البسيط = وحدة تخزين واحدة.
+  - المخزون وكل عملياته تُمسك على مستوى المتغيّر (وفاءً كاملًا للتصميم).
+  - **إدارة المتغيّرات الكاملة** (تعدد المتغيّرات، تركيبات السمات، واجهة المتغيّرات) **مؤجّلة**؛ 2.4 يحتاج **سجلّات** متغيّرات فقط لحمل المخزون.
+- **الترقية:** backfill للمنتجات القائمة بلا متغيّر افتراضي (idempotent).
+- **الأثر:** لا إعادة تصميم؛ إضافة substrate يتبع الأعراف (uuid، soft-delete، auditable).
 
 ## ADR-022 — الجداول الداعمة والكيانات المؤجلة [مُعتمد في مراجعة التصميم]
 - **الجداول الداعمة (Pivots/Children)** خارج الـ27 لكنها جزء طبيعي من Phase 2: `shipping_zone_city`, `shipping_zone_area`, `variant_attribute_value`, `product_tag_links`, `stock_adjustment_items`, `warehouse_transfer_items`. مقبولة ولا تُعدّ توسّعًا للنطاق.

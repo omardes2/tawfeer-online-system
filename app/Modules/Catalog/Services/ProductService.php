@@ -23,6 +23,7 @@ class ProductService
             $product = Product::create($attributes);
             $product->tags()->sync($tagIds);
             $product->attributes()->sync($attributeIds);
+            $this->ensureDefaultVariant($product);
 
             return $product;
         });
@@ -58,6 +59,23 @@ class ProductService
     public function delete(Product $product): void
     {
         $product->delete();
+    }
+
+    /**
+     * كل منتج يملك متغيّرًا افتراضيًا واحدًا على الأقل — أساس المخزون (ADR-024).
+     */
+    public function ensureDefaultVariant(Product $product): void
+    {
+        if ($product->variants()->exists()) {
+            return;
+        }
+
+        $product->variants()->create([
+            'sku' => $product->sku,
+            'name' => $product->name,
+            'is_default' => true,
+            'is_active' => true,
+        ]);
     }
 
     /**

@@ -37,6 +37,21 @@ class ProductFactory extends Factory
         ];
     }
 
+    public function configure(): static
+    {
+        // كل منتج يحصل على متغيّر افتراضي (ADR-024) كما في ProductService.
+        return $this->afterCreating(function (Product $product) {
+            if (! $product->variants()->exists()) {
+                $product->variants()->create([
+                    'sku' => $product->sku,
+                    'name' => $product->name,
+                    'is_default' => true,
+                    'is_active' => true,
+                ]);
+            }
+        });
+    }
+
     public function active(): static
     {
         return $this->state(fn () => ['status' => 'active', 'is_active' => true]);

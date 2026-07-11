@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.4 (Inventory, Movements, Reservations, Adjustments)
+- Prerequisite (ADR-024): `product_variants` (§17) as the inventory
+  substrate; `ProductService` auto-creates one default variant per product.
+- Tables: `inventory_stocks` (buckets on_hand/reserved/damaged/
+  returned_pending/in_transit + WAC), `inventory_movements` (append-only,
+  10 canonical types), `inventory_ledger` (append-only, running balance +
+  WAC, no updated_at/deleted_at), `stock_reservations`, `stock_adjustments`
+  (+ items). FKs, composite uniques, indexes; order_id deferred (Phase 3).
+- New `Inventory` module (models, services, policies, service provider).
+- `InventoryService` engine: receive/issue/transfer with weighted-average
+  cost recompute (ADR-005), negative-stock prevention per
+  `warehouse.allow_negative` (ADR-007a), every op inside `DB::transaction`
+  with `lockForUpdate`, writing a movement + ledger entry (ADR-008).
+- `ReservationService` (reserve/release on the reserved bucket, blocks
+  reserving beyond available); `StockAdjustmentService` (draft →
+  pending_approval → approved → posted, `ADJ-{YYYY}-{seq}` numbering via
+  `NumberGenerator`, post applies per-item diffs). Full auditability.
+- API `/api/v1/inventory/*`: stocks, movements, ledger, receive, issue,
+  transfer, reservations (create/release), adjustments (CRUD/approve/post);
+  cost fields gated by `pricing.view_cost` (ADR-013).
+- RBAC: 14 granular `inventory.*` permissions (ADR-021) + Policies;
+  `InventoryPermissionSeeder`.
+- Admin UI (Arabic RTL): stock levels, movement log, reservations, an
+  operations page (receive/issue/transfer), and adjustments
+  (create/approve/post); inventory nav link.
+- Tests: 27 new (operations, reservations, adjustments, service unit,
+  admin web) → 164 passing total.
+
 ### Added — Phase 2.3 (Products & Media)
 - Tables: `products` (design §16 + ADR-023 extensions), `product_images`,
   `product_tag_links`, `product_attribute_links` — FKs, composite uniques,
