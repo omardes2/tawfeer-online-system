@@ -395,6 +395,40 @@
 
 ---
 
+## الأحداث المستقرّة المواجِهة للنمو (Growth-facing Stable Events — ADR-032)
+
+> عقد الأسماء الذي يشترك فيه سياق **Growth & Commerce Intelligence** مستقبلًا (بلا تنفيذ لأي وحدة نمو). المرجع: [`GROWTH_COMMERCE_ARCHITECTURE.md`](GROWTH_COMMERCE_ARCHITECTURE.md). حدث بلا مستمع = نقطة امتداد مشروعة. الأحداث تُطلَق `afterCommit`؛ مستمعو النمو **إضافيون** ولا يُفشلون عملية التجارة.
+
+| الاسم المستقر (Growth) | يُعادِل / يُشتقّ من | الحالة الحالية |
+|-----------------------|--------------------|----------------|
+| `CustomerRegistered` | `CustomerCreated` (§1.1) | مُخطَّط (كتالوج) |
+| `CustomerUpdated` | `CustomerUpdated` (§1.2) | مُخطَّط |
+| `CustomerBlocked` | (حظر العميل — BR-CUST-12) | مُخطَّط |
+| `CustomerMerged` | (دمج العميل — BR-CUST-14) | مُخطَّط |
+| `CartCreated` | سلة نشطة تُنشأ (ADR-031) | مُخطَّط |
+| `CartUpdated` | تغيّر بنود السلة | مُخطَّط |
+| `CartItemAdded` | إضافة بند للسلة | مُخطَّط |
+| `CartItemRemoved` | حذف بند من السلة | مُخطَّط |
+| `CartAbandoned` | ≈ `AbandonedCartDetected` (مرشّح) | مُخطَّط |
+| `CheckoutStarted` | بدء إتمام الشراء (3.2) | يُصدَر في 3.2 |
+| `CheckoutCompleted` | إتمام ناجح → طلب (3.2) | يُصدَر في 3.2 |
+| `OrderCreated` | `OrderCreated` (§5.1) | مُخطَّط |
+| `OrderConfirmed` | `OrderConfirmed` (§5.2) | مُخطَّط |
+| `OrderPaid` | ≈ `PaymentReceived`→ حالة دفع الطلب `paid` (§6.1) | مُخطَّط |
+| `OrderCancelled` | `OrderCancelled` (§5.3) | مُخطَّط |
+| `OrderReturned` | `OrderReturned` (§5.7) | مُخطَّط |
+| `ShipmentCreated` | إنشاء شحنة (ADR-027) | مُخطَّط |
+| `ShipmentDelivered` | ≈ `OrderDelivered`/تسليم الشحنة (§5.6) | مُخطَّط |
+| `PaymentCaptured` | ≈ `PaymentReceived` (§6.1) | مُخطَّط |
+| `PaymentRefunded` | `RefundCompleted` (§6.2) | مُخطَّط |
+| `ReviewSubmitted` | (مراجعات المنتج — مستقبلي) | مُخطَّط |
+| `CouponApplied` | (محرّك الكوبونات — سياق النمو) | مُخطَّط |
+| `LoyaltyPointsEarned` | (محرّك الولاء — سياق النمو) | مُخطَّط |
+
+**قواعد التوافق:** حيث يوجد اسم دومين محلي سابق (مثل `CustomerCreated`/`PaymentReceived`)، يبقى **حدثًا واحدًا** ويُنشر باسمه المحلي؛ عند بناء النمو يُوفَّر جسر (bridge) يعيد النشر بالاسم المستقر إن لزم — دون ازدواج منطق أو تعديل الخدمة المُصدِرة (ADR-032). الأسماء الجديدة تمامًا (`Cart*`, `Checkout*`, `ReviewSubmitted`, `CouponApplied`, `LoyaltyPointsEarned`) تُضاف للمفردات عند تفعيلها.
+
+---
+
 ## أحداث مرشّحة لاحقًا (خارج نطاق هذا الإصدار — للتتبّع فقط)
 `LeadCreated` · `OpportunityStageChanged` · `AbandonedCartDetected` · `PayoutRequested` · `ReturnInspected` · `SupplierInvoicePaid` · `ConversationAssigned`. تُوثَّق عند تفعيلها وتُضاف للمفردات إن لزم (قاعدة `DECISIONS.md`).
 

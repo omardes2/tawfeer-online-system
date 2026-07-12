@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Architecture — Growth & Commerce Intelligence readiness (docs only, ADR-032)
+- Documented a future isolated bounded context "Growth & Commerce Intelligence"
+  (smart cart, recommendations, promotions, loyalty/rewards/cashback, coupons,
+  referrals, marketing automation, campaigns, segmentation, analytics) fully
+  decoupled from the Commerce Engine. **No Growth feature is implemented; this is
+  architecture/documentation only.**
+- New `docs/GROWTH_COMMERCE_ARCHITECTURE.md` (canonical reference) + ADR-032 in
+  `docs/DECISIONS.md`; note added to `ARCHITECTURE.md` principle 14.
+- `docs/EVENTS.md`: added the Growth-facing stable domain-event contract
+  (`Cart*`, `Checkout*`, `Order*`, `Shipment*`, `Payment*`, `ReviewSubmitted`,
+  `CouponApplied`, `LoyaltyPointsEarned`) with equivalences to existing local
+  event names — Growth modules subscribe without modifying existing services.
+- Directives captured for future readiness without schema redesign: customer
+  marketing fields via additive migrations only (no change to completed CRM
+  schema); smart-cart/promotion/analytics/checkout extension points; all Growth
+  messaging must go through the existing provider-agnostic Messaging layer.
+- No code, migration, or business-logic change; completed modules untouched.
+
 ### Added — Phase 3.1 (Storefront Cart)
 - New `Store` module (ADR-031): all logic in `CartService`; cart is self-scoped
   to the authenticated user (no policy/route-binding needed — a user only ever
