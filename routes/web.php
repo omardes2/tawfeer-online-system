@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Admin\Accounting\AccountingController as AdminAccountingController;
+use App\Http\Controllers\Admin\Accounting\JournalEntryController as AdminJournalEntryController;
 use App\Http\Controllers\Admin\Catalog\BrandController;
 use App\Http\Controllers\Admin\Catalog\CategoryController;
 use App\Http\Controllers\Admin\Catalog\ProductAttributeController;
@@ -110,6 +112,15 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::resource('payments', AdminPaymentController::class)->only(['index', 'create', 'store', 'show']);
     Route::post('payments/{payment}/capture', [AdminPaymentController::class, 'capture'])->name('payments.capture');
     Route::post('payments/{payment}/refund', [AdminPaymentController::class, 'refund'])->name('payments.refund');
+
+    // المحاسبة (Phase 2.9)
+    Route::prefix('accounting')->name('accounting.')->group(function () {
+        Route::get('accounts', [AdminAccountingController::class, 'accounts'])->name('accounts.index');
+        Route::get('reports/trial-balance', [AdminAccountingController::class, 'trialBalance'])->name('reports.trial_balance');
+        Route::resource('journal', AdminJournalEntryController::class)->only(['index', 'create', 'store', 'show'])->parameters(['journal' => 'journalEntry']);
+        Route::post('journal/{journalEntry}/post', [AdminJournalEntryController::class, 'post'])->name('journal.post');
+        Route::post('journal/{journalEntry}/reverse', [AdminJournalEntryController::class, 'reverse'])->name('journal.reverse');
+    });
 });
 
 require __DIR__.'/auth.php';

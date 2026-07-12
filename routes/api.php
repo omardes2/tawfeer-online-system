@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Accounting\AccountController;
+use App\Http\Controllers\Api\V1\Accounting\JournalEntryController;
+use App\Http\Controllers\Api\V1\Accounting\ReportController;
 use App\Http\Controllers\Api\V1\BranchController;
 use App\Http\Controllers\Api\V1\Catalog\BrandController;
 use App\Http\Controllers\Api\V1\Catalog\CategoryController;
@@ -219,6 +222,24 @@ Route::prefix('v1')->group(function () {
             Route::post('{payment}/capture', [PaymentController::class, 'capture']);
             Route::post('{payment}/refund', [PaymentController::class, 'refund']);
             Route::post('{payment}/callback', [PaymentController::class, 'callback']);
+        });
+
+        /*
+        | Phase 2.9 — المحاسبة (ADR-029/016)
+        | قيد مزدوج؛ قيود غير قابلة للتعديل؛ الأرصدة تُشتقّ من الدفتر؛ العزل عبر AccountingService والأحداث.
+        */
+        Route::prefix('accounting')->group(function () {
+            Route::get('accounts', [AccountController::class, 'index']);
+            Route::post('accounts', [AccountController::class, 'store']);
+            Route::get('accounts/{account}/balance', [AccountController::class, 'balance']);
+
+            Route::get('journal-entries', [JournalEntryController::class, 'index']);
+            Route::post('journal-entries', [JournalEntryController::class, 'store']);
+            Route::get('journal-entries/{journalEntry}', [JournalEntryController::class, 'show']);
+            Route::post('journal-entries/{journalEntry}/post', [JournalEntryController::class, 'post']);
+            Route::post('journal-entries/{journalEntry}/reverse', [JournalEntryController::class, 'reverse']);
+
+            Route::get('reports/trial-balance', [ReportController::class, 'trialBalance']);
         });
 
     });

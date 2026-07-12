@@ -40,6 +40,9 @@ class DatabaseSeeder extends Seeder
             // Phase 2.8 — المدفوعات
             PaymentMethodSeeder::class,
             PaymentPermissionSeeder::class,
+            // Phase 2.9 — المحاسبة
+            ChartOfAccountsSeeder::class,
+            AccountingPermissionSeeder::class,
         ]);
     }
 }

@@ -200,6 +200,16 @@
 - **التكلفة المُحمّلة (Landed Cost — BR-PUR-06):** `goods_receipts.additional_cost` تُوزَّع على البنود بنسبة قيمة السطر قبل احتساب WAC.
 - **FK مؤجّلة:** `suppliers.governorate_id/city_id/currency_id` (جداولها غير مُنشأة) — أعمدة nullable بلا قيد الآن.
 
+## ADR-029 — محرّك المحاسبة بالقيد المزدوج (Double-Entry Accounting Engine) [مُعتمد في Phase 2.9]
+- **السياق:** ADR-016 يفرض قيدًا مزدوجًا وعكسًا لا حذفًا و`journal_lines` بلا soft-delete، و BR-ACC-01…11 تحدّد الأحداث المولّدة للقيود والتوازن والعزل عبر الأحداث. لا مخطط جداول مجمّد؛ اعتمد المالك معمارية صريحة. لا إعادة تصميم.
+- **الكيانات:** `accounts` (دليل حسابات شجري، أنواع asset/liability/equity/revenue/expense، أوراق قابلة للترحيل)، `fiscal_years` + `accounting_periods` (تعدد السنوات — المتطلّب 7)، `journal_entries` (uuid، `JE-{YYYY}-{seq}`، draft→posted)، `journal_lines` (append-only بلا updated_at/soft-delete — مصدر الحقيقة).
+- **القيد المزدوج (المتطلّب 1/3، BR-ACC-10):** كل قيد سطراه ≥2، كل سطر مدين XOR دائن، ومجموع المدين = مجموع الدائن (يُرفض غير المتوازن). الترحيل داخل معاملة.
+- **عدم القابلية للتعديل (المتطلّب 2/8، BR-ACC-09):** القيد المُرحّل و`journal_lines` غير قابلة للتعديل/الحذف (حرّاس على مستوى النموذج). التصحيح **بقيد عاكس فقط** يقلب المدين/الدائن ويشير للأصل عبر `reverses_entry_id`؛ حالة "معكوس" تُشتقّ (لا نعدّل الأصل).
+- **الأرصدة مشتقّة (المتطلّب 4):** رصيد أي حساب = Σ(مدين)−Σ(دائن) للسطور المُرحّلة (بطبيعته)، وميزان المراجعة يُبنى من الدفتر. **لا رصيد مخزَّن.**
+- **العزل عبر الأحداث (المتطلّب 6، BR-ACC-11):** `AccountingService` يحوي كل المنطق؛ حدث `FinancialEventOccurred` تُطلقه الوحدات، ومستمع `PostFinancialEventToLedger` (متزامن) يولّد القيد عبر `AccountingService::recordEvent` بخريطة حسابات من `config/accounting.php`. المحاسبة لا تعرف الوحدات؛ التكامل مع المبيعات/المشتريات/المخزون/المدفوعات/الاسترداد/الضرائب/الشحن **مستقبلي** بإضافة خرائط أحداث دون تعديل الكود (المتطلّب 5/7).
+- **الصلاحيات:** `accounting.accounts.{view,manage}`، `accounting.journal.{view,create,post,reverse}`، `accounting.reports.view` (ADR-021)؛ للمدير والمحاسب.
+- **مؤجّل بخُطّافات:** الخزائن/البنوك التفصيلية، الضريبة الفعلية، القوائم المالية الكاملة، تعدد العملات التشغيلي، وربط أحداث الوحدات فعليًا — كلٌّ في مرحلته دون إعادة تصميم.
+
 ## ADR-028 — مخطط المدفوعات وطبقة تكامل المزوّدين (Payments Schema & Provider Integration) [مُعتمد في Phase 2.8]
 - **السياق:** لا مخطط جداول مجمّد للمدفوعات؛ المجمّد: مفردات `payment_statuses` (unpaid/partially_paid/paid/refunded)، ADR-016 (خطّافات محاسبية مؤجّلة)، ADR-018 (أحداث)، Idempotency-Key. اعتمد المالك معمارية Provider/Integration صريحة. لا إعادة تصميم لنموذج الأعمال.
 - **طبقة التكامل (المبدأ 13/ADR-019):** عقد موحّد `PaymentProviderInterface` (charge/capture/verify/refund/name)؛ كل المزوّدين خلفه + Driver. `PaymentProviderManager` هو النقطة الوحيدة لإنشاء مزوّد (يربط `payment_methods.driver` بصنف من `config/payments.php`). **المزوّدون يُوصَلون حصريًا عبر هذه الطبقة — لا استدعاء مباشر من متحكم/خدمة (المتطلّب 6).**

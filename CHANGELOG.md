@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.9 (Accounting: Double-Entry Engine)
+- Double-entry accounting engine (ADR-029): immutable journal entries + journal
+  lines as the source of truth; balances always derived from the ledger, never
+  stored.
+- New `Accounting` module: `accounts` (tree chart of accounts, asset/liability/
+  equity/revenue/expense), `fiscal_years` + `accounting_periods` (multi-year
+  ready), `journal_entries` (JE-{YYYY}-{seq}, draft→posted), `journal_lines`
+  (append-only, no updated_at/soft-delete). Chart of accounts + FY 2026 seeded.
+- `AccountingService` holds all logic: createEntry (balanced, each line debit XOR
+  credit, postable leaf accounts), post (draft→posted, open FY/period), reverse
+  (reverse-not-delete — a new mirrored entry linking the original; "reversed" is
+  derived, original never modified), recordEvent (config-driven account map),
+  accountBalance + trialBalance derived from posted lines.
+- Immutability enforced at the model level: posted entries and journal lines
+  cannot be updated or deleted; corrections are made only via reversing entries
+  (BR-ACC-08/09).
+- Isolation via events (BR-ACC-11): business modules dispatch
+  `FinancialEventOccurred`; a synchronous `PostFinancialEventToLedger` listener
+  generates the journal entry through `AccountingService`. Accounting knows
+  nothing about business modules — future integration with Sales/Purchasing/
+  Inventory/Payments/Refunds/Taxes/Shipping is a config event-map entry, no code
+  change.
+- API `/api/v1/accounting/*`: accounts (+ balance), journal-entries CRUD +
+  post/reverse, reports/trial-balance. RBAC: 7 `accounting.*` permissions +
+  Policy; chart-of-accounts + permission seeders.
+- Admin UI (Arabic RTL): journal entries (list, create with dynamic lines +
+  live balance check, detail with post/reverse + immutability notice), chart of
+  accounts, trial-balance report; accounting nav link.
+- Production-readiness review fix: removed an N+1 in the journal index
+  (is_reversed now uses an eager-loaded relation).
+- Tests: 24 new (balanced entries, unbalanced/both-sided/non-postable rejects,
+  posted + line immutability, reverse-not-delete, ledger-derived balances,
+  event-listener posting, balanced trial balance, authorization, admin RTL) →
+  270 passing total.
+
 ### Added — Phase 2.8 (Payments: Provider Integration Layer, COD, Refunds)
 - Provider/Integration architecture (ADR-028): a single `PaymentProviderInterface`
   (charge/capture/verify/refund) with all providers behind it + a
