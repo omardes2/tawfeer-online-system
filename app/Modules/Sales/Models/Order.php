@@ -28,7 +28,7 @@ class Order extends Model
     protected $fillable = [
         'number', 'branch_id', 'warehouse_id', 'customer_id',
         'customer_name', 'customer_phone', 'customer_email', 'shipping_address',
-        'channel', 'status', 'payment_status', 'assigned_to',
+        'channel', 'status', 'payment_status', 'assigned_to', 'affiliate_id',
         'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'total', 'amount_paid',
         'notes', 'cancel_reason',
         'confirmed_at', 'reserved_at', 'shipped_at', 'delivered_at', 'cancelled_at',
@@ -64,9 +64,21 @@ class Order extends Model
         return $this->belongsTo(User::class, 'assigned_to');
     }
 
+    /** المسوّق المُحيل (Phase 4.1). */
+    public function affiliate(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'affiliate_id');
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    /** سجلّ تغييرات السعر اليدوي غير القابل للتعديل (Phase 4.1). */
+    public function priceChanges(): HasMany
+    {
+        return $this->hasMany(OrderPriceChange::class)->orderBy('id');
     }
 
     public function statusHistory(): HasMany

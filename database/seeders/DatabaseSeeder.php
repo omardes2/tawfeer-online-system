@@ -45,6 +45,8 @@ class DatabaseSeeder extends Seeder
             AccountingPermissionSeeder::class,
             // Phase 2.10 — CRM/العملاء
             CrmPermissionSeeder::class,
+            // Phase 4.1 — عمليات المبيعات (البيع المُساعد)
+            SalesOperationsPermissionSeeder::class,
         ]);
     }
 }

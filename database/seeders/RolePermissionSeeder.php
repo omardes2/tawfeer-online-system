@@ -52,6 +52,11 @@ class RolePermissionSeeder extends Seeder
             'dashboard.view', 'orders.view', 'orders.manage', 'catalog.view',
             'crm.view', 'crm.manage', 'messaging.view', 'messaging.manage',
         ],
+        // مشرف مبيعات (Phase 4.1): يعتمد تعديلات السعر/الخصم فوق الحدود.
+        'sales_supervisor' => [
+            'dashboard.view', 'orders.view', 'orders.manage', 'catalog.view',
+            'crm.view', 'crm.manage', 'messaging.view', 'messaging.manage', 'reports.view',
+        ],
         'accountant' => [
             'dashboard.view', 'accounting.view', 'accounting.manage',
             'orders.view', 'purchasing.view', 'reports.view',

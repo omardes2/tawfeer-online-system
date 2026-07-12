@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\V1\Purchasing\GoodsReceiptController;
 use App\Http\Controllers\Api\V1\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\Purchasing\SupplierController;
 use App\Http\Controllers\Api\V1\Purchasing\SupplierReturnController;
+use App\Http\Controllers\Api\V1\Sales\AssistedOrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderTransitionController;
 use App\Http\Controllers\Api\V1\Shipping\GeographyController;
@@ -187,6 +188,12 @@ Route::prefix('v1')->group(function () {
             Route::post('orders/{order}/ship', [OrderTransitionController::class, 'ship']);
             Route::post('orders/{order}/deliver', [OrderTransitionController::class, 'deliver']);
             Route::post('orders/{order}/cancel', [OrderTransitionController::class, 'cancel']);
+
+            // البيع المُساعد (Phase 4.1 / ADR-037).
+            Route::post('assisted-orders', [AssistedOrderController::class, 'store'])->middleware('can:sales.orders.assist');
+            Route::get('assisted-orders/price-changes', [AssistedOrderController::class, 'priceChanges'])->middleware('can:sales.orders.override_price');
+            Route::post('assisted-orders/price-changes/{priceChange}/approve', [AssistedOrderController::class, 'approve'])->middleware('can:sales.orders.override_price');
+            Route::post('assisted-orders/price-changes/{priceChange}/reject', [AssistedOrderController::class, 'reject'])->middleware('can:sales.orders.override_price');
         });
 
         /*

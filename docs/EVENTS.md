@@ -429,6 +429,14 @@
 
 ---
 
+## أحداث العمليات (Phase 4 — ADR-037)
+
+**Phase 4.1 (مُنفَّذ):** `AssistedOrderCreated` (إنشاء طلب مُساعد من قناة)، `OrderPriceChangeRequested` (تعديل سعر تحت الحد يتطلّب اعتمادًا)، `OrderPriceChangeApproved`/`OrderPriceChangeRejected` (قرار المشرف) — نقاط امتداد تُستهلك محاسبيًا/عموليًا في 4.2/4.6.
+
+**Phase 4.2–4.7 (مُخطَّط):** `CommissionAccrued`/`AffiliateEarningAccrued` (عند التسليم)، `CommissionBecameEligible`/`AffiliateEarningBecameEligible` (عند التسوية)، `…Approved`/`…Paid`/`…Reversed`؛ `DeliveryExceptionRaised`/`…Resolved`؛ `ReturnRequested`/`ReturnApproved`/`ReturnInspected`؛ `DeliveryClaim{Submitted,Decided,Paid}`؛ `SettlementReconciled`/`OrderSettled`.
+
+---
+
 ## أحداث مرشّحة لاحقًا (خارج نطاق هذا الإصدار — للتتبّع فقط)
 `LeadCreated` · `OpportunityStageChanged` · `AbandonedCartDetected` · `PayoutRequested` · `ReturnInspected` · `SupplierInvoicePaid` · `ConversationAssigned`. تُوثَّق عند تفعيلها وتُضاف للمفردات إن لزم (قاعدة `DECISIONS.md`).
 

@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4 design + Phase 4.1 (Assisted Sales)
+- Phase 4 (Operations: assisted sales, affiliate, delivery ops, returns, claims,
+  settlements) design document `docs/PHASE_4_OPERATIONS_DESIGN.md` + ADR-037,
+  broken into approvable sub-phases 4.1–4.7. No blocking contradictions found.
+- **Phase 4.1 — Assisted/manual order entry:** `AssistedOrderService` creates an
+  order from a channel by **reusing `OrderService::create`** (reservation/state/
+  price-snapshot) and `CustomerService` (search/create by normalized phone) — no
+  duplicated business logic; thin controller.
+- Channel attribution: `orders.channel` vocabulary extended (whatsapp/instagram/
+  messenger/phone/other); `orders.affiliate_id` for marketer attribution (the
+  marketer/wallet entity comes in 4.2).
+- Manual price edits with full snapshots (additive columns on `order_items`:
+  retail/wholesale-cost/reason/approved-by) and an **immutable
+  `order_price_changes` ledger**. Approval required when a line price is below
+  `min_price` or below wholesale cost, unless the actor holds
+  `sales.orders.override_price` (BR-EMP-05/BR-PRICE-06); supervisors approve/reject
+  pending changes.
+- New `sales_supervisor` role; `sales.orders.{assist,override_price}` permissions
+  (ADR-021); domain events `AssistedOrderCreated`, `OrderPriceChange{Requested,
+  Approved,Rejected}`.
+- API: `POST /api/v1/sales/assisted-orders`, `GET/POST
+  .../price-changes[/{id}/approve|reject]`.
+- Additive schema only; no completed module redesigned.
+- Tests: 8 new assisted-sales tests → 357 passing. Pint clean.
+
 ### Added — Phase 3.5 (Authentication & Identity)
 - Completes the auth/identity layer on top of the 3.4 account (ADR-036); thin
   controllers, service-oriented, reuses CustomerService/CartService — no
