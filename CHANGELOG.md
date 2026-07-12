@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 3.2 (Checkout)
+- `CheckoutService` (ADR-033): pure orchestration converting the active cart into
+  a sales Order via existing services — no new business logic, no new tables.
+  Authenticated-only (self-scoped, consistent with the 3.1 cart), single atomic
+  `POST /api/v1/store/checkout`, depth "order + payment initiation".
+- Flow (one transaction): read cart + reject empty → re-validate each line is
+  sellable/available (stock may change after add) → derive branch/warehouse
+  (branch default warehouse) → `OrderService::create` (customer snapshot + cart
+  lines, `channel=web`) → `confirm` → `reserveStock` (**reflects on inventory —
+  Phase 3 acceptance criterion**) → `PaymentService::initiate` (COD stays pending
+  until collection at delivery) → mark cart `converted`.
+- Stable domain events (ADR-032): `CheckoutStarted` (before the transaction) and
+  `CheckoutCompleted` (after successful commit) — Growth extension points, no
+  listeners today.
+- `CheckoutRequest` (shipping snapshot + `payment_method` exists/active),
+  `CheckoutResource` (order + payment summary). Added a public
+  `CartService::assertPurchasable` for reuse (no behavior change to 3.1).
+- Tests: 9 new (guest denied, empty-cart rejected, successful checkout creates a
+  reserved order + payment, inventory reservation reflected, cart converted +
+  fresh cart next, inactive/unknown payment method rejected, stock-dropped
+  rejection, events dispatched) → 308 passing total.
+
 ### Architecture — Growth & Commerce Intelligence readiness (docs only, ADR-032)
 - Documented a future isolated bounded context "Growth & Commerce Intelligence"
   (smart cart, recommendations, promotions, loyalty/rewards/cashback, coupons,

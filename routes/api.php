@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\V1\Sales\OrderTransitionController;
 use App\Http\Controllers\Api\V1\Shipping\GeographyController;
 use App\Http\Controllers\Api\V1\Shipping\ShipmentController;
 use App\Http\Controllers\Api\V1\Store\CartController;
+use App\Http\Controllers\Api\V1\Store\CheckoutController;
 use App\Http\Controllers\Api\V1\WarehouseController;
 use App\Http\Controllers\Api\V1\WarehouseLocationController;
 use App\Http\Resources\UserResource;
@@ -271,6 +272,9 @@ Route::prefix('v1')->group(function () {
             Route::match(['put', 'patch'], 'cart/items/{variant}', [CartController::class, 'updateItem']);
             Route::delete('cart/items/{variant}', [CartController::class, 'removeItem']);
             Route::delete('cart', [CartController::class, 'clear']);
+
+            // Phase 3.2 — إتمام الشراء: تحويل السلة إلى طلب (ADR-033).
+            Route::post('checkout', [CheckoutController::class, 'store']);
         });
 
     });

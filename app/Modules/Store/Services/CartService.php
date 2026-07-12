@@ -93,6 +93,13 @@ class CartService
         return (float) $stocks->sum(fn ($s) => (float) $s->on_hand - (float) $s->reserved);
     }
 
+    /** التحقّق أن المتغيّر قابل للبيع ومتوفّر بالكمية — يُعاد استخدامه عند إتمام الشراء (3.2). */
+    public function assertPurchasable(ProductVariant $variant, float $qty): void
+    {
+        $this->assertSellable($variant);
+        $this->assertAvailable($variant, $qty);
+    }
+
     private function assertSellable(ProductVariant $variant): void
     {
         $product = $variant->product;
