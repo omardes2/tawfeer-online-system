@@ -132,5 +132,119 @@
                 </div>
             </div>
         @endif
+
+        {{-- الخطّ الزمني الموحّد --}}
+        <div class="bg-white shadow-sm sm:rounded-lg p-6">
+            <h3 class="font-semibold text-gray-800 mb-3">{{ __('delivery.timeline') }}</h3>
+            <ol class="relative border-s border-gray-200 space-y-4 ps-4">
+                @foreach ($timeline as $item)
+                    <li class="text-sm">
+                        <span class="absolute -start-1.5 mt-1.5 h-3 w-3 rounded-full
+                            @class([
+                                'bg-indigo-500' => $item['type'] === 'status',
+                                'bg-gray-400' => $item['type'] === 'provider_status',
+                                'bg-sky-500' => $item['type'] === 'webhook',
+                                'bg-amber-500' => $item['type'] === 'sync',
+                            ])"></span>
+                        @if ($item['type'] === 'status')
+                            <span class="font-medium text-indigo-700">{{ __('delivery.timeline_status') }}</span>:
+                            {{ $item['from'] ? __('delivery.status.'.$item['from']) : '—' }} → {{ __('delivery.status.'.$item['to']) }}
+                            <span class="text-xs text-gray-400">({{ __('delivery.actor.'.$item['actor_type']) }})</span>
+                            @if ($item['reason_code'])<span class="text-amber-700 text-xs"> — {{ __('delivery.reason_label.'.$item['reason_code']) }}</span>@endif
+                        @elseif ($item['type'] === 'provider_status')
+                            <span class="font-medium text-gray-600">{{ __('delivery.timeline_provider') }}</span>:
+                            <span class="text-gray-500">{{ $item['from'] ?? '—' }} → {{ $item['to'] }}</span>
+                        @else
+                            <span class="font-medium {{ $item['type'] === 'webhook' ? 'text-sky-700' : 'text-amber-700' }}">
+                                {{ $item['type'] === 'webhook' ? __('delivery.timeline_webhook') : __('delivery.timeline_sync') }}</span>:
+                            <span class="text-gray-500">{{ $item['provider_status'] ?? '—' }} ({{ $item['result'] }})</span>
+                        @endif
+                        <span class="block text-xs text-gray-400">{{ optional($item['at'])->format('Y-m-d H:i') }}</span>
+                    </li>
+                @endforeach
+            </ol>
+        </div>
+
+        {{-- الاستثناءات (SLA/تصعيد) --}}
+        <div class="bg-white shadow-sm sm:rounded-lg p-6">
+            <h3 class="font-semibold text-gray-800 mb-3">{{ __('delivery.exceptions') }}</h3>
+            @forelse ($shipment->exceptions as $ex)
+                <div class="border rounded-md p-3 mb-2 text-sm">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="font-medium">{{ $ex->category?->name }}</span>
+                            <span class="ms-2 px-2 py-0.5 rounded text-xs bg-gray-100">{{ __('delivery.status_'.$ex->status) }}</span>
+                            @if ($ex->assignee)<span class="ms-2 text-xs text-gray-500">{{ __('delivery.assigned_to') }}: {{ $ex->assignee->name }}</span>@endif
+                            @if ($ex->sla_due_at)<span class="ms-2 text-xs {{ $ex->sla_due_at->isPast() && $ex->status !== 'resolved' ? 'text-rose-600 font-bold' : 'text-gray-400' }}">{{ __('delivery.sla_due') }}: {{ $ex->sla_due_at->format('Y-m-d H:i') }}</span>@endif
+                        </div>
+                        @can('shipping.delivery.manage')
+                            @if ($ex->status !== 'resolved')
+                                <form method="POST" action="{{ route('admin.shipping.delivery.exceptions.resolve', $ex) }}" class="flex items-center gap-1">
+                                    @csrf
+                                    <input type="text" name="resolution" required placeholder="{{ __('delivery.resolution') }}" class="rounded-md border-gray-300 text-xs w-40">
+                                    <button class="px-2 py-1 bg-emerald-600 text-white text-xs rounded">{{ __('delivery.resolve') }}</button>
+                                </form>
+                            @endif
+                        @endcan
+                    </div>
+                </div>
+            @empty
+                <p class="text-gray-400 text-sm mb-3">{{ __('delivery.no_exceptions') }}</p>
+            @endforelse
+
+            @can('shipping.delivery.manage')
+                <form method="POST" action="{{ route('admin.shipping.delivery.exceptions.open', $shipment) }}" class="flex flex-wrap items-end gap-2 border-t pt-3 mt-2">
+                    @csrf
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">{{ __('delivery.category') }}</label>
+                        <select name="category" class="rounded-md border-gray-300 text-sm">
+                            @foreach ($categories as $c)
+                                <option value="{{ $c->code }}">{{ $c->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">{{ __('delivery.note') }}</label>
+                        <input type="text" name="note" class="rounded-md border-gray-300 text-sm w-48">
+                    </div>
+                    <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('delivery.open_exception') }}</button>
+                </form>
+            @endcan
+        </div>
+
+        {{-- الرسوم المُركّبة (مستقلّة عن المزوّد) --}}
+        <div class="bg-white shadow-sm sm:rounded-lg p-6">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-semibold text-gray-800">{{ __('delivery.fees') }}</h3>
+                <span class="text-sm font-bold text-gray-900">{{ __('delivery.fee_total') }}: {{ number_format($feeTotal, 2) }}</span>
+            </div>
+            @forelse ($shipment->feeComponents as $fee)
+                <div class="flex items-center justify-between border-b py-1.5 text-sm">
+                    <span>{{ __('delivery.fee_type_label.'.$fee->type) }} <span class="text-xs text-gray-400">({{ __('delivery.owner_label.'.$fee->owner) }})</span></span>
+                    <span class="{{ (float) $fee->amount < 0 ? 'text-rose-600' : 'text-gray-800' }}">{{ number_format((float) $fee->amount, 2) }}</span>
+                </div>
+            @empty
+                <p class="text-gray-400 text-sm mb-3">{{ __('delivery.no_fees') }}</p>
+            @endforelse
+
+            @can('shipping.delivery.fees')
+                <form method="POST" action="{{ route('admin.shipping.delivery.fees.add', $shipment) }}" class="flex flex-wrap items-end gap-2 border-t pt-3 mt-2">
+                    @csrf
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">{{ __('delivery.fee_type') }}</label>
+                        <select name="type" class="rounded-md border-gray-300 text-sm">
+                            @foreach ($feeTypes as $t)
+                                <option value="{{ $t }}">{{ __('delivery.fee_type_label.'.$t) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">{{ __('delivery.fee_amount') }}</label>
+                        <input type="number" step="0.01" name="amount" required class="rounded-md border-gray-300 text-sm w-28">
+                    </div>
+                    <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('delivery.add_fee') }}</button>
+                </form>
+            @endcan
+        </div>
     </div>
 </x-app-layout>

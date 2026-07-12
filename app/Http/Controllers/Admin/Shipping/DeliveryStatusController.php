@@ -4,8 +4,15 @@ namespace App\Http\Controllers\Admin\Shipping;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Shipping\DeliveryTransitionRequest;
+use App\Http\Requests\Shipping\FeeComponentRequest;
+use App\Http\Requests\Shipping\OpenExceptionRequest;
+use App\Modules\Shipping\Models\DeliveryException;
+use App\Modules\Shipping\Models\DeliveryExceptionCategory;
 use App\Modules\Shipping\Models\Shipment;
+use App\Modules\Shipping\Services\DeliveryExceptionService;
+use App\Modules\Shipping\Services\DeliveryFeeService;
 use App\Modules\Shipping\Services\DeliveryStatusService;
+use App\Modules\Shipping\Services\ShipmentTimelineService;
 use App\Modules\Shipping\Support\DeliveryStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +24,11 @@ use Illuminate\View\View;
  */
 class DeliveryStatusController extends Controller
 {
-    public function __construct(private readonly DeliveryStatusService $service) {}
+    public function __construct(
+        private readonly DeliveryStatusService $service,
+        private readonly DeliveryExceptionService $exceptions,
+        private readonly DeliveryFeeService $fees,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -35,12 +46,16 @@ class DeliveryStatusController extends Controller
         ]);
     }
 
-    public function show(Shipment $shipment): View
+    public function show(Shipment $shipment, ShipmentTimelineService $timeline): View
     {
         return view('admin.delivery.show', [
-            'shipment' => $shipment->load(['order:id,number', 'deliveryTransitions.actor', 'providerTransitions']),
+            'shipment' => $shipment->load(['order:id,number', 'deliveryTransitions.actor', 'providerTransitions', 'exceptions.category', 'exceptions.assignee', 'feeComponents']),
             'allowed' => DeliveryStatus::TRANSITIONS[$shipment->delivery_status] ?? [],
             'reasons' => DeliveryStatus::HOLD_REASONS,
+            'timeline' => $timeline->build($shipment),
+            'categories' => DeliveryExceptionCategory::active()->get(),
+            'feeTypes' => config('delivery.fees.types'),
+            'feeTotal' => $this->fees->total($shipment),
         ]);
     }
 
@@ -66,5 +81,37 @@ class DeliveryStatusController extends Controller
         $this->service->close($shipment, request()->user());
 
         return back()->with('status', __('delivery.closed_done'));
+    }
+
+    public function openException(OpenExceptionRequest $request, Shipment $shipment): RedirectResponse
+    {
+        $category = DeliveryExceptionCategory::where('code', $request->validated('category'))->firstOrFail();
+        $this->exceptions->open($shipment, $category, [
+            'assigned_to' => $request->validated('assigned_to'),
+            'note' => $request->validated('note'),
+            'actor' => $request->user(),
+        ]);
+
+        return back()->with('status', __('delivery.exception_opened'));
+    }
+
+    public function resolveException(Request $request, DeliveryException $exception): RedirectResponse
+    {
+        $data = $request->validate(['resolution' => ['required', 'string', 'max:500']]);
+        $this->exceptions->resolve($exception, $data['resolution'], $request->user());
+
+        return back()->with('status', __('delivery.exception_resolved'));
+    }
+
+    public function addFee(FeeComponentRequest $request, Shipment $shipment): RedirectResponse
+    {
+        $this->fees->addComponent($shipment, $request->validated('type'), (float) $request->validated('amount'), [
+            'owner' => $request->validated('owner'),
+            'source' => $request->validated('source'),
+            'note' => $request->validated('note'),
+            'actor' => $request->user(),
+        ]);
+
+        return back()->with('status', __('delivery.fee_added'));
     }
 }

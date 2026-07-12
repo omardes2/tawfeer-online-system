@@ -36,7 +36,7 @@ class Shipment extends Model
         'governorate_id', 'city_id', 'area_id', 'shipping_zone_id',
         'shipping_cost', 'cost_source', 'cost_currency',
         'delivery_provider_id', 'external_id', 'external_code', 'provider_metadata',
-        'last_synced_at', 'sync_status',
+        'last_synced_at', 'sync_status', 'sync_attempts', 'sync_error',
         'dispatched_at', 'delivered_at', 'failed_at', 'delivery_attempts',
         'failure_reason', 'notes', 'created_by',
     ];
@@ -107,6 +107,24 @@ class Shipment extends Model
     public function providerTransitions(): HasMany
     {
         return $this->hasMany(DeliveryProviderTransition::class)->orderBy('id');
+    }
+
+    /** سجلّ استيعاب أحداث المزوّد (webhook/مزامنة — ADR-039). */
+    public function providerEvents(): HasMany
+    {
+        return $this->hasMany(DeliveryProviderEvent::class)->orderBy('id');
+    }
+
+    /** استثناءات التوصيل (ADR-039). */
+    public function exceptions(): HasMany
+    {
+        return $this->hasMany(DeliveryException::class)->orderBy('id');
+    }
+
+    /** مكوّنات رسوم الشحنة (ADR-039). */
+    public function feeComponents(): HasMany
+    {
+        return $this->hasMany(ShipmentFeeComponent::class)->orderBy('id');
     }
 
     protected static function newFactory(): Factory

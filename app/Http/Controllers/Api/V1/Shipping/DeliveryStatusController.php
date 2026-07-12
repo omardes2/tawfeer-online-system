@@ -7,6 +7,7 @@ use App\Http\Requests\Shipping\DeliveryTransitionRequest;
 use App\Http\Requests\Shipping\ProviderStatusRequest;
 use App\Modules\Shipping\Models\Shipment;
 use App\Modules\Shipping\Services\DeliveryStatusService;
+use App\Modules\Shipping\Services\ShipmentTimelineService;
 use App\Modules\Shipping\Support\DeliveryStatus;
 use Illuminate\Http\JsonResponse;
 
@@ -91,5 +92,11 @@ class DeliveryStatusController extends Controller
     public function holdReasons(): JsonResponse
     {
         return response()->json(['reasons' => $this->service->holdReasonReport()]);
+    }
+
+    /** الخطّ الزمني الموحّد للشحنة (حالة داخلية/مزوّد/تعليق/إجراءات/webhook/مزامنة). */
+    public function timeline(Shipment $shipment, ShipmentTimelineService $timeline): JsonResponse
+    {
+        return response()->json(['timeline' => $timeline->build($shipment)]);
     }
 }

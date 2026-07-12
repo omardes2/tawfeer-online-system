@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.3 rest (Delivery operations: exceptions · webhooks · sync · fees · timeline)
+- **Multi-provider abstraction:** `DeliveryProviderManager` resolves the right
+  driver by provider code (from `config/shipping.php`) for ingestion/sync/webhook
+  — multiple providers supported without touching business logic. `DeliveryStatus
+  Service` now resolves the driver per shipment.
+- **Delivery Exception Engine:** configurable `delivery_exception_categories`
+  (per-category SLA + escalation hours + escalation role), `delivery_exceptions`
+  (status open→in_progress→escalated→resolved→reopened, responsible employee,
+  SLA due, reopen counter) and append-only `delivery_exception_notes`.
+  `DeliveryExceptionService` (open/assign/note/escalate/resolve/reopen) +
+  scheduled `delivery:escalate-exceptions` command.
+- **Webhook infrastructure:** public `POST /api/v1/webhooks/delivery/{provider}`
+  — signature verification in the driver (`verifyWebhookSignature`, HMAC for
+  Opost; failure → 401), idempotency + duplicate protection (processed-event
+  guard + unique provider-transition constraint), and full logging in
+  `delivery_provider_events`. All status ingestion flows through
+  `DeliveryStatusService::applyProviderStatus` (no duplicated logic).
+- **Scheduled synchronization:** `delivery:sync` (config-gated) polls only active
+  (non-terminal) shipments with a provider, detects provider inconsistencies
+  (illegal canonical transition → `inconsistent`), retries failed syncs
+  (`sync_attempts`/`sync_error`, capped by `max_attempts`), and audits every
+  attempt. Idempotent (skips unchanged status).
+- **Delivery Fee Engine (provider-independent):** `shipment_fee_components`
+  (type/amount/owner/source) with an extensible type vocabulary (delivery, cod,
+  oversize, overweight, remote_area, return, exchange, retry, manual, discount);
+  `DeliveryFeeService` (add, quoted snapshot, total, totals-by-owner).
+- **Unified shipment timeline:** `ShipmentTimelineService` merges internal
+  status, provider status, hold reasons, user actions, webhook events, and sync
+  events chronologically (read-only).
+- New `DeliveryProviderInterface` methods: `supportsWebhookSignature`,
+  `verifyWebhookSignature`, `parseWebhookEvent` (implemented in Null + Opost
+  drivers). Permission `shipping.delivery.fees`; exceptions under
+  `shipping.delivery.manage`. Admin UI extended (timeline + exceptions + fees);
+  API for exceptions/fees/timeline. Additive schema only.
+- Tests: 15 new delivery-operations tests → 403 passing. Pint clean; frontend
+  build succeeds.
+
 ### Added — Phase 4.3 (Canonical Delivery Status Engine · Opost mapping)
 - **Canonical Delivery Status Engine (ADR-038):** the official Opost workflow is
   now the canonical delivery lifecycle, kept **completely separate** from raw

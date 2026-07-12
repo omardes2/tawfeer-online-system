@@ -8,7 +8,7 @@ use App\Modules\Shipping\Events\DeliveryStatusChanged;
 use App\Modules\Shipping\Events\ShipmentClosed;
 use App\Modules\Shipping\Models\Shipment;
 use App\Modules\Shipping\Support\DeliveryStatus;
-use App\Support\Contracts\Shipping\DeliveryProviderInterface;
+use App\Support\Integrations\Shipping\DeliveryProviderManager;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -30,7 +30,7 @@ class DeliveryStatusService
 {
     public function __construct(
         private readonly CommissionService $commissions,
-        private readonly DeliveryProviderInterface $provider,
+        private readonly DeliveryProviderManager $providers,
     ) {}
 
     /**
@@ -166,7 +166,7 @@ class DeliveryStatusService
             return $shipment->fresh();
         }
 
-        $canonical = $this->provider->mapProviderStatus($providerStatus);
+        $canonical = $this->providers->forShipment($shipment)->mapProviderStatus($providerStatus);
         $fromProvider = $shipment->provider_status;
 
         DB::transaction(function () use ($shipment, $providerStatus, $canonical, $fromProvider, $eventId, $opts) {

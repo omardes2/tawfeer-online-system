@@ -29,6 +29,21 @@ class NullDeliveryProvider implements DeliveryProviderInterface
         return null; // لا مزوّد ⇒ لا تعيين حالات.
     }
 
+    public function supportsWebhookSignature(): bool
+    {
+        return false;
+    }
+
+    public function verifyWebhookSignature(string $rawPayload, array $headers, ?string $secret): bool
+    {
+        return false;
+    }
+
+    public function parseWebhookEvent(array $payload): array
+    {
+        return ['event_id' => null, 'external_id' => null, 'provider_status' => null];
+    }
+
     public function name(): string
     {
         return 'null';

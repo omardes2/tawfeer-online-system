@@ -42,7 +42,8 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
 
     public function track(string $trackingNumber): array
     {
-        return ['status' => 'pending_integration', 'driver' => $this->name()];
+        // يُنفَّذ عند ربط الـAPI الحيّ؛ الشكل الموحّد: provider_status + external_id.
+        return ['provider_status' => null, 'external_id' => $trackingNumber, 'driver' => $this->name()];
     }
 
     public function cancel(string $reference): bool
@@ -53,6 +54,33 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
     public function mapProviderStatus(string $providerStatus): ?string
     {
         return self::STATUS_MAP[strtolower(trim($providerStatus))] ?? null;
+    }
+
+    public function supportsWebhookSignature(): bool
+    {
+        return true;
+    }
+
+    public function verifyWebhookSignature(string $rawPayload, array $headers, ?string $secret): bool
+    {
+        if ($secret === null || $secret === '') {
+            return false; // بلا سرّ ⇒ لا يمكن التحقّق (يُعامَل كغير متحقّق أعلى).
+        }
+        // ترويسة التوقيع (غير حسّاسة لحالة الأحرف).
+        $normalized = array_change_key_case($headers, CASE_LOWER);
+        $provided = $normalized['x-opost-signature'] ?? '';
+        $expected = hash_hmac('sha256', $rawPayload, $secret);
+
+        return $provided !== '' && hash_equals($expected, $provided);
+    }
+
+    public function parseWebhookEvent(array $payload): array
+    {
+        return [
+            'event_id' => $payload['event_id'] ?? $payload['id'] ?? null,
+            'external_id' => $payload['tracking_number'] ?? $payload['external_id'] ?? null,
+            'provider_status' => $payload['status'] ?? $payload['state'] ?? null,
+        ];
     }
 
     public function name(): string

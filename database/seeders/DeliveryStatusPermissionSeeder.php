@@ -13,16 +13,17 @@ use Spatie\Permission\Models\Role;
 class DeliveryStatusPermissionSeeder extends Seeder
 {
     private array $permissions = [
-        'shipping.delivery.view',          // عرض الحالة القانونية + السجلّ + التقارير
-        'shipping.delivery.manage',        // تنفيذ انتقالات قانونية يدوية (submit/pickup/hold/return...)
+        'shipping.delivery.view',          // عرض الحالة القانونية + السجلّ + الخطّ الزمني + التقارير
+        'shipping.delivery.manage',        // انتقالات يدوية + إدارة الاستثناءات (SLA/تصعيد/ملاحظات)
         'shipping.delivery.sync',          // استيعاب حالة مزوّد (webhook/مزامنة)
         'shipping.delivery.close',         // الإغلاق المالي النهائي (يُفعّل التسوية) — مقصور
+        'shipping.delivery.fees',          // إدارة مكوّنات رسوم الشحنة
     ];
 
     private array $grants = [
         'manager' => ['*'],
-        'delivery_ops' => ['shipping.delivery.view', 'shipping.delivery.manage', 'shipping.delivery.sync'],
-        'finance' => ['shipping.delivery.view', 'shipping.delivery.close'],
+        'delivery_ops' => ['shipping.delivery.view', 'shipping.delivery.manage', 'shipping.delivery.sync', 'shipping.delivery.fees'],
+        'finance' => ['shipping.delivery.view', 'shipping.delivery.close', 'shipping.delivery.fees'],
         'warehouse' => ['shipping.delivery.view', 'shipping.delivery.manage'],
         'sales' => ['shipping.delivery.view'],
         'accountant' => ['shipping.delivery.view'],

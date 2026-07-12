@@ -31,7 +31,10 @@ use App\Http\Controllers\Api\V1\Sales\AssistedOrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderTransitionController;
 use App\Http\Controllers\Api\V1\Shipping\GeographyController;
+use App\Http\Controllers\Api\V1\Shipping\DeliveryExceptionController;
+use App\Http\Controllers\Api\V1\Shipping\DeliveryFeeController;
 use App\Http\Controllers\Api\V1\Shipping\DeliveryStatusController;
+use App\Http\Controllers\Api\V1\Shipping\DeliveryWebhookController;
 use App\Http\Controllers\Api\V1\Shipping\ShipmentController;
 use App\Http\Controllers\Api\V1\Store\CartController;
 use App\Http\Controllers\Api\V1\Store\CheckoutController;
@@ -59,6 +62,9 @@ Route::prefix('v1')->group(function () {
             'time' => now()->toIso8601String(),
         ]);
     })->name('api.health');
+
+    // webhook مزوّدي التوصيل — عام (تحقّق التوقيع/idempotency في الخدمة/الـDriver، ADR-039).
+    Route::post('webhooks/delivery/{provider}', [DeliveryWebhookController::class, 'handle'])->name('api.webhooks.delivery');
 
     // مسارات محميّة بـ Sanctum.
     Route::middleware('auth:sanctum')->group(function () {
@@ -243,10 +249,24 @@ Route::prefix('v1')->group(function () {
             | CLOSE = نقطة الاكتمال المالي الوحيدة (تُفعّل التسوية واستحقاق العمولات).
             */
             Route::get('shipments/{shipment}/delivery', [DeliveryStatusController::class, 'show'])->middleware('can:shipping.delivery.view');
+            Route::get('shipments/{shipment}/delivery/timeline', [DeliveryStatusController::class, 'timeline'])->middleware('can:shipping.delivery.view');
             Route::get('delivery/hold-reasons', [DeliveryStatusController::class, 'holdReasons'])->middleware('can:shipping.delivery.view');
             Route::post('shipments/{shipment}/delivery/transition', [DeliveryStatusController::class, 'transition'])->middleware('can:shipping.delivery.manage');
             Route::post('shipments/{shipment}/delivery/provider-status', [DeliveryStatusController::class, 'providerStatus'])->middleware('can:shipping.delivery.sync');
             Route::post('shipments/{shipment}/delivery/close', [DeliveryStatusController::class, 'close'])->middleware('can:shipping.delivery.close');
+
+            // استثناءات التوصيل (SLA/تصعيد/ملاحظات) — ADR-039
+            Route::get('shipments/{shipment}/exceptions', [DeliveryExceptionController::class, 'index'])->middleware('can:shipping.delivery.view');
+            Route::post('shipments/{shipment}/exceptions', [DeliveryExceptionController::class, 'store'])->middleware('can:shipping.delivery.manage');
+            Route::post('delivery/exceptions/{exception}/note', [DeliveryExceptionController::class, 'note'])->middleware('can:shipping.delivery.manage');
+            Route::post('delivery/exceptions/{exception}/assign', [DeliveryExceptionController::class, 'assign'])->middleware('can:shipping.delivery.manage');
+            Route::post('delivery/exceptions/{exception}/escalate', [DeliveryExceptionController::class, 'escalate'])->middleware('can:shipping.delivery.manage');
+            Route::post('delivery/exceptions/{exception}/resolve', [DeliveryExceptionController::class, 'resolve'])->middleware('can:shipping.delivery.manage');
+            Route::post('delivery/exceptions/{exception}/reopen', [DeliveryExceptionController::class, 'reopen'])->middleware('can:shipping.delivery.manage');
+
+            // رسوم الشحنة المُركّبة (مستقلّة عن المزوّد) — ADR-039
+            Route::get('shipments/{shipment}/fees', [DeliveryFeeController::class, 'index'])->middleware('can:shipping.delivery.view');
+            Route::post('shipments/{shipment}/fees', [DeliveryFeeController::class, 'store'])->middleware('can:shipping.delivery.fees');
         });
 
         /*

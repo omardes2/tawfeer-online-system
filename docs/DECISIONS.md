@@ -205,6 +205,17 @@
 - **التكلفة المُحمّلة (Landed Cost — BR-PUR-06):** `goods_receipts.additional_cost` تُوزَّع على البنود بنسبة قيمة السطر قبل احتساب WAC.
 - **FK مؤجّلة:** `suppliers.governorate_id/city_id/currency_id` (جداولها غير مُنشأة) — أعمدة nullable بلا قيد الآن.
 
+## ADR-039 — بنية عمليات التوصيل (استثناءات · Webhook · مزامنة · رسوم · خطّ زمني) [مُعتمد في Phase 4.3]
+- **السياق:** إكمال Phase 4.3 فوق محرّك الحالات (ADR-038) بالبنية التشغيلية للمزوّد. كلّها **عبر طبقة تجريد المزوّد** (`DeliveryProviderManager` + `DeliveryProviderInterface`) — لا منطق مزوّد في وحدات الأعمال، ودعم عدّة مزوّدين دون تغيير المنطق.
+- **مُحلّل متعدّد المزوّدين:** `DeliveryProviderManager::driver(code)`/`forShipment()` يحلّ الـDriver من `config/shipping.php` بحسب كود مزوّد الشحنة/المسار — استيعاب/مزامنة/webhook كلّها تحلّ المزوّد الصحيح ديناميكيًا.
+- **محرّك الاستثناءات:** `delivery_exception_categories` (قابلة للضبط: SLA/تصعيد/دور لكل فئة) + `delivery_exceptions` (حالة `open→in_progress→escalated→resolved→reopened`، مسؤول، مهلة SLA، عدّاد إعادة فتح) + `delivery_exception_notes` (append-only). `DeliveryExceptionService`: فتح/إسناد/ملاحظة/تصعيد/حلّ/إعادة فتح + **تصعيد مجدول** (`escalateOverdue` عبر `delivery:escalate-exceptions`).
+- **بنية Webhook:** نقطة عامّة `POST /api/v1/webhooks/delivery/{provider}` — **تحقّق توقيع في الـDriver** (`verifyWebhookSignature`، HMAC لـOpost؛ فشل التوقيع ⇒ 401 `unverified`)، **idempotency + حماية من التكرار** (تجاهل event_id مُعالَج + قيد `delivery_provider_transitions` الفريد)، وتسجيل كامل في `delivery_provider_events`. كل استيعاب حالة يمرّ عبر `DeliveryStatusService::applyProviderStatus` (لا تكرار).
+- **المزامنة المجدولة:** `DeliverySyncService::syncActive` (أمر `delivery:sync`، مفعّل بالإعداد) يستطلع **الشحنات النشطة فقط** (غير النهائية، لها مزوّد، دون تجاوز `max_attempts`)، **يكشف تعارضات المزوّد** (حالة قانونية غير قابلة للانتقال ⇒ `inconsistent`)، **يعيد محاولة الفاشلة** (`sync_attempts`/`sync_error`)، وسجلّ تدقيق في `delivery_provider_events` (channel=sync). idempotent (يتجاهل الحالة غير المتغيّرة).
+- **محرّك الرسوم (مستقلّ عن المزوّد):** `shipment_fee_components` (type/amount/owner/source) — أنواع قابلة للتوسّع من `config/delivery.php` (delivery/cod/oversize/overweight/remote_area/return/exchange/retry/manual/discount). `DeliveryFeeService`: إضافة/لقطة عرض/إجمالي/تفصيل حسب المالك. **لا ربط بمنطق مزوّد.**
+- **الخطّ الزمني الموحّد:** `ShipmentTimelineService` يدمج (للقراءة) الحالة الداخلية + حالة المزوّد + أسباب التعليق + إجراءات المستخدم + أحداث webhook + أحداث المزامنة زمنيًا (بلا تخزين).
+- **الصلاحيات:** إضافة `shipping.delivery.fees`؛ إدارة الاستثناءات تحت `shipping.delivery.manage`؛ الـwebhook عامّ (توقيع).
+- **الحالة:** مُنفَّذ (30 اختبارًا إجماليًا لـ4.3). Phase 4.3 مكتملة.
+
 ## ADR-038 — محرّك حالة التوصيل القانوني (Canonical Delivery Status Engine · تعيين Opost) [مُعتمد في Phase 4.3]
 - **السياق:** سير عمل التوصيل الرسمي (مصدره Opost، 10 حالات) يجب أن يصبح **دورة الحياة القانونية** للتوصيل داخل النظام، ويحكم الاكتمال المالي واستحقاق العمولات. أسماء Opost مضلّلة (`cod_pickup` = سُلّم للعميل والنقد لدى المندوب، `delivered` = بضاعة مرتجعة عائدة إلينا) فلا تُستخدم كمفاتيح قانونية.
 - **القرار — حالة داخلية قانونية منفصلة عن المزوّد:** عمودان على `shipments`: `delivery_status` (قانوني، تقرأه وحدات الأعمال) و`provider_status` (خام، للعرض/التتبّع فقط). المفردات القانونية في `App\Modules\Shipping\Support\DeliveryStatus` (ثوابت + رسم انتقالات + أسباب تعليق) — ثابتة بالكود (تحكم منطقًا ماليًا)، لا في جدول قابل للإدارة.

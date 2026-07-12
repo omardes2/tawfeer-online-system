@@ -201,6 +201,9 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('delivery/{shipment}', [AdminDeliveryStatusController::class, 'show'])->name('delivery.show')->middleware('can:shipping.delivery.view');
         Route::post('delivery/{shipment}/transition', [AdminDeliveryStatusController::class, 'transition'])->name('delivery.transition')->middleware('can:shipping.delivery.manage');
         Route::post('delivery/{shipment}/close', [AdminDeliveryStatusController::class, 'close'])->name('delivery.close')->middleware('can:shipping.delivery.close');
+        Route::post('delivery/{shipment}/exceptions', [AdminDeliveryStatusController::class, 'openException'])->name('delivery.exceptions.open')->middleware('can:shipping.delivery.manage');
+        Route::post('delivery/exceptions/{exception}/resolve', [AdminDeliveryStatusController::class, 'resolveException'])->name('delivery.exceptions.resolve')->middleware('can:shipping.delivery.manage');
+        Route::post('delivery/{shipment}/fees', [AdminDeliveryStatusController::class, 'addFee'])->name('delivery.fees.add')->middleware('can:shipping.delivery.fees');
     });
 
     // المدفوعات (Phase 2.8)

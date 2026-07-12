@@ -7,6 +7,7 @@ use App\Modules\Shipping\Policies\ShipmentPolicy;
 use App\Support\Contracts\Shipping\DeliveryProviderInterface;
 use App\Support\Contracts\Shipping\GeographySyncProviderInterface;
 use App\Support\Contracts\Shipping\ShippingQuoteProviderInterface;
+use App\Support\Integrations\Shipping\DeliveryProviderManager;
 use App\Support\Integrations\Shipping\NullDeliveryProvider;
 use App\Support\Integrations\Shipping\NullGeographySyncProvider;
 use App\Support\Integrations\Shipping\NullShippingQuoteProvider;
@@ -26,6 +27,9 @@ class ShippingServiceProvider extends ServiceProvider
         $this->app->bind(DeliveryProviderInterface::class, $drivers['delivery'] ?? NullDeliveryProvider::class);
         $this->app->bind(ShippingQuoteProviderInterface::class, $drivers['quote'] ?? NullShippingQuoteProvider::class);
         $this->app->bind(GeographySyncProviderInterface::class, $drivers['geography_sync'] ?? NullGeographySyncProvider::class);
+
+        // مُحلّل متعدّد المزوّدين (يحلّ الـDriver بحسب كود مزوّد الشحنة/المسار — ADR-039).
+        $this->app->singleton(DeliveryProviderManager::class);
     }
 
     public function boot(): void

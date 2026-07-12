@@ -35,5 +35,25 @@ interface DeliveryProviderInterface
      */
     public function mapProviderStatus(string $providerStatus): ?string;
 
+    /**
+     * هل يدعم المزوّد التحقّق من توقيع الـwebhook؟ (ADR-039)
+     */
+    public function supportsWebhookSignature(): bool;
+
+    /**
+     * التحقّق من توقيع حمولة webhook الخام (ADR-039). منطق التوقيع في الـDriver.
+     *
+     * @param  array<string, string>  $headers
+     */
+    public function verifyWebhookSignature(string $rawPayload, array $headers, ?string $secret): bool;
+
+    /**
+     * تطبيع حمولة webhook/تتبّع إلى مفاتيح موحّدة (ADR-039).
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{event_id: ?string, external_id: ?string, provider_status: ?string}
+     */
+    public function parseWebhookEvent(array $payload): array;
+
     public function name(): string;
 }

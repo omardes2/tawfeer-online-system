@@ -14,7 +14,7 @@
 |-------|--------|--------|
 | 4.1 | البيع المُساعد + الأدوار + تعديل السعر اليدوي بالموافقة واللقطات | ✅ مكتملة |
 | **4.2** | عمولات الموظفين + أرباح المسوّقين (دفاتر غير قابلة للتعديل + حالات) | ✅ مكتملة |
-| 4.3 | عمليات التوصيل + تكامل المزوّد (تقديم/webhook/مزامنة) + الاستثناءات | 🔄 محرّك الحالات مُنفَّذ |
+| 4.3 | عمليات التوصيل + تكامل المزوّد (تقديم/webhook/مزامنة) + الاستثناءات | ✅ مكتملة |
 | 4.4 | المرتجعات والاستبدال (RMA) + الفحص وتوجيه المخزون | ⬜ |
 | 4.5 | مطالبات التوصيل (تلف/كسر/فقد/نقص/تسرّب) | ⬜ |
 | 4.6 | تسويات ومطابقة التوصيل → تفعيل استحقاق العمولات/الأرباح + قيود محاسبية | ⬜ |
@@ -104,7 +104,14 @@
 - **أسباب تعليق مُصنّفة وقابلة للتقرير (المتطلّب 2/3):** `customer_no_answer/wrong_phone/wrong_address/customer_requested_delay/customer_refused/area_unavailable/courier_issue/business_issue/other` + تقرير تجميعي.
 - **CLOSE = الاكتمال المالي الوحيد (المتطلّب 4):** `DeliveryStatusService::close` ⇒ `orders.settled_at` + استحقاق العمولات **eligible فقط** (`markEligibleForOrder`) + حدث `ShipmentClosed`. **لا دفع تلقائي**؛ الاعتماد/الصرف منفصلان (4.2).
 - **الخدمة/الأحداث/الصلاحيات:** `DeliveryStatusService` (كل المنطق)؛ `DeliveryStatusChanged`/`ShipmentClosed`؛ `shipping.delivery.{view,manage,sync,close}`؛ دور `delivery_ops`؛ API + لوحة RTL. **15 اختبارًا.**
-- **مؤجّل ضمن بقية 4.3:** استثناءات التوصيل (`delivery_exceptions`: SLA/تصعيد/متابعة)، ربط webhook حيّ + مزامنة مجدولة، ورسوم التوصيل المفصّلة (المتطلّب 9).
+
+> **مُنفَّذ (بقية 4.3 — البنية التشغيلية، ADR-039):** كلّها **عبر تجريد المزوّد** (`DeliveryProviderManager`)، دعم عدّة مزوّدين دون تغيير المنطق.
+- **محرّك الاستثناءات:** فئات قابلة للضبط (SLA/تصعيد/دور) + استثناءات (حالة/مسؤول/مهلة/إعادة فتح) + ملاحظات append-only + **تصعيد مجدول** (`delivery:escalate-exceptions`). `DeliveryExceptionService`.
+- **بنية Webhook:** نقطة عامّة `POST /webhooks/delivery/{provider}` — تحقّق توقيع في الـDriver (HMAC، فشل ⇒ 401)، idempotency + منع تكرار، تسجيل كامل (`delivery_provider_events`). `DeliveryWebhookService`.
+- **مزامنة مجدولة:** `delivery:sync` (بالإعداد) — الشحنات النشطة فقط، كشف تعارضات، إعادة محاولة الفاشلة، تدقيق. `DeliverySyncService`.
+- **محرّك الرسوم (مستقلّ عن المزوّد):** `shipment_fee_components` (نوع/مبلغ/مالك/مصدر) — أنواع قابلة للتوسّع (المتطلّب 9). `DeliveryFeeService`.
+- **الخطّ الزمني الموحّد:** `ShipmentTimelineService` يدمج كل المصادر زمنيًا (داخلي/مزوّد/تعليق/إجراءات/webhook/مزامنة).
+- **الصلاحيات:** `shipping.delivery.fees` + الاستثناءات تحت `manage`. **15 اختبارًا إضافيًا (إجمالي 4.3 = 30).**
 
 ### 4.4 — المرتجعات والاستبدال RMA (المتطلّبان 7، 8)
 - **الجداول:** `return_requests` (مصدر: customer/sales/warehouse/provider؛ نوع: return/exchange؛ حالة `return_request → approved → received → inspected → completed` + `rejected`)؛ `return_request_items` (بند/كمية/نوع الاستبدال/فرق السعر/مالك الرسوم)؛ الفحص (`inspection`): تصنيفات (sellable/open_box/repackage/damaged/broken/missing_parts/wrong_item/quarantine) → توجيه المخزون (on_hand/damaged/quarantine/provider_claim/internal). **لا تعديل غير رسمي للطلب الأصلي** (BR-RET-01). موافقات (مشرف/مستودع/مالية/عمليات). أنواع الاستبدال (نفس/أعلى بتحصيل/أقل باسترداد أو رصيد، جزئي، pickup+replacement متزامن/لاحق). الأثر العكسي عبر Inventory/Accounting القائمين (BR-RET-05).
