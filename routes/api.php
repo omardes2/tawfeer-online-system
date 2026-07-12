@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\V1\Sales\OrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderTransitionController;
 use App\Http\Controllers\Api\V1\Shipping\GeographyController;
 use App\Http\Controllers\Api\V1\Shipping\ShipmentController;
+use App\Http\Controllers\Api\V1\Store\CartController;
 use App\Http\Controllers\Api\V1\WarehouseController;
 use App\Http\Controllers\Api\V1\WarehouseLocationController;
 use App\Http\Resources\UserResource;
@@ -258,6 +259,18 @@ Route::prefix('v1')->group(function () {
             Route::post('customers/{customer}/block', [CustomerController::class, 'block']);
             Route::post('customers/{customer}/unblock', [CustomerController::class, 'unblock']);
             Route::post('customers/{customer}/merge', [CustomerController::class, 'merge']);
+        });
+
+        /*
+        | Phase 3.1 — المتجر: السلة (ADR-031)
+        | سلة المستخدم الحالي فقط (self-scoped)؛ السعر لقطة من الكتالوج؛ لا حجز مخزون هنا.
+        */
+        Route::prefix('store')->group(function () {
+            Route::get('cart', [CartController::class, 'show']);
+            Route::post('cart/items', [CartController::class, 'addItem']);
+            Route::match(['put', 'patch'], 'cart/items/{variant}', [CartController::class, 'updateItem']);
+            Route::delete('cart/items/{variant}', [CartController::class, 'removeItem']);
+            Route::delete('cart', [CartController::class, 'clear']);
         });
 
     });

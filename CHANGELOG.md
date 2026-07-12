@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 3.1 (Storefront Cart)
+- New `Store` module (ADR-031): all logic in `CartService`; cart is self-scoped
+  to the authenticated user (no policy/route-binding needed — a user only ever
+  touches their own cart).
+- Tables (2): `carts` (uuid/soft-delete; `user_id`/`customer_id`/`branch_id`/
+  `session_token`/`status`) + `cart_items` (`variant_id`, `qty` decimal(15,3),
+  `unit_price` decimal(15,2), unique per (cart, variant)).
+- `CartService`: active cart created on demand (`forUser`); add/set/remove/clear
+  items inside DB transactions; price is a catalog snapshot (promo price when
+  present, else retail — no pricing engine); availability check
+  Σ(on_hand − reserved) across warehouses; rejects non-sellable variants
+  (inactive/hidden product); **no stock reservation in the cart** — reservation
+  happens at order confirmation (ADR-009).
+- API `/api/v1/store/cart`: GET cart; POST items; PUT/PATCH + DELETE
+  items/{variant}; DELETE cart. Sanctum-authenticated; Form Requests for
+  validation; `CartResource`.
+- Production-readiness fix: reload a fresh cart instance before serializing so a
+  first-access GET returns 200 (not the auto-201 JsonResource emits for a
+  just-created model).
+- Tests: 9 new (guest denied, empty cart on first access, promo pricing,
+  accumulate, update/remove, clear, over-stock rejected, non-sellable rejected,
+  per-user scoping) → 299 passing total.
+
 ### Added — Phase 2.10 (CRM / Customers)
 - New `Crm` module (ADR-030): all logic in `CustomerService`; integration-ready.
 - Tables (5): `customers` (uuid/soft-delete/audited; optional `user_id`;
