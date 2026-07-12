@@ -157,6 +157,11 @@
 ### حالات الطلب / الدفع / الشحن / العمولة / الإرجاع
 معرّفة في ADR-010 / الأساس / ADR-009 / ADR-012 / ADR-011 على التوالي.
 
+### حالة التوصيل القانونية (Canonical Delivery Lifecycle — ADR-038، Phase 4.3)
+`draft → ready_for_pickup → picked_up → { on_hold ⇄ picked_up } → delivered_cod_held → funds_at_courier_accounting → closed`
+ومسار الإرجاع: `picked_up|on_hold → returning_to_courier → return_in_transit → closed`؛ والإلغاء `cancelled` (قبل الاستلام فقط).
+> **منفصلة تمامًا عن حالة المزوّد الخام** (`provider_status`)؛ التعيين مزوّد ← قانوني يقع في الـDriver (لا في وحدات الأعمال). `closed` هي **نقطة الاكتمال المالي الوحيدة** (تسوية الطلب + استحقاق العمولات `eligible`). أسباب التعليق المُصنّفة: `customer_no_answer · wrong_phone · wrong_address · customer_requested_delay · customer_refused · area_unavailable · courier_issue · business_issue · other`.
+
 ### حالات تحويل المستودعات (Warehouse Transfer) — مُرسّمة في مراجعة التصميم
 `draft → pending_approval → approved → dispatched(in_transit) → received` + `cancelled`.
 > `dispatched` يحرّك الكمية إلى دلو `in_transit` (ADR-007)؛ `received` يودعها في مستودع الوجهة. توقيعان منفصلان (إرسال/استلام).
@@ -199,6 +204,17 @@
 - **التكامل مع المخزون (إلزامي):** الاستلام والمرتجع **يمرّان حصريًا عبر `InventoryService`** (لا تحديث مباشر لجداول المخزون)، داخل معاملات ذرّية، ويكتبان حركة + قيد دفتر (BR-PUR-13).
 - **التكلفة المُحمّلة (Landed Cost — BR-PUR-06):** `goods_receipts.additional_cost` تُوزَّع على البنود بنسبة قيمة السطر قبل احتساب WAC.
 - **FK مؤجّلة:** `suppliers.governorate_id/city_id/currency_id` (جداولها غير مُنشأة) — أعمدة nullable بلا قيد الآن.
+
+## ADR-038 — محرّك حالة التوصيل القانوني (Canonical Delivery Status Engine · تعيين Opost) [مُعتمد في Phase 4.3]
+- **السياق:** سير عمل التوصيل الرسمي (مصدره Opost، 10 حالات) يجب أن يصبح **دورة الحياة القانونية** للتوصيل داخل النظام، ويحكم الاكتمال المالي واستحقاق العمولات. أسماء Opost مضلّلة (`cod_pickup` = سُلّم للعميل والنقد لدى المندوب، `delivered` = بضاعة مرتجعة عائدة إلينا) فلا تُستخدم كمفاتيح قانونية.
+- **القرار — حالة داخلية قانونية منفصلة عن المزوّد:** عمودان على `shipments`: `delivery_status` (قانوني، تقرأه وحدات الأعمال) و`provider_status` (خام، للعرض/التتبّع فقط). المفردات القانونية في `App\Modules\Shipping\Support\DeliveryStatus` (ثوابت + رسم انتقالات + أسباب تعليق) — ثابتة بالكود (تحكم منطقًا ماليًا)، لا في جدول قابل للإدارة.
+- **التعيين في الـDriver (المبدأ 13):** `DeliveryProviderInterface::mapProviderStatus()` يعيّن حالة المزوّد الخام ← قانوني. **كل منطق Opost محصور في `OpostDeliveryProvider`** (خريطة `STATUS_MAP`)؛ إضافة/تبديل مزوّد = Driver جديد + إعداد، دون لمس منطق الأعمال. Null Driver يُرجِع null.
+- **السجلّات (append-only، منفصلة):** `delivery_status_transitions` (سجلّ قانوني: from/to/actor_type[user/system/provider]/actor/reason_code/note/provider_status/وقت) و`delivery_provider_transitions` (سجلّ مزوّد خام + `payload` + مفتاح idempotency فريد `(provider, event_id)` للـwebhook). لا تعديل ولا حذف.
+- **أسباب التعليق المُصنّفة (قابلة للتقرير):** قائمة معتمدة تُلزَم عند `on_hold` اليدوي؛ لقطة `on_hold_reason` على الشحنة + تقرير تجميعي.
+- **CLOSE = نقطة الاكتمال المالي الوحيدة (المتطلّب 4):** عندها فقط عبر `DeliveryStatusService` ضمن معاملة: `orders.settled_at` (مُضاف)، ثم استحقاق العمولات `accrueForOrder`+`markEligibleForOrder` (pending → **eligible فقط**)، وحدث `ShipmentClosed` (نقطة امتداد للترحيل المحاسبي 4.6). **لا دفع تلقائي** — الاعتماد/الصرف يبقيان مسؤولية المالية منفصلين (Phase 4.2). `delivered_cod_held` لا يجعل العمولة مستحقّة (تبقى pending).
+- **الاستيعاب idempotent:** أحداث المزوّد قد تصل خارج الترتيب؛ الانتقال القانوني غير المسموح يُوثَّق كحالة مزوّد فقط دون تغيير القانوني ولا رمي استثناء (الانتقالات اليدوية صارمة تُرفَض).
+- **الصلاحيات/الأدوار:** `shipping.delivery.{view,manage,sync,close}` (ADR-021)؛ دور `delivery_ops` (view/manage/sync)؛ `close` مقصور على `finance`/`manager`.
+- **الحالة:** مُنفَّذ محرّك الحالات الأساسي + تعيين Opost + السجلّات + التقارير + الأثر المالي عند الإغلاق (15 اختبارًا). استثناءات SLA/التصعيد وربط الـwebhook الحيّ ورسوم التوصيل تبقى ضمن بقية 4.3.
 
 ## ADR-037 — عمليات المرحلة 4 (Operations: Assisted Sales · Affiliate · Delivery · Returns · Claims · Settlements) [مُعتمد؛ التنفيذ بالدفعات]
 - **السياق:** المرحلة 4 تعكس سير العمل التشغيلي الفعلي لتوفير أونلاين (12 مجالًا). ضخمة جدًا؛ تُقسَّم إلى دفعات مستقلة قابلة للاختبار/الاعتماد كما المرحلة 3. المرجع الكامل: [`PHASE_4_OPERATIONS_DESIGN.md`](PHASE_4_OPERATIONS_DESIGN.md).

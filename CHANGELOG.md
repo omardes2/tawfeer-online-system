@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.3 (Canonical Delivery Status Engine · Opost mapping)
+- **Canonical Delivery Status Engine (ADR-038):** the official Opost workflow is
+  now the canonical delivery lifecycle, kept **completely separate** from raw
+  provider statuses. Two columns on `shipments`: `delivery_status` (canonical,
+  read by business modules) and `provider_status` (raw, display/tracking only),
+  plus `on_hold_reason` and `closed_at`.
+- Canonical vocabulary with clean names (Opost's are misleading — `cod_pickup` =
+  delivered-to-customer, `delivered` = returned-goods-coming-back): `draft →
+  ready_for_pickup → picked_up → {on_hold ⇄} → delivered_cod_held →
+  funds_at_courier_accounting → closed`, return path `returning_to_courier →
+  return_in_transit → closed`, plus `cancelled` (before pickup only).
+- **Provider→canonical mapping lives in the driver** (`OpostDeliveryProvider::
+  mapProviderStatus`), never in business modules; swap/add providers via
+  `config/shipping.php` without touching business logic (multi-provider-ready).
+  New `DeliveryProviderInterface::mapProviderStatus`.
+- **Two append-only history tables:** `delivery_status_transitions` (canonical:
+  from/to/actor_type user·system·provider/actor/reason_code/note/timestamp) and
+  `delivery_provider_transitions` (raw provider transitions + payload +
+  idempotency unique `(provider, event_id)` for webhooks).
+- **Categorized, reportable hold reasons** (customer_no_answer, wrong_phone,
+  wrong_address, customer_requested_delay, customer_refused, area_unavailable,
+  courier_issue, business_issue, other) — required on manual `on_hold`, with an
+  aggregation report.
+- **CLOSE is the sole financial-completion state:** sets `orders.settled_at`, makes
+  sales + affiliate commissions **eligible only** (`markEligibleForOrder`), and
+  fires `ShipmentClosed`. **Never auto-pays** — finance approval and payout stay
+  separate (Phase 4.2). `delivered_cod_held` leaves commissions `pending`.
+- All logic in `DeliveryStatusService`; events `DeliveryStatusChanged`,
+  `ShipmentClosed`. Permissions `shipping.delivery.{view,manage,sync,close}`;
+  `delivery_ops` role; `close` restricted to finance/manager.
+- Admin UI (RTL) + Arabic/English lang; API under `shipping/shipments/{s}/
+  delivery`. Additive schema only; no completed module redesigned.
+- Tests: 15 new delivery-engine tests → 387 passing. Pint clean; frontend build
+  succeeds.
+
 ### Added — Phase 4.2 (Sales Commission & Affiliate Earnings Ledgers)
 - **CommissionService engine:** automatic accrual on `OrderDelivered` (via a
   listener); default **1%** sales commission, configurable through

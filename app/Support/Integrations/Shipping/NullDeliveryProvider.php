@@ -24,6 +24,11 @@ class NullDeliveryProvider implements DeliveryProviderInterface
         return false;
     }
 
+    public function mapProviderStatus(string $providerStatus): ?string
+    {
+        return null; // لا مزوّد ⇒ لا تعيين حالات.
+    }
+
     public function name(): string
     {
         return 'null';

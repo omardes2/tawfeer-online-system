@@ -31,7 +31,7 @@ class Order extends Model
         'channel', 'status', 'payment_status', 'assigned_to', 'affiliate_id',
         'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'total', 'amount_paid',
         'notes', 'cancel_reason',
-        'confirmed_at', 'reserved_at', 'shipped_at', 'delivered_at', 'cancelled_at',
+        'confirmed_at', 'reserved_at', 'shipped_at', 'delivered_at', 'cancelled_at', 'settled_at',
         'created_by',
     ];
 
@@ -47,6 +47,7 @@ class Order extends Model
         'shipped_at' => 'datetime',
         'delivered_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'settled_at' => 'datetime',
     ];
 
     public function branch(): BelongsTo

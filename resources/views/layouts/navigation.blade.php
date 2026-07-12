@@ -43,7 +43,10 @@
                         <x-nav-link :href="route('admin.sales.orders.index')" :active="request()->routeIs('admin.sales.*')">{{ __('المبيعات') }}</x-nav-link>
                     @endcan
                     @can('shipping.shipments.view')
-                        <x-nav-link :href="route('admin.shipping.shipments.index')" :active="request()->routeIs('admin.shipping.*')">{{ __('الشحن') }}</x-nav-link>
+                        <x-nav-link :href="route('admin.shipping.shipments.index')" :active="request()->routeIs('admin.shipping.shipments.*')">{{ __('الشحن') }}</x-nav-link>
+                    @endcan
+                    @can('shipping.delivery.view')
+                        <x-nav-link :href="route('admin.shipping.delivery.index')" :active="request()->routeIs('admin.shipping.delivery.*')">{{ __('delivery.title') }}</x-nav-link>
                     @endcan
                     @can('payments.view')
                         <x-nav-link :href="route('admin.payments.index')" :active="request()->routeIs('admin.payments.*')">{{ __('المدفوعات') }}</x-nav-link>

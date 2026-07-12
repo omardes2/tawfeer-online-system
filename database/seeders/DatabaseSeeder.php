@@ -49,6 +49,8 @@ class DatabaseSeeder extends Seeder
             SalesOperationsPermissionSeeder::class,
             // Phase 4.2 — العمولات/الأرباح
             CommissionsPermissionSeeder::class,
+            // Phase 4.3 — محرّك حالة التوصيل القانوني
+            DeliveryStatusPermissionSeeder::class,
         ]);
     }
 }

@@ -65,6 +65,10 @@ class RolePermissionSeeder extends Seeder
             'dashboard.view', 'inventory.view', 'inventory.manage',
             'purchasing.view', 'orders.view',
         ],
+        // عمليات التوصيل (Phase 4.3): إدارة دورة حياة التوصيل القانونية والاستثناءات.
+        'delivery_ops' => [
+            'dashboard.view', 'orders.view', 'reports.view',
+        ],
         'affiliate' => [
             'dashboard.view', 'affiliate.view',
         ],

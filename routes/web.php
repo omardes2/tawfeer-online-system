@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\Purchasing\SupplierController as AdminSupplierCon
 use App\Http\Controllers\Admin\Purchasing\SupplierReturnController as AdminSupplierReturnController;
 use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
+use App\Http\Controllers\Admin\Shipping\DeliveryStatusController as AdminDeliveryStatusController;
 use App\Http\Controllers\Admin\Shipping\ShipmentController as AdminShipmentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Storefront\Account\AccountController;
@@ -194,6 +195,12 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('shipments/{shipment}/out-for-delivery', [AdminShipmentController::class, 'outForDelivery'])->name('shipments.out_for_delivery');
         Route::post('shipments/{shipment}/deliver', [AdminShipmentController::class, 'deliver'])->name('shipments.deliver');
         Route::post('shipments/{shipment}/fail', [AdminShipmentController::class, 'fail'])->name('shipments.fail');
+
+        // محرّك حالة التوصيل القانوني (Phase 4.3 / ADR-038)
+        Route::get('delivery', [AdminDeliveryStatusController::class, 'index'])->name('delivery.index')->middleware('can:shipping.delivery.view');
+        Route::get('delivery/{shipment}', [AdminDeliveryStatusController::class, 'show'])->name('delivery.show')->middleware('can:shipping.delivery.view');
+        Route::post('delivery/{shipment}/transition', [AdminDeliveryStatusController::class, 'transition'])->name('delivery.transition')->middleware('can:shipping.delivery.manage');
+        Route::post('delivery/{shipment}/close', [AdminDeliveryStatusController::class, 'close'])->name('delivery.close')->middleware('can:shipping.delivery.close');
     });
 
     // المدفوعات (Phase 2.8)

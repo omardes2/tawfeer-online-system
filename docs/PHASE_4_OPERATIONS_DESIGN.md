@@ -14,7 +14,7 @@
 |-------|--------|--------|
 | 4.1 | البيع المُساعد + الأدوار + تعديل السعر اليدوي بالموافقة واللقطات | ✅ مكتملة |
 | **4.2** | عمولات الموظفين + أرباح المسوّقين (دفاتر غير قابلة للتعديل + حالات) | ✅ مكتملة |
-| 4.3 | عمليات التوصيل + تكامل المزوّد (تقديم/webhook/مزامنة) + الاستثناءات | ⬜ |
+| 4.3 | عمليات التوصيل + تكامل المزوّد (تقديم/webhook/مزامنة) + الاستثناءات | 🔄 محرّك الحالات مُنفَّذ |
 | 4.4 | المرتجعات والاستبدال (RMA) + الفحص وتوجيه المخزون | ⬜ |
 | 4.5 | مطالبات التوصيل (تلف/كسر/فقد/نقص/تسرّب) | ⬜ |
 | 4.6 | تسويات ومطابقة التوصيل → تفعيل استحقاق العمولات/الأرباح + قيود محاسبية | ⬜ |
@@ -97,10 +97,14 @@
 - **الصلاحيات/الأدوار:** `commissions.{view_own,view_team,rules.manage,approve,payout,audit.view}`؛ `finance`/`sales_supervisor`.
 - **الواجهات:** API `commissions[/statement|approve|payout]` + `apiResource commissions/rules`؛ لوحة إدارة RTL. **15 اختبارًا ناجحًا.**
 
-### 4.3 — عمليات التوصيل وتكامل المزوّد (المتطلّبان 5، 6)
-- **إعادة استخدام** طبقة الشحن (2.7): `DeliveryProviderInterface` + جدول ربط المزوّدين. **لا مزوّد مثبّت**.
-- **الجداول:** توسعة `shipments` بـ external ref/حالة مزوّد؛ `shipment_provider_events` (payloads + سجلّ مزامنة — تخزين آمن)؛ `delivery_exceptions` (نوع من القائمة؛ owner, attempts, last_action, next_follow_up, sla/escalation, employee_note, provider_note, resolution). **حالات قانونية داخلية + خريطة حالة المزوّد**. عمليات: delivery/exchange/return-pickup/replacement.
-- **Webhook idempotent:** مفتاح فريد `(provider, external_id, event_id)` يمنع التكرار؛ مزامنة مجدولة عبر مهمّة.
+### 🔄 4.3 — عمليات التوصيل وتكامل المزوّد (المتطلّبان 5، 6)
+> **مُنفَّذ (محرّك الحالات القانوني — ADR-038):** سير عمل Opost الرسمي أصبح دورة الحياة القانونية للتوصيل.
+- **الحالة القانونية منفصلة عن المزوّد:** عمودان مُضافان على `shipments`: `delivery_status` (قانوني) و`provider_status` (خام) + `on_hold_reason` + `closed_at`. المفردات في `DeliveryStatus` (ثوابت + انتقالات + أسباب). التعيين مزوّد ← قانوني في `OpostDeliveryProvider::mapProviderStatus` (كل منطق Opost محصور هناك؛ Driver قابل للتبديل عبر `config/shipping.php`).
+- **السجلّات (append-only، منفصلة):** `delivery_status_transitions` (قانوني: from/to/actor_type/actor/reason_code/note/وقت — المتطلّب 1) و`delivery_provider_transitions` (مزوّد خام + payload + idempotency فريد `(provider, event_id)`).
+- **أسباب تعليق مُصنّفة وقابلة للتقرير (المتطلّب 2/3):** `customer_no_answer/wrong_phone/wrong_address/customer_requested_delay/customer_refused/area_unavailable/courier_issue/business_issue/other` + تقرير تجميعي.
+- **CLOSE = الاكتمال المالي الوحيد (المتطلّب 4):** `DeliveryStatusService::close` ⇒ `orders.settled_at` + استحقاق العمولات **eligible فقط** (`markEligibleForOrder`) + حدث `ShipmentClosed`. **لا دفع تلقائي**؛ الاعتماد/الصرف منفصلان (4.2).
+- **الخدمة/الأحداث/الصلاحيات:** `DeliveryStatusService` (كل المنطق)؛ `DeliveryStatusChanged`/`ShipmentClosed`؛ `shipping.delivery.{view,manage,sync,close}`؛ دور `delivery_ops`؛ API + لوحة RTL. **15 اختبارًا.**
+- **مؤجّل ضمن بقية 4.3:** استثناءات التوصيل (`delivery_exceptions`: SLA/تصعيد/متابعة)، ربط webhook حيّ + مزامنة مجدولة، ورسوم التوصيل المفصّلة (المتطلّب 9).
 
 ### 4.4 — المرتجعات والاستبدال RMA (المتطلّبان 7، 8)
 - **الجداول:** `return_requests` (مصدر: customer/sales/warehouse/provider؛ نوع: return/exchange؛ حالة `return_request → approved → received → inspected → completed` + `rejected`)؛ `return_request_items` (بند/كمية/نوع الاستبدال/فرق السعر/مالك الرسوم)؛ الفحص (`inspection`): تصنيفات (sellable/open_box/repackage/damaged/broken/missing_parts/wrong_item/quarantine) → توجيه المخزون (on_hand/damaged/quarantine/provider_claim/internal). **لا تعديل غير رسمي للطلب الأصلي** (BR-RET-01). موافقات (مشرف/مستودع/مالية/عمليات). أنواع الاستبدال (نفس/أعلى بتحصيل/أقل باسترداد أو رصيد، جزئي، pickup+replacement متزامن/لاحق). الأثر العكسي عبر Inventory/Accounting القائمين (BR-RET-05).

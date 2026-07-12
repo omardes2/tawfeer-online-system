@@ -290,6 +290,24 @@
 | **المستمعون والمهام** | **Sync:** إرجاع المخزون + عكس العمولة. **Async:** `ReverseRevenueCogsJob` (Phase 5)، `ProcessRefundJob`، `NotifyReturnJob`. |
 | **الطور** | Phase 3. |
 
+## 5.8 `DeliveryStatusChanged` — *(مُنفَّذ Phase 4.3 / ADR-038)*
+| البند | التفصيل |
+|------|---------|
+| **المُطلِق** | تغيّر الحالة القانونية للتوصيل عبر `DeliveryStatusService::transitionTo` (يدوي/نظام/مزوّد). |
+| **الحمولة** | `shipment`, `fromStatus`, `toStatus`, `actorType` (user/system/provider), `reasonCode?`. |
+| **تغييرات قاعدة البيانات** | `shipments.delivery_status` (+`on_hold_reason`/`closed_at` عند اللزوم) + صفّ في `delivery_status_transitions` (append-only). حالة المزوّد الخام في `delivery_provider_transitions` منفصلة. |
+| **الآثار الجانبية** | نقطة امتداد (إشعارات/تحليلات) دون تسريب منطق مزوّد. **لا منطق نمو/تسويق.** |
+| **الطور** | Phase 4.3. |
+
+## 5.9 `ShipmentClosed` — *(مُنفَّذ Phase 4.3 / ADR-038)*
+| البند | التفصيل |
+|------|---------|
+| **المُطلِق** | بلوغ الحالة القانونية `closed` (الاكتمال المالي الوحيد). |
+| **الحمولة** | `shipment`, `order`. |
+| **تغييرات قاعدة البيانات** | `orders.settled_at` + عمولات الطلب `pending → eligible` (عبر `markEligibleForOrder`). **لا دفع تلقائي.** |
+| **الآثار الجانبية** | نقطة امتداد **للترحيل المحاسبي النهائي في 4.6** (لا محاسبة نهائية هنا). الاعتماد/الصرف يبقيان مسؤولية المالية منفصلين (4.2). |
+| **الطور** | Phase 4.3 (المحاسبة النهائية 4.6/Phase 5). |
+
 ---
 
 # 6) وحدة Payments / Accounting (المدفوعات)

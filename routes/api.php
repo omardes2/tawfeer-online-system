@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\V1\Sales\AssistedOrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderTransitionController;
 use App\Http\Controllers\Api\V1\Shipping\GeographyController;
+use App\Http\Controllers\Api\V1\Shipping\DeliveryStatusController;
 use App\Http\Controllers\Api\V1\Shipping\ShipmentController;
 use App\Http\Controllers\Api\V1\Store\CartController;
 use App\Http\Controllers\Api\V1\Store\CheckoutController;
@@ -235,6 +236,17 @@ Route::prefix('v1')->group(function () {
             Route::post('shipments/{shipment}/deliver', [ShipmentController::class, 'deliver']);
             Route::post('shipments/{shipment}/fail', [ShipmentController::class, 'fail']);
             Route::post('shipments/{shipment}/override-cost', [ShipmentController::class, 'overrideCost']);
+
+            /*
+            | Phase 4.3 — محرّك حالة التوصيل القانوني (ADR-038)
+            | حالة قانونية داخلية منفصلة عن حالة المزوّد الخام؛ التعيين في الـDriver.
+            | CLOSE = نقطة الاكتمال المالي الوحيدة (تُفعّل التسوية واستحقاق العمولات).
+            */
+            Route::get('shipments/{shipment}/delivery', [DeliveryStatusController::class, 'show'])->middleware('can:shipping.delivery.view');
+            Route::get('delivery/hold-reasons', [DeliveryStatusController::class, 'holdReasons'])->middleware('can:shipping.delivery.view');
+            Route::post('shipments/{shipment}/delivery/transition', [DeliveryStatusController::class, 'transition'])->middleware('can:shipping.delivery.manage');
+            Route::post('shipments/{shipment}/delivery/provider-status', [DeliveryStatusController::class, 'providerStatus'])->middleware('can:shipping.delivery.sync');
+            Route::post('shipments/{shipment}/delivery/close', [DeliveryStatusController::class, 'close'])->middleware('can:shipping.delivery.close');
         });
 
         /*

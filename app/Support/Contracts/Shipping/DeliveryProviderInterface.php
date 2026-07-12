@@ -28,5 +28,12 @@ interface DeliveryProviderInterface
      */
     public function cancel(string $reference): bool;
 
+    /**
+     * تعيين حالة المزوّد الخام إلى الحالة القانونية الداخلية (ADR-038).
+     * هنا **فقط** يعيش منطق المزوّد الخاص بالحالات — لا يُسرّب لوحدات الأعمال.
+     * يُرجِع مفتاحًا من DeliveryStatus، أو null إن كانت حالة المزوّد غير معروفة.
+     */
+    public function mapProviderStatus(string $providerStatus): ?string;
+
     public function name(): string;
 }

@@ -30,6 +30,7 @@ class Shipment extends Model
 
     protected $fillable = [
         'number', 'order_id', 'branch_id', 'warehouse_id', 'status',
+        'delivery_status', 'provider_status', 'on_hold_reason', 'closed_at',
         'carrier_name', 'tracking_number',
         'recipient_name', 'recipient_phone', 'address_text',
         'governorate_id', 'city_id', 'area_id', 'shipping_zone_id',
@@ -47,6 +48,7 @@ class Shipment extends Model
         'dispatched_at' => 'datetime',
         'delivered_at' => 'datetime',
         'failed_at' => 'datetime',
+        'closed_at' => 'datetime',
         'delivery_attempts' => 'integer',
     ];
 
@@ -93,6 +95,18 @@ class Shipment extends Model
     public function events(): HasMany
     {
         return $this->hasMany(ShipmentEvent::class)->orderBy('id');
+    }
+
+    /** سجلّ انتقالات الحالة القانونية للتوصيل (ADR-038). */
+    public function deliveryTransitions(): HasMany
+    {
+        return $this->hasMany(DeliveryStatusTransition::class)->orderBy('id');
+    }
+
+    /** سجلّ انتقالات حالة المزوّد الخام (ADR-038). */
+    public function providerTransitions(): HasMany
+    {
+        return $this->hasMany(DeliveryProviderTransition::class)->orderBy('id');
     }
 
     protected static function newFactory(): Factory
