@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 3.5 (Authentication & Identity)
+- Completes the auth/identity layer on top of the 3.4 account (ADR-036); thin
+  controllers, service-oriented, reuses CustomerService/CartService — no
+  duplicated business logic, no completed module redesigned.
+- Authentication: standard register/login with **email or phone** + password,
+  password reset (standard broker, storefront-styled RTL pages via
+  `ResetPassword::createUrlUsing`), remember-me, secure logout, and a required
+  Terms & Privacy acceptance at registration (`users.terms_accepted_at`).
+- Social login (Google/Facebook) via Laravel Socialite behind a swappable
+  `SocialAuthProvider` contract + neutral `SocialUserData` DTO (tests use a fake
+  provider — no real OAuth). Providers from `config/social.php`; **secrets only
+  in `.env`** via `config/services.php`. OAuth state/callback handled by
+  Socialite; login-vs-link intent tracked in session. Official-branding buttons
+  on login + register.
+- Identity: `social_identities` table (provider ids stored separately, unique
+  per provider+id, no secrets). `SocialAuthService` — existing identity → login;
+  **verified existing email → secure link**; else create account. Never
+  duplicates a customer. Account provider management (view/link/unlink) with a
+  last-login-method guard.
+- Profile completion before checkout: social users missing phone/birth-date/
+  language/comm-prefs are redirected via `EnsureProfileComplete` on `/checkout`;
+  completeness derived by `Customer::isProfileComplete()`.
+- Guest merge (extended): `GuestMergeService` unifies cart merge, links eligible
+  guest orders by normalized phone (CRM rule), and preserves addresses/
+  notifications.
+- Additive schema only: `social_identities`, `users.terms_accepted_at`, and
+  `customers.primary_phone` made nullable (social users have no phone until
+  completion). `CustomerService::create` now tolerates a null phone.
+- Explicitly NOT implemented (extension points only): loyalty, birthday rewards,
+  smart cart, marketing automation, recommendations, coupons, Meta Ads, Facebook
+  Pixel, analytics.
+- Tests: 12 new identity tests (Google/Facebook registration, existing-email
+  linking, duplicate prevention, guest merge, checkout profile guard, link/unlink
+  + last-method guard, password reset, phone login, terms required, guest-order
+  linking) → 349 passing total. Pint clean. Vite build passes.
+
 ### Added — Phase 3.4 (Customer Experience Layer)
 - Full customer account layer (ADR-035) on the storefront, session-based (web
   guard, separate from admin/Sanctum auth), Arabic RTL + English, mobile-first,

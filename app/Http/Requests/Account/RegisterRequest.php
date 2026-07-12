@@ -22,6 +22,8 @@ class RegisterRequest extends FormRequest
             'password' => ['required', 'confirmed', Password::defaults()],
             // تاريخ الميلاد مطلوب (جاهزية مكافآت الميلاد/التسويق مستقبلًا — ADR-035).
             'birth_date' => ['required', 'date', 'before:today'],
+            // قبول الشروط والخصوصية مطلوب (ADR-036).
+            'terms' => ['accepted'],
         ];
     }
 }

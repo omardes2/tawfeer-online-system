@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureProfileComplete;
 use App\Http\Middleware\RequireCustomer;
 use App\Http\Middleware\ResolveStoreIdentity;
 use App\Http\Middleware\SetStorefrontLocale;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'store.identity' => ResolveStoreIdentity::class,
             'storefront.locale' => SetStorefrontLocale::class,
             'require.customer' => RequireCustomer::class,
+            'profile.complete' => EnsureProfileComplete::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

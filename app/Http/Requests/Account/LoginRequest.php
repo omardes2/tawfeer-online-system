@@ -14,10 +14,20 @@ class LoginRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
+        // الحقل يقبل البريد أو رقم الجوال (Phase 3.5).
         return [
-            'email' => ['required', 'email'],
+            'email' => ['required', 'string'],
             'password' => ['required', 'string'],
             'remember' => ['nullable', 'boolean'],
         ];
+    }
+
+    /** بيانات الاعتماد: يحلّ الحقل إلى email أو phone حسب صيغته. */
+    public function credentials(): array
+    {
+        $login = (string) $this->input('email');
+        $field = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'phone';
+
+        return [$field => $login, 'password' => $this->input('password')];
     }
 }

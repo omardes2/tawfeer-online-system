@@ -60,6 +60,7 @@ class AccountExperienceTest extends TestCase
             'birth_date' => '1990-05-20',
             'password' => 'password123',
             'password_confirmation' => 'password123',
+            'terms' => '1', // مطلوب منذ Phase 3.5.
         ], $o);
     }
 

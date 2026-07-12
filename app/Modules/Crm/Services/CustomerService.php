@@ -16,7 +16,10 @@ class CustomerService
 {
     public function create(array $data, array $phones = [], array $addresses = [], array $contacts = []): Customer
     {
-        $data['primary_phone'] = $this->normalizePhone($data['primary_phone']);
+        // الهاتف اختياري لعملاء الدخول الاجتماعي (يُكمَّل لاحقًا) — يُطبَّع إن وُجد فقط.
+        $data['primary_phone'] = filled($data['primary_phone'] ?? null)
+            ? $this->normalizePhone($data['primary_phone'])
+            : null;
 
         return DB::transaction(function () use ($data, $phones, $addresses, $contacts) {
             $customer = Customer::create($data + ['created_by' => auth()->id()]);

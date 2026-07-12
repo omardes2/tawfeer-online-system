@@ -3,21 +3,32 @@
         <h1 class="text-xl font-bold text-gray-900 mb-1">{{ __('account.login') }}</h1>
         <p class="text-sm text-gray-500 mb-6">{{ __('storefront.site_name') }}</p>
 
+        @if (session('status'))
+            <div class="mb-4 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm px-4 py-3">
+                {{ session('status') }}
+            </div>
+        @endif
+
         @if ($errors->any())
             <div class="mb-4 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3">
                 {{ $errors->first() }}
             </div>
         @endif
 
+        <x-storefront.social-buttons />
+
         <form method="POST" action="{{ route('account.login') }}" class="space-y-4">
             @csrf
             <div>
-                <label for="email" class="block text-sm font-medium text-gray-700 mb-1">{{ __('account.email') }}</label>
-                <input id="email" name="email" type="email" value="{{ old('email') }}" required autofocus autocomplete="email"
+                <label for="email" class="block text-sm font-medium text-gray-700 mb-1">{{ __('account.email_or_phone') }}</label>
+                <input id="email" name="email" type="text" value="{{ old('email') }}" required autofocus autocomplete="username"
                        class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
             </div>
             <div>
-                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">{{ __('account.password') }}</label>
+                <div class="flex items-center justify-between mb-1">
+                    <label for="password" class="block text-sm font-medium text-gray-700">{{ __('account.password') }}</label>
+                    <a href="{{ route('account.password.request') }}" class="text-xs text-emerald-600 hover:underline">{{ __('account.forgot_password') }}</a>
+                </div>
                 <input id="password" name="password" type="password" required autocomplete="current-password"
                        class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
             </div>

@@ -23,10 +23,14 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Storefront\Account\AccountController;
 use App\Http\Controllers\Storefront\Account\AddressController;
 use App\Http\Controllers\Storefront\Account\AuthController as AccountAuthController;
+use App\Http\Controllers\Storefront\Account\LinkedProviderController;
 use App\Http\Controllers\Storefront\Account\NotificationController as AccountNotificationController;
 use App\Http\Controllers\Storefront\Account\OrderController as AccountOrderController;
+use App\Http\Controllers\Storefront\Account\PasswordResetController;
 use App\Http\Controllers\Storefront\Account\PreferenceController;
+use App\Http\Controllers\Storefront\Account\ProfileCompletionController;
 use App\Http\Controllers\Storefront\Account\ProfileController as AccountProfileController;
+use App\Http\Controllers\Storefront\Account\SocialAuthController;
 use App\Http\Controllers\Storefront\Account\WishlistController;
 use App\Http\Controllers\Storefront\StorefrontController;
 use Illuminate\Support\Facades\Route;
@@ -45,7 +49,7 @@ Route::middleware('storefront.locale')->group(function () {
     Route::get('/b/{slug}', [StorefrontController::class, 'brand'])->name('storefront.brand');
     Route::get('/p/{slug}', [StorefrontController::class, 'show'])->name('storefront.product');
     Route::get('/cart', [StorefrontController::class, 'cart'])->name('storefront.cart');
-    Route::get('/checkout', [StorefrontController::class, 'checkout'])->name('storefront.checkout');
+    Route::get('/checkout', [StorefrontController::class, 'checkout'])->middleware('profile.complete')->name('storefront.checkout');
     Route::get('/lang/{locale}', [StorefrontController::class, 'setLocale'])->name('storefront.locale');
 
     /*
@@ -56,7 +60,17 @@ Route::middleware('storefront.locale')->group(function () {
         Route::post('/account/login', [AccountAuthController::class, 'login']);
         Route::get('/account/register', [AccountAuthController::class, 'showRegister'])->name('account.register');
         Route::post('/account/register', [AccountAuthController::class, 'register']);
+
+        // استرجاع كلمة المرور (Phase 3.5).
+        Route::get('/account/forgot-password', [PasswordResetController::class, 'request'])->name('account.password.request');
+        Route::post('/account/forgot-password', [PasswordResetController::class, 'email'])->name('account.password.email');
+        Route::get('/account/reset-password/{token}', [PasswordResetController::class, 'reset'])->name('account.password.reset');
+        Route::post('/account/reset-password', [PasswordResetController::class, 'update'])->name('account.password.store');
     });
+
+    // الدخول الاجتماعي (Phase 3.5 / ADR-036) — login أو link حسب النيّة.
+    Route::get('/auth/{provider}/redirect', [SocialAuthController::class, 'redirect'])->name('social.redirect');
+    Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback'])->name('social.callback');
 
     Route::middleware('require.customer')->prefix('account')->name('account.')->group(function () {
         Route::post('logout', [AccountAuthController::class, 'logout'])->name('logout');
@@ -82,6 +96,15 @@ Route::middleware('storefront.locale')->group(function () {
 
         Route::get('preferences', [PreferenceController::class, 'edit'])->name('preferences');
         Route::patch('preferences', [PreferenceController::class, 'update'])->name('preferences.update');
+
+        // إكمال الملف بعد الدخول الاجتماعي (Phase 3.5).
+        Route::get('complete-profile', [ProfileCompletionController::class, 'show'])->name('profile.complete');
+        Route::post('complete-profile', [ProfileCompletionController::class, 'store'])->name('profile.complete.store');
+
+        // مزوّدو الدخول المربوطون (Phase 3.5).
+        Route::get('providers', [LinkedProviderController::class, 'index'])->name('providers');
+        Route::get('providers/{provider}/link', [SocialAuthController::class, 'redirectLink'])->name('providers.link');
+        Route::delete('providers/{provider}', [LinkedProviderController::class, 'unlink'])->name('providers.unlink');
 
         Route::get('notifications', [AccountNotificationController::class, 'index'])->name('notifications');
         Route::post('notifications/{id}/read', [AccountNotificationController::class, 'markRead'])->name('notifications.read');

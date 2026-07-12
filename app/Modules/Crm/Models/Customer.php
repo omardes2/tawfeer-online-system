@@ -63,6 +63,18 @@ class Customer extends Model
         return $this->belongsTo(Branch::class, 'preferred_branch_id');
     }
 
+    /**
+     * اكتمل الملف بالبيانات المطلوبة قبل الشراء (Phase 3.5): هاتف + ميلاد + لغة مفضّلة
+     * + تفضيلات تواصل. يُستخدم لتوجيه مستخدمي الدخول الاجتماعي لإكمال الملف.
+     */
+    public function isProfileComplete(): bool
+    {
+        return filled($this->primary_phone)
+            && filled($this->birth_date)
+            && filled($this->preferred_locale)
+            && ! is_null($this->communication_preferences);
+    }
+
     /** عناصر قائمة المفضّلة (Phase 3.4). */
     public function wishlistItems(): HasMany
     {

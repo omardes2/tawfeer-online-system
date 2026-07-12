@@ -13,6 +13,8 @@
             </div>
         @endif
 
+        <x-storefront.social-buttons />
+
         <form method="POST" action="{{ route('account.register') }}" class="space-y-4">
             @csrf
             <div>
@@ -46,6 +48,10 @@
                 <input id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password"
                        class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
             </div>
+            <label class="flex items-start gap-2 text-sm text-gray-600">
+                <input type="checkbox" name="terms" value="1" @checked(old('terms')) required class="mt-0.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                <span>{{ __('account.terms_accept') }}</span>
+            </label>
             <button type="submit" class="w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5">
                 {{ __('account.register') }}
             </button>

@@ -41,7 +41,8 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request)
     {
-        if (! Auth::attempt($request->only('email', 'password'), $request->boolean('remember'))) {
+        // يقبل البريد أو رقم الجوال (Phase 3.5) عبر credentials().
+        if (! Auth::attempt($request->credentials(), $request->boolean('remember'))) {
             throw ValidationException::withMessages(['email' => __('auth.failed')]);
         }
         $request->session()->regenerate();

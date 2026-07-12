@@ -19,6 +19,7 @@ class AccountService
     public function __construct(
         private readonly CustomerService $customers,
         private readonly CartService $carts,
+        private readonly GuestMergeService $guestMerge,
     ) {}
 
     /**
@@ -38,6 +39,7 @@ class AccountService
                 'password' => $data['password'],
                 'branch_id' => $branchId,
                 'is_active' => true,
+                'terms_accepted_at' => now(), // قبول الشروط مطلوب عند التسجيل العادي (ADR-036).
             ]);
             $user->assignRole('customer');
 
@@ -66,10 +68,10 @@ class AccountService
         return Customer::where('user_id', $user->id)->first();
     }
 
-    /** دمج سلة الضيف في سلة المستخدم (عند الدخول/التسجيل). */
+    /** دمج بيانات الضيف (سلة + طلبات مؤهّلة…) عند الدخول/التسجيل — عبر GuestMergeService. */
     public function mergeGuestCart(User $user, ?string $guestToken): void
     {
-        $this->carts->mergeGuestIntoUser($user, $guestToken);
+        $this->guestMerge->merge($user, $guestToken);
     }
 
     /**

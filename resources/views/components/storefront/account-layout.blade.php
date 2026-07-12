@@ -8,6 +8,7 @@
         'addresses' => ['label' => __('account.addresses'), 'route' => 'account.addresses'],
         'notifications' => ['label' => __('account.notifications'), 'route' => 'account.notifications'],
         'preferences' => ['label' => __('account.preferences'), 'route' => 'account.preferences'],
+        'providers' => ['label' => __('account.linked_providers'), 'route' => 'account.providers'],
         'profile' => ['label' => __('account.settings'), 'route' => 'account.profile'],
     ];
 @endphp
