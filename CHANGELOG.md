@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.7 (Operational Reports & Analytics) — completes Phase 4
+- **New read-only `Reporting` module (ADR-042)** — SQL aggregations over the
+  existing business tables; no duplicated logic and no writes. Reads the ledgers
+  that phases 4.1–4.6 write (commissions from `commission_entries`, money from
+  `delivery_settlements`/`payments`, etc.).
+- **5 dashboards:** Executive, Sales, Orders, Delivery, Finance.
+- **6 reports:** Sales-employee performance, Marketer performance, Product
+  performance, Customer statistics, Delivery-company statistics, Returns
+  statistics.
+- Date ranges: day / week / month / custom (`DateRange`). Fast name search on
+  tabular reports.
+- **Export:** Excel = UTF-8 CSV with BOM (real download, Arabic-safe); PDF =
+  browser print (print CSS, correct Arabic RTL) — no heavy PDF dependency added.
+- Server-rendered CSS bar charts (no JS lib), mobile-responsive, RTL, Arabic/
+  English.
+- All report routes gated by `can:reports.view`. Additive only; no schema
+  change.
+- Tests: 10 new reporting tests → 433 passing. Pint clean; frontend build
+  succeeds.
+
 ### Changed — scope
 - **Phase 4.5 (Delivery Claims) removed** per owner request — no dedicated
   claims module. Claim-like deductions are handled as generic settlement lines.

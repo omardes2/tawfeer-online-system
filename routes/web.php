@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\Purchasing\SupplierController as AdminSupplierCon
 use App\Http\Controllers\Admin\Purchasing\SupplierReturnController as AdminSupplierReturnController;
 use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
+use App\Http\Controllers\Admin\Reports\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\Returns\ReturnController as AdminReturnController;
 use App\Http\Controllers\Admin\Settlements\SettlementController as AdminSettlementController;
 use App\Http\Controllers\Admin\Shipping\DeliveryStatusController as AdminDeliveryStatusController;
@@ -222,6 +223,22 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('rules', [AdminCommissionController::class, 'rules'])->name('rules')->middleware('can:commissions.rules.manage');
         Route::post('rules', [AdminCommissionController::class, 'storeRule'])->name('rules.store')->middleware('can:commissions.rules.manage');
         Route::delete('rules/{rule}', [AdminCommissionController::class, 'destroyRule'])->name('rules.destroy')->middleware('can:commissions.rules.manage');
+    });
+
+    // التقارير والتحليلات (Phase 4.7) — للقراءة فقط
+    Route::prefix('reports')->name('reports.')->middleware('can:reports.view')->group(function () {
+        Route::get('/', [AdminReportController::class, 'index'])->name('index');
+        Route::get('executive', [AdminReportController::class, 'executive'])->name('executive');
+        Route::get('sales', [AdminReportController::class, 'sales'])->name('sales');
+        Route::get('orders', [AdminReportController::class, 'orders'])->name('orders');
+        Route::get('delivery', [AdminReportController::class, 'delivery'])->name('delivery');
+        Route::get('finance', [AdminReportController::class, 'finance'])->name('finance');
+        Route::get('sales-employees', [AdminReportController::class, 'salesEmployees'])->name('sales_employees');
+        Route::get('marketers', [AdminReportController::class, 'marketers'])->name('marketers');
+        Route::get('products', [AdminReportController::class, 'products'])->name('products');
+        Route::get('customers', [AdminReportController::class, 'customers'])->name('customers');
+        Route::get('delivery-companies', [AdminReportController::class, 'deliveryCompanies'])->name('delivery_companies');
+        Route::get('returns', [AdminReportController::class, 'returns'])->name('returns');
     });
 
     // التسويات المالية (Phase 4.6)
