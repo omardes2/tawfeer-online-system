@@ -11,7 +11,9 @@ use App\Http\Controllers\Admin\Catalog\UnitController;
 use App\Http\Controllers\Admin\Commissions\CommissionController as AdminCommissionController;
 use App\Http\Controllers\Admin\Crm\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Admin\Inventory\InventoryController;
+use App\Http\Controllers\Admin\Inventory\InventoryCountController as AdminInventoryCountController;
 use App\Http\Controllers\Admin\Inventory\StockAdjustmentController as AdminStockAdjustmentController;
+use App\Http\Controllers\Admin\Inventory\WarehouseController as AdminWarehouseController;
 use App\Http\Controllers\Admin\Payment\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\Purchasing\GoodsReceiptController as AdminGoodsReceiptController;
 use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController as AdminPurchaseOrderController;
@@ -158,6 +160,22 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::resource('adjustments', AdminStockAdjustmentController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
         Route::post('adjustments/{adjustment}/approve', [AdminStockAdjustmentController::class, 'approve'])->name('adjustments.approve');
         Route::post('adjustments/{adjustment}/post', [AdminStockAdjustmentController::class, 'post'])->name('adjustments.post');
+
+        // Phase 5 — لوحة المستودع + جرد + تنبيهات نقص + باركود + دفعات
+        Route::get('warehouse', [AdminWarehouseController::class, 'dashboard'])->name('warehouse')->middleware('can:inventory.stocks.view');
+        Route::get('low-stock', [AdminWarehouseController::class, 'lowStock'])->name('low_stock')->middleware('can:inventory.alerts.view');
+        Route::get('barcode', [AdminWarehouseController::class, 'barcode'])->name('barcode')->middleware('can:inventory.stocks.view');
+        Route::get('batch', [AdminWarehouseController::class, 'batch'])->name('batch')->middleware('can:inventory.batch');
+        Route::post('batch', [AdminWarehouseController::class, 'batchStore'])->name('batch.store')->middleware('can:inventory.batch');
+
+        Route::get('counts', [AdminInventoryCountController::class, 'index'])->name('counts.index')->middleware('can:inventory.counts.view');
+        Route::post('counts', [AdminInventoryCountController::class, 'store'])->name('counts.store')->middleware('can:inventory.counts.manage');
+        Route::get('counts/{count}', [AdminInventoryCountController::class, 'show'])->name('counts.show')->middleware('can:inventory.counts.view');
+        Route::post('counts/{count}/record', [AdminInventoryCountController::class, 'record'])->name('counts.record')->middleware('can:inventory.counts.manage');
+        Route::post('counts/{count}/record-batch', [AdminInventoryCountController::class, 'recordBatch'])->name('counts.record_batch')->middleware('can:inventory.counts.manage');
+        Route::post('counts/{count}/review', [AdminInventoryCountController::class, 'review'])->name('counts.review')->middleware('can:inventory.counts.manage');
+        Route::post('counts/{count}/complete', [AdminInventoryCountController::class, 'complete'])->name('counts.complete')->middleware('can:inventory.counts.manage');
+        Route::post('counts/{count}/cancel', [AdminInventoryCountController::class, 'cancel'])->name('counts.cancel')->middleware('can:inventory.counts.manage');
     });
 
     // المشتريات (Phase 2.5)

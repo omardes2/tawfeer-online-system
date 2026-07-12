@@ -15,9 +15,11 @@ use App\Http\Controllers\Api\V1\Catalog\UnitController;
 use App\Http\Controllers\Api\V1\Crm\CustomerController;
 use App\Http\Controllers\Api\V1\Inventory\InventoryLedgerController;
 use App\Http\Controllers\Api\V1\Inventory\InventoryMovementController;
+use App\Http\Controllers\Api\V1\Inventory\InventoryCountController;
 use App\Http\Controllers\Api\V1\Inventory\InventoryOperationController;
 use App\Http\Controllers\Api\V1\Inventory\InventoryStockController;
 use App\Http\Controllers\Api\V1\Inventory\StockAdjustmentController;
+use App\Http\Controllers\Api\V1\Inventory\WarehouseInsightController;
 use App\Http\Controllers\Api\V1\Inventory\StockReservationController;
 use App\Http\Controllers\Api\V1\Payment\PaymentController;
 use App\Http\Controllers\Api\V1\Payment\PaymentMethodController;
@@ -150,6 +152,18 @@ Route::prefix('v1')->group(function () {
             Route::delete('adjustments/{adjustment}', [StockAdjustmentController::class, 'destroy']);
             Route::post('adjustments/{adjustment}/approve', [StockAdjustmentController::class, 'approve']);
             Route::post('adjustments/{adjustment}/post', [StockAdjustmentController::class, 'post']);
+
+            // Phase 5 — رؤى المستودع + الجرد الفعلي (ADR-043)
+            Route::get('barcode', [WarehouseInsightController::class, 'barcode'])->middleware('can:inventory.stocks.view');
+            Route::get('low-stock', [WarehouseInsightController::class, 'lowStock'])->middleware('can:inventory.alerts.view');
+            Route::get('warehouse-dashboard', [WarehouseInsightController::class, 'dashboard'])->middleware('can:inventory.stocks.view');
+            Route::get('counts', [InventoryCountController::class, 'index'])->middleware('can:inventory.counts.view');
+            Route::post('counts', [InventoryCountController::class, 'store'])->middleware('can:inventory.counts.manage');
+            Route::get('counts/{count}', [InventoryCountController::class, 'show'])->middleware('can:inventory.counts.view');
+            Route::post('counts/{count}/record', [InventoryCountController::class, 'record'])->middleware('can:inventory.counts.manage');
+            Route::post('counts/{count}/review', [InventoryCountController::class, 'review'])->middleware('can:inventory.counts.manage');
+            Route::post('counts/{count}/complete', [InventoryCountController::class, 'complete'])->middleware('can:inventory.counts.manage');
+            Route::post('counts/{count}/cancel', [InventoryCountController::class, 'cancel'])->middleware('can:inventory.counts.manage');
         });
 
         /*

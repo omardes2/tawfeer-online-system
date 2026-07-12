@@ -205,6 +205,16 @@
 - **التكلفة المُحمّلة (Landed Cost — BR-PUR-06):** `goods_receipts.additional_cost` تُوزَّع على البنود بنسبة قيمة السطر قبل احتساب WAC.
 - **FK مؤجّلة:** `suppliers.governorate_id/city_id/currency_id` (جداولها غير مُنشأة) — أعمدة nullable بلا قيد الآن.
 
+## ADR-043 — تعزيزات المستودع والمخزون (Warehouse & Inventory) [مُعتمد في Phase 5]
+- **السياق:** استكمال إدارة المستودع فوق محرّك المخزون القائم (2.4) دون إعادة تصميم: **جرد فعلي (stock-take)، تنبيهات نقص، بحث باركود، عمليات دفعية، ولوحة مستودع**. الأرصدة/الحركات/الدفتر/الحجز/الخصم عند الشحن/الإرجاع التلقائي كلّها **قائمة وتُعاد استخدامها كما هي**.
+- **مبدأ إلزامي — كل تغيير مخزون عبر `InventoryService`:** أي تسوية (جرد/دفعة) تمرّ حصريًا عبر `adjustIn/adjustOut`، فتُسجَّل `inventory_movements` + `inventory_ledger` + التدقيق تلقائيًا. **لا مساس مباشر بالأرصدة ولا تكرار منطق.**
+- **الجرد الفعلي (جديد):** `inventory_counts` (uuid/رقم CNT/حالة counting→review→completed+cancelled/نطاق) + `inventory_count_items` (لقطة `system_qty` مقابل `counted_qty` والفرق). `InventoryCountService`: فتح (لقطة أرصدة النظام)، تسجيل (بالصنف أو الباركود أو دفعة)، مراجعة، **إكمال يطبّق الفرق مقابل الرصيد الحالي عبر المحرّك** (يضمن أن يصبح on_hand = المعدود).
+- **تنبيهات النقص (تعزيز):** يعاد استخدام `inventory_stocks.reorder_level`/`reorder_qty` **القائمة** (لا عمود جديد)؛ استعلام `on_hand ≤ reorder_level` + تقرير/لوحة + صلاحية `inventory.alerts.view`.
+- **الباركود:** بحث دقيق `product_variants.barcode` ثم `products.barcode` (المتغيّر الافتراضي) — نقطة `WarehouseService::findByBarcode` + مسار API/شاشة مسح للجرد.
+- **الدفعات:** `InventoryBatchService::adjust` يطبّق فروقًا موقّعة متعدّدة ذرّيًا عبر المحرّك.
+- **مستودع واحد رئيسي:** WH-MAIN القائم (`is_default`)؛ لا تغيير على النموذج. الصلاحيات الجديدة `inventory.counts.{view,manage}`, `inventory.alerts.view`, `inventory.batch` (تُضاف لدور warehouse/manager/admin عبر `InventoryPermissionSeeder`).
+- **الحالة:** مُنفَّذ (جرد/تنبيهات/باركود/دفعات/لوحة، 12 اختبارًا). عربي/إنجليزي RTL متجاوب. لا إعادة تصميم لأي وحدة مكتملة.
+
 ## ADR-042 — التقارير والتحليلات التشغيلية (Operational Reports) [مُعتمد في Phase 4.7]
 - **السياق:** لوحات وتقارير تشغيلية تنفيذية/مبيعات/طلبات/توصيل/مالية + أداء موظفين/مسوّقين/منتجات + إحصاءات عملاء/شركات توصيل/مرتجعات. بنطاقات يومي/أسبوعي/شهري/مخصّص، تصدير Excel/PDF، بحث/فلترة، رسوم، RTL عربي/إنجليزي، متجاوبة للجوّال.
 - **القرار — طبقة قراءة فقط، لا تكرار منطق:** وحدة `app/Modules/Reporting` (`ReportingService`) **تجميعات SQL فوق نفس جداول الأعمال القائمة** (orders/order_items/commission_entries/shipments/delivery_status_transitions/return_requests/delivery_settlements/payments/customers). **لا تكتب شيئًا ولا تعيد حساب أي منطق** — تقرأ الدفاتر والجداول التي تكتبها خدمات المراحل 4.1–4.6 (العمولة من `commission_entries`، المال من `delivery_settlements`/`payments`، إلخ). أداء عبر group-by مفهرسة.

@@ -26,6 +26,11 @@ class InventoryPermissionSeeder extends Seeder
         'inventory.adjustments.approve',
         'inventory.adjustments.post',
         'inventory.adjustments.delete',
+        // Phase 5 — جرد/تنبيهات/دفعات
+        'inventory.counts.view',
+        'inventory.counts.manage',
+        'inventory.alerts.view',
+        'inventory.batch',
     ];
 
     private array $grants = [
@@ -35,8 +40,9 @@ class InventoryPermissionSeeder extends Seeder
             'inventory.operations.receive', 'inventory.operations.issue', 'inventory.operations.transfer',
             'inventory.reservations.view', 'inventory.reservations.create', 'inventory.reservations.release',
             'inventory.adjustments.view', 'inventory.adjustments.create', 'inventory.adjustments.update',
+            'inventory.counts.view', 'inventory.counts.manage', 'inventory.alerts.view', 'inventory.batch',
         ],
-        'accountant' => ['inventory.stocks.view', 'inventory.movements.view'],
+        'accountant' => ['inventory.stocks.view', 'inventory.movements.view', 'inventory.alerts.view'],
         'sales' => ['inventory.stocks.view', 'inventory.reservations.view'],
     ];
 

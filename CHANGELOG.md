@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 5 (Warehouse & Inventory Management)
+- **Additive enhancements over the existing inventory engine (2.4) — no
+  redesign (ADR-043).** Existing capabilities reused as-is and verified: single
+  main warehouse (WH-MAIN), stock management, movements + ledger, purchase
+  receiving (2.5), manual `StockAdjustment`, reservation on order creation,
+  automatic deduction after shipment, automatic stock return on approved returns
+  (4.4), full audit logs, availability sync (`available = on_hand − reserved`).
+- **Physical inventory count / stock-take (new):** `inventory_counts` +
+  `inventory_count_items` and `InventoryCountService` — open (snapshots system
+  quantities) → record by item / **barcode** / batch → review → complete.
+  **Completion applies every variance exclusively through `InventoryService::
+  adjustIn/adjustOut`**, so movement + ledger + audit are written automatically
+  (no direct balance mutation, no duplicated logic). Variance is computed vs the
+  current on-hand at completion (result always equals the counted quantity).
+- **Low-stock alerts:** reuses the existing `reorder_level`/`reorder_qty`
+  columns; low-stock report + warehouse dashboard tile + `inventory.alerts.view`.
+- **Barcode support:** exact variant/product barcode lookup
+  (`WarehouseService::findByBarcode`) with a scan endpoint used in count screens.
+- **Batch operations:** `InventoryBatchService::adjust` applies multiple signed
+  deltas atomically through the engine.
+- **Warehouse dashboard:** KPIs (SKUs, on-hand, reserved, available, stock
+  value, low-stock, open counts) + quick links. RTL, Arabic/English, mobile.
+- New permissions `inventory.counts.{view,manage}`, `inventory.alerts.view`,
+  `inventory.batch` (granted to warehouse/manager/admin). API under
+  `/api/v1/inventory` (counts, barcode, low-stock, dashboard) + admin pages.
+- Tests: 12 new warehouse tests → 445 passing. Pint clean; frontend build
+  succeeds.
+
 ### Added — Phase 4.7 (Operational Reports & Analytics) — completes Phase 4
 - **New read-only `Reporting` module (ADR-042)** — SQL aggregations over the
   existing business tables; no duplicated logic and no writes. Reads the ledgers
