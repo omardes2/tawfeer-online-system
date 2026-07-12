@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\Accounting\AccountingController as AdminAccountingController;
 use App\Http\Controllers\Admin\Accounting\JournalEntryController as AdminJournalEntryController;
+use App\Http\Controllers\Admin\Ai\AiContentController;
 use App\Http\Controllers\Admin\Catalog\BrandController;
 use App\Http\Controllers\Admin\Catalog\CategoryController;
 use App\Http\Controllers\Admin\Catalog\ProductAttributeController;
@@ -14,17 +15,21 @@ use App\Http\Controllers\Admin\Inventory\InventoryController;
 use App\Http\Controllers\Admin\Inventory\InventoryCountController as AdminInventoryCountController;
 use App\Http\Controllers\Admin\Inventory\StockAdjustmentController as AdminStockAdjustmentController;
 use App\Http\Controllers\Admin\Inventory\WarehouseController as AdminWarehouseController;
+use App\Http\Controllers\Admin\Marketing\CampaignController as AdminCampaignController;
+use App\Http\Controllers\Admin\Marketing\CampaignTemplateController as AdminCampaignTemplateController;
 use App\Http\Controllers\Admin\Payment\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\Purchasing\GoodsReceiptController as AdminGoodsReceiptController;
 use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController as AdminPurchaseOrderController;
 use App\Http\Controllers\Admin\Purchasing\SupplierController as AdminSupplierController;
 use App\Http\Controllers\Admin\Purchasing\SupplierReturnController as AdminSupplierReturnController;
-use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
-use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
+use App\Http\Controllers\Admin\Recommendations\RecommendationRuleController as AdminRecommendationRuleController;
+use App\Http\Controllers\Admin\Reports\KpiController as AdminKpiController;
 use App\Http\Controllers\Admin\Reports\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\Returns\ReturnController as AdminReturnController;
+use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\Settlements\SettlementController as AdminSettlementController;
 use App\Http\Controllers\Admin\Shipping\DeliveryStatusController as AdminDeliveryStatusController;
+use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
 use App\Http\Controllers\Admin\Shipping\ShipmentController as AdminShipmentController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Storefront\Account\AccountController;
@@ -39,6 +44,7 @@ use App\Http\Controllers\Storefront\Account\ProfileCompletionController;
 use App\Http\Controllers\Storefront\Account\ProfileController as AccountProfileController;
 use App\Http\Controllers\Storefront\Account\SocialAuthController;
 use App\Http\Controllers\Storefront\Account\WishlistController;
+use App\Http\Controllers\Storefront\RecommendationTrackingController;
 use App\Http\Controllers\Storefront\StorefrontController;
 use Illuminate\Support\Facades\Route;
 
@@ -58,6 +64,9 @@ Route::middleware('storefront.locale')->group(function () {
     Route::get('/cart', [StorefrontController::class, 'cart'])->name('storefront.cart');
     Route::get('/checkout', [StorefrontController::class, 'checkout'])->middleware('profile.complete')->name('storefront.checkout');
     Route::get('/lang/{locale}', [StorefrontController::class, 'setLocale'])->name('storefront.locale');
+
+    // تتبّع أحداث التوصيات (انطباع/نقر/تحويل) — Phase 6 / ADR-045
+    Route::post('/recommendations/track', [RecommendationTrackingController::class, 'store'])->name('storefront.recommendations.track');
 
     /*
     | حساب العميل (Phase 3.4 / ADR-035) — جلسة الويب، عربي RTL + إنجليزي، noindex.
@@ -257,6 +266,36 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('customers', [AdminReportController::class, 'customers'])->name('customers');
         Route::get('delivery-companies', [AdminReportController::class, 'deliveryCompanies'])->name('delivery_companies');
         Route::get('returns', [AdminReportController::class, 'returns'])->name('returns');
+    });
+
+    // لوحات مؤشّرات الأداء الموسّعة (Phase 6 / ADR-047) — للقراءة فقط
+    Route::get('kpis', [AdminKpiController::class, 'index'])->name('kpis')->middleware('can:kpis.view');
+
+    // مساعد محتوى المنتجات بالذكاء الاصطناعي (Phase 6 / ADR-044) — اقتراح فقط
+    Route::post('ai/content/generate', [AiContentController::class, 'generate'])->name('ai.content.generate')->middleware('can:ai.content.use');
+
+    // محرّك التوصيات — قواعد يدوية واستثناءات (Phase 6 / ADR-045)
+    Route::prefix('recommendations')->name('recommendations.')->middleware('can:recommendations.manage')->group(function () {
+        Route::get('/', [AdminRecommendationRuleController::class, 'index'])->name('index');
+        Route::post('/', [AdminRecommendationRuleController::class, 'store'])->name('store');
+        Route::delete('{recommendation}', [AdminRecommendationRuleController::class, 'destroy'])->name('destroy');
+    });
+
+    // أتمتة التسويق — الحملات والقوالب (Phase 6 / ADR-046)
+    Route::prefix('marketing')->name('marketing.')->group(function () {
+        Route::get('templates', [AdminCampaignTemplateController::class, 'index'])->name('templates.index')->middleware('can:marketing.templates.manage');
+        Route::post('templates', [AdminCampaignTemplateController::class, 'store'])->name('templates.store')->middleware('can:marketing.templates.manage');
+        Route::delete('templates/{template}', [AdminCampaignTemplateController::class, 'destroy'])->name('templates.destroy')->middleware('can:marketing.templates.manage');
+
+        Route::get('campaigns', [AdminCampaignController::class, 'index'])->name('campaigns.index')->middleware('can:marketing.campaigns.view');
+        Route::get('campaigns/create', [AdminCampaignController::class, 'create'])->name('campaigns.create')->middleware('can:marketing.campaigns.manage');
+        Route::post('campaigns', [AdminCampaignController::class, 'store'])->name('campaigns.store')->middleware('can:marketing.campaigns.manage');
+        Route::get('campaigns/{campaign}', [AdminCampaignController::class, 'show'])->name('campaigns.show')->middleware('can:marketing.campaigns.view');
+        Route::post('campaigns/{campaign}/submit', [AdminCampaignController::class, 'submit'])->name('campaigns.submit')->middleware('can:marketing.campaigns.manage');
+        Route::post('campaigns/{campaign}/approve', [AdminCampaignController::class, 'approve'])->name('campaigns.approve')->middleware('can:marketing.campaigns.approve');
+        Route::post('campaigns/{campaign}/activate', [AdminCampaignController::class, 'activate'])->name('campaigns.activate')->middleware('can:marketing.campaigns.approve');
+        Route::post('campaigns/{campaign}/pause', [AdminCampaignController::class, 'pause'])->name('campaigns.pause')->middleware('can:marketing.campaigns.manage');
+        Route::post('campaigns/{campaign}/test', [AdminCampaignController::class, 'test'])->name('campaigns.test')->middleware('can:marketing.campaigns.manage');
     });
 
     // التسويات المالية (Phase 4.6)

@@ -56,6 +56,10 @@ class DatabaseSeeder extends Seeder
             ReturnsPermissionSeeder::class,
             // Phase 4.6 — التسويات المالية
             SettlementsPermissionSeeder::class,
+            // Phase 6 — الذكاء الاصطناعي والتوصيات والتسويق ولوحات المؤشّرات
+            AiPermissionSeeder::class,
+            RecommendationsPermissionSeeder::class,
+            MarketingPermissionSeeder::class,
         ]);
     }
 }

@@ -83,12 +83,18 @@ class StorefrontController extends Controller
 
     public function cart(): View
     {
-        return view('storefront.cart');
+        // توصيات في السلة (Phase 6 / ADR-045): شخصية إن أمكن، وإلا الأكثر مبيعًا.
+        return view('storefront.cart', [
+            'recommendations' => $this->reco->personalized(auth()->id(), 8),
+        ]);
     }
 
     public function checkout(): View
     {
-        return view('storefront.checkout');
+        // توصيات في الإتمام (Phase 6 / ADR-045): الأكثر مبيعًا (بيع تكميلي خفيف).
+        return view('storefront.checkout', [
+            'recommendations' => $this->reco->bestSellers(8),
+        ]);
     }
 
     public function setLocale(Request $request, string $locale): RedirectResponse

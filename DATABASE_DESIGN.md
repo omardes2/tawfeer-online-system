@@ -217,6 +217,35 @@
 
 ---
 
+## 11. النمو والذكاء (Phase 6 — مُنفَّذ)
+
+> إضافية بالكامل (ADR-044/045/046/047). الأسرار في `.env` — لا مفاتيح في الجداول.
+
+### `ai_generation_logs` (append-only)
+`user_id` → users · `product_id` → products · `type` · `action` · `locale` · `provider` · `model` · `prompt_tokens` · `completion_tokens` · `total_tokens` · `status` · `error` — **بلا أسرار**. (ADR-044)
+
+### `product_recommendations`
+`product_id` → products · `recommended_product_id` → products · `type` (related/cross_sell/upsell/complementary/fbt) · `kind` (include/exclude) · `position` · `is_active` · `created_by`. فريد (product, recommended, type). (ADR-045)
+
+### `recommendation_events` (append-only)
+`source_product_id` · `recommended_product_id` · `type` · `event` (impression/click/conversion) · `source` · `placement` · `user_id` · `session_token`. (ADR-045)
+
+### `campaign_templates`
+`name` · `channel` · `subject` · `body_ar` · `body_en` · `is_active` · `created_by`. (ADR-046)
+
+### `campaigns` (uuid · soft-delete · auditable)
+`name` · `use_case` · `channel` · `status` (draft→pending_approval→approved→active→paused→completed→archived) · `trigger_type` (event/scheduled/manual) · `trigger_event` · `audience (json)` · `delay_minutes` · `scheduled_at` · `template_id` → campaign_templates · `body_ar/body_en/subject` · `frequency_cap_days` · `quiet_start/quiet_end` · `approved_by/approved_at`. (ADR-046)
+
+### `campaign_messages`
+`campaign_id` → campaigns · `customer_id` → customers · `channel` · `recipient` · `body` · `status` · `provider_reference` · `error` · `idempotency_key` (فريد) · `attempts` · `is_test` · `sent_at`. (ADR-046)
+
+### `message_suppressions` (opt-out · append-only)
+`customer_id` → customers · `contact` · `channel` · `reason`. (ADR-046)
+
+> **KPIs (ADR-047):** بلا جداول جديدة — `ReportingService::kpis()` يقرأ الجداول أعلاه مع جداول الأعمال القائمة.
+
+---
+
 ## مخطّط العلاقات (مبسّط)
 
 ```

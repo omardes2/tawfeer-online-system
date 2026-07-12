@@ -57,6 +57,15 @@
                     @can('reports.view')
                         <x-nav-link :href="route('admin.reports.index')" :active="request()->routeIs('admin.reports.*')">{{ __('reports.title') }}</x-nav-link>
                     @endcan
+                    @can('kpis.view')
+                        <x-nav-link :href="route('admin.kpis')" :active="request()->routeIs('admin.kpis')">{{ __('reports.kpis') }}</x-nav-link>
+                    @endcan
+                    @can('marketing.campaigns.view')
+                        <x-nav-link :href="route('admin.marketing.campaigns.index')" :active="request()->routeIs('admin.marketing.*')">{{ __('التسويق') }}</x-nav-link>
+                    @endcan
+                    @can('recommendations.manage')
+                        <x-nav-link :href="route('admin.recommendations.index')" :active="request()->routeIs('admin.recommendations.*')">{{ __('التوصيات') }}</x-nav-link>
+                    @endcan
                     @can('payments.view')
                         <x-nav-link :href="route('admin.payments.index')" :active="request()->routeIs('admin.payments.*')">{{ __('المدفوعات') }}</x-nav-link>
                     @endcan

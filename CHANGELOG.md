@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 6 (AI Content · Recommendations · Marketing Automation · KPI Dashboards)
+- **AI Product Content Assistant (ADR-044).** Provider-abstracted content
+  assistant on the product create/edit page. `AiContentProviderInterface` +
+  `NullAiContentProvider` (safe, offline default & graceful fallback) and
+  `OpenAiContentProvider` (all OpenAI logic isolated; key from `.env` only, never
+  in code). `AiContentService` orchestrates behind the injected provider — **no
+  provider calls from controllers/models**. **Suggestions only — the service
+  never writes a product field or publishes**; an employee reviews and applies
+  manually via the `x-admin.ai-panel` AJAX panel. Per-user rate limiting,
+  timeout/retry handling, and append-only `ai_generation_logs` (user, product,
+  type, provider, model, token counts, status — **no secrets**). Vision image
+  sent only when explicitly enabled and requested. **Never invents specs not
+  supplied.** Permissions `ai.content.use`, `ai.config.manage`, `ai.logs.view`.
+- **Product Recommendation Engine (ADR-045).** `RuleBasedRecommendationProvider`
+  implements the existing storefront contract (ADR-034), swapping in via
+  `config/storefront.php` **without touching the storefront** (revert with
+  `STOREFRONT_RECOMMENDATION_PROVIDER=null`). `RecommendationService` derives
+  related / similar / frequently-bought-together / cross-sell / upsell / bundles /
+  best-sellers / personalized **from catalog + order history only**. **Never
+  recommends inactive/deleted/hidden/out-of-stock products** (availability floor
+  on the single main warehouse). Admin manual pins (`include`) and blocks
+  (`exclude`) via `product_recommendations`; source & reason recorded per item.
+  Impression/click/conversion tracking via `recommendation_events` (public
+  storefront endpoint). Sections on product, cart, and checkout pages, mobile-first
+  RTL. Permissions `recommendations.{view,manage}`.
+- **Marketing Automation (ADR-046).** Provider-independent engine sending
+  **exclusively through `MessagingManager`** (ADR-030). `MessageDispatcher`
+  enforces consent (opt-in), suppression (opt-out), quiet hours, frequency caps,
+  and **idempotency** before any send. `Campaign` (uuid + soft-delete + auditable)
+  with guarded lifecycle draft → pending_approval → approved → active → paused →
+  completed → archived. Event triggers bridged from existing domain events
+  (`OrderDelivered`, `ReturnRequested`, `ReturnCompleted`, `DeliveryStatusChanged`)
+  via `MarketingEventSubscriber`; scheduled `marketing:run-birthdays` (daily) and
+  `marketing:run-abandoned-carts` (hourly). `AudienceResolver` builds audiences
+  from approved fields only. AR/EN templates with `{{name}}` variables, test-send,
+  execution log with per-message status/attempts. **Tests never send real
+  messages** — `FakeMessagingProvider` (in-memory). Permissions
+  `marketing.campaigns.{view,manage,approve}`, `marketing.templates.manage`,
+  `marketing.reports.view`.
+- **Expanded KPI Dashboards (ADR-047).** `ReportingService::kpis(DateRange)`
+  (read-only) aggregating sales, collected/unsettled, gross profit (approximate),
+  by channel/employee, marketer earnings & commissions, delivery success/exception
+  rates, return rate, AOV, abandoned carts, top products, low-stock items, campaign
+  performance, recommendation impressions/clicks/conversions/CTR, and AI usage/cost
+  — over day/week/month/custom. Dashboard reuses the `x-report` components.
+  Permission `kpis.view`.
+- **Additive only.** New modules `Ai`, `Recommendations`, `Marketing`; new
+  migrations (`ai_generation_logs`, `product_recommendations`,
+  `recommendation_events`, `campaign_templates`, `campaigns`, `campaign_messages`,
+  `message_suppressions`). No completed module redesigned. **Out of scope and not
+  built:** loyalty points, smart coupons, Aliphia, branches/multiple warehouses,
+  delivery-claims module. **22 focused tests** (AI 6, recommendations 4, marketing
+  9, KPIs 3). Arabic RTL throughout; all strings via `lang/{ar,en}`.
+
 ### Added — Phase 5 (Warehouse & Inventory Management)
 - **Additive enhancements over the existing inventory engine (2.4) — no
   redesign (ADR-043).** Existing capabilities reused as-is and verified: single

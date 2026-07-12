@@ -48,4 +48,10 @@ return [
         'redirect' => env('FACEBOOK_REDIRECT_URI', '/auth/facebook/callback'),
     ],
 
+    // مساعد المحتوى بالذكاء الاصطناعي (Phase 6 / ADR-044). الأسرار في .env فقط (المبدأ 5).
+    'openai' => [
+        'key' => env('OPENAI_API_KEY'),
+        'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+    ],
+
 ];

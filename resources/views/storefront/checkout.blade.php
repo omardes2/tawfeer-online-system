@@ -121,4 +121,9 @@
             };
         }
     </script>
+
+    {{-- توصيات في الإتمام (Phase 6 / ADR-045) --}}
+    <div class="max-w-6xl mx-auto px-4 mt-8">
+        <x-storefront.section :title="__('storefront.customers_also_bought')" :items="$recommendations" data-reco-placement="checkout" />
+    </div>
 </x-storefront.layout>

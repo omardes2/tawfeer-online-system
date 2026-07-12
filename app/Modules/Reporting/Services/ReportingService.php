@@ -223,6 +223,119 @@ class ReportingService
         ];
     }
 
+    /**
+     * لوحة مؤشّرات الأداء الموسّعة (Phase 6 / ADR-047) — للقراءة فقط.
+     *
+     * تجميعة واحدة تجمع مؤشّرات المبيعات والتحصيل والربح والتوصيل والمرتجعات والتسويق
+     * والتوصيات والذكاء الاصطناعي فوق الجداول القائمة. لا تكرار منطق أعمال ولا كتابة.
+     *
+     * @return array<string, mixed>
+     */
+    public function kpis(DateRange $range): array
+    {
+        [$from, $to] = $range->bounds();
+        $orders = fn () => DB::table('orders')->whereBetween('created_at', [$from, $to])->where('status', '!=', 'cancelled');
+
+        $salesTotal = $this->money($orders()->sum('total'));
+        $ordersCount = (int) $orders()->count();
+
+        // تحصيل وتسوية.
+        $collected = $this->money(DB::table('delivery_settlements')->whereBetween('posted_at', [$from, $to])->where('status', 'posted')->sum('computed_cod_total'));
+        $deliveredTotal = $this->money(DB::table('orders')->whereBetween('delivered_at', [$from, $to])->sum('total'));
+        $unsettled = $this->money(max(0, $deliveredTotal - $collected));
+
+        // ربح إجمالي تقريبي: إجمالي السطور − (الكمية × متوسّط التكلفة). لقطة تكلفة غير محفوظة بالسطر.
+        $grossProfit = $this->money(DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->leftJoin('product_variants', 'order_items.variant_id', '=', 'product_variants.id')
+            ->whereBetween('orders.created_at', [$from, $to])->where('orders.status', '!=', 'cancelled')
+            ->selectRaw('COALESCE(SUM(order_items.line_total - (order_items.qty * COALESCE(product_variants.average_cost, 0))), 0) as gp')
+            ->value('gp'));
+
+        // توصيل.
+        $shipments = (int) DB::table('shipments')->whereBetween('created_at', [$from, $to])->count();
+        $closed = (int) DB::table('shipments')->whereBetween('created_at', [$from, $to])->where('delivery_status', 'closed')->count();
+        $exceptions = (int) DB::table('delivery_exceptions')->whereBetween('created_at', [$from, $to])->count();
+
+        // مرتجعات.
+        $returnsCount = (int) DB::table('return_requests')->whereBetween('created_at', [$from, $to])->count();
+
+        // سلال مهجورة.
+        $abandonedCarts = (int) DB::table('carts')->whereBetween('updated_at', [$from, $to])->where('status', 'abandoned')->count();
+
+        // أداء الحملات التسويقية.
+        $campaignAgg = DB::table('campaign_messages')->whereBetween('created_at', [$from, $to])
+            ->selectRaw('COUNT(*) as total, '.
+                "SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as sent, ".
+                "SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed")->first();
+
+        // أداء التوصيات.
+        $recoAgg = DB::table('recommendation_events')->whereBetween('created_at', [$from, $to])
+            ->selectRaw("SUM(CASE WHEN event = 'impression' THEN 1 ELSE 0 END) as impressions, ".
+                "SUM(CASE WHEN event = 'click' THEN 1 ELSE 0 END) as clicks, ".
+                "SUM(CASE WHEN event = 'conversion' THEN 1 ELSE 0 END) as conversions")->first();
+
+        // استخدام الذكاء الاصطناعي وتكلفته (رموز).
+        $aiAgg = DB::table('ai_generation_logs')->whereBetween('created_at', [$from, $to])
+            ->selectRaw('COUNT(*) as requests, COALESCE(SUM(total_tokens), 0) as tokens')->first();
+
+        return [
+            'sales' => [
+                'total' => $salesTotal,
+                'orders' => $ordersCount,
+                'avg_order_value' => $ordersCount > 0 ? round($salesTotal / $ordersCount, 2) : 0.0,
+                'collected' => $collected,
+                'unsettled' => $unsettled,
+                'gross_profit' => $grossProfit,
+                'by_channel' => $orders()->selectRaw('channel, COUNT(*) as c, SUM(total) as t')->groupBy('channel')->get(),
+            ],
+            'employees' => $this->salesEmployees($range),
+            'marketers' => $this->marketers($range),
+            'commissions_eligible' => $this->money(DB::table('commission_entries')->where('state', 'eligible')->sum('amount')),
+            'delivery' => [
+                'shipments' => $shipments,
+                'closed' => $closed,
+                'success_rate' => $shipments > 0 ? round($closed / $shipments * 100, 1) : 0.0,
+                'exceptions' => $exceptions,
+                'exception_rate' => $shipments > 0 ? round($exceptions / $shipments * 100, 1) : 0.0,
+            ],
+            'returns' => [
+                'count' => $returnsCount,
+                'rate' => $ordersCount > 0 ? round($returnsCount / $ordersCount * 100, 1) : 0.0,
+            ],
+            'abandoned_carts' => $abandonedCarts,
+            'top_products' => $this->products($range, 10),
+            'low_stock' => $this->lowStock(),
+            'campaigns' => [
+                'total' => (int) ($campaignAgg->total ?? 0),
+                'sent' => (int) ($campaignAgg->sent ?? 0),
+                'failed' => (int) ($campaignAgg->failed ?? 0),
+            ],
+            'recommendations' => [
+                'impressions' => (int) ($recoAgg->impressions ?? 0),
+                'clicks' => (int) ($recoAgg->clicks ?? 0),
+                'conversions' => (int) ($recoAgg->conversions ?? 0),
+                'ctr' => ($recoAgg->impressions ?? 0) > 0 ? round(($recoAgg->clicks ?? 0) / $recoAgg->impressions * 100, 1) : 0.0,
+            ],
+            'ai' => [
+                'requests' => (int) ($aiAgg->requests ?? 0),
+                'tokens' => (int) ($aiAgg->tokens ?? 0),
+            ],
+        ];
+    }
+
+    /** أصناف تحت حدّ إعادة الطلب (تنبيه نقص) — يعيد استخدام reorder_level القائم. */
+    private function lowStock(int $limit = 10): Collection
+    {
+        return DB::table('inventory_stocks')
+            ->join('product_variants', 'inventory_stocks.variant_id', '=', 'product_variants.id')
+            ->leftJoin('products', 'product_variants.product_id', '=', 'products.id')
+            ->whereNotNull('inventory_stocks.reorder_level')
+            ->whereColumn('inventory_stocks.on_hand', '<=', 'inventory_stocks.reorder_level')
+            ->selectRaw('COALESCE(products.name, product_variants.sku) as name, inventory_stocks.on_hand, inventory_stocks.reorder_level')
+            ->orderBy('inventory_stocks.on_hand')->limit($limit)->get();
+    }
+
     private function money(mixed $value): float
     {
         return round((float) $value, 2);

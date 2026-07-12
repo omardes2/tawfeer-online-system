@@ -107,6 +107,9 @@
             </form>
         </div>
 
+        {{-- مساعد المحتوى بالذكاء الاصطناعي (Phase 6 / ADR-044) — اقتراح فقط --}}
+        <x-admin.ai-panel :product="$product->exists ? $product : null" />
+
         {{-- معرض الصور (بعد الإنشاء) --}}
         @if ($product->exists)
             <div class="bg-white shadow-sm sm:rounded-lg p-6">

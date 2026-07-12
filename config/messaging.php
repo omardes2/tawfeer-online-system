@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Integrations\Messaging\FakeMessagingProvider;
 use App\Support\Integrations\Messaging\NullMessagingProvider;
 
 return [
@@ -19,6 +20,7 @@ return [
 
     'drivers' => [
         'null' => NullMessagingProvider::class,
+        'fake' => FakeMessagingProvider::class, // للاختبارات فقط (Phase 6)
         // 'whatsapp_cloud' => \App\Support\Integrations\Messaging\WhatsAppCloudProvider::class, // لاحقًا
         // 'ses'            => \App\Support\Integrations\Messaging\SesEmailProvider::class,       // لاحقًا
     ],

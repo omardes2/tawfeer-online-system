@@ -17,3 +17,10 @@ if (config('delivery.sync.enabled')) {
 if (config('delivery.escalation.enabled')) {
     Schedule::command('delivery:escalate-exceptions')->cron(config('delivery.escalation.cron'))->withoutOverlapping();
 }
+
+/*
+| جدولة أتمتة التسويق (Phase 6 / ADR-046). آمنة بلا حملات مفعّلة (no-op). الإرسال عبر
+| MessagingManager فقط؛ لا رسائل خارجية أثناء الاختبارات (مزوّد وهمي).
+*/
+Schedule::command('marketing:run-birthdays')->dailyAt('09:00')->withoutOverlapping();
+Schedule::command('marketing:run-abandoned-carts')->hourly()->withoutOverlapping();

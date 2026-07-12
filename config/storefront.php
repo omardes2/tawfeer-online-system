@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Recommendations\Support\RuleBasedRecommendationProvider;
 use App\Support\Storefront\NullRecommendationProvider;
 
 return [
@@ -15,11 +16,14 @@ return [
     'locales' => ['ar', 'en'],
 
     /*
-    | مزوّد التوصيات/العروض (جاهزية سياق النمو — ADR-032/034). الافتراضي Null:
-    | featured/new-arrivals من الكتالوج؛ best-sellers/related/cross-sell/upsell/
-    | bundles/personalized تُعاد فارغة حتى يُربط محرّك النمو (بلا تعديل المتجر).
+    | مزوّد التوصيات/العروض (جاهزية سياق النمو — ADR-032/034/045). الافتراضي الآن
+    | المحرّك القائم على القواعد (Phase 6): related/cross-sell/upsell/fbt/best-sellers
+    | من الكتالوج وتاريخ الطلبات مع توافر المخزون وتوصيات يدوية. يمكن الرجوع إلى Null
+    | عبر STOREFRONT_RECOMMENDATION_PROVIDER=null دون تعديل المتجر.
     */
-    'recommendation_provider' => NullRecommendationProvider::class,
+    'recommendation_provider' => env('STOREFRONT_RECOMMENDATION_PROVIDER') === 'null'
+        ? NullRecommendationProvider::class
+        : RuleBasedRecommendationProvider::class,
 
     /*
     | جاهزية العروض الترويجية (بلا منطق نمو). عتبة الشحن المجاني: null = بلا رسالة.
