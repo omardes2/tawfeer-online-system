@@ -1,0 +1,17 @@
+# ============================================================================
+# Tawfeer Online — cron entries (production).
+# Add via `crontab -e` for the deploy user, or cPanel → Cron Jobs.
+# Replace <APP_PATH> with the real path (e.g. /home/tawfeer/app).
+# ============================================================================
+
+# 1) Laravel scheduler — the ONLY cron Laravel needs. It internally runs:
+#      delivery:sync (every 15m, if DELIVERY_SYNC_ENABLED)
+#      delivery:escalate-exceptions (hourly, if DELIVERY_ESCALATION_ENABLED)
+#      marketing:run-birthdays (daily 09:00)
+#      marketing:run-abandoned-carts (hourly)
+* * * * * cd <APP_PATH> && php artisan schedule:run >> /dev/null 2>&1
+
+# 2) Queue worker fallback (ONLY if Supervisor is NOT available on the host).
+#    Prefer Supervisor (deploy/supervisor/tawfeer-worker.conf). This cron
+#    processes any pending jobs each minute and exits, so jobs are not stuck.
+# * * * * * cd <APP_PATH> && php artisan queue:work redis --stop-when-empty --max-time=55 --tries=3 >> storage/logs/worker.log 2>&1

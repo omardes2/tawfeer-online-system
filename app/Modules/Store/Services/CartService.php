@@ -147,10 +147,16 @@ class CartService
         return $promo > 0 ? $promo : (float) $variant->retail_price;
     }
 
-    /** المتاح = Σ(on_hand − reserved) عبر المستودعات. */
+    /**
+     * المتاح = Σ(on_hand − reserved) عبر المستودعات.
+     * مدرك للتحميل المُسبق: يستخدم علاقة inventoryStocks المحمّلة إن وُجدت (يتفادى N+1
+     * في بطاقات المتجر)، وإلا يستعلم — سلوك متطابق.
+     */
     public function availableQty(ProductVariant $variant): float
     {
-        $stocks = InventoryStock::where('variant_id', $variant->id)->get();
+        $stocks = $variant->relationLoaded('inventoryStocks')
+            ? $variant->inventoryStocks
+            : InventoryStock::where('variant_id', $variant->id)->get();
 
         return (float) $stocks->sum(fn ($s) => (float) $s->on_hand - (float) $s->reserved);
     }

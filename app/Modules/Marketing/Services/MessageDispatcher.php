@@ -3,6 +3,7 @@
 namespace App\Modules\Marketing\Services;
 
 use App\Modules\Crm\Models\Customer;
+use App\Modules\Marketing\Jobs\SendCampaignMessageJob;
 use App\Modules\Marketing\Models\Campaign;
 use App\Modules\Marketing\Models\CampaignMessage;
 use App\Modules\Marketing\Models\MessageSuppression;
@@ -65,8 +66,17 @@ class MessageDispatcher
             if ($this->frequencyCapped($campaign, $customer)) {
                 return $this->finalize($message, 'frequency_capped');
             }
+
+            // الإرسال الخارجي عبر الطابور (إنتاج): لا يحجب مسار الطلب/الأمر.
+            // في الاختبارات QUEUE_CONNECTION=sync ⇒ ينفَّذ فورًا. آمن لإعادة المحاولة.
+            $message->status = 'queued';
+            $message->save();
+            SendCampaignMessageJob::dispatch($message->id);
+
+            return $message->refresh();
         }
 
+        // الإرسال التجريبي مباشر (تفاعلي — نتيجة فورية للمشرف).
         return $this->send($message, $channel, $recipient);
     }
 

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * الفئة — تصنيف شجري للمنتجات (PHASE_2_DESIGN §11).
@@ -41,6 +42,14 @@ class Category extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    /** إبطال كاش تنقّل المتجر عند أي تغيير فئة (Production Readiness). */
+    protected static function booted(): void
+    {
+        $flush = fn () => Cache::forget('storefront:categories');
+        static::saved($flush);
+        static::deleted($flush);
     }
 
     protected static function newFactory(): Factory

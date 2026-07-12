@@ -120,7 +120,7 @@ class ReturnController extends Controller
 
     public function photo(ReturnRequest $return, Request $request): RedirectResponse
     {
-        $request->validate(['photo' => ['required', 'image', 'max:5120']]);
+        $request->validate(['photo' => ['required', 'file', 'image', 'mimes:jpeg,jpg,png,webp', 'max:5120']]);
         $path = $request->file('photo')->store('returns', 'public');
         $this->service->addPhoto($return, $path, $request->user());
 

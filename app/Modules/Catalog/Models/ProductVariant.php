@@ -2,6 +2,7 @@
 
 namespace App\Modules\Catalog\Models;
 
+use App\Modules\Inventory\Models\InventoryStock;
 use App\Support\Concerns\Auditable;
 use App\Support\Concerns\HasUuid;
 use Database\Factories\Catalog\ProductVariantFactory;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -42,6 +44,12 @@ class ProductVariant extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /** أرصدة المخزون لهذا المتغيّر — للتحميل المُسبق وتفادي N+1 عند حساب التوافر. */
+    public function inventoryStocks(): HasMany
+    {
+        return $this->hasMany(InventoryStock::class, 'variant_id');
     }
 
     protected static function newFactory(): Factory

@@ -121,9 +121,74 @@ document.addEventListener('alpine:init', () => {
 window.Alpine = Alpine;
 Alpine.start();
 
-// تحميل السلة + إطلاق حدث الصفحة (ProductViewed/CategoryViewed/SearchPerformed).
+/*
+| تتبّع أداء التوصيات (Phase 6 / ADR-045). يلتقط أقسام [data-reco-section] ويطلق:
+|  - ظهور (impression) مرة واحدة عندما يدخل القسم إطار العرض (IntersectionObserver).
+|  - نقر (click) عند فتح منتج موصى به.
+| **بلا تكرار ولا ضوضاء:** مجموعة إزالة تكرار لكل (حدث/منتج/موضع) مرّة واحدة لكل تحميل صفحة،
+| ويُلغى مراقبة القسم بعد أوّل ظهور. يحترم جلسة الضيف/المُصادَق (كوكي الجلسة + CSRF).
+*/
+const RecoTracker = {
+    seen: new Set(),
+    csrf() {
+        return document.querySelector('meta[name="csrf-token"]')?.content || '';
+    },
+    send(event, card, section) {
+        const productId = card?.dataset.recoProduct;
+        if (!productId) return;
+        const placement = section?.dataset.recoPlacement || null;
+        const key = `${event}:${placement}:${productId}`;
+        if (this.seen.has(key)) return; // إزالة التكرار
+        this.seen.add(key);
+
+        const body = JSON.stringify({
+            recommended_product_id: Number(productId),
+            source_product_id: section?.dataset.recoSource ? Number(section.dataset.recoSource) : null,
+            type: section?.dataset.recoType || 'related',
+            event,
+            source: card?.dataset.recoSrc || 'rule',
+            placement,
+        });
+
+        // keepalive ليكتمل الطلب حتى عند مغادرة الصفحة (النقر يقود إلى تنقّل).
+        fetch('/recommendations/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': this.csrf() },
+            body,
+            credentials: 'same-origin',
+            keepalive: true,
+        }).catch(() => {});
+    },
+    init() {
+        const sections = document.querySelectorAll('[data-reco-section]');
+        if (!sections.length) return;
+
+        // الظهور: مرّة واحدة لكل قسم عند دخوله إطار العرض.
+        const observer = new IntersectionObserver((entries, obs) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                const section = entry.target;
+                section.querySelectorAll('[data-reco-product]').forEach((card) => this.send('impression', card, section));
+                obs.unobserve(section); // لا تكرار للظهور
+            });
+        }, { threshold: 0.4 });
+        sections.forEach((s) => observer.observe(s));
+
+        // النقر: تفويض حدث واحد على مستوى المستند.
+        document.addEventListener('click', (e) => {
+            const card = e.target.closest('[data-reco-product]');
+            if (!card) return;
+            const section = card.closest('[data-reco-section]');
+            if (section) this.send('click', card, section);
+        });
+    },
+};
+window.StorefrontRecoTracker = RecoTracker;
+
+// تحميل السلة + إطلاق حدث الصفحة (ProductViewed/CategoryViewed/SearchPerformed) + تتبّع التوصيات.
 document.addEventListener('DOMContentLoaded', () => {
     Alpine.store('cart').refresh();
+    RecoTracker.init();
 
     const el = document.getElementById('sf-page-event');
     if (el && el.dataset.event) {

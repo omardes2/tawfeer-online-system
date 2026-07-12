@@ -65,7 +65,7 @@
             </div>
         </template>
 
-        {{-- توصيات في السلة (Phase 6 / ADR-045) --}}
-        <x-storefront.section :title="__('storefront.recommended_for_you')" :items="$recommendations" data-reco-placement="cart" />
+        {{-- توصيات في السلة (Phase 6 / ADR-045) — مُتتبَّعة --}}
+        <x-storefront.section :title="__('storefront.recommended_for_you')" :items="$recommendations" recoType="personalized" placement="cart" />
     </div>
 </x-storefront.layout>

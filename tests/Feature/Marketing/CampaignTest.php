@@ -3,6 +3,7 @@
 namespace Tests\Feature\Marketing;
 
 use App\Modules\Crm\Models\Customer;
+use App\Modules\Marketing\Jobs\SendCampaignMessageJob;
 use App\Modules\Marketing\Models\Campaign;
 use App\Modules\Marketing\Models\CampaignMessage;
 use App\Modules\Marketing\Models\MessageSuppression;
@@ -11,6 +12,7 @@ use App\Modules\Sales\Events\OrderDelivered;
 use App\Support\Integrations\Messaging\FakeMessagingProvider;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -150,5 +152,19 @@ class CampaignTest extends TestCase
         // التأكد من ربط الحدث بالمحفّز (بلا بناء طلب كامل).
         $listeners = app('events')->getListeners(OrderDelivered::class);
         $this->assertNotEmpty($listeners);
+    }
+
+    public function test_external_send_is_queued_not_synchronous(): void
+    {
+        Queue::fake();
+        $this->campaign();
+        $customer = $this->customer();
+
+        $this->svc->handleTrigger('order_delivered', $customer, [], 'order:queued');
+
+        // الإرسال الخارجي مُجدوَل (لا يحجب الطلب)؛ الرسالة محفوظة بحالة queued.
+        Queue::assertPushed(SendCampaignMessageJob::class, 1);
+        $this->assertSame('queued', CampaignMessage::first()->status);
+        $this->assertCount(0, FakeMessagingProvider::$sent); // لم يُرسَل تزامنيًا
     }
 }

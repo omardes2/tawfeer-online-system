@@ -65,23 +65,25 @@ Route::middleware('storefront.locale')->group(function () {
     Route::get('/checkout', [StorefrontController::class, 'checkout'])->middleware('profile.complete')->name('storefront.checkout');
     Route::get('/lang/{locale}', [StorefrontController::class, 'setLocale'])->name('storefront.locale');
 
-    // تتبّع أحداث التوصيات (انطباع/نقر/تحويل) — Phase 6 / ADR-045
-    Route::post('/recommendations/track', [RecommendationTrackingController::class, 'store'])->name('storefront.recommendations.track');
+    // تتبّع أحداث التوصيات (انطباع/نقر/تحويل) — Phase 6 / ADR-045. عام + محدود المعدّل.
+    Route::post('/recommendations/track', [RecommendationTrackingController::class, 'store'])
+        ->middleware('throttle:60,1')->name('storefront.recommendations.track');
 
     /*
     | حساب العميل (Phase 3.4 / ADR-035) — جلسة الويب، عربي RTL + إنجليزي، noindex.
     */
     Route::middleware('guest')->group(function () {
         Route::get('/account/login', [AccountAuthController::class, 'showLogin'])->name('account.login');
-        Route::post('/account/login', [AccountAuthController::class, 'login']);
+        // حدّ معدّل ضدّ حشو بيانات الاعتماد (Security Review) — الدخول/التسجيل.
+        Route::post('/account/login', [AccountAuthController::class, 'login'])->middleware('throttle:10,1');
         Route::get('/account/register', [AccountAuthController::class, 'showRegister'])->name('account.register');
-        Route::post('/account/register', [AccountAuthController::class, 'register']);
+        Route::post('/account/register', [AccountAuthController::class, 'register'])->middleware('throttle:10,1');
 
-        // استرجاع كلمة المرور (Phase 3.5).
+        // استرجاع كلمة المرور (Phase 3.5) — محدود لمنع التعداد/الإغراق.
         Route::get('/account/forgot-password', [PasswordResetController::class, 'request'])->name('account.password.request');
-        Route::post('/account/forgot-password', [PasswordResetController::class, 'email'])->name('account.password.email');
+        Route::post('/account/forgot-password', [PasswordResetController::class, 'email'])->middleware('throttle:6,1')->name('account.password.email');
         Route::get('/account/reset-password/{token}', [PasswordResetController::class, 'reset'])->name('account.password.reset');
-        Route::post('/account/reset-password', [PasswordResetController::class, 'update'])->name('account.password.store');
+        Route::post('/account/reset-password', [PasswordResetController::class, 'update'])->middleware('throttle:6,1')->name('account.password.store');
     });
 
     // الدخول الاجتماعي (Phase 3.5 / ADR-036) — login أو link حسب النيّة.

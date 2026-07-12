@@ -10,6 +10,7 @@ use App\Modules\Inventory\Models\InventoryStock;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * طبقة قراءة المتجر (ADR-034): استعلامات العرض العامّة (منتجات معروضة/فعّالة،
@@ -28,7 +29,7 @@ class StorefrontService
     public function list(array $filters = []): LengthAwarePaginator
     {
         $query = Product::query()->active()->visible()
-            ->with(['primaryImage', 'defaultVariant', 'brand', 'category']);
+            ->with(['primaryImage', 'defaultVariant.inventoryStocks', 'brand', 'category']);
 
         if (! empty($filters['category'])) {
             $query->whereHas('category', fn (Builder $q) => $q->where('slug', $filters['category']));
@@ -78,14 +79,20 @@ class StorefrontService
     {
         return Product::query()->active()->visible()
             ->where('slug', $slug)
-            ->with(['images', 'variants', 'defaultVariant', 'brand', 'category', 'attributes.values', 'unit'])
+            ->with(['images', 'variants', 'defaultVariant.inventoryStocks', 'brand', 'category', 'attributes.values', 'unit'])
             ->firstOrFail();
     }
 
-    /** @return Collection<int, Category> */
+    /**
+     * @return Collection<int, Category>
+     *
+     * بيانات مرجعية مستقرّة تُقرأ على كل صفحة متجر — مُخزّنة مؤقتًا وتُبطَل عند أي تعديل
+     * فئة (Category::saved/deleted). يقلّل استعلامات التنقّل بشكل كبير في الإنتاج.
+     */
     public function categories(): Collection
     {
-        return Category::query()->active()->orderBy('sort_order')->orderBy('name')->get();
+        return Cache::remember('storefront:categories', now()->addMinutes(30),
+            fn () => Category::query()->active()->orderBy('sort_order')->orderBy('name')->get());
     }
 
     public function findCategoryBySlug(string $slug): Category
@@ -93,10 +100,11 @@ class StorefrontService
         return Category::query()->active()->where('slug', $slug)->firstOrFail();
     }
 
-    /** @return Collection<int, Brand> */
+    /** @return Collection<int, Brand> — مُخزّنة مؤقتًا وتُبطَل عند تعديل علامة. */
     public function brands(): Collection
     {
-        return Brand::query()->active()->orderBy('name')->get();
+        return Cache::remember('storefront:brands', now()->addMinutes(30),
+            fn () => Brand::query()->active()->orderBy('name')->get());
     }
 
     public function findBrandBySlug(string $slug): Brand

@@ -38,7 +38,7 @@ class RecommendationService
                     ->whereColumn('product_variants.product_id', 'products.id')
                     ->whereRaw('inventory_stocks.on_hand - inventory_stocks.reserved > 0');
             })
-            ->with(['primaryImage', 'defaultVariant', 'brand']);
+            ->with(['primaryImage', 'defaultVariant.inventoryStocks', 'brand']);
     }
 
     /** مميّز (حقيقة كتالوجية). */

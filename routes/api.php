@@ -12,33 +12,33 @@ use App\Http\Controllers\Api\V1\Catalog\ProductController;
 use App\Http\Controllers\Api\V1\Catalog\ProductImageController;
 use App\Http\Controllers\Api\V1\Catalog\ProductTagController;
 use App\Http\Controllers\Api\V1\Catalog\UnitController;
+use App\Http\Controllers\Api\V1\Commissions\CommissionController;
+use App\Http\Controllers\Api\V1\Commissions\CommissionRuleController;
 use App\Http\Controllers\Api\V1\Crm\CustomerController;
+use App\Http\Controllers\Api\V1\Inventory\InventoryCountController;
 use App\Http\Controllers\Api\V1\Inventory\InventoryLedgerController;
 use App\Http\Controllers\Api\V1\Inventory\InventoryMovementController;
-use App\Http\Controllers\Api\V1\Inventory\InventoryCountController;
 use App\Http\Controllers\Api\V1\Inventory\InventoryOperationController;
 use App\Http\Controllers\Api\V1\Inventory\InventoryStockController;
 use App\Http\Controllers\Api\V1\Inventory\StockAdjustmentController;
-use App\Http\Controllers\Api\V1\Inventory\WarehouseInsightController;
 use App\Http\Controllers\Api\V1\Inventory\StockReservationController;
+use App\Http\Controllers\Api\V1\Inventory\WarehouseInsightController;
 use App\Http\Controllers\Api\V1\Payment\PaymentController;
 use App\Http\Controllers\Api\V1\Payment\PaymentMethodController;
 use App\Http\Controllers\Api\V1\Purchasing\GoodsReceiptController;
 use App\Http\Controllers\Api\V1\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\Purchasing\SupplierController;
 use App\Http\Controllers\Api\V1\Purchasing\SupplierReturnController;
-use App\Http\Controllers\Api\V1\Commissions\CommissionController;
-use App\Http\Controllers\Api\V1\Commissions\CommissionRuleController;
+use App\Http\Controllers\Api\V1\Returns\ReturnController;
 use App\Http\Controllers\Api\V1\Sales\AssistedOrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderTransitionController;
-use App\Http\Controllers\Api\V1\Shipping\GeographyController;
-use App\Http\Controllers\Api\V1\Returns\ReturnController;
 use App\Http\Controllers\Api\V1\Settlements\SettlementController;
 use App\Http\Controllers\Api\V1\Shipping\DeliveryExceptionController;
 use App\Http\Controllers\Api\V1\Shipping\DeliveryFeeController;
 use App\Http\Controllers\Api\V1\Shipping\DeliveryStatusController;
 use App\Http\Controllers\Api\V1\Shipping\DeliveryWebhookController;
+use App\Http\Controllers\Api\V1\Shipping\GeographyController;
 use App\Http\Controllers\Api\V1\Shipping\ShipmentController;
 use App\Http\Controllers\Api\V1\Store\CartController;
 use App\Http\Controllers\Api\V1\Store\CheckoutController;
@@ -68,10 +68,12 @@ Route::prefix('v1')->group(function () {
     })->name('api.health');
 
     // webhook مزوّدي التوصيل — عام (تحقّق التوقيع/idempotency في الخدمة/الـDriver، ADR-039).
-    Route::post('webhooks/delivery/{provider}', [DeliveryWebhookController::class, 'handle'])->name('api.webhooks.delivery');
+    // محدود المعدّل بالـIP لمنع الإغراق/التخمين (Security Review).
+    Route::post('webhooks/delivery/{provider}', [DeliveryWebhookController::class, 'handle'])
+        ->middleware('throttle:60,1')->name('api.webhooks.delivery');
 
-    // مسارات محميّة بـ Sanctum.
-    Route::middleware('auth:sanctum')->group(function () {
+    // مسارات محميّة بـ Sanctum + حدّ معدّل عام (Security Review).
+    Route::middleware(['auth:sanctum', 'throttle:120,1'])->group(function () {
 
         // المستخدم الحالي مع أدواره وصلاحياته.
         Route::get('/me', function (Request $request) {

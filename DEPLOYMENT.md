@@ -4,7 +4,11 @@
 
 دليل تهيئة بيئات التطوير والإنتاج ونشر المنصة.
 
-> ⚠️ المشروع في **مرحلة التخطيط** — هذه الخطوات تصبح فعّالة بعد إنشاء مشروع Laravel في المرحلة 1.
+> 📌 **دليل الإنتاج الكامل (Hostinger VPS · AlmaLinux 9 · cPanel):**
+> راجع [`docs/PRODUCTION_DEPLOYMENT.md`](docs/PRODUCTION_DEPLOYMENT.md) —
+> الخطوات التفصيلية للنشر، مع [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
+> (النسخ الاحتياطي/الاسترجاع/الفهارس) و[`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md)
+> (خريطة قبول سير العمل) و`.env.production.example` وملفّات `deploy/`.
 
 ---
 

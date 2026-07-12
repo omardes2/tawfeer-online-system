@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added / Changed — Production Readiness (Security · Performance · Queues · Deploy) — ADR-048
+- **Recommendation event tracking wired (completes ADR-045).** Storefront reco
+  sections now emit **impression** events (IntersectionObserver, once per section)
+  and **click** events (delegated) to `POST /recommendations/track`, deduped per
+  (event, product, placement), respecting guest/authenticated sessions (session
+  cookie + CSRF). Feeds `recommendation_events` → KPI CTR/conversions.
+- **Security:** rate limiting added to storefront login/register (`throttle:10,1`),
+  forgot/reset-password (`6,1`), the tracking endpoint (`60,1`), the whole
+  authenticated API (`120,1`), and the delivery webhook (`60,1`). Return-photo upload
+  tightened to `mimes:jpeg,jpg,png,webp` (blocks stored-SVG XSS). Confirmed clean:
+  CSRF on all web routes, no SQL injection (all raw SQL static/parameter-bound), no
+  `$guarded=[]` mass assignment, Opost webhook HMAC (constant-time), secrets only in
+  `.env` (none tracked), no sensitive logging.
+- **Performance:** additive migration `add_production_reporting_indexes` indexes the
+  hot report/KPI/marketing columns (orders `created_at`/`delivered_at`, settlements
+  `(status,posted_at)`, shipments `(delivery_status,created_at)`, returns/commissions/
+  campaign_messages/ai_logs/reco_events `created_at`, suppressions `(contact,channel)`,
+  carts `(status,updated_at)`). Fixed storefront product-card N+1: `availableQty` is
+  now eager-load-aware via `defaultVariant.inventoryStocks` (identical behaviour, falls
+  back to a query). Storefront categories/brands cached with invalidation on write.
+- **Queues:** external marketing sends moved to `SendCampaignMessageJob` (ShouldQueue,
+  `$tries=3`, backoff, retry-safe & idempotent via the message's unique key) — no
+  longer blocks the request/command. AI generation stays synchronous (interactive, with
+  timeout/fallback); delivery webhooks stay synchronous but idempotent; delivery sync
+  stays scheduled + `withoutOverlapping`. Redis recommended for cache/session/queue/
+  rate-limit in production.
+- **Deployment artifacts:** `.env.production.example` (no secrets, incl. Redis, OpenAI,
+  messaging, Opost, OAuth placeholders), `deploy/supervisor/tawfeer-worker.conf`,
+  `deploy/cron/tawfeer-crontab.txt`, `docs/PRODUCTION_DEPLOYMENT.md` (Hostinger VPS,
+  AlmaLinux 9 + cPanel), `docs/OPERATIONS.md` (backup/restore, index inventory,
+  append-only ledgers, invariants), `docs/ACCEPTANCE.md` (workflow → test coverage map).
+
 ### Added — Phase 6 (AI Content · Recommendations · Marketing Automation · KPI Dashboards)
 - **AI Product Content Assistant (ADR-044).** Provider-abstracted content
   assistant on the product create/edit page. `AiContentProviderInterface` +

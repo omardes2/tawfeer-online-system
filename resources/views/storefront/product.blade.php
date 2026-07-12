@@ -178,12 +178,12 @@
         </section>
     @endif
 
-    {{-- أقسام التسويق (نقاط امتداد — تظهر فقط عند توفّر بيانات من محرّك النمو) --}}
-    <x-storefront.section :title="__('storefront.frequently_bought')" :items="$frequentlyBoughtTogether" />
-    <x-storefront.section :title="__('storefront.related')" :items="$related" />
-    <x-storefront.section :title="__('storefront.cross_sell')" :items="$crossSell" />
-    <x-storefront.section :title="__('storefront.upsell')" :items="$upsell" />
-    <x-storefront.section :title="__('storefront.bundles')" :items="$bundles" />
+    {{-- أقسام التوصيات (Phase 6 / ADR-045) — مُتتبَّعة (ظهور/نقر) عبر JS المتجر --}}
+    <x-storefront.section :title="__('storefront.frequently_bought')" :items="$frequentlyBoughtTogether" recoType="fbt" placement="product" :source="$product->id" />
+    <x-storefront.section :title="__('storefront.related')" :items="$related" recoType="related" placement="product" :source="$product->id" />
+    <x-storefront.section :title="__('storefront.cross_sell')" :items="$crossSell" recoType="cross_sell" placement="product" :source="$product->id" />
+    <x-storefront.section :title="__('storefront.upsell')" :items="$upsell" recoType="upsell" placement="product" :source="$product->id" />
+    <x-storefront.section :title="__('storefront.bundles')" :items="$bundles" recoType="complementary" placement="product" :source="$product->id" />
 
     {{-- بيانات مهيكلة: منتج --}}
     @push('structured-data')

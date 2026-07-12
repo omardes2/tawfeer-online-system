@@ -19,7 +19,7 @@ class NullRecommendationProvider implements StorefrontRecommendationProvider
     {
         return Product::query()->active()->visible()
             ->where('is_featured', true)
-            ->with(['primaryImage', 'defaultVariant', 'brand'])
+            ->with(['primaryImage', 'defaultVariant.inventoryStocks', 'brand'])
             ->latest('id')->limit($limit)->get();
     }
 
@@ -27,7 +27,7 @@ class NullRecommendationProvider implements StorefrontRecommendationProvider
     public function newArrivals(int $limit = 8): Collection
     {
         return Product::query()->active()->visible()
-            ->with(['primaryImage', 'defaultVariant', 'brand'])
+            ->with(['primaryImage', 'defaultVariant.inventoryStocks', 'brand'])
             ->latest('id')->limit($limit)->get();
     }
 
