@@ -126,6 +126,13 @@ Frequently Bought Together · منتجات ذات صلة · توصيات AI · C
 متوسط قيمة الطلب (AOV) · القيمة الدائمة للعميل (CLV) · معدّل تكرار الشراء · معدّل التحويل · هجر السلة · أداء التوصيات · ROI الحملات · أفضل الحزم · أداء Cross Sell · أداء Upsell · شرائح العملاء.
 
 > **لا تقارير الآن.**
+>
+> **مُحقَّق كنقاط امتداد (ADR-034):** تُطلق واجهة المتجر أحداث نافذة عميلية
+> (`ProductViewed`/`CategoryViewed`/`SearchPerformed`/`ProductAddedToCart`/
+> `ProductRemovedFromCart`/`CheckoutStarted`) عبر `storefront:analytics` — جاهزة
+> لاشتراك مزوّد مستقبلي، بلا أي مزوّد خارجي الآن. وأقسام التوصيات في المتجر
+> (related/cross-sell/upsell/bundles/best-sellers) نقاط امتداد فارغة عبر عقد
+> `StorefrontRecommendationProvider` (تُملأ من محرّك النمو دون تعديل المتجر).
 
 ---
 

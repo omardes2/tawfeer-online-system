@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 3.3 (Storefront Catalog)
+- Customer-facing storefront (ADR-034): server-rendered Blade + Tailwind + Alpine,
+  **Arabic RTL primary + English**, mobile-first. Home, categories, brands,
+  product listing (filter/search/sort/pagination), product details (image gallery,
+  attributes, availability), cart, and checkout pages with clear navigation.
+- Read layer `StorefrontService` reuses existing scopes and **`CartService`
+  pricing/availability** (no business-logic duplication); branch-aware availability
+  via `availableQty(Product, ?Branch)`. New `SetStorefrontLocale` middleware +
+  `/lang/{locale}` switch. No completed backend module redesigned.
+- Cart/checkout are driven client-side against the existing 3.1/3.2 APIs with dual
+  identity (guest `X-Cart-Token` in localStorage, or Bearer when present) — guest
+  and authenticated add-to-cart both supported.
+- SEO: clean slug URLs (`/p`, `/c`, `/b`), meta title/description, Open Graph +
+  Twitter cards, canonical URLs, and JSON-LD structured data (Product on details,
+  ItemList on listings).
+- Marketing/conversion readiness (ADR-032, no Growth logic): `StorefrontRecommendationProvider`
+  contract + `NullRecommendationProvider` (featured/new-arrivals from catalog;
+  best-sellers/related/frequently-bought/cross-sell/upsell/bundles/personalized
+  return empty and their sections auto-hide) — config-swappable for a future Growth
+  engine. Catalog-derived sale badges; config-driven free-shipping-threshold message.
+- Analytics readiness (no provider): client-side window events
+  `ProductViewed`/`CategoryViewed`/`SearchPerformed`/`ProductAddedToCart`/
+  `ProductRemovedFromCart`/`CheckoutStarted`.
+- UX: fast lazy-loaded product cards, clear price/availability, image gallery,
+  empty/loading/error states, accessible labelled forms and navigation, Tajawal RTL.
+- New Vite entries (`resources/css/storefront.css`, `resources/js/storefront.js`);
+  production build passes. New `config/storefront.php` + `StoreServiceProvider`.
+- `ExampleTest` now uses `RefreshDatabase` (the `/` route is now the DB-backed
+  storefront home, still returns 200 with an empty catalog).
+- Tests: 14 new storefront feature tests (listing shows only active+visible,
+  SEO/JSON-LD + add-to-cart on details, 404 for hidden/inactive, category/brand
+  filters, search, price filter/sort, pagination, empty state, locale switch +
+  direction, guest & authenticated add-to-cart) → 326 passing total.
+
 ### Changed — Phase 3.2 revised to multi-step + guest checkout (ADR-033, owner decision)
 - Checkout now supports **both authenticated users and guests**, and replaces the
   single atomic endpoint with a **multi-step checkout session** — while

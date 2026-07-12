@@ -20,10 +20,25 @@ use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
 use App\Http\Controllers\Admin\Shipping\ShipmentController as AdminShipmentController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Storefront\StorefrontController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
+/*
+| واجهة المتجر العامّة (Phase 3.3 / ADR-034) — SSR للـSEO، عربي RTL + إنجليزي.
+| قراءة عبر StorefrontService؛ السلة/الإتمام عبر واجهات API (3.1/3.2) من العميل.
+*/
+Route::middleware('storefront.locale')->group(function () {
+    Route::get('/', [StorefrontController::class, 'home'])->name('storefront.home');
+    Route::get('/shop', [StorefrontController::class, 'index'])->name('storefront.shop');
+    Route::get('/search', [StorefrontController::class, 'search'])->name('storefront.search');
+    Route::get('/categories', [StorefrontController::class, 'categories'])->name('storefront.categories');
+    Route::get('/brands', [StorefrontController::class, 'brands'])->name('storefront.brands');
+    Route::get('/c/{slug}', [StorefrontController::class, 'category'])->name('storefront.category');
+    Route::get('/b/{slug}', [StorefrontController::class, 'brand'])->name('storefront.brand');
+    Route::get('/p/{slug}', [StorefrontController::class, 'show'])->name('storefront.product');
+    Route::get('/cart', [StorefrontController::class, 'cart'])->name('storefront.cart');
+    Route::get('/checkout', [StorefrontController::class, 'checkout'])->name('storefront.checkout');
+    Route::get('/lang/{locale}', [StorefrontController::class, 'setLocale'])->name('storefront.locale');
 });
 
 Route::get('/dashboard', function () {

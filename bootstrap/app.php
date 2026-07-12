@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\ResolveStoreIdentity;
+use App\Http\Middleware\SetStorefrontLocale;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'store.identity' => ResolveStoreIdentity::class,
+            'storefront.locale' => SetStorefrontLocale::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
