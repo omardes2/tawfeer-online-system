@@ -34,6 +34,9 @@ class DatabaseSeeder extends Seeder
             PurchasingPermissionSeeder::class,
             // Phase 2.6 — المبيعات
             SalesPermissionSeeder::class,
+            // Phase 2.7 — الشحن والجغرافيا
+            GeographySeeder::class,
+            ShippingPermissionSeeder::class,
         ]);
     }
 }

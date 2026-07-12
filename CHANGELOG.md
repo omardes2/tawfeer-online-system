@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.7 (Shipping: Geography, Shipments, Delivery-Provider Integration)
+- Design-first (ADR-027, `docs/PHASE_2_7_SHIPPING_DESIGN.md`): lowers the frozen
+  shipping rules into a schema, since no frozen shipments table existed and the
+  frozen geography tables were never built.
+- Geography (built exactly per PHASE_2_DESIGN §3-6): `governorates`, `cities`,
+  `areas` (reference tables) + `shipping_zones` (uuid/soft-delete/audited) with
+  `shipping_zone_city`/`shipping_zone_area` pivots; basic geography seed.
+- Multi-provider integration: `delivery_providers` registry + polymorphic
+  `geo_provider_mappings` (delivery_provider_id, external_id, external_code,
+  provider_metadata JSON, last_synced_at, sync_status, is_active) — the same
+  local city/area maps to multiple providers simultaneously; local tables stay
+  the source of truth; disabling/replacing a provider loses no local data.
+- New `Shipping` module: `shipments` (+ append-only `shipment_events`) linked to
+  orders — address snapshot with mapped area/city IDs (not name-based), single
+  `delivery_provider_id`, and a frozen shipping-cost snapshot.
+- `ShipmentService` state machine (not_shipped → in_transit → out_for_delivery →
+  delivered, + failed and operational delayed/customer_unavailable) completes
+  the delivery sub-states Phase 2.6 deferred and syncs the parent order; does
+  not re-run inventory deduction (stays in OrderService::ship). Shipment
+  statuses extended (ADR-017).
+- Delivery-provider integration layer (ARCHITECTURE §13 / ADR-019):
+  `DeliveryProviderInterface`, `GeographySyncProviderInterface`,
+  `ShippingQuoteProviderInterface` + Null drivers, bound via `config/shipping.php`;
+  providers reached only through the layer. No specific provider implemented.
+- `ShippingCostResolver` with priority/fallback (live quote → last synced →
+  local zone price → manual override → manual review); manual/live-null branches
+  active, pricing engine deferred. Result snapshotted onto shipment + order.
+- API `/api/v1/geo/*` (read) and `/api/v1/shipping/shipments` (CRUD + dispatch/
+  out-for-delivery/delay/customer-unavailable/deliver/fail/override-cost).
+- RBAC: 9 `shipping.*` / `settings.geography.*` permissions + Policy;
+  `ShippingPermissionSeeder`.
+- Admin UI (Arabic RTL): shipments list, create-from-shipped-order, detail page
+  with delivery-transition buttons + event log, and a geography view; shipping
+  nav link + status-badge component.
+- Deferred with hooks: shipping-cost engine, specific provider integration, live
+  sync, payments/COD (2.8), revenue accounting (2.9), customer/address CRM (2.10).
+- Tests: 19 new (shipment lifecycle + order sync, one-shipment-per-order guard,
+  cost override permission, multi-provider mapping, transition guards,
+  authorization, admin RTL) → 227 passing total.
+
 ### Added — Phase 2.6 (Sales Orders)
 - Design-first: `docs/PHASE_2_6_SALES_ORDERS_DESIGN.md` + ADR-026 lower the
   frozen order rules (ADR-009/010/010a, BR-ORD-01..18, status vocabulary) into

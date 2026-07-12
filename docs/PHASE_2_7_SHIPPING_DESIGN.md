@@ -40,28 +40,50 @@
 | المدفوعات/COD والتسوية | 2.8 | لا ربط دفع؛ `shipping_total` لقطة على الطلب |
 | الاعتراف بالإيراد محاسبيًا عند التسليم | 2.9 | معلم `delivered_at` + حالة الطلب `delivered` (خُطّاف) |
 
-## 3. الجغرافيا — تُبنى بحذافير §3–6 + حقول تكامل
+## 3. الجغرافيا — تُبنى بحذافير §3–6، والتكامل عبر **جدول تعيين مزوّدين** (مُحدّث بالاعتماد)
 
-تُنفَّذ الأعمدة والقيود والفهارس **تمامًا** كما في `PHASE_2_DESIGN §3–6` (بلا uuid/soft-delete/auditable
-للمحافظات/المدن/المناطق؛ shipping_zones بـ uuid/soft-delete/auditable). **يُضاف فقط** طقم حقول التكامل التالي
-إلى كلٍّ من `governorates`, `cities`, `areas`, `shipping_zones` (المصدر المحلي يبقى مرجع النظام — المتطلّب 1):
+تُنفَّذ الأعمدة والقيود والفهارس **تمامًا** كما في `PHASE_2_DESIGN §3–6` **دون أي تغيير** على مخططها
+(بلا حقول `external_*` مضمّنة). ربط المزوّدين يتم عبر **جدول تعيين مستقلّ** يدعم **تعيين السجلّ المحلي الواحد
+لعدّة مزوّدين في آنٍ** (المصدر المحلي يبقى مرجع النظام — المتطلّب 1).
 
-| الحقل | النوع | الغرض |
-|------|------|-------|
-| external_provider | string(40) nullable | اسم المزوّد المصدر (المزامن الحالي) |
+### 3.1 `delivery_providers` — سجلّ شركات التوصيل
+| العمود | النوع | ملاحظات |
+|--------|------|---------|
+| id / uuid | — | خارجي uuid |
+| name | string(120) | اسم الشركة |
+| code | string(40) unique | رمز ثابت يعتمده الكود (مثل `null`, `aramex`) |
+| driver | string(40) default `null` | مفتاح الـDriver في طبقة التكامل (§7) |
+| is_active | boolean default `true` | تعطيل/استبدال دون فقد بيانات (المتطلّب 10) |
+| config | json nullable | إعداد غير سرّي (الأسرار في `.env`) |
+| timestamps + softDeletes | — | ADR-020 |
+
+### 3.2 `geo_provider_mappings` — تعيين متعدد المزوّدين (Polymorphic)
+تعيين أي كيان جغرافي محلي (`Governorate`/`City`/`Area`/`ShippingZone`) إلى سجلّ مزوّد خارجي، **بتعدّد مزوّدين
+لكل سجلّ محلي**:
+
+| العمود | النوع | ملاحظات |
+|--------|------|---------|
+| id | BIGINT PK | |
+| mappable_type / mappable_id | polymorphic | الكيان الجغرافي المحلي (المصدر) |
+| delivery_provider_id | FK delivery_providers CASCADE | المزوّد |
 | external_id | string(80) nullable | معرّف السجلّ لدى المزوّد (ربط ID لا اسمًا — المتطلّب 9) |
 | external_code | string(80) nullable | رمز المزوّد (بديل/إضافي) |
-| provider_metadata | json nullable | حمولة المزوّد الخام (تعيينات، إحداثيات، مناطق فرعية) |
+| provider_metadata | json nullable | حمولة المزوّد الخام (مناطق فرعية/إحداثيات) |
 | last_synced_at | timestamp nullable | آخر مزامنة ناجحة |
-| sync_status | string(20) default `'local'` | `local`/`synced`/`pending`/`stale`/`conflict` |
-| is_active | boolean | موجود أصلًا في §3–6 (يخدم التعطيل — المتطلّب 10) |
+| sync_status | string(20) default `pending` | `pending`/`synced`/`stale`/`conflict` |
+| is_active | boolean default `true` | تعطيل تعيين مزوّد دون حذفه |
+| timestamps | — | |
 
-- **فهرس مساعد:** (`external_provider`,`external_id`) على المدن والمناطق ومناطق الشحن (بحث سريع للتعيين العكسي).
-- **المتطلّب 5 (تعيين خارجي→محلي):** يتم عبر هذه الحقول على السجلّ المحلي؛ المزامنة تكتبها والمُحلّل يقرأ `external_id`
-  (لا الاسم) عند الاستعلام من مزوّد. **المتطلّب 10 (تعطيل/استبدال مزوّد دون فقد بيانات):** حذف/تعطيل المزوّد =
-  تصفير حقول `external_*` أو تعطيل مزامنته؛ الجغرافيا والطلبات المحلية (المصدر) تبقى سليمة.
-- **الترقيم/UUID:** يلتزم §3–6 (المحافظات/المدن/المناطق مرجعية بلا uuid؛ shipping_zones بـ uuid).
-- **بذور:** بذرة محافظات/مدن أساسية (كما ألمح §187 "البذور تُزرع إداريًا الآن") — مجموعة صغيرة معقولة قابلة للإدارة.
+- **Unique:** (`mappable_type`,`mappable_id`,`delivery_provider_id`) — تعيين واحد لكل (سجلّ محلي × مزوّد).
+- **Index:** (`delivery_provider_id`,`external_id`) — بحث عكسي سريع خارجي→محلي؛ و(`mappable_type`,`mappable_id`).
+- **المتطلّب 5 (تعيين خارجي→محلي):** صفّ تعيين لكل مزوّد. **المتطلّب (تعدّد المزوّدين):** عدّة صفوف لنفس
+  `(mappable_type, mappable_id)` بمزوّدين مختلفين. **المتطلّب 10 (تعطيل/استبدال):** تعطيل `delivery_providers.is_active`
+  أو `is_active` التعيين، أو حذف صفوف تعيين مزوّد — والجغرافيا والطلبات المحلية (المصدر) تبقى سليمة.
+- **النماذج:** لكل من `Governorate`/`City`/`Area`/`ShippingZone` علاقة `morphMany` إلى `GeoProviderMapping`؛
+  والمُحلّل يقرأ `external_id` المُعيَّن (لا الاسم) عند الاستعلام من مزوّد.
+
+- **الجغرافيا نفسها:** تلتزم §3–6 حرفيًا (المحافظات/المدن/المناطق مرجعية بلا uuid/soft-delete؛ shipping_zones بـ uuid/soft-delete/auditable) — **بلا أي عمود إضافي**.
+- **بذور:** بذرة محافظات/مدن أساسية (§187 "البذور تُزرع إداريًا الآن") + مزوّد `null` افتراضي في `delivery_providers`.
 
 ## 4. `shipments` — الشحنة (كيان جديد، مُصمَّم من القواعد المجمّدة)
 
@@ -86,8 +108,9 @@
 | shipping_cost | decimal(15,2) default 0 | التكلفة المطبّقة (لقطة ثابتة) |
 | cost_source | string(20) default `pending` | `provider_live`/`provider_synced`/`zone`/`manual`/`pending` |
 | cost_currency | string(3) nullable | عملة التكلفة (افتراضي من الإعدادات) |
-| **التكامل:** | | |
-| external_provider / external_id / external_code | string nullable | مرجع الشحنة لدى المزوّد |
+| **التكامل (الشحنة لمزوّد واحد — FK لا تعيين متعدد):** | | |
+| delivery_provider_id | FK delivery_providers SET NULL nullable | مزوّد التوصيل المنفّذ |
+| external_id / external_code | string nullable | مرجع الشحنة لدى المزوّد |
 | provider_metadata | json nullable | حمولة المزوّد (ملصق، تتبّع، حالة خام) |
 | last_synced_at / sync_status | timestamp/string nullable | حالة مزامنة الشحنة |
 | **المعالم الزمنية:** | | |
@@ -194,7 +217,7 @@ not_shipped → preparing → in_transit → out_for_delivery → delivered
 
 ## 11. الطبقات والملفات (اتّساقًا مع المراحل السابقة)
 
-- **وحدة الجغرافيا:** ضمن `Foundation` (مرجعية) — نماذج `Governorate`/`City`/`Area`/`ShippingZone` + هجرات + بذرة.
+- **وحدة الجغرافيا:** ضمن `Foundation` (مرجعية) — نماذج `Governorate`/`City`/`Area`/`ShippingZone` + `DeliveryProvider`/`GeoProviderMapping` + هجرات + بذرة.
 - **وحدة الشحن:** `app/Modules/Shipping/{Models,Services,Policies,Providers}` — `Shipment`/`ShipmentEvent`, `ShipmentService`, `ShipmentPolicy`, `ShippingServiceProvider`.
 - **التكامل:** `app/Support/Contracts/Shipping/*` (3 عقود + DTOs) و`app/Support/Integrations/Shipping/*` (3 Null Drivers) و`ShippingCostResolver`.
 - **Form Requests / Resources / Controllers (API + Admin) / Routes / Nav** بنفس أنماط 2.5/2.6.
@@ -219,7 +242,9 @@ not_shipped → preparing → in_transit → out_for_delivery → delivered
 ---
 
 ### مقترح إضافة إلى `DECISIONS.md`: ADR-027 — مخطط الشحن وطبقة تكامل التوصيل (Phase 2.7)
-يلخّص: بناء الجغرافيا المجمّدة (§3–6) + حقول تكامل (`external_*`/`provider_metadata`/`last_synced_at`/`sync_status`)؛
-كيان `shipments`(+`shipment_events`) بلقطة عنوان ومعرّفات مُعيَّنة ولقطة تكلفة؛ آلة حالات شحن تُكمل جزء التوصيل من
-ADR-010/BR-ORD-10 وتُزامن حالة الطلب؛ طبقة مزوّدين (3 عقود + Null Drivers) بنمط المبدأ 13؛ مُحلّل تكلفة بأولوية
-(حيّ→مُزامَن→منطقة→يدوي→مراجعة) مع لقطة ثابتة؛ **تأجيل** محرّك التسعير الفعلي وأي مزوّد محدّد ومزامنة حيّة لمرحلتها.
+يلخّص: بناء الجغرافيا المجمّدة (§3–6) **بحذافيرها بلا أعمدة إضافية**؛ التكامل عبر سجلّ `delivery_providers` +
+جدول تعيين متعدد المزوّدين `geo_provider_mappings` (polymorphic — تعيين السجلّ المحلي الواحد لعدّة مزوّدين، والمحلي
+مرجع النظام)؛ كيان `shipments`(+`shipment_events`) بلقطة عنوان ومعرّفات مُعيَّنة و`delivery_provider_id` ولقطة تكلفة؛
+آلة حالات شحن تُكمل جزء التوصيل من ADR-010/BR-ORD-10 وتُزامن حالة الطلب؛ طبقة مزوّدين (3 عقود + Null Drivers)
+بنمط المبدأ 13؛ مُحلّل تكلفة بأولوية (حيّ→مُزامَن→منطقة→يدوي→مراجعة) مع لقطة ثابتة؛ **تأجيل** محرّك التسعير الفعلي
+وأي مزوّد محدّد ومزامنة حيّة لمرحلتها.

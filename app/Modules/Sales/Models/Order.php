@@ -71,6 +71,11 @@ class Order extends Model
         return $this->hasMany(OrderStatusHistory::class)->orderBy('id');
     }
 
+    public function shipments(): HasMany
+    {
+        return $this->hasMany(\App\Modules\Shipping\Models\Shipment::class);
+    }
+
     protected static function newFactory(): Factory
     {
         return OrderFactory::new();

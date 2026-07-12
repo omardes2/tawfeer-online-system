@@ -200,6 +200,17 @@
 - **التكلفة المُحمّلة (Landed Cost — BR-PUR-06):** `goods_receipts.additional_cost` تُوزَّع على البنود بنسبة قيمة السطر قبل احتساب WAC.
 - **FK مؤجّلة:** `suppliers.governorate_id/city_id/currency_id` (جداولها غير مُنشأة) — أعمدة nullable بلا قيد الآن.
 
+## ADR-027 — مخطط الشحن وطبقة تكامل التوصيل (Shipping Schema & Delivery Integration) [مُعتمد في Phase 2.7]
+- **السياق:** لا مخطط جداول مجمّد للشحنات (مؤشّرة "Phase 3" في `API_CONTRACT §378`)؛ الجغرافيا مجمّدة في `PHASE_2_DESIGN §3–6` لكنها لم تُبنَ؛ تسعير الشحن مؤجّل صراحةً (§149/§187). يُنزِل هذا القرار قواعد ADR-014/010/BR-ORD-10 إلى مخطط تنفيذي (وثيقة `PHASE_2_7_SHIPPING_DESIGN.md`) — لا إعادة تصميم لنموذج الأعمال.
+- **الجغرافيا:** تُبنى `governorates`/`cities`/`areas`/`shipping_zones` (+ جدولا ربط) **بحذافير §3–6 بلا أعمدة إضافية**. المحلي مرجع النظام.
+- **التكامل (تعيين متعدد المزوّدين):** سجلّ `delivery_providers` + جدول تعيين polymorphic `geo_provider_mappings` (`delivery_provider_id`, `external_id`, `external_code`, `provider_metadata`, `last_synced_at`, `sync_status`, `is_active`) — تعيين السجلّ المحلي الواحد لعدّة مزوّدين في آنٍ؛ تعطيل/استبدال مزوّد دون فقد بيانات محلية.
+- **الشحنات:** `shipments` (uuid/soft-delete/auditable، ترقيم `SHP-{YYYY}-{seq}`) + `shipment_events` (append-only). لقطة عنوان + معرّفات مُعيَّنة (`area_id`/`city_id` لا اسم — يمنع الحساب من الاسم)؛ لقطة تكلفة ثابتة؛ `delivery_provider_id` لمزوّد واحد.
+- **آلة الحالات:** `not_shipped → in_transit → out_for_delivery → delivered` (+`failed`، وحالات تشغيلية `delayed`/`customer_unavailable`) — تُكمل جزء التوصيل من ADR-010/BR-ORD-10 الذي أجّلته 2.6، وتُزامن حالة الطلب. لا تكرّر خصم المخزون (يبقى في `OrderService::ship` — 2.6).
+- **طبقة التكامل (المبدأ 13/ADR-019):** عقود `DeliveryProviderInterface`/`GeographySyncProviderInterface`/`ShippingQuoteProviderInterface` + **Null Drivers**، تُربط عبر `config/shipping.php`. الوصول للمزوّد حصريًا عبر هذه العقود المحقونة — لا استدعاء مباشر من متحكم/نموذج.
+- **مُحلّل التكلفة (أولوية/احتياط):** عرض حيّ → أحدث مُزامَن → سعر منطقة → تجاوز يدوي (بصلاحية `shipping.override_cost`) → مراجعة يدوية. **الفعّال في 2.7:** الحيّ (Null ⇒ غير متوفّر) واليدوي/المراجعة؛ المستويان المُزامَن/المنطقة مُعرّفان ومؤجّلان. النتيجة **لقطة** على الشحنة والطلب.
+- **الصلاحيات:** `shipping.shipments.{view,create,update,dispatch,deliver,fail}` + `shipping.override_cost` + `settings.geography.{view,manage}` (ADR-021).
+- **مؤجّل بخُطّافات:** محرّك تسعير الشحن الفعلي، أي مزوّد محدّد، المزامنة الحيّة، المدفوعات/COD، الاعتراف المحاسبي، كيان العملاء/العناوين — كلٌّ لمرحلته.
+
 ## ADR-026 — مخطط طلبات البيع (Sales Orders Schema) [مُعتمد في Phase 2.6]
 - **السياق:** وثائق التصميم المجمّدة (`PHASE_2_DESIGN`, `DATA_DICTIONARY`, `DESIGN_REVIEW §9`) تحصر Phase 2 في 6 دفعات تنتهي عند المخزون وتؤجّل الطلبات إلى "Phase 3" دون مخطط جداول؛ **قواعد الطلب مجمّدة** (ADR-009/010/010a، BR-ORD-01…18، مفردات الحالات). يُنزِل هذا القرار تلك القواعد إلى مخطط تنفيذي (وثيقة `PHASE_2_6_SALES_ORDERS_DESIGN.md`) — لا إعادة تصميم.
 - **الكيانات:** `orders` (+`order_items`) + `order_status_history` (append-only). الرأس: uuid + soft-delete + Auditable؛ البنود بلا uuid/soft-delete؛ السجلّ بلا updated_at/soft-delete.

@@ -13,6 +13,8 @@ use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController as AdminPurcha
 use App\Http\Controllers\Admin\Purchasing\SupplierController as AdminSupplierController;
 use App\Http\Controllers\Admin\Purchasing\SupplierReturnController as AdminSupplierReturnController;
 use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
+use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
+use App\Http\Controllers\Admin\Shipping\ShipmentController as AdminShipmentController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -91,6 +93,16 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('orders/{order}/ship', [AdminOrderController::class, 'ship'])->name('orders.ship');
         Route::post('orders/{order}/deliver', [AdminOrderController::class, 'deliver'])->name('orders.deliver');
         Route::post('orders/{order}/cancel', [AdminOrderController::class, 'cancel'])->name('orders.cancel');
+    });
+
+    // الشحن والجغرافيا (Phase 2.7)
+    Route::prefix('shipping')->name('shipping.')->group(function () {
+        Route::get('geography', [AdminGeographyController::class, 'index'])->name('geography.index');
+        Route::resource('shipments', AdminShipmentController::class)->only(['index', 'create', 'store', 'show']);
+        Route::post('shipments/{shipment}/dispatch', [AdminShipmentController::class, 'dispatchShipment'])->name('shipments.dispatch');
+        Route::post('shipments/{shipment}/out-for-delivery', [AdminShipmentController::class, 'outForDelivery'])->name('shipments.out_for_delivery');
+        Route::post('shipments/{shipment}/deliver', [AdminShipmentController::class, 'deliver'])->name('shipments.deliver');
+        Route::post('shipments/{shipment}/fail', [AdminShipmentController::class, 'fail'])->name('shipments.fail');
     });
 });
 

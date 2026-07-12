@@ -21,6 +21,8 @@ use App\Http\Controllers\Api\V1\Purchasing\SupplierController;
 use App\Http\Controllers\Api\V1\Purchasing\SupplierReturnController;
 use App\Http\Controllers\Api\V1\Sales\OrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderTransitionController;
+use App\Http\Controllers\Api\V1\Shipping\GeographyController;
+use App\Http\Controllers\Api\V1\Shipping\ShipmentController;
 use App\Http\Controllers\Api\V1\WarehouseController;
 use App\Http\Controllers\Api\V1\WarehouseLocationController;
 use App\Http\Resources\UserResource;
@@ -177,6 +179,30 @@ Route::prefix('v1')->group(function () {
             Route::post('orders/{order}/ship', [OrderTransitionController::class, 'ship']);
             Route::post('orders/{order}/deliver', [OrderTransitionController::class, 'deliver']);
             Route::post('orders/{order}/cancel', [OrderTransitionController::class, 'cancel']);
+        });
+
+        /*
+        | Phase 2.7 — الشحن والجغرافيا (ADR-014/027)
+        | الجغرافيا (قراءة) + الشحنات؛ المزوّدون حصريًا عبر طبقة التكامل.
+        */
+        Route::prefix('geo')->group(function () {
+            Route::get('governorates', [GeographyController::class, 'governorates']);
+            Route::get('cities', [GeographyController::class, 'cities']);
+            Route::get('areas', [GeographyController::class, 'areas']);
+            Route::get('shipping-zones', [GeographyController::class, 'shippingZones']);
+        });
+
+        Route::prefix('shipping')->group(function () {
+            Route::get('shipments', [ShipmentController::class, 'index']);
+            Route::post('shipments', [ShipmentController::class, 'store']);
+            Route::get('shipments/{shipment}', [ShipmentController::class, 'show']);
+            Route::post('shipments/{shipment}/dispatch', [ShipmentController::class, 'dispatchShipment']);
+            Route::post('shipments/{shipment}/out-for-delivery', [ShipmentController::class, 'outForDelivery']);
+            Route::post('shipments/{shipment}/delay', [ShipmentController::class, 'delay']);
+            Route::post('shipments/{shipment}/customer-unavailable', [ShipmentController::class, 'customerUnavailable']);
+            Route::post('shipments/{shipment}/deliver', [ShipmentController::class, 'deliver']);
+            Route::post('shipments/{shipment}/fail', [ShipmentController::class, 'fail']);
+            Route::post('shipments/{shipment}/override-cost', [ShipmentController::class, 'overrideCost']);
         });
 
     });

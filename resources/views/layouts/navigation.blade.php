@@ -42,6 +42,9 @@
                     @can('sales.orders.view')
                         <x-nav-link :href="route('admin.sales.orders.index')" :active="request()->routeIs('admin.sales.*')">{{ __('المبيعات') }}</x-nav-link>
                     @endcan
+                    @can('shipping.shipments.view')
+                        <x-nav-link :href="route('admin.shipping.shipments.index')" :active="request()->routeIs('admin.shipping.*')">{{ __('الشحن') }}</x-nav-link>
+                    @endcan
                 </div>
             </div>
 

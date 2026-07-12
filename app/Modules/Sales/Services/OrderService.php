@@ -168,10 +168,47 @@ class OrderService
         return $order;
     }
 
+    /**
+     * الحالات التشغيلية للتوصيل (BR-ORD-10، ADR-010) — تُقاد من وحدة الشحن (Phase 2.7).
+     * كانت معرّفة في 2.6 ومؤجّلة المسارات؛ هنا تُفتح دون تغيير الأثر المالي/المخزوني.
+     */
+    public function markOutForDelivery(Order $order): Order
+    {
+        $this->transition($order, ['shipped', 'delayed', 'customer_unavailable'], 'out_for_delivery');
+
+        return $order;
+    }
+
+    public function markDelayed(Order $order, ?string $note = null): Order
+    {
+        $this->transition($order, ['shipped', 'out_for_delivery'], 'delayed', null, $note);
+
+        return $order;
+    }
+
+    public function markCustomerUnavailable(Order $order, ?string $note = null): Order
+    {
+        $this->transition($order, ['shipped', 'out_for_delivery'], 'customer_unavailable', null, $note);
+
+        return $order;
+    }
+
+    public function markDeliveryFailed(Order $order, ?string $reason = null): Order
+    {
+        $this->transition($order, ['shipped', 'out_for_delivery', 'delayed', 'customer_unavailable'], 'delivery_failed', null, $reason);
+
+        return $order;
+    }
+
     /** التسليم: اعتراف الإيراد يُنفَّذ محاسبيًا في 2.9؛ هنا معلم زمني فقط (ADR-010a). */
     public function deliver(Order $order): Order
     {
-        $this->transition($order, ['shipped'], 'delivered', fn () => $order->update(['delivered_at' => now()]));
+        $this->transition(
+            $order,
+            ['shipped', 'out_for_delivery', 'delayed', 'customer_unavailable'],
+            'delivered',
+            fn () => $order->update(['delivered_at' => now()]),
+        );
 
         return $order;
     }
@@ -187,6 +224,17 @@ class OrderService
 
             $order->update(['cancel_reason' => $reason, 'cancelled_at' => now()]);
         }, $reason);
+
+        return $order;
+    }
+
+    /** لقطة تكلفة الشحن على الطلب وإعادة احتساب الإجمالي (المتطلّب 8 — تُستدعى من وحدة الشحن). */
+    public function applyShippingTotal(Order $order, float $shippingTotal): Order
+    {
+        $order->update([
+            'shipping_total' => $shippingTotal,
+            'total' => (float) $order->subtotal - (float) $order->discount_total + (float) $order->tax_total + $shippingTotal,
+        ]);
 
         return $order;
     }

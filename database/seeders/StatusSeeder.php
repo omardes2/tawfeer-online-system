@@ -45,12 +45,16 @@ class StatusSeeder extends Seeder
             ['key' => 'refunded', 'name' => 'مُسترَد', 'color' => '#64748b', 'sort_order' => 4, 'is_final' => true],
         ];
 
+        // مفردات حالة الشحن (ADR-027) — تغطّي جزء التوصيل من دورة حياة الطلب (ADR-010، BR-ORD-10).
         $shipmentStatuses = [
             ['key' => 'not_shipped', 'name' => 'لم يُشحَن', 'color' => '#64748b', 'sort_order' => 1, 'is_default' => true],
             ['key' => 'preparing', 'name' => 'قيد التجهيز', 'color' => '#6366f1', 'sort_order' => 2],
             ['key' => 'in_transit', 'name' => 'في الطريق', 'color' => '#3b82f6', 'sort_order' => 3],
-            ['key' => 'delivered', 'name' => 'تم التسليم', 'color' => '#22c55e', 'sort_order' => 4, 'is_final' => true],
-            ['key' => 'failed', 'name' => 'فشل التسليم', 'color' => '#ef4444', 'sort_order' => 5, 'is_final' => true],
+            ['key' => 'out_for_delivery', 'name' => 'خرج للتوصيل', 'color' => '#8b5cf6', 'sort_order' => 4],
+            ['key' => 'delayed', 'name' => 'مؤجّل', 'color' => '#f59e0b', 'sort_order' => 5],
+            ['key' => 'customer_unavailable', 'name' => 'العميل غير متاح', 'color' => '#f59e0b', 'sort_order' => 6],
+            ['key' => 'delivered', 'name' => 'تم التسليم', 'color' => '#22c55e', 'sort_order' => 7, 'is_final' => true],
+            ['key' => 'failed', 'name' => 'فشل التسليم', 'color' => '#ef4444', 'sort_order' => 8, 'is_final' => true],
         ];
 
         foreach ($orderStatuses as $status) {
