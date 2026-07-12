@@ -16,6 +16,6 @@ class CheckoutStarted
 
     public function __construct(
         public readonly Cart $cart,
-        public readonly User $user,
+        public readonly ?User $user = null,
     ) {}
 }

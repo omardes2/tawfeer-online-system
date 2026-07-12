@@ -13,6 +13,7 @@ use App\Modules\Store\Events\CheckoutStarted;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -44,40 +45,54 @@ class CheckoutApiTest extends TestCase
         return $variant;
     }
 
-    private function addToCart(ProductVariant $v, float $qty = 2): void
+    /** @param array<string, string> $headers */
+    private function addToCart(ProductVariant $v, float $qty = 2, array $headers = []): void
     {
-        $this->postJson('/api/v1/store/cart/items', ['variant' => $v->uuid, 'qty' => $qty])->assertOk();
+        $this->postJson('/api/v1/store/cart/items', ['variant' => $v->uuid, 'qty' => $qty], $headers)->assertOk();
     }
 
-    /** @param array<string, mixed> $overrides */
-    private function payload(array $overrides = []): array
+    /** @return array<string, mixed> */
+    private function details(array $overrides = []): array
     {
         return array_merge([
             'customer_name' => 'عميل تجريبي',
             'customer_phone' => '0500000000',
             'shipping_address' => 'الرياض - حي النخيل - شارع 1',
-            'payment_method' => 'cod',
+            'payment_method_code' => 'cod',
         ], $overrides);
     }
 
-    public function test_guest_cannot_checkout(): void
+    // ---- المصادقة والهوية ----
+
+    public function test_guest_without_token_cannot_start_checkout(): void
     {
-        $this->postJson('/api/v1/store/checkout', $this->payload())->assertUnauthorized();
+        $this->postJson('/api/v1/store/checkout')->assertUnauthorized();
     }
 
-    public function test_cannot_checkout_empty_cart(): void
+    public function test_cannot_start_checkout_with_empty_cart(): void
     {
         Sanctum::actingAs($this->admin());
-        $this->postJson('/api/v1/store/checkout', $this->payload())->assertUnprocessable();
+        $this->postJson('/api/v1/store/checkout')->assertUnprocessable();
     }
 
-    public function test_successful_checkout_creates_order_and_payment(): void
+    // ---- التدفّق متعدّد الخطوات (مستخدم مُصادَق) ----
+
+    public function test_successful_multistep_checkout(): void
     {
         Sanctum::actingAs($this->admin());
         $v = $this->sellableVariant(40, null, 10);
         $this->addToCart($v, 3);
 
-        $this->postJson('/api/v1/store/checkout', $this->payload())->assertOk()
+        $sid = $this->postJson('/api/v1/store/checkout')->assertSuccessful()
+            ->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.ready', false)
+            ->json('data.id');
+
+        $this->patchJson("/api/v1/store/checkout/{$sid}", $this->details())->assertOk()
+            ->assertJsonPath('data.ready', true)
+            ->assertJsonPath('data.payment_method', 'cod');
+
+        $this->postJson("/api/v1/store/checkout/{$sid}/place")->assertOk()
             ->assertJsonPath('data.status', 'stock_reserved')
             ->assertJsonPath('data.payment_status', 'unpaid')
             ->assertJsonPath('data.item_count', 1)
@@ -85,6 +100,7 @@ class CheckoutApiTest extends TestCase
             ->assertJsonPath('data.payment.status', 'pending');
 
         $this->assertDatabaseHas('orders', ['channel' => 'web', 'status' => 'stock_reserved']);
+        $this->assertDatabaseHas('checkout_sessions', ['uuid' => $sid, 'status' => 'placed']);
     }
 
     public function test_checkout_reserves_inventory(): void
@@ -93,7 +109,9 @@ class CheckoutApiTest extends TestCase
         $v = $this->sellableVariant(40, null, 10);
         $this->addToCart($v, 4);
 
-        $this->postJson('/api/v1/store/checkout', $this->payload())->assertOk();
+        $sid = $this->postJson('/api/v1/store/checkout')->json('data.id');
+        $this->patchJson("/api/v1/store/checkout/{$sid}", $this->details());
+        $this->postJson("/api/v1/store/checkout/{$sid}/place")->assertOk();
 
         $stock = InventoryStock::where('variant_id', $v->id)
             ->where('warehouse_id', $this->warehouse->id)->first();
@@ -107,43 +125,60 @@ class CheckoutApiTest extends TestCase
         $v = $this->sellableVariant(40, null, 10);
         $this->addToCart($v, 2);
 
-        $this->postJson('/api/v1/store/checkout', $this->payload())->assertOk();
+        $sid = $this->postJson('/api/v1/store/checkout')->json('data.id');
+        $this->patchJson("/api/v1/store/checkout/{$sid}", $this->details());
+        $this->postJson("/api/v1/store/checkout/{$sid}/place")->assertOk();
 
-        // سلة جديدة فارغة عند الوصول التالي (السلة السابقة صارت converted).
         $this->getJson('/api/v1/store/cart')->assertOk()->assertJsonPath('data.item_count', 0);
     }
 
-    public function test_inactive_payment_method_rejected(): void
+    public function test_place_rejected_when_details_incomplete(): void
     {
         Sanctum::actingAs($this->admin());
         $v = $this->sellableVariant();
         $this->addToCart($v, 1);
 
-        // hyperpay مسجّل لكنه غير مُفعّل (is_active=false).
-        $this->postJson('/api/v1/store/checkout', $this->payload(['payment_method' => 'hyperpay']))
-            ->assertUnprocessable();
+        $sid = $this->postJson('/api/v1/store/checkout')->json('data.id');
+        // لم تُضبط بيانات الشحن/الدفع.
+        $this->postJson("/api/v1/store/checkout/{$sid}/place")->assertUnprocessable();
     }
 
-    public function test_unknown_payment_method_rejected(): void
+    public function test_inactive_payment_method_rejected_at_place(): void
     {
         Sanctum::actingAs($this->admin());
         $v = $this->sellableVariant();
         $this->addToCart($v, 1);
 
-        $this->postJson('/api/v1/store/checkout', $this->payload(['payment_method' => 'nope']))
+        $sid = $this->postJson('/api/v1/store/checkout')->json('data.id');
+        // hyperpay مسجّل (يمرّ exists) لكنه غير مُفعّل → يُرفض عند الإتمام.
+        $this->patchJson("/api/v1/store/checkout/{$sid}", $this->details(['payment_method_code' => 'hyperpay']))->assertOk();
+        $this->postJson("/api/v1/store/checkout/{$sid}/place")->assertUnprocessable();
+    }
+
+    public function test_unknown_payment_method_rejected_at_update(): void
+    {
+        Sanctum::actingAs($this->admin());
+        $v = $this->sellableVariant();
+        $this->addToCart($v, 1);
+
+        $sid = $this->postJson('/api/v1/store/checkout')->json('data.id');
+        $this->patchJson("/api/v1/store/checkout/{$sid}", $this->details(['payment_method_code' => 'nope']))
             ->assertUnprocessable();
     }
 
-    public function test_checkout_rejected_when_stock_dropped_below_cart_qty(): void
+    public function test_place_rejected_when_stock_dropped_below_cart_qty(): void
     {
         Sanctum::actingAs($this->admin());
         $v = $this->sellableVariant(40, null, 5);
         $this->addToCart($v, 5);
 
-        // إخراج مخزون بعد الإضافة يخفّض المتاح دون كمية السلة.
+        $sid = $this->postJson('/api/v1/store/checkout')->json('data.id');
+        $this->patchJson("/api/v1/store/checkout/{$sid}", $this->details());
+
+        // إخراج مخزون بعد بدء الجلسة يخفّض المتاح دون كمية السلة.
         app(InventoryService::class)->issue($v, $this->warehouse, 3);
 
-        $this->postJson('/api/v1/store/checkout', $this->payload())->assertUnprocessable();
+        $this->postJson("/api/v1/store/checkout/{$sid}/place")->assertUnprocessable();
     }
 
     public function test_checkout_dispatches_domain_events(): void
@@ -153,9 +188,55 @@ class CheckoutApiTest extends TestCase
         $v = $this->sellableVariant(40, null, 10);
         $this->addToCart($v, 2);
 
-        $this->postJson('/api/v1/store/checkout', $this->payload())->assertOk();
-
+        $sid = $this->postJson('/api/v1/store/checkout')->json('data.id');
         Event::assertDispatched(CheckoutStarted::class);
+
+        $this->patchJson("/api/v1/store/checkout/{$sid}", $this->details());
+        $this->postJson("/api/v1/store/checkout/{$sid}/place")->assertOk();
         Event::assertDispatched(CheckoutCompleted::class);
+    }
+
+    public function test_cannot_access_another_users_session(): void
+    {
+        Sanctum::actingAs($this->admin());
+        $v = $this->sellableVariant();
+        $this->addToCart($v, 1);
+        $sid = $this->postJson('/api/v1/store/checkout')->json('data.id');
+
+        $other = User::factory()->create();
+        Sanctum::actingAs($other);
+        $this->getJson("/api/v1/store/checkout/{$sid}")->assertForbidden();
+    }
+
+    // ---- إتمام الضيف (رمز سلة) ----
+
+    public function test_guest_checkout_end_to_end(): void
+    {
+        $token = (string) Str::uuid();
+        $headers = ['X-Cart-Token' => $token];
+        $v = $this->sellableVariant(50, null, 10);
+
+        $this->addToCart($v, 2, $headers);
+
+        $sid = $this->postJson('/api/v1/store/checkout', [], $headers)->assertSuccessful()->json('data.id');
+        $this->patchJson("/api/v1/store/checkout/{$sid}", $this->details(), $headers)->assertOk();
+        $this->postJson("/api/v1/store/checkout/{$sid}/place", [], $headers)->assertOk()
+            ->assertJsonPath('data.status', 'stock_reserved')
+            ->assertJsonPath('data.total', '100.00');
+
+        // طلب ضيف: بلا عميل مرتبط.
+        $this->assertDatabaseHas('orders', ['channel' => 'web', 'customer_id' => null, 'status' => 'stock_reserved']);
+    }
+
+    public function test_guest_cannot_access_session_without_matching_token(): void
+    {
+        $token = (string) Str::uuid();
+        $v = $this->sellableVariant();
+        $this->addToCart($v, 1, ['X-Cart-Token' => $token]);
+        $sid = $this->postJson('/api/v1/store/checkout', [], ['X-Cart-Token' => $token])->json('data.id');
+
+        // رمز مختلف → ممنوع.
+        $this->getJson("/api/v1/store/checkout/{$sid}", ['X-Cart-Token' => (string) Str::uuid()])
+            ->assertForbidden();
     }
 }

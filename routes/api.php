@@ -262,20 +262,23 @@ Route::prefix('v1')->group(function () {
             Route::post('customers/{customer}/merge', [CustomerController::class, 'merge']);
         });
 
-        /*
-        | Phase 3.1 — المتجر: السلة (ADR-031)
-        | سلة المستخدم الحالي فقط (self-scoped)؛ السعر لقطة من الكتالوج؛ لا حجز مخزون هنا.
-        */
-        Route::prefix('store')->group(function () {
-            Route::get('cart', [CartController::class, 'show']);
-            Route::post('cart/items', [CartController::class, 'addItem']);
-            Route::match(['put', 'patch'], 'cart/items/{variant}', [CartController::class, 'updateItem']);
-            Route::delete('cart/items/{variant}', [CartController::class, 'removeItem']);
-            Route::delete('cart', [CartController::class, 'clear']);
+    });
 
-            // Phase 3.2 — إتمام الشراء: تحويل السلة إلى طلب (ADR-033).
-            Route::post('checkout', [CheckoutController::class, 'store']);
-        });
+    /*
+    | Phase 3.1/3.2 — المتجر: السلة وإتمام الشراء (ADR-031/033)
+    | هوية مزدوجة (store.identity): مستخدم مُصادَق أو ضيف برمز سلة (X-Cart-Token).
+    */
+    Route::prefix('store')->middleware('store.identity')->group(function () {
+        Route::get('cart', [CartController::class, 'show']);
+        Route::post('cart/items', [CartController::class, 'addItem']);
+        Route::match(['put', 'patch'], 'cart/items/{variant}', [CartController::class, 'updateItem']);
+        Route::delete('cart/items/{variant}', [CartController::class, 'removeItem']);
+        Route::delete('cart', [CartController::class, 'clear']);
 
+        // إتمام الشراء متعدّد الخطوات: بدء جلسة → تحديث بيانات → إتمام (ADR-033).
+        Route::post('checkout', [CheckoutController::class, 'start']);
+        Route::get('checkout/{session}', [CheckoutController::class, 'show']);
+        Route::match(['put', 'patch'], 'checkout/{session}', [CheckoutController::class, 'update']);
+        Route::post('checkout/{session}/place', [CheckoutController::class, 'place']);
     });
 });

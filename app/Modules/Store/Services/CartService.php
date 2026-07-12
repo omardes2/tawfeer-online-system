@@ -5,6 +5,7 @@ namespace App\Modules\Store\Services;
 use App\Models\User;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Crm\Models\Customer;
+use App\Modules\Foundation\Models\Branch;
 use App\Modules\Inventory\Models\InventoryStock;
 use App\Modules\Store\Models\Cart;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +25,31 @@ class CartService
             ['user_id' => $user->id, 'status' => 'active'],
             ['customer_id' => $customerId, 'branch_id' => $user->branch_id],
         );
+    }
+
+    /** سلة الضيف النشطة عبر رمز الجلسة (Phase 3.2 — تُنشأ عند الحاجة، فرع افتراضي). */
+    public function forGuest(string $sessionToken): Cart
+    {
+        return Cart::firstOrCreate(
+            ['session_token' => $sessionToken, 'status' => 'active'],
+            ['branch_id' => Branch::default()?->id],
+        );
+    }
+
+    /**
+     * حلّ السلة النشطة للهوية الحالية (مستخدم مُصادَق أو ضيف برمز جلسة).
+     * تضمن طبقة الهوية (store.identity) وجود إحداهما؛ تُعيد null احتياطًا فقط.
+     */
+    public function resolveActive(?User $user, ?string $guestToken): ?Cart
+    {
+        if ($user) {
+            return $this->forUser($user);
+        }
+        if (is_string($guestToken) && $guestToken !== '') {
+            return $this->forGuest($guestToken);
+        }
+
+        return null;
     }
 
     public function addItem(Cart $cart, ProductVariant $variant, float $qty): Cart

@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Phase 3.2 revised to multi-step + guest checkout (ADR-033, owner decision)
+- Checkout now supports **both authenticated users and guests**, and replaces the
+  single atomic endpoint with a **multi-step checkout session** — while
+  **preserving the exact final atomic order-creation transaction and payment
+  initiation** from the first 3.2 implementation. Minimum additive changes; no
+  completed module redesigned.
+- Dual identity: new `store.identity` middleware accepts a Sanctum user or a guest
+  cart token (`X-Cart-Token`, UUID), and returns 401 when neither is present
+  (preserves the 3.1 cart's unauthenticated behavior). Guest carts use the
+  existing `carts.session_token` column (no schema change); added
+  `CartService::resolveActive`/`forGuest` (existing `forUser` unchanged).
+- New additive table `checkout_sessions` (uuid, cart_id, nullable user_id/
+  session_token, status pending/placed/abandoned, accumulated shipping snapshot +
+  payment_method_code, order_id on placement). No change to `orders`/`payments`/
+  inventory.
+- `CheckoutService` steps: `start` (rejects empty cart, dispatches
+  `CheckoutStarted`) → `update` (progressive shipping/payment details) → `place`
+  (completeness + availability re-check, then the preserved `placeOrder`
+  transaction: create → confirm → reserveStock → payment initiate → cart
+  converted, then `CheckoutCompleted`). `CheckoutStarted.user` is now nullable
+  (guests).
+- API: `POST /store/checkout` (start), `GET|PUT|PATCH /store/checkout/{session}`,
+  `POST /store/checkout/{session}/place`. Per-session ownership enforced (403 on
+  mismatch). `UpdateCheckoutSessionRequest` (all-optional, validated) replaces the
+  old `CheckoutRequest`.
+- Tests: checkout suite grew 9 → 13 (added full guest checkout + cross-identity
+  access denial; migrated the existing 9 behaviours to the multi-step flow); the
+  9 cart tests pass unchanged under the new middleware → **312 passing total**.
+- Deferred extension point added: guest-cart merge into the account on login.
+
 ### Added — Phase 3.2 (Checkout)
 - `CheckoutService` (ADR-033): pure orchestration converting the active cart into
   a sales Order via existing services — no new business logic, no new tables.
