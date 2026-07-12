@@ -33,6 +33,7 @@ class ChartOfAccountsSeeder extends Seeder
         $leaves = [
             ['1010', 'الصندوق', 'asset', '1000'],
             ['1020', 'البنك', 'asset', '1000'],
+            ['1050', 'ذمم شركات التوصيل (COD قيد التحصيل)', 'asset', '1000'], // Phase 4.6 — COD clearing
             ['1100', 'ذمم العملاء', 'asset', '1000'],
             ['1200', 'المخزون', 'asset', '1000'],
             ['2010', 'ذمم الموردين', 'liability', '2000'],

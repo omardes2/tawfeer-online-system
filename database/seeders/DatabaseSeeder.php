@@ -54,6 +54,8 @@ class DatabaseSeeder extends Seeder
             DeliveryExceptionCategorySeeder::class,
             // Phase 4.4 — المرتجعات والاستبدال (RMA)
             ReturnsPermissionSeeder::class,
+            // Phase 4.6 — التسويات المالية
+            SettlementsPermissionSeeder::class,
         ]);
     }
 }

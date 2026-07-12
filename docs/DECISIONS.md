@@ -205,6 +205,15 @@
 - **التكلفة المُحمّلة (Landed Cost — BR-PUR-06):** `goods_receipts.additional_cost` تُوزَّع على البنود بنسبة قيمة السطر قبل احتساب WAC.
 - **FK مؤجّلة:** `suppliers.governorate_id/city_id/currency_id` (جداولها غير مُنشأة) — أعمدة nullable بلا قيد الآن.
 
+## ADR-041 — التسوية المالية ومطابقة المزوّد (Financial Settlement) [مُعتمد في Phase 4.6]
+- **السياق:** مطابقة بيان تسوية مزوّد التوصيل (COD محصّل، رسوم، خصومات، صافٍ) بسجلّاتنا، وترحيلها محاسبيًا. **إضافي بالكامل**؛ يُعيد استخدام المحاسبة والعمولات دون تكرار. (المرحلة 4.5 مطالبات التوصيل **مُستبعَدة** — الخصومات ذات الطابع المطالبي تُعالَج كبنود خصم عامّة في السطور.)
+- **الجداول:** `delivery_settlements` (مزوّد/فترة/حالة + إجماليات **مُبلَّغة** من البيان و**محسوبة** من سجلّاتنا + `variance` + `accounting_entry_id`)؛ `settlement_lines` (لكل طلب/شحنة: COD + رسوم + خصم + صافٍ + `reported_cod`/`matched`/`variance`). حالات `draft → reconciled → posted → closed` (+ cancelled) محروسة. soft-delete + auditable.
+- **الأساس المحسوب:** COD = `orders.total` للطلب المرتبط بشحنة **مُغلقة** (`delivery_status=closed`)؛ الرسوم = مجموع `shipment_fee_components`. `net = cod − fees − deductions`.
+- **المطابقة وكشف التباين:** `reconcile` يحسب الإجماليات، يطابق `reported_cod` لكل سطر (matched/variance)، ويحسب تباين الصافي إجماليًا. لا يمنع الترحيل مع تباين موثّق.
+- **الترحيل المحاسبي (إعادة استخدام `AccountingService::postEntry`، ADR-029):** قيد مزدوج متوازن — **Dr نقد (`1010`) بالصافي + Dr مصروف الشحن (`5020`) بالرسوم + Dr الخصومات (`5030`) = Cr ذمم شركات التوصيل (`1050` — حساب COD clearing مُضاف)**. مرتبط بالتسوية عبر `reference_type/id`. لا محاسبة يدوية مكرّرة.
+- **تأكيد الاستحقاق (idempotent):** عند الترحيل تُعلَّم الطلبات `settled_at` وتُستدعى `accrueForOrder`+`markEligibleForOrder` — **مؤكِّدة لما جرى عند إغلاق التوصيل (4.3)** لا مُكرِّرة (الاستحقاق يمسّ pending فقط، وsettled_at يُضبَط مرّة). الملكية للدور `finance` (صلاحيات `settlements.{view,manage,reconcile,post}`).
+- **العلاقة مع الإغلاق (4.3):** إغلاق التوصيل يُفعّل الاستحقاق تشغيليًا؛ التسوية المالية **تطبّق الأثر المحاسبي وتطابق المال مع المزوّد** — الطبقتان idempotent ومتكاملتان.
+
 ## ADR-040 — المرتجعات والاستبدال RMA (Returns & Exchanges) [مُعتمد في Phase 4.4]
 - **السياق:** تفعيل تدفّق ADR-011/BR-RET-* فعليًا: طلب مرتجع/استبدال/إبدال مرتبط بطلب مُسلَّم، بسير موافقات ووجهة مخزون/مالية عكسية. **إضافي بالكامل**؛ يُعيد استخدام الخدمات القائمة دون تكرار.
 - **إعادة الاستخدام (المبدأ 12، لا تكرار منطق):** المخزون عبر `InventoryService` (طريقتان مُضافتان `returnToStock`=`return_in`→on_hand و`returnToDamaged`=`damage_out`→damaged — تستخدمان محرّك الحركات القائم؛ كل حركة مسجَّلة في الحركات/الدفتر)؛ الاسترداد عبر `PaymentService::refund`؛ عكس العمولة عبر `CommissionService::reverseForOrder` (كامل) / `adjustForReturn` (جزئي تناسبي، BR-RET-09)؛ حالة الطلب عبر `OrderService::markReturned/markPartiallyReturned/markExchanged` (مُضافة — تُفعّل مفاتيح `returned/partially_returned/exchanged` القانونية)؛ الشحنة المرتبطة عبر `ShipmentService::createLinkedShipment`.

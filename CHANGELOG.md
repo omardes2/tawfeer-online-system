@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — scope
+- **Phase 4.5 (Delivery Claims) removed** per owner request — no dedicated
+  claims module. Claim-like deductions are handled as generic settlement lines.
+
+### Added — Phase 4.6 (Financial Settlement & Reconciliation)
+- **New `Settlements` module (ADR-041)** — additive; reuses AccountingService
+  and CommissionService with no duplicated logic.
+- `delivery_settlements` (provider/period/status + reported vs computed totals +
+  variance + accounting_entry_id) and `settlement_lines` (per order/shipment:
+  COD/fee/deduction/net + reported_cod/matched/variance). State machine
+  `draft → reconciled → posted → closed` (+ cancelled).
+- Computed basis: COD = `orders.total` for a closed shipment, fees = sum of
+  `shipment_fee_components`; `net = cod − fees − deductions`. Reconcile computes
+  totals, matches reported COD per line, and detects variance.
+- **Double-entry posting via `AccountingService::postEntry`:** balanced entry
+  Dr Cash (1010) net + Dr Delivery expense (5020) fees + Dr Discounts (5030)
+  deductions = Cr COD clearing (**new account 1050**), linked to the settlement
+  via reference_type/id.
+- On post: marks orders `settled_at` and confirms commission eligibility
+  (`markEligibleForOrder`) idempotently — reaffirming what delivery CLOSE (4.3)
+  already did, never double-counting.
+- Permissions `settlements.{view,manage,reconcile,post}` (finance/manager).
+  Admin UI (RTL) + ar/en lang; API under `/api/v1/settlements/*`.
+- Tests: 7 new settlement tests → 423 passing. Pint clean; frontend build
+  succeeds.
+
 ### Added — Phase 4.4 (Returns & Exchanges / RMA)
 - **New `Returns` module (ADR-040)** — fully additive; reuses every existing
   service with no duplicated business logic.

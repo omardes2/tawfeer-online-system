@@ -51,6 +51,9 @@
                     @can('returns.view')
                         <x-nav-link :href="route('admin.returns.index')" :active="request()->routeIs('admin.returns.*')">{{ __('returns.title') }}</x-nav-link>
                     @endcan
+                    @can('settlements.view')
+                        <x-nav-link :href="route('admin.settlements.index')" :active="request()->routeIs('admin.settlements.*')">{{ __('settlements.title') }}</x-nav-link>
+                    @endcan
                     @can('payments.view')
                         <x-nav-link :href="route('admin.payments.index')" :active="request()->routeIs('admin.payments.*')">{{ __('المدفوعات') }}</x-nav-link>
                     @endcan

@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\V1\Sales\OrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderTransitionController;
 use App\Http\Controllers\Api\V1\Shipping\GeographyController;
 use App\Http\Controllers\Api\V1\Returns\ReturnController;
+use App\Http\Controllers\Api\V1\Settlements\SettlementController;
 use App\Http\Controllers\Api\V1\Shipping\DeliveryExceptionController;
 use App\Http\Controllers\Api\V1\Shipping\DeliveryFeeController;
 use App\Http\Controllers\Api\V1\Shipping\DeliveryStatusController;
@@ -274,6 +275,22 @@ Route::prefix('v1')->group(function () {
         | Phase 4.4 — المرتجعات والاستبدال RMA (ADR-040)
         | سير موافقات: مبيعات → مشرف → مستودع → قرار نهائي. الأثر عكسي عبر الخدمات القائمة.
         */
+        /*
+        | Phase 4.6 — التسويات المالية ومطابقة المزوّد (ADR-041)
+        | مطابقة بيان المزوّد + ترحيل محاسبي عبر AccountingService القائم.
+        */
+        Route::prefix('settlements')->group(function () {
+            Route::get('/', [SettlementController::class, 'index'])->middleware('can:settlements.view');
+            Route::post('/', [SettlementController::class, 'store'])->middleware('can:settlements.manage');
+            Route::get('{settlement}', [SettlementController::class, 'show'])->middleware('can:settlements.view');
+            Route::post('{settlement}/shipments', [SettlementController::class, 'addShipments'])->middleware('can:settlements.manage');
+            Route::post('{settlement}/lines', [SettlementController::class, 'addLine'])->middleware('can:settlements.manage');
+            Route::post('{settlement}/reconcile', [SettlementController::class, 'reconcile'])->middleware('can:settlements.reconcile');
+            Route::post('{settlement}/post', [SettlementController::class, 'post'])->middleware('can:settlements.post');
+            Route::post('{settlement}/close', [SettlementController::class, 'close'])->middleware('can:settlements.post');
+            Route::post('{settlement}/cancel', [SettlementController::class, 'cancel'])->middleware('can:settlements.manage');
+        });
+
         Route::prefix('rma')->group(function () {
             Route::get('/', [ReturnController::class, 'index'])->middleware('can:returns.view');
             Route::post('/', [ReturnController::class, 'store'])->middleware('can:returns.create');

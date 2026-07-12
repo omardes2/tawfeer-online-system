@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\Purchasing\SupplierReturnController as AdminSuppl
 use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
 use App\Http\Controllers\Admin\Returns\ReturnController as AdminReturnController;
+use App\Http\Controllers\Admin\Settlements\SettlementController as AdminSettlementController;
 use App\Http\Controllers\Admin\Shipping\DeliveryStatusController as AdminDeliveryStatusController;
 use App\Http\Controllers\Admin\Shipping\ShipmentController as AdminShipmentController;
 use App\Http\Controllers\ProfileController;
@@ -221,6 +222,19 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('rules', [AdminCommissionController::class, 'rules'])->name('rules')->middleware('can:commissions.rules.manage');
         Route::post('rules', [AdminCommissionController::class, 'storeRule'])->name('rules.store')->middleware('can:commissions.rules.manage');
         Route::delete('rules/{rule}', [AdminCommissionController::class, 'destroyRule'])->name('rules.destroy')->middleware('can:commissions.rules.manage');
+    });
+
+    // التسويات المالية (Phase 4.6)
+    Route::prefix('settlements')->name('settlements.')->group(function () {
+        Route::get('/', [AdminSettlementController::class, 'index'])->name('index')->middleware('can:settlements.view');
+        Route::get('create', [AdminSettlementController::class, 'create'])->name('create')->middleware('can:settlements.manage');
+        Route::post('/', [AdminSettlementController::class, 'store'])->name('store')->middleware('can:settlements.manage');
+        Route::get('{settlement}', [AdminSettlementController::class, 'show'])->name('show')->middleware('can:settlements.view');
+        Route::post('{settlement}/shipments', [AdminSettlementController::class, 'addShipments'])->name('shipments')->middleware('can:settlements.manage');
+        Route::post('{settlement}/reconcile', [AdminSettlementController::class, 'reconcile'])->name('reconcile')->middleware('can:settlements.reconcile');
+        Route::post('{settlement}/post', [AdminSettlementController::class, 'post'])->name('post')->middleware('can:settlements.post');
+        Route::post('{settlement}/close', [AdminSettlementController::class, 'close'])->name('close')->middleware('can:settlements.post');
+        Route::post('{settlement}/cancel', [AdminSettlementController::class, 'cancel'])->name('cancel')->middleware('can:settlements.manage');
     });
 
     // المرتجعات والاستبدال RMA (Phase 4.4)
