@@ -47,6 +47,8 @@ class DatabaseSeeder extends Seeder
             CrmPermissionSeeder::class,
             // Phase 4.1 — عمليات المبيعات (البيع المُساعد)
             SalesOperationsPermissionSeeder::class,
+            // Phase 4.2 — العمولات/الأرباح
+            CommissionsPermissionSeeder::class,
         ]);
     }
 }

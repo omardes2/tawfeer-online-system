@@ -54,6 +54,9 @@
                     @can('crm.customers.view')
                         <x-nav-link :href="route('admin.crm.customers.index')" :active="request()->routeIs('admin.crm.*')">{{ __('العملاء') }}</x-nav-link>
                     @endcan
+                    @can('commissions.view_team')
+                        <x-nav-link :href="route('admin.commissions.index')" :active="request()->routeIs('admin.commissions.*')">{{ __('commissions.title') }}</x-nav-link>
+                    @endcan
                 </div>
             </div>
 

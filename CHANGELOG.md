@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.2 (Sales Commission & Affiliate Earnings Ledgers)
+- **CommissionService engine:** automatic accrual on `OrderDelivered` (via a
+  listener); default **1%** sales commission, configurable through
+  `commission_rules` scoped by employee/period/campaign/product/category/branch/
+  role. Affiliate earnings = margin `(selling price − wholesale-cost snapshot) ×
+  qty`.
+- **Immutable append-only ledgers:** `commission_entries` (signed accrual/
+  adjustment/reversal movements) + `commission_transitions` (state-change log) +
+  `commission_payouts`/`commission_payout_entries`. **Balances are derived from
+  the ledger, never stored;** a model guard blocks mutation of financial fields
+  (`RuntimeException`).
+- **Lifecycle:** `pending → eligible → approved → paid` (+ `adjusted/reversed/
+  cancelled`) with enforced transitions. Eligibility is **only granted at
+  settlement in 4.6** (`markEligibleForOrder`) — never merely on create/deliver.
+- **Deterministic rule precedence:** employee > campaign > product/category >
+  branch > role > global (`ruleScorePriority`), highest-priority active rule in
+  the effective period wins.
+- **Approval/payout controls:** single & batch approval (finance/supervisor);
+  batch payout with reference; double-approval/double-payment prevented (unique
+  `uniq_entry_paid_once` constraint + `lockForUpdate`); partial per-earner payout.
+- **Returns-readiness:** `adjustForReturn` (proportional negative adjustment) and
+  `reverseForOrder` (full reversal) add **new movements without mutating
+  history** — services/events ready for RMA (4.4) without implementing it.
+- **Accounting-readiness:** reuses `AccountingService`; **no final entries before
+  settlement eligibility;** future posting idempotent.
+- Permissions (ADR-021): `commissions.{view_own,view_team,rules.manage,approve,
+  payout,audit.view}`; `finance` / `sales_supervisor` roles.
+- Admin UI (RTL): ledger with state tabs, rule management, per-earner statement,
+  batch approve/payout; full Arabic/English lang files.
+- API: `GET /api/v1/commissions[/statement]`, `POST .../approve|payout`,
+  `apiResource commissions/rules`.
+- Additive schema only; no completed module redesigned.
+- Tests: 15 new commission-ledger tests → 372 passing. Pint clean; frontend build
+  succeeds.
+
 ### Added — Phase 4 design + Phase 4.1 (Assisted Sales)
 - Phase 4 (Operations: assisted sales, affiliate, delivery ops, returns, claims,
   settlements) design document `docs/PHASE_4_OPERATIONS_DESIGN.md` + ADR-037,

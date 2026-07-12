@@ -12,8 +12,8 @@
 
 | الدفعة | النطاق | الحالة |
 |-------|--------|--------|
-| **4.1** | البيع المُساعد + الأدوار + تعديل السعر اليدوي بالموافقة واللقطات | **هذه الدفعة** |
-| 4.2 | عمولات الموظفين + أرباح المسوّقين (دفاتر غير قابلة للتعديل + حالات) | ⬜ |
+| 4.1 | البيع المُساعد + الأدوار + تعديل السعر اليدوي بالموافقة واللقطات | ✅ مكتملة |
+| **4.2** | عمولات الموظفين + أرباح المسوّقين (دفاتر غير قابلة للتعديل + حالات) | ✅ مكتملة |
 | 4.3 | عمليات التوصيل + تكامل المزوّد (تقديم/webhook/مزامنة) + الاستثناءات | ⬜ |
 | 4.4 | المرتجعات والاستبدال (RMA) + الفحص وتوجيه المخزون | ⬜ |
 | 4.5 | مطالبات التوصيل (تلف/كسر/فقد/نقص/تسرّب) | ⬜ |
@@ -83,10 +83,19 @@
 
 ## الدفعات اللاحقة (تصميم مرجعي — تُفصَّل عند اعتمادها)
 
-### 4.2 — عمولات الموظفين وأرباح المسوّقين (المتطلّبان 3، 4)
-- **الجداول:** `commission_rules` (نوع: `percent`/`fixed`/`price_diff`/`profit`/`tiered`؛ نطاق: موظف/فترة/حملة/منتج؛ `rate`/`amount`؛ افتراضي 1% — ADR-012)؛ `sales_commissions` (**دفتر غير قابل للتعديل** لكل بند طلب: base, rate, amount, state)؛ `affiliate_earnings` (**دفتر**: selling_snapshot − wholesale_snapshot = earning)؛ حالات لكليهما: `pending → eligible → approved → paid` + `adjusted` · `reversed` (تُطابق BR-MKT-7.2 مع مواءمة الأسماء). محفظة المسوّق (`wallet_balance`) مشتقّة من الدفتر لا عمود مصدر.
-- **القواعد:** استبعاد الشحن افتراضيًا (BR-MKT-04)؛ الاستحقاق `eligible` **فقط بعد التحصيل + تسوية** (4.6، المتطلّب 3/4)؛ إعادة الحساب للمرتجع الجزئي/الاستبدال/تعديل السعر/الإلغاء (BR-MKT-07/08، تناسبيًا) بقيود `adjusted`/`reversed`.
-- **الأحداث:** `CommissionAccrued`/`AffiliateEarningAccrued` (عند التسليم)، `…BecameEligible` (عند التسوية)، `…Approved`/`Paid`/`Reversed`.
+### ✅ 4.2 — عمولات الموظفين وأرباح المسوّقين (المتطلّبان 3، 4) — مكتملة
+> **مُنفَّذ (as-built):** وحدة `app/Modules/Commissions`. اعتُمد **دفتر موحّد واحد** `commission_entries` (بحقل `earner_type` = `sales`/`affiliate`) بدلًا من جدولين منفصلين — يبسّط الأسبقية والاعتماد/الصرف والاستعلام مع الحفاظ على كل الضمانات.
+- **الجداول (المُنفَّذة):**
+  - `commission_rules` — نطاقات: `user_id`/`campaign`/`product_id`/`category_id`/`branch_id`/`role` + `period_start/end`؛ طرق `percent`/`fixed`/`margin`؛ `rate` decimal(8,6)/`amount` decimal(15,2)؛ `priority`؛ `is_active`؛ softDeletes. الافتراضي **1%** ثابتًا في الخدمة عند غياب قاعدة.
+  - `commission_entries` — **دفتر append-only غير قابل للتعديل**: `entry_type` (`accrual`/`adjustment`/`reversal`)، `basis`، `rate`، `amount` **موقّع**، `wholesale_cost_snapshot`، `rule_snapshot` (json)، `state`، `reverses_entry_id`/`adjusts_entry_id`، `settlement_reference`. حارس نموذجي يرمي `RuntimeException` عند تعديل حقل مالي. **بلا soft-delete** (عكس لا حذف).
+  - `commission_transitions` — سجل انتقالات الحالة (append-only: from/to/actor/reference/note).
+  - `commission_payouts` + `commission_payout_entries` — مع **قيد فريد `uniq_entry_paid_once`** يمنع دفع البند مرتين على مستوى قاعدة البيانات.
+  - **الرصيد مُشتقّ من الدفتر** (`statement()`) لا عمود مصدر.
+- **الحالات (المُنفَّذة):** `pending → eligible → approved → paid` (+ `reversed`/`cancelled`؛ التسوية تُمثَّل بقيد `adjustment` جديد) بانتقالات مُتحقَّقة (`TRANSITIONS`).
+- **القواعد (المُنفَّذة):** أسبقية حتمية عبر `ruleScorePriority` (موظف>حملة>منتج/فئة>فرع>دور>عام)؛ أرباح المسوّق = `max((unit_price − wholesale_cost_snapshot) × qty, 0)`؛ الاستحقاق `eligible` **فقط بعد التسوية** (4.6) عبر `markEligibleForOrder`؛ إعادة الحساب للمرتجع الجزئي (`adjustForReturn` تناسبيًا) والعكس الكامل (`reverseForOrder`) بقيود جديدة دون مسّ التاريخ.
+- **الأحداث (المُنفَّذة):** الاستحقاق عبر مستمع `AccrueCommissionsOnDelivery` على `OrderDelivered` (idempotent). أحداث `…BecameEligible`/`Approved`/`Paid`/`Reversed` نقاط امتداد تُفصَّل عند ربطها بالتسوية (4.6) والإشعارات.
+- **الصلاحيات/الأدوار:** `commissions.{view_own,view_team,rules.manage,approve,payout,audit.view}`؛ `finance`/`sales_supervisor`.
+- **الواجهات:** API `commissions[/statement|approve|payout]` + `apiResource commissions/rules`؛ لوحة إدارة RTL. **15 اختبارًا ناجحًا.**
 
 ### 4.3 — عمليات التوصيل وتكامل المزوّد (المتطلّبان 5، 6)
 - **إعادة استخدام** طبقة الشحن (2.7): `DeliveryProviderInterface` + جدول ربط المزوّدين. **لا مزوّد مثبّت**.

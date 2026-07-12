@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\Catalog\ProductAttributeController;
 use App\Http\Controllers\Admin\Catalog\ProductController;
 use App\Http\Controllers\Admin\Catalog\ProductTagController;
 use App\Http\Controllers\Admin\Catalog\UnitController;
+use App\Http\Controllers\Admin\Commissions\CommissionController as AdminCommissionController;
 use App\Http\Controllers\Admin\Crm\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Admin\Inventory\InventoryController;
 use App\Http\Controllers\Admin\Inventory\StockAdjustmentController as AdminStockAdjustmentController;
@@ -199,6 +200,17 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::resource('payments', AdminPaymentController::class)->only(['index', 'create', 'store', 'show']);
     Route::post('payments/{payment}/capture', [AdminPaymentController::class, 'capture'])->name('payments.capture');
     Route::post('payments/{payment}/refund', [AdminPaymentController::class, 'refund'])->name('payments.refund');
+
+    // العمولات/الأرباح (Phase 4.2)
+    Route::prefix('commissions')->name('commissions.')->group(function () {
+        Route::get('/', [AdminCommissionController::class, 'index'])->name('index')->middleware('can:commissions.view_team');
+        Route::get('statement/{earnerId}', [AdminCommissionController::class, 'statement'])->name('statement')->middleware('can:commissions.view_team');
+        Route::post('approve', [AdminCommissionController::class, 'approve'])->name('approve')->middleware('can:commissions.approve');
+        Route::post('payout', [AdminCommissionController::class, 'payout'])->name('payout')->middleware('can:commissions.payout');
+        Route::get('rules', [AdminCommissionController::class, 'rules'])->name('rules')->middleware('can:commissions.rules.manage');
+        Route::post('rules', [AdminCommissionController::class, 'storeRule'])->name('rules.store')->middleware('can:commissions.rules.manage');
+        Route::delete('rules/{rule}', [AdminCommissionController::class, 'destroyRule'])->name('rules.destroy')->middleware('can:commissions.rules.manage');
+    });
 
     // CRM/العملاء (Phase 2.10)
     Route::prefix('crm')->name('crm.')->group(function () {

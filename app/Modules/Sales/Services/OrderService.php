@@ -219,6 +219,9 @@ class OrderService
             fn () => $order->update(['delivered_at' => now()]),
         );
 
+        // استحقاق العمولة (pending) — Phase 4.2. الاستحقاق النهائي (eligible) عند التسوية (4.6).
+        \App\Modules\Sales\Events\OrderDelivered::dispatch($order);
+
         return $order;
     }
 

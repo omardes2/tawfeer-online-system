@@ -9,6 +9,7 @@ use App\Modules\Payment\Providers\PaymentServiceProvider;
 use App\Modules\Purchasing\Providers\PurchasingServiceProvider;
 use App\Modules\Sales\Providers\SalesServiceProvider;
 use App\Modules\Shipping\Providers\ShippingServiceProvider;
+use App\Modules\Commissions\Providers\CommissionsServiceProvider;
 use App\Modules\Store\Providers\StoreServiceProvider;
 use App\Providers\AppServiceProvider;
 
@@ -24,4 +25,5 @@ return [
     AccountingServiceProvider::class,
     CrmServiceProvider::class,
     StoreServiceProvider::class,
+    CommissionsServiceProvider::class,
 ];

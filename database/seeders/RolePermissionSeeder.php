@@ -68,6 +68,11 @@ class RolePermissionSeeder extends Seeder
         'affiliate' => [
             'dashboard.view', 'affiliate.view',
         ],
+        // موظف مالية (Phase 4.2): اعتماد/صرف العمولات والتسويات لاحقًا.
+        'finance' => [
+            'dashboard.view', 'accounting.view', 'accounting.manage',
+            'orders.view', 'reports.view',
+        ],
         'customer' => [],
     ];
 

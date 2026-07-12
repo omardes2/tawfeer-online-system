@@ -1,0 +1,71 @@
+<?php
+
+// نصوص العمولات/الأرباح (عربي RTL — Phase 4.2).
+return [
+    'title' => 'العمولات والأرباح',
+    'ledger' => 'الدفتر',
+    'rules' => 'القواعد',
+    'statement' => 'كشف حساب',
+    'earner' => 'المستفيد',
+    'earner_type' => 'النوع',
+    'sales' => 'مبيعات',
+    'affiliate' => 'مسوّق',
+    'order' => 'الطلب',
+    'entry_type' => 'نوع الحركة',
+    'basis' => 'الأساس',
+    'rate' => 'النسبة',
+    'amount' => 'القيمة',
+    'state' => 'الحالة',
+    'reference' => 'المرجع',
+    'total' => 'الإجمالي',
+    'actions' => 'إجراءات',
+
+    // الحالات
+    'pending' => 'قيد الانتظار',
+    'eligible' => 'مستحقّة',
+    'approved' => 'معتمدة',
+    'paid' => 'مدفوعة',
+    'reversed' => 'معكوسة',
+    'cancelled' => 'ملغاة',
+    'accrual' => 'استحقاق',
+    'adjustment' => 'تعديل',
+    'reversal' => 'عكس',
+
+    // إجراءات
+    'approve_selected' => 'اعتماد المحدّد',
+    'payout_selected' => 'صرف المحدّد',
+    'approved_count' => 'تم اعتماد :count بند.',
+    'paid_total' => 'تم صرف :total.',
+    'no_entries' => 'لا توجد بنود في هذه الحالة.',
+    'select' => 'تحديد',
+
+    // القواعد
+    'add_rule' => 'إضافة قاعدة',
+    'method' => 'الطريقة',
+    'method_percent' => 'نسبة',
+    'method_fixed' => 'مبلغ ثابت',
+    'method_margin' => 'هامش',
+    'fixed_amount' => 'المبلغ الثابت',
+    'scope' => 'النطاق',
+    'employee' => 'الموظف (user_id)',
+    'campaign' => 'الحملة',
+    'product' => 'المنتج (id)',
+    'category' => 'الفئة (id)',
+    'branch' => 'الفرع (id)',
+    'role' => 'الدور',
+    'priority' => 'الأولويّة',
+    'period_start' => 'من تاريخ',
+    'period_end' => 'إلى تاريخ',
+    'active' => 'مفعّلة',
+    'save' => 'حفظ',
+    'delete' => 'حذف',
+    'rule_saved' => 'تم حفظ القاعدة.',
+    'rule_removed' => 'تم حذف القاعدة.',
+    'precedence_hint' => 'الأولويّة: موظف > حملة > منتج/فئة > فرع > دور > عام.',
+
+    // كشف الحساب
+    'total_pending' => 'قيد الانتظار',
+    'total_eligible' => 'مستحقّة',
+    'total_approved' => 'معتمدة',
+    'total_paid' => 'مدفوعة',
+];

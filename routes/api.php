@@ -25,6 +25,8 @@ use App\Http\Controllers\Api\V1\Purchasing\GoodsReceiptController;
 use App\Http\Controllers\Api\V1\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\Purchasing\SupplierController;
 use App\Http\Controllers\Api\V1\Purchasing\SupplierReturnController;
+use App\Http\Controllers\Api\V1\Commissions\CommissionController;
+use App\Http\Controllers\Api\V1\Commissions\CommissionRuleController;
 use App\Http\Controllers\Api\V1\Sales\AssistedOrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderTransitionController;
@@ -194,6 +196,21 @@ Route::prefix('v1')->group(function () {
             Route::get('assisted-orders/price-changes', [AssistedOrderController::class, 'priceChanges'])->middleware('can:sales.orders.override_price');
             Route::post('assisted-orders/price-changes/{priceChange}/approve', [AssistedOrderController::class, 'approve'])->middleware('can:sales.orders.override_price');
             Route::post('assisted-orders/price-changes/{priceChange}/reject', [AssistedOrderController::class, 'reject'])->middleware('can:sales.orders.override_price');
+        });
+
+        /*
+        | العمولات/الأرباح (Phase 4.2 / ADR-037). دفتر غير قابل للتعديل + آلة حالات.
+        */
+        Route::prefix('commissions')->group(function () {
+            Route::get('entries', [CommissionController::class, 'index']);
+            Route::get('statement/{earnerId}', [CommissionController::class, 'statement']);
+            Route::post('approve', [CommissionController::class, 'approve'])->middleware('can:commissions.approve');
+            Route::post('payout', [CommissionController::class, 'payout'])->middleware('can:commissions.payout');
+
+            Route::get('rules', [CommissionRuleController::class, 'index'])->middleware('can:commissions.rules.manage');
+            Route::post('rules', [CommissionRuleController::class, 'store'])->middleware('can:commissions.rules.manage');
+            Route::match(['put', 'patch'], 'rules/{rule}', [CommissionRuleController::class, 'update'])->middleware('can:commissions.rules.manage');
+            Route::delete('rules/{rule}', [CommissionRuleController::class, 'destroy'])->middleware('can:commissions.rules.manage');
         });
 
         /*

@@ -275,7 +275,8 @@
 | **الإشعارات** | شكر/طلب تقييم للعميل؛ إشعار المسوّق باستحقاق العمولة؛ تغذية أتمتة *customer follow-up reminders*. |
 | **متطلبات التدقيق** | `audit_logs`: الحالة + إنشاء الفاتورة + تحوّل العمولة (ADR-020). |
 | **المستمعون والمهام** | **Sync:** إنشاء الفاتورة + تحديث العمولة `earned`. **Async:** `RecognizeRevenueJob` (Phase 5)، `RequestReviewJob`، `MarkCommissionEarnedJob`. |
-| **الطور** | Phase 3 (المحاسبة Phase 5). |
+| **مُنفَّذ (4.2):** | يُطلَق `\App\Modules\Sales\Events\OrderDelivered` عند التسليم؛ يستمع له `AccrueCommissionsOnDelivery` فيستحقّ عمولة المبيعات/أرباح المسوّق عبر `CommissionService::accrueForOrder` (idempotent). **يُنشأ القيد بحالة `pending` فقط — لا يُصبح `eligible` إلا بالتسوية في 4.6** (المتطلّب 11)؛ الاعتراف بالإيراد والقيود المحاسبية النهائية مؤجّلة لطورها. |
+| **الطور** | Phase 3 (المحاسبة Phase 5؛ استحقاق العمولة Phase 4.2). |
 
 ## 5.7 `OrderReturned`
 | البند | التفصيل |
