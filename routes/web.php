@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\Catalog\ProductTagController;
 use App\Http\Controllers\Admin\Catalog\UnitController;
 use App\Http\Controllers\Admin\Inventory\InventoryController;
 use App\Http\Controllers\Admin\Inventory\StockAdjustmentController as AdminStockAdjustmentController;
+use App\Http\Controllers\Admin\Payment\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\Purchasing\GoodsReceiptController as AdminGoodsReceiptController;
 use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController as AdminPurchaseOrderController;
 use App\Http\Controllers\Admin\Purchasing\SupplierController as AdminSupplierController;
@@ -104,6 +105,11 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('shipments/{shipment}/deliver', [AdminShipmentController::class, 'deliver'])->name('shipments.deliver');
         Route::post('shipments/{shipment}/fail', [AdminShipmentController::class, 'fail'])->name('shipments.fail');
     });
+
+    // المدفوعات (Phase 2.8)
+    Route::resource('payments', AdminPaymentController::class)->only(['index', 'create', 'store', 'show']);
+    Route::post('payments/{payment}/capture', [AdminPaymentController::class, 'capture'])->name('payments.capture');
+    Route::post('payments/{payment}/refund', [AdminPaymentController::class, 'refund'])->name('payments.refund');
 });
 
 require __DIR__.'/auth.php';

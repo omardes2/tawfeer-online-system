@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\V1\Inventory\InventoryOperationController;
 use App\Http\Controllers\Api\V1\Inventory\InventoryStockController;
 use App\Http\Controllers\Api\V1\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Api\V1\Inventory\StockReservationController;
+use App\Http\Controllers\Api\V1\Payment\PaymentController;
+use App\Http\Controllers\Api\V1\Payment\PaymentMethodController;
 use App\Http\Controllers\Api\V1\Purchasing\GoodsReceiptController;
 use App\Http\Controllers\Api\V1\Purchasing\PurchaseOrderController;
 use App\Http\Controllers\Api\V1\Purchasing\SupplierController;
@@ -203,6 +205,20 @@ Route::prefix('v1')->group(function () {
             Route::post('shipments/{shipment}/deliver', [ShipmentController::class, 'deliver']);
             Route::post('shipments/{shipment}/fail', [ShipmentController::class, 'fail']);
             Route::post('shipments/{shipment}/override-cost', [ShipmentController::class, 'overrideCost']);
+        });
+
+        /*
+        | Phase 2.8 — المدفوعات (ADR-028)
+        | مزوّدو الدفع حصريًا عبر طبقة التكامل (PaymentProviderManager).
+        */
+        Route::prefix('payments')->group(function () {
+            Route::get('methods', [PaymentMethodController::class, 'index']);
+            Route::get('/', [PaymentController::class, 'index']);
+            Route::post('/', [PaymentController::class, 'store']);
+            Route::get('{payment}', [PaymentController::class, 'show']);
+            Route::post('{payment}/capture', [PaymentController::class, 'capture']);
+            Route::post('{payment}/refund', [PaymentController::class, 'refund']);
+            Route::post('{payment}/callback', [PaymentController::class, 'callback']);
         });
 
     });

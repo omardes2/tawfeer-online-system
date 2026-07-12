@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.8 (Payments: Provider Integration Layer, COD, Refunds)
+- Provider/Integration architecture (ADR-028): a single `PaymentProviderInterface`
+  (charge/capture/verify/refund) with all providers behind it + a
+  `PaymentProviderManager` as the only place a provider is instantiated (maps
+  `payment_methods.driver` to a class in `config/payments.php`). Providers are
+  reached exclusively through this layer — never from controllers/services.
+- Adding a provider needs only a `payment_methods` row + a driver map entry, with
+  no changes to order/checkout logic. Drivers: `OfflinePaymentProvider`
+  (COD/bank transfer — manual capture, active) and `NullPaymentProvider`
+  (unconfigured online gateways — safe placeholder). HyperPay/MyFatoorah/Stripe/
+  PayPal/Moyasar seeded as disabled placeholders.
+- Tables: `payment_methods` (registry), `payments` (uuid/soft-delete/audited,
+  PAY-{YYYY}-{seq}), `payment_transactions` (append-only generic structure for
+  provider references, statuses, callbacks, and metadata). Orders gain derived
+  `payment_status` (payment_statuses vocab) + `amount_paid`.
+- `PaymentService`: initiate (via the method's provider), capture (COD collection
+  / gateway capture), handleCallback (webhook verify), refund (full/partial), and
+  order payment-status recomputation — supports partial, cumulative, and refunded
+  payments. All business logic in the service; DB transactions throughout.
+- API `/api/v1/payments/*`: methods list, payments CRUD, capture, refund,
+  callback. RBAC: 5 `payments.*` permissions + Policy; PaymentMethod +
+  PaymentPermission seeders.
+- Admin UI (Arabic RTL): payments list, create-from-order, detail with capture/
+  refund actions + transaction log; payments nav link + status badge.
+- Deferred with hooks: specific gateway integrations, accounting/treasury impact
+  (2.9), Idempotency-Key, credit notes.
+- Tests: 19 new (COD capture updates order, partial/cumulative payments,
+  full/partial refunds, double-capture + cancelled-order + over-refund guards,
+  null-gateway stays pending, manager driver resolution, authorization, admin
+  RTL) → 246 passing total.
+
 ### Added — Phase 2.7 (Shipping: Geography, Shipments, Delivery-Provider Integration)
 - Design-first (ADR-027, `docs/PHASE_2_7_SHIPPING_DESIGN.md`): lowers the frozen
   shipping rules into a schema, since no frozen shipments table existed and the

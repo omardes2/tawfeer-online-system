@@ -13,6 +13,7 @@ class OrderResource extends JsonResource
             'id' => $this->uuid,
             'number' => $this->number,
             'status' => $this->status,
+            'payment_status' => $this->payment_status,
             'channel' => $this->channel,
             'customer' => [
                 'name' => $this->customer_name,
@@ -37,6 +38,7 @@ class OrderResource extends JsonResource
             'tax_total' => $this->tax_total,
             'shipping_total' => $this->shipping_total,
             'total' => $this->total,
+            'amount_paid' => $this->amount_paid,
             'notes' => $this->notes,
             'cancel_reason' => $this->cancel_reason,
             'history' => $this->whenLoaded('statusHistory', fn () => OrderStatusHistoryResource::collection($this->statusHistory)),

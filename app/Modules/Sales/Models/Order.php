@@ -5,6 +5,8 @@ namespace App\Modules\Sales\Models;
 use App\Models\User;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\Warehouse;
+use App\Modules\Payment\Models\Payment;
+use App\Modules\Shipping\Models\Shipment;
 use App\Support\Concerns\Auditable;
 use App\Support\Concerns\HasUuid;
 use Database\Factories\Sales\OrderFactory;
@@ -26,8 +28,8 @@ class Order extends Model
     protected $fillable = [
         'number', 'branch_id', 'warehouse_id', 'customer_id',
         'customer_name', 'customer_phone', 'customer_email', 'shipping_address',
-        'channel', 'status', 'assigned_to',
-        'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'total',
+        'channel', 'status', 'payment_status', 'assigned_to',
+        'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'total', 'amount_paid',
         'notes', 'cancel_reason',
         'confirmed_at', 'reserved_at', 'shipped_at', 'delivered_at', 'cancelled_at',
         'created_by',
@@ -39,6 +41,7 @@ class Order extends Model
         'tax_total' => 'decimal:2',
         'shipping_total' => 'decimal:2',
         'total' => 'decimal:2',
+        'amount_paid' => 'decimal:2',
         'confirmed_at' => 'datetime',
         'reserved_at' => 'datetime',
         'shipped_at' => 'datetime',
@@ -73,7 +76,12 @@ class Order extends Model
 
     public function shipments(): HasMany
     {
-        return $this->hasMany(\App\Modules\Shipping\Models\Shipment::class);
+        return $this->hasMany(Shipment::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
     }
 
     protected static function newFactory(): Factory

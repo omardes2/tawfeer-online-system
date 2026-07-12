@@ -200,6 +200,16 @@
 - **التكلفة المُحمّلة (Landed Cost — BR-PUR-06):** `goods_receipts.additional_cost` تُوزَّع على البنود بنسبة قيمة السطر قبل احتساب WAC.
 - **FK مؤجّلة:** `suppliers.governorate_id/city_id/currency_id` (جداولها غير مُنشأة) — أعمدة nullable بلا قيد الآن.
 
+## ADR-028 — مخطط المدفوعات وطبقة تكامل المزوّدين (Payments Schema & Provider Integration) [مُعتمد في Phase 2.8]
+- **السياق:** لا مخطط جداول مجمّد للمدفوعات؛ المجمّد: مفردات `payment_statuses` (unpaid/partially_paid/paid/refunded)، ADR-016 (خطّافات محاسبية مؤجّلة)، ADR-018 (أحداث)، Idempotency-Key. اعتمد المالك معمارية Provider/Integration صريحة. لا إعادة تصميم لنموذج الأعمال.
+- **طبقة التكامل (المبدأ 13/ADR-019):** عقد موحّد `PaymentProviderInterface` (charge/capture/verify/refund/name)؛ كل المزوّدين خلفه + Driver. `PaymentProviderManager` هو النقطة الوحيدة لإنشاء مزوّد (يربط `payment_methods.driver` بصنف من `config/payments.php`). **المزوّدون يُوصَلون حصريًا عبر هذه الطبقة — لا استدعاء مباشر من متحكم/خدمة (المتطلّب 6).**
+- **إضافة مزوّد دون لمس منطق الطلب/الدفع (المتطلّب 3):** صفّ في `payment_methods` يشير إلى Driver مُسجَّل. Drivers الحالية: `offline` (COD/تحويل بنكي — تحصيل يدوي، فعّال) و`null` (بوابات أونلاين غير مُهيّأة — placeholder آمن). مُهيّأة كـ placeholders معطّلة: HyperPay/MyFatoorah/Stripe/PayPal/Moyasar.
+- **الكيانات:** `payment_methods` (سجلّ)، `payments` (uuid/soft-delete/auditable، ترقيم `PAY-{YYYY}-{seq}`)، `payment_transactions` (append-only — بنية عامة لمراجع/حالات/callbacks/بيانات أي مزوّد، المتطلّب 5).
+- **حالة سجلّ الدفع:** pending → processing → paid | failed | cancelled | (paid →) partially_refunded/refunded (حالة تقنية داخلية).
+- **حالة دفع الطلب (مشتقّة):** أُضيف `orders.payment_status` (مفردات payment_statuses) و`amount_paid` — تُعاد اشتقاقها من المدفوعات المقبوضة ناقص المُسترَد؛ تدعم الدفع الجزئي والتراكمي والاسترداد.
+- **الصلاحيات:** `payments.{view,create,capture,refund}` + `payments.methods.manage` (ADR-021)؛ المحاسب كامل عمليًا، المبيعات view/create، المستودع view/capture (تحصيل COD عند التسليم).
+- **مؤجّل بخُطّافات:** أي تكامل بوابة محدّدة، الأثر المحاسبي/الخزائن (2.9)، Idempotency-Key (عابر للنظام)، تسويات/إشعارات دائنة.
+
 ## ADR-027 — مخطط الشحن وطبقة تكامل التوصيل (Shipping Schema & Delivery Integration) [مُعتمد في Phase 2.7]
 - **السياق:** لا مخطط جداول مجمّد للشحنات (مؤشّرة "Phase 3" في `API_CONTRACT §378`)؛ الجغرافيا مجمّدة في `PHASE_2_DESIGN §3–6` لكنها لم تُبنَ؛ تسعير الشحن مؤجّل صراحةً (§149/§187). يُنزِل هذا القرار قواعد ADR-014/010/BR-ORD-10 إلى مخطط تنفيذي (وثيقة `PHASE_2_7_SHIPPING_DESIGN.md`) — لا إعادة تصميم لنموذج الأعمال.
 - **الجغرافيا:** تُبنى `governorates`/`cities`/`areas`/`shipping_zones` (+ جدولا ربط) **بحذافير §3–6 بلا أعمدة إضافية**. المحلي مرجع النظام.
