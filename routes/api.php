@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Catalog\ProductController;
 use App\Http\Controllers\Api\V1\Catalog\ProductImageController;
 use App\Http\Controllers\Api\V1\Catalog\ProductTagController;
 use App\Http\Controllers\Api\V1\Catalog\UnitController;
+use App\Http\Controllers\Api\V1\Crm\CustomerController;
 use App\Http\Controllers\Api\V1\Inventory\InventoryLedgerController;
 use App\Http\Controllers\Api\V1\Inventory\InventoryMovementController;
 use App\Http\Controllers\Api\V1\Inventory\InventoryOperationController;
@@ -240,6 +241,23 @@ Route::prefix('v1')->group(function () {
             Route::post('journal-entries/{journalEntry}/reverse', [JournalEntryController::class, 'reverse']);
 
             Route::get('reports/trial-balance', [ReportController::class, 'trialBalance']);
+        });
+
+        /*
+        | Phase 2.10 — CRM/العملاء (ADR-030، BR-CUST)
+        | تعدد الهواتف/العناوين/جهات الاتصال/الملاحظات؛ حظر/دمج؛ لقطة عميل ثابتة على الطلبات.
+        */
+        Route::prefix('crm')->group(function () {
+            Route::get('customers/duplicates', [CustomerController::class, 'duplicates']);
+            Route::get('customers', [CustomerController::class, 'index']);
+            Route::post('customers', [CustomerController::class, 'store']);
+            Route::get('customers/{customer}', [CustomerController::class, 'show']);
+            Route::match(['put', 'patch'], 'customers/{customer}', [CustomerController::class, 'update']);
+            Route::delete('customers/{customer}', [CustomerController::class, 'destroy']);
+            Route::post('customers/{customer}/notes', [CustomerController::class, 'addNote']);
+            Route::post('customers/{customer}/block', [CustomerController::class, 'block']);
+            Route::post('customers/{customer}/unblock', [CustomerController::class, 'unblock']);
+            Route::post('customers/{customer}/merge', [CustomerController::class, 'merge']);
         });
 
     });

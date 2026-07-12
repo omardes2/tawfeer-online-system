@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\Catalog\ProductAttributeController;
 use App\Http\Controllers\Admin\Catalog\ProductController;
 use App\Http\Controllers\Admin\Catalog\ProductTagController;
 use App\Http\Controllers\Admin\Catalog\UnitController;
+use App\Http\Controllers\Admin\Crm\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Admin\Inventory\InventoryController;
 use App\Http\Controllers\Admin\Inventory\StockAdjustmentController as AdminStockAdjustmentController;
 use App\Http\Controllers\Admin\Payment\PaymentController as AdminPaymentController;
@@ -112,6 +113,14 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::resource('payments', AdminPaymentController::class)->only(['index', 'create', 'store', 'show']);
     Route::post('payments/{payment}/capture', [AdminPaymentController::class, 'capture'])->name('payments.capture');
     Route::post('payments/{payment}/refund', [AdminPaymentController::class, 'refund'])->name('payments.refund');
+
+    // CRM/العملاء (Phase 2.10)
+    Route::prefix('crm')->name('crm.')->group(function () {
+        Route::resource('customers', AdminCustomerController::class)->except('destroy');
+        Route::post('customers/{customer}/notes', [AdminCustomerController::class, 'addNote'])->name('customers.notes.store');
+        Route::post('customers/{customer}/block', [AdminCustomerController::class, 'block'])->name('customers.block');
+        Route::post('customers/{customer}/unblock', [AdminCustomerController::class, 'unblock'])->name('customers.unblock');
+    });
 
     // المحاسبة (Phase 2.9)
     Route::prefix('accounting')->name('accounting.')->group(function () {

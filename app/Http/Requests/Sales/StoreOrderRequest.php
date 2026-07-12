@@ -16,8 +16,9 @@ class StoreOrderRequest extends FormRequest
     {
         return [
             'warehouse' => ['required', 'string', 'exists:warehouses,uuid'],
-            'customer_name' => ['required', 'string', 'max:180'],
-            'customer_phone' => ['required', 'string', 'max:40'],
+            'customer' => ['nullable', 'string', 'exists:customers,uuid'], // ربط اختياري بعميل CRM
+            'customer_name' => ['required_without:customer', 'string', 'max:180'],
+            'customer_phone' => ['required_without:customer', 'string', 'max:40'],
             'customer_email' => ['nullable', 'email', 'max:180'],
             'shipping_address' => ['nullable', 'string', 'max:1000'],
             'channel' => ['sometimes', Rule::in(['web', 'manual', 'marketer', 'pos'])],

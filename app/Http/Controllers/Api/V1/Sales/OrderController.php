@@ -7,6 +7,7 @@ use App\Http\Requests\Sales\StoreOrderRequest;
 use App\Http\Requests\Sales\UpdateOrderRequest;
 use App\Http\Resources\Sales\OrderResource;
 use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Crm\Models\Customer;
 use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
@@ -87,6 +88,15 @@ class OrderController extends Controller
             if ($request->has($field)) {
                 $data[$field] = $request->input($field);
             }
+        }
+
+        // ربط عميل CRM (اختياري): يضبط customer_id ويشتقّ لقطة العميل إن لم تُمرَّر (تبقى ثابتة تاريخيًا).
+        if ($request->filled('customer')) {
+            $customer = Customer::where('uuid', $request->string('customer'))->firstOrFail();
+            $data['customer_id'] = $customer->id;
+            $data['customer_name'] ??= $customer->name;
+            $data['customer_phone'] ??= $customer->primary_phone;
+            $data['customer_email'] ??= $customer->email;
         }
 
         return $data;

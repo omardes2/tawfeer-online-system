@@ -3,6 +3,7 @@
 namespace App\Modules\Sales\Services;
 
 use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Crm\Models\Customer;
 use App\Modules\Inventory\Models\StockReservation;
 use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Inventory\Services\ReservationService;
@@ -27,6 +28,14 @@ class OrderService
      */
     public function create(array $data, array $items, int $year): Order
     {
+        // عميل محظور لا يُنشئ طلبات جديدة (BR-CUST-12) — عند ربط عميل.
+        if (! empty($data['customer_id'])) {
+            $blocked = Customer::whereKey($data['customer_id'])->value('is_blocked');
+            if ($blocked) {
+                throw ValidationException::withMessages(['customer' => __('العميل محظور ولا يمكن إنشاء طلبات له.')]);
+            }
+        }
+
         return DB::transaction(function () use ($data, $items, $year) {
             $order = Order::create([
                 'number' => NumberGenerator::next('orders', 'number', 'SO', $year),

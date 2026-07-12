@@ -200,6 +200,15 @@
 - **التكلفة المُحمّلة (Landed Cost — BR-PUR-06):** `goods_receipts.additional_cost` تُوزَّع على البنود بنسبة قيمة السطر قبل احتساب WAC.
 - **FK مؤجّلة:** `suppliers.governorate_id/city_id/currency_id` (جداولها غير مُنشأة) — أعمدة nullable بلا قيد الآن.
 
+## ADR-030 — مخطط CRM/العملاء (Customers/CRM Schema) [مُعتمد في Phase 2.10]
+- **السياق:** لا مخطط جداول مجمّد للعملاء؛ المجمّد: `BR-CUST-01…14` (إنشاء يدوي/ذاتي، كشف تكرار بالهاتف، تعدد الهواتف/العناوين، وسوم/تصنيفات، عالي الخطورة، حظر، حذف ناعم، دمج) و`orders.customer_id` المؤجّل منذ 2.6. اعتمد المالك معمارية صريحة. لا إعادة تصميم.
+- **الكيانات:** `customers` (uuid، soft-delete، auditable؛ `user_id` اختياري — BR-CUST-02؛ حقول `credit_limit`/`loyalty_points` **جاهزة للربط المستقبلي دون إعادة تصميم**؛ `is_high_risk`/`is_blocked`/عدّادات الإلغاء/المرتجعات؛ `merged_into_id`)، و**جداول تابعة**: `customer_phones` (تعدد + أساسي — BR-CUST-05)، `customer_addresses` (تعدد + افتراضي، يشير للجغرافيا — BR-CUST-06)، `customer_contacts`، `customer_notes` (سجلّ زمني append-only).
+- **كل المنطق في `CustomerService`:** إنشاء/تعديل مع مزامنة الأبناء (أساسي/افتراضي واحد)، تطبيع الهاتف (أرقام فقط)، كشف التكرار عبر كل الأرقام (BR-CUST-03/05)، ملاحظات، حظر/رفع (BR-CUST-12)، **دمج** (BR-CUST-14: نقل الأبناء والطلبات، تعليم وحذف ناعم للمُدمَج).
+- **الربط بالطلبات + لقطة ثابتة:** `orders.customer_id` يُملأ اختياريًا عند إنشاء الطلب (بلا FK صارم — اتساقًا مع 2.6 وسلامة اللقطة)؛ **لقطة العميل على الطلب (الاسم/الهاتف) تبقى ثابتة تاريخيًا** ولا تتأثّر بتعديل العميل لاحقًا. عميل محظور لا يُنشئ طلبات (BR-CUST-12).
+- **جاهزية التكامل (المتطلّب):** طبقة مراسلة provider-agnostic — عقد `MessagingProviderInterface` + `MessagingManager` + Null Driver + `config/messaging.php` (قنوات whatsapp/email/sms/marketing) — جاهزة لربط مزوّدين لاحقًا دون لمس منطق CRM. حقول العميل تسمح بالربط المستقبلي بنقاط الولاء/الائتمان/الفواتير/الطلبات/الشحن/المحاسبة دون تغيير المخطط.
+- **الصلاحيات:** `crm.customers.{view,create,update,delete,block,merge}` (ADR-021)؛ للمدير كامل، المبيعات إنشاء/تعديل، المسوّق/المحاسب قراءة.
+- **مؤجّل بخُطّافات:** مزوّدو المراسلة الفعليون، محرّك التسعير حسب التصنيف (BR-PRICE)، احتساب "عالي الخطورة" التلقائي، حساب دخول العميل (`user_id`).
+
 ## ADR-029 — محرّك المحاسبة بالقيد المزدوج (Double-Entry Accounting Engine) [مُعتمد في Phase 2.9]
 - **السياق:** ADR-016 يفرض قيدًا مزدوجًا وعكسًا لا حذفًا و`journal_lines` بلا soft-delete، و BR-ACC-01…11 تحدّد الأحداث المولّدة للقيود والتوازن والعزل عبر الأحداث. لا مخطط جداول مجمّد؛ اعتمد المالك معمارية صريحة. لا إعادة تصميم.
 - **الكيانات:** `accounts` (دليل حسابات شجري، أنواع asset/liability/equity/revenue/expense، أوراق قابلة للترحيل)، `fiscal_years` + `accounting_periods` (تعدد السنوات — المتطلّب 7)، `journal_entries` (uuid، `JE-{YYYY}-{seq}`، draft→posted)، `journal_lines` (append-only بلا updated_at/soft-delete — مصدر الحقيقة).

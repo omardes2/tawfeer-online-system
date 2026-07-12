@@ -51,6 +51,9 @@
                     @can('accounting.journal.view')
                         <x-nav-link :href="route('admin.accounting.journal.index')" :active="request()->routeIs('admin.accounting.*')">{{ __('المحاسبة') }}</x-nav-link>
                     @endcan
+                    @can('crm.customers.view')
+                        <x-nav-link :href="route('admin.crm.customers.index')" :active="request()->routeIs('admin.crm.*')">{{ __('العملاء') }}</x-nav-link>
+                    @endcan
                 </div>
             </div>
 

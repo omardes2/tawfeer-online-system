@@ -2,6 +2,7 @@
 
 use App\Modules\Accounting\Providers\AccountingServiceProvider;
 use App\Modules\Catalog\Providers\CatalogServiceProvider;
+use App\Modules\Crm\Providers\CrmServiceProvider;
 use App\Modules\Foundation\Providers\FoundationServiceProvider;
 use App\Modules\Inventory\Providers\InventoryServiceProvider;
 use App\Modules\Payment\Providers\PaymentServiceProvider;
@@ -20,4 +21,5 @@ return [
     ShippingServiceProvider::class,
     PaymentServiceProvider::class,
     AccountingServiceProvider::class,
+    CrmServiceProvider::class,
 ];

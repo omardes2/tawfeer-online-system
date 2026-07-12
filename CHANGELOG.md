@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2.10 (CRM / Customers)
+- New `Crm` module (ADR-030): all logic in `CustomerService`; integration-ready.
+- Tables (5): `customers` (uuid/soft-delete/audited; optional `user_id`;
+  `credit_limit`/`loyalty_points` present for future linkage without schema
+  changes; high-risk/blocked flags, cancel/return counters, `merged_into_id`) +
+  `customer_phones` (multiple + primary), `customer_addresses` (multiple +
+  default, referencing geography), `customer_contacts`, `customer_notes`
+  (append-only timeline).
+- `CustomerService`: create/update with child sync (single primary/default),
+  phone normalization + phone-based duplicate detection across all numbers
+  (BR-CUST-03/05), notes, block/unblock (BR-CUST-12), and merge (BR-CUST-14 —
+  moves children + reassigns orders, marks + soft-deletes the merged record).
+- Order linkage + immutable snapshot: order creation optionally links a customer
+  (populates `orders.customer_id`, derives the snapshot from the customer); the
+  historical customer snapshot on the order never changes when the customer is
+  later edited; a blocked customer cannot place orders. `orders.customer_id`
+  kept FK-less (as deferred in 2.6) with an added index.
+- Integration-ready messaging layer: provider-agnostic
+  `MessagingProviderInterface` + `MessagingManager` + Null driver +
+  `config/messaging.php` (whatsapp/email/sms/marketing channels) — ready to wire
+  real providers without touching CRM logic.
+- API `/api/v1/crm/customers`: CRUD + notes, block/unblock, merge, duplicates.
+  RBAC: 6 `crm.customers.*` permissions + Policy; `CrmPermissionSeeder`.
+- Admin UI (Arabic RTL): customers list, create/edit (dynamic phones +
+  addresses), detail with notes, block/unblock, and order history; customers
+  nav link.
+- Production-readiness fixes: consistent digits-only phone normalization so
+  dedup matches regardless of `+`/separators; added the CRM model factory.
+- Tests: 22 new (create-with-children, single primary/default, dedup,
+  block/unblock, merge, order link + snapshot immutability, blocked-order guard,
+  messaging layer, authorization, admin RTL) → 290 passing total.
+
 ### Added — Phase 2.9 (Accounting: Double-Entry Engine)
 - Double-entry accounting engine (ADR-029): immutable journal entries + journal
   lines as the source of truth; balances always derived from the ledger, never
