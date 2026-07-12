@@ -24,6 +24,8 @@ function cartToken() {
         t = (crypto.randomUUID && crypto.randomUUID()) || `${Date.now()}-${Math.random()}`;
         localStorage.setItem('cart_token', t);
     }
+    // نسخة في كوكي حتى يقرأها الخادم لدمج سلة الضيف عند تسجيل الدخول (Phase 3.4).
+    document.cookie = `cart_token=${t}; path=/; max-age=31536000; SameSite=Lax`;
     return t;
 }
 

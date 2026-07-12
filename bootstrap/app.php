@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\RequireCustomer;
 use App\Http\Middleware\ResolveStoreIdentity;
 use App\Http\Middleware\SetStorefrontLocale;
 use Illuminate\Foundation\Application;
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'store.identity' => ResolveStoreIdentity::class,
             'storefront.locale' => SetStorefrontLocale::class,
+            'require.customer' => RequireCustomer::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

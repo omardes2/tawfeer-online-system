@@ -118,6 +118,30 @@
                 </div>
             @endif
 
+            {{-- المفضّلة --}}
+            <div class="mt-4">
+                @auth
+                    @php
+                        $wishCustomer = \App\Modules\Crm\Models\Customer::where('user_id', auth()->id())->first();
+                        $inWishlist = $wishCustomer && app(\App\Modules\Store\Services\WishlistService::class)->has($wishCustomer, $product);
+                    @endphp
+                    @if ($wishCustomer)
+                        <form method="POST" action="{{ route('account.wishlist.toggle', $product) }}">
+                            @csrf
+                            <button type="submit" class="inline-flex items-center gap-1.5 text-sm {{ $inWishlist ? 'text-rose-600' : 'text-gray-500 hover:text-rose-600' }}">
+                                <svg class="h-4 w-4" fill="{{ $inWishlist ? 'currentColor' : 'none' }}" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21s-7.5-4.6-10-9.2C.6 8.9 2 5.5 5.2 5.5c1.9 0 3.2 1.1 3.8 2.2.6-1.1 1.9-2.2 3.8-2.2 3.2 0 4.6 3.4 3.2 6.3C19.5 16.4 12 21 12 21Z"/></svg>
+                                {{ $inWishlist ? __('account.in_wishlist') : __('account.add_to_wishlist') }}
+                            </button>
+                        </form>
+                    @endif
+                @else
+                    <a href="{{ route('account.login') }}" class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-rose-600">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21s-7.5-4.6-10-9.2C.6 8.9 2 5.5 5.2 5.5c1.9 0 3.2 1.1 3.8 2.2.6-1.1 1.9-2.2 3.8-2.2 3.2 0 4.6 3.4 3.2 6.3C19.5 16.4 12 21 12 21Z"/></svg>
+                        {{ __('account.add_to_wishlist') }}
+                    </a>
+                @endauth
+            </div>
+
             {{-- المشاركة --}}
             <div class="mt-4" x-data="{ shared: false }">
                 <button type="button"

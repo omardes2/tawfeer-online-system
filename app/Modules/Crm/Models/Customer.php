@@ -5,6 +5,7 @@ namespace App\Modules\Crm\Models;
 use App\Models\User;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Sales\Models\Order;
+use App\Modules\Store\Models\WishlistItem;
 use App\Support\Concerns\Auditable;
 use App\Support\Concerns\HasUuid;
 use Database\Factories\Crm\CustomerFactory;
@@ -28,6 +29,9 @@ class Customer extends Model
         'category', 'tags', 'credit_limit', 'loyalty_points',
         'is_high_risk', 'is_blocked', 'blocked_reason', 'blocked_at',
         'cancelled_orders_count', 'returns_count', 'merged_into_id', 'notes', 'created_by',
+        // Phase 3.4 — جاهزية تجربة/تسويق العميل (ADR-035)
+        'birth_date', 'preferred_locale', 'preferred_branch_id',
+        'communication_preferences', 'acquisition_source',
     ];
 
     protected $casts = [
@@ -39,6 +43,8 @@ class Customer extends Model
         'blocked_at' => 'datetime',
         'cancelled_orders_count' => 'integer',
         'returns_count' => 'integer',
+        'birth_date' => 'date',
+        'communication_preferences' => 'array',
     ];
 
     public function user(): BelongsTo
@@ -49,6 +55,18 @@ class Customer extends Model
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    /** الفرع المفضّل (Phase 3.4 — تفضيلات العميل). */
+    public function preferredBranch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class, 'preferred_branch_id');
+    }
+
+    /** عناصر قائمة المفضّلة (Phase 3.4). */
+    public function wishlistItems(): HasMany
+    {
+        return $this->hasMany(WishlistItem::class);
     }
 
     public function phones(): HasMany

@@ -1,0 +1,111 @@
+<?php
+
+// نصوص حساب العميل (عربي RTL — Phase 3.4). لا نصوص مضمّنة في القوالب.
+return [
+    'my_account' => 'حسابي',
+    'dashboard' => 'لوحة الحساب',
+    'hello' => 'مرحبًا',
+    'logout' => 'تسجيل الخروج',
+
+    // مصادقة
+    'login' => 'تسجيل الدخول',
+    'register' => 'إنشاء حساب',
+    'email' => 'البريد الإلكتروني',
+    'password' => 'كلمة المرور',
+    'password_confirmation' => 'تأكيد كلمة المرور',
+    'current_password' => 'كلمة المرور الحالية',
+    'new_password' => 'كلمة المرور الجديدة',
+    'name' => 'الاسم',
+    'phone' => 'رقم الجوال',
+    'birth_date' => 'تاريخ الميلاد',
+    'birth_date_hint' => 'يُستخدم لاحقًا لمكافآت الميلاد والعروض المخصّصة.',
+    'remember_me' => 'تذكّرني',
+    'have_account' => 'لديك حساب؟',
+    'no_account' => 'ليس لديك حساب؟',
+    'create_one' => 'أنشئ حسابًا',
+    'sign_in' => 'ادخل',
+
+    // أقسام
+    'overview' => 'نظرة عامّة',
+    'profile' => 'الملف الشخصي',
+    'orders' => 'طلباتي',
+    'my_orders' => 'طلباتي',
+    'addresses' => 'العناوين',
+    'wishlist' => 'المفضّلة',
+    'preferences' => 'التفضيلات',
+    'notifications' => 'الإشعارات',
+    'settings' => 'الإعدادات',
+
+    // لوحة
+    'recent_orders' => 'أحدث الطلبات',
+    'total_orders' => 'إجمالي الطلبات',
+    'saved_addresses' => 'العناوين المحفوظة',
+    'wishlist_items' => 'منتجات مفضّلة',
+    'unread_notifications' => 'إشعارات غير مقروءة',
+    'view_all' => 'عرض الكل',
+
+    // طلبات
+    'order_number' => 'رقم الطلب',
+    'order_date' => 'التاريخ',
+    'order_status' => 'الحالة',
+    'order_total' => 'الإجمالي',
+    'items_count' => 'عدد البنود',
+    'track_order' => 'تتبّع الطلب',
+    'reorder' => 'إعادة الطلب',
+    'reorder_added' => 'أُضيف :count بند إلى سلّتك.',
+    'no_orders' => 'لا توجد طلبات بعد',
+    'no_orders_hint' => 'ابدأ التسوّق لأول طلب.',
+    'order_timeline' => 'مسار الطلب',
+    'payment_status' => 'حالة الدفع',
+    'shipment_status' => 'حالة الشحن',
+    'live' => 'مباشر',
+    'items' => 'البنود',
+
+    // عناوين
+    'add_address' => 'إضافة عنوان',
+    'edit_address' => 'تعديل العنوان',
+    'label' => 'التسمية',
+    'recipient_name' => 'اسم المستلم',
+    'address_line' => 'العنوان التفصيلي',
+    'set_default' => 'تعيين افتراضيًا',
+    'default' => 'افتراضي',
+    'save' => 'حفظ',
+    'delete' => 'حذف',
+    'no_addresses' => 'لا توجد عناوين محفوظة',
+    'address_saved' => 'تم حفظ العنوان.',
+    'address_removed' => 'تم حذف العنوان.',
+    'address_default_set' => 'تم تعيين العنوان الافتراضي.',
+
+    // مفضّلة
+    'no_wishlist' => 'قائمة المفضّلة فارغة',
+    'no_wishlist_hint' => 'أضف منتجات تعجبك لحفظها هنا.',
+    'wishlist_added' => 'أُضيف إلى المفضّلة.',
+    'wishlist_removed' => 'أُزيل من المفضّلة.',
+    'add_to_wishlist' => 'أضف للمفضّلة',
+    'in_wishlist' => 'في المفضّلة',
+
+    // تفضيلات
+    'preferred_language' => 'اللغة المفضّلة',
+    'preferred_branch' => 'الفرع المفضّل',
+    'communication_preferences' => 'تفضيلات التواصل',
+    'channel_whatsapp' => 'واتساب',
+    'channel_email' => 'البريد الإلكتروني',
+    'channel_sms' => 'الرسائل النصية',
+    'channel_push' => 'الإشعارات الفورية',
+    'preferences_saved' => 'تم حفظ التفضيلات.',
+    'none' => 'بدون',
+
+    // ملف/إعدادات
+    'profile_saved' => 'تم حفظ الملف.',
+    'change_password' => 'تغيير كلمة المرور',
+    'password_saved' => 'تم تحديث كلمة المرور.',
+    'update' => 'تحديث',
+
+    // إشعارات
+    'no_notifications' => 'لا توجد إشعارات',
+    'mark_read' => 'تعليم كمقروء',
+    'mark_all_read' => 'تعليم الكل كمقروء',
+    'notifications_all_read' => 'تم تعليم كل الإشعارات كمقروءة.',
+    'welcome_title' => 'مرحبًا بك في توفير أونلاين',
+    'welcome_body' => 'تم إنشاء حسابك بنجاح. تسوّق واستمتع بتجربة سلسة.',
+];

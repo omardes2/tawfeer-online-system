@@ -52,6 +52,42 @@ class CartService
         return null;
     }
 
+    /**
+     * دمج سلة الضيف (برمز الجلسة) في سلة المستخدم عند تسجيل الدخول/التسجيل (Phase 3.4).
+     * تُنقل البنود بالتراكم ثم تُعلَّم سلة الضيف «merged». يُعاد استخدام تسعير الكتالوج.
+     */
+    public function mergeGuestIntoUser(User $user, ?string $guestToken): Cart
+    {
+        $userCart = $this->forUser($user);
+        if (! is_string($guestToken) || $guestToken === '') {
+            return $userCart;
+        }
+
+        $guestCart = Cart::where('session_token', $guestToken)
+            ->whereNull('user_id')->where('status', 'active')->first();
+
+        if (! $guestCart || $guestCart->id === $userCart->id) {
+            return $userCart;
+        }
+
+        return DB::transaction(function () use ($guestCart, $userCart) {
+            $guestCart->loadMissing('items');
+            foreach ($guestCart->items as $item) {
+                $existing = $userCart->items()->where('variant_id', $item->variant_id)->first();
+                $userCart->items()->updateOrCreate(
+                    ['variant_id' => $item->variant_id],
+                    [
+                        'qty' => ($existing ? (float) $existing->qty : 0) + (float) $item->qty,
+                        'unit_price' => $item->unit_price,
+                    ],
+                );
+            }
+            $guestCart->update(['status' => 'merged']);
+
+            return $userCart->fresh('items');
+        });
+    }
+
     public function addItem(Cart $cart, ProductVariant $variant, float $qty): Cart
     {
         $this->assertPositive($qty);

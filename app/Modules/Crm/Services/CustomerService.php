@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Services;
 
 use App\Modules\Crm\Models\Customer;
+use App\Modules\Crm\Models\CustomerAddress;
 use App\Modules\Sales\Models\Order;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -57,6 +58,87 @@ class CustomerService
     {
         // حذف ناعم فقط لكيان مهم (BR-CUST-13).
         $customer->delete();
+    }
+
+    /*
+    | إدارة عناوين العميل المستقلّة (Phase 3.4 — تجربة العميل). تُعيد استخدام قاعدة
+    | «افتراضي واحد» (BR-CUST-06). كل المنطق هنا، لا تكرار في متحكّمات الواجهة.
+    */
+
+    /** @param  array<string, mixed>  $data */
+    public function addAddress(Customer $customer, array $data): void
+    {
+        DB::transaction(function () use ($customer, $data) {
+            $isDefault = (bool) ($data['is_default'] ?? false) || $customer->addresses()->count() === 0;
+            if ($isDefault) {
+                $customer->addresses()->update(['is_default' => false]);
+            }
+            $customer->addresses()->create($this->addressAttributes($data, $isDefault));
+        });
+    }
+
+    /** @param  array<string, mixed>  $data */
+    public function updateAddress(Customer $customer, CustomerAddress $address, array $data): void
+    {
+        abort_unless($address->customer_id === $customer->id, 403);
+
+        DB::transaction(function () use ($customer, $address, $data) {
+            $isDefault = (bool) ($data['is_default'] ?? false);
+            if ($isDefault) {
+                $customer->addresses()->where('id', '!=', $address->id)->update(['is_default' => false]);
+            }
+            $address->update($this->addressAttributes($data, $isDefault || $address->is_default));
+        });
+    }
+
+    public function removeAddress(Customer $customer, CustomerAddress $address): void
+    {
+        abort_unless($address->customer_id === $customer->id, 403);
+        $wasDefault = $address->is_default;
+        $address->delete();
+
+        // ترقية أوّل عنوان متبقٍّ ليكون الافتراضي إن حُذف الافتراضي.
+        if ($wasDefault) {
+            $next = $customer->addresses()->orderBy('id')->first();
+            $next?->update(['is_default' => true]);
+        }
+    }
+
+    public function setDefaultAddress(Customer $customer, CustomerAddress $address): void
+    {
+        abort_unless($address->customer_id === $customer->id, 403);
+        DB::transaction(function () use ($customer, $address) {
+            $customer->addresses()->update(['is_default' => false]);
+            $address->update(['is_default' => true]);
+        });
+    }
+
+    /** تحديث تفضيلات العميل (لغة/فرع مفضّل/تفضيلات تواصل — جاهزية تسويق، بلا منطق نمو). */
+    public function updatePreferences(Customer $customer, array $data): Customer
+    {
+        $customer->update(array_intersect_key($data, array_flip([
+            'preferred_locale', 'preferred_branch_id', 'communication_preferences',
+        ])));
+
+        return $customer->refresh();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function addressAttributes(array $data, bool $isDefault): array
+    {
+        return [
+            'label' => $data['label'] ?? null,
+            'recipient_name' => $data['recipient_name'] ?? null,
+            'phone' => $data['phone'] ?? null,
+            'governorate_id' => $data['governorate_id'] ?? null,
+            'city_id' => $data['city_id'] ?? null,
+            'area_id' => $data['area_id'] ?? null,
+            'address_line' => $data['address_line'] ?? null,
+            'is_default' => $isDefault,
+        ];
     }
 
     public function addNote(Customer $customer, string $body): Customer

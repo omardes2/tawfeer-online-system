@@ -20,6 +20,14 @@ use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
 use App\Http\Controllers\Admin\Shipping\ShipmentController as AdminShipmentController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Storefront\Account\AccountController;
+use App\Http\Controllers\Storefront\Account\AddressController;
+use App\Http\Controllers\Storefront\Account\AuthController as AccountAuthController;
+use App\Http\Controllers\Storefront\Account\NotificationController as AccountNotificationController;
+use App\Http\Controllers\Storefront\Account\OrderController as AccountOrderController;
+use App\Http\Controllers\Storefront\Account\PreferenceController;
+use App\Http\Controllers\Storefront\Account\ProfileController as AccountProfileController;
+use App\Http\Controllers\Storefront\Account\WishlistController;
 use App\Http\Controllers\Storefront\StorefrontController;
 use Illuminate\Support\Facades\Route;
 
@@ -39,6 +47,46 @@ Route::middleware('storefront.locale')->group(function () {
     Route::get('/cart', [StorefrontController::class, 'cart'])->name('storefront.cart');
     Route::get('/checkout', [StorefrontController::class, 'checkout'])->name('storefront.checkout');
     Route::get('/lang/{locale}', [StorefrontController::class, 'setLocale'])->name('storefront.locale');
+
+    /*
+    | حساب العميل (Phase 3.4 / ADR-035) — جلسة الويب، عربي RTL + إنجليزي، noindex.
+    */
+    Route::middleware('guest')->group(function () {
+        Route::get('/account/login', [AccountAuthController::class, 'showLogin'])->name('account.login');
+        Route::post('/account/login', [AccountAuthController::class, 'login']);
+        Route::get('/account/register', [AccountAuthController::class, 'showRegister'])->name('account.register');
+        Route::post('/account/register', [AccountAuthController::class, 'register']);
+    });
+
+    Route::middleware('require.customer')->prefix('account')->name('account.')->group(function () {
+        Route::post('logout', [AccountAuthController::class, 'logout'])->name('logout');
+        Route::get('/', [AccountController::class, 'dashboard'])->name('dashboard');
+
+        Route::get('profile', [AccountProfileController::class, 'edit'])->name('profile');
+        Route::patch('profile', [AccountProfileController::class, 'update'])->name('profile.update');
+        Route::patch('password', [AccountProfileController::class, 'updatePassword'])->name('password.update');
+
+        Route::get('orders', [AccountOrderController::class, 'index'])->name('orders');
+        Route::get('orders/{order}', [AccountOrderController::class, 'show'])->name('orders.show');
+        Route::get('orders/{order}/status', [AccountOrderController::class, 'status'])->name('orders.status');
+        Route::post('orders/{order}/reorder', [AccountOrderController::class, 'reorder'])->name('orders.reorder');
+
+        Route::get('addresses', [AddressController::class, 'index'])->name('addresses');
+        Route::post('addresses', [AddressController::class, 'store'])->name('addresses.store');
+        Route::patch('addresses/{address}', [AddressController::class, 'update'])->name('addresses.update');
+        Route::delete('addresses/{address}', [AddressController::class, 'destroy'])->name('addresses.destroy');
+        Route::post('addresses/{address}/default', [AddressController::class, 'setDefault'])->name('addresses.default');
+
+        Route::get('wishlist', [WishlistController::class, 'index'])->name('wishlist');
+        Route::post('wishlist/{product}/toggle', [WishlistController::class, 'toggle'])->name('wishlist.toggle');
+
+        Route::get('preferences', [PreferenceController::class, 'edit'])->name('preferences');
+        Route::patch('preferences', [PreferenceController::class, 'update'])->name('preferences.update');
+
+        Route::get('notifications', [AccountNotificationController::class, 'index'])->name('notifications');
+        Route::post('notifications/{id}/read', [AccountNotificationController::class, 'markRead'])->name('notifications.read');
+        Route::post('notifications/read-all', [AccountNotificationController::class, 'markAllRead'])->name('notifications.read_all');
+    });
 });
 
 Route::get('/dashboard', function () {

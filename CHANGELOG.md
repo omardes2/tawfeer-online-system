@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 3.4 (Customer Experience Layer)
+- Full customer account layer (ADR-035) on the storefront, session-based (web
+  guard, separate from admin/Sanctum auth), Arabic RTL + English, mobile-first,
+  all account pages `noindex`. No completed module redesigned; no business logic
+  duplicated — reuses CustomerService/CartService/OrderService.
+- Register/login/logout: registration creates a `User` (customer role) + linked
+  `Customer` (via CustomerService) with a **required birth date** (readiness for
+  future birthday rewards/marketing — stored only), and a transactional welcome
+  in-app notification.
+- Guest→customer cart merge on login/register: `storefront.js` mirrors the guest
+  cart token into a `cart_token` cookie; `CartService::mergeGuestIntoUser` merges
+  the guest cart into the user's active cart (items accumulate, guest cart marked
+  `merged`).
+- Additive schema only (ADR-032): customer columns (`birth_date`,
+  `preferred_locale`, `preferred_branch_id`, `communication_preferences` JSON,
+  `acquisition_source`); `wishlist_items`; Laravel's standard `notifications`
+  table (in-app inbox).
+- My Orders (history), order tracking (status timeline + payment/shipment status
+  + lightweight live status poll), and reorder (adds an order's available items
+  to the cart via `CartService::addItem`). Ownership enforced (403 on others').
+- Saved addresses (multiple + single default) via new `CustomerService` methods;
+  customer preferences (language, preferred branch, communication channels);
+  profile + password settings; wishlist (toggle + list) via `WishlistService`.
+- Notification center: `database` channel inbox now; external channels
+  (WhatsApp/Email/Push) documented as future custom channels routed through the
+  existing MessagingManager (ADR-030) — no external provider implemented.
+- Explicitly NOT implemented (kept as plug-in-ready hooks): loyalty points,
+  birthday rewards, coupons/promotions, recommendations/smart cart, marketing
+  automation.
+- Tests: 11 new account feature tests → 337 passing total. Pint clean. Vite
+  production build passes.
+
 ### Added — Phase 3.3 (Storefront Catalog)
 - Customer-facing storefront (ADR-034): server-rendered Blade + Tailwind + Alpine,
   **Arabic RTL primary + English**, mobile-first. Home, categories, brands,

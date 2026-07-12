@@ -1,0 +1,111 @@
+<?php
+
+// Customer account strings (English — Phase 3.4). No hardcoded strings in templates.
+return [
+    'my_account' => 'My account',
+    'dashboard' => 'Account dashboard',
+    'hello' => 'Hello',
+    'logout' => 'Log out',
+
+    // Auth
+    'login' => 'Log in',
+    'register' => 'Create account',
+    'email' => 'Email',
+    'password' => 'Password',
+    'password_confirmation' => 'Confirm password',
+    'current_password' => 'Current password',
+    'new_password' => 'New password',
+    'name' => 'Name',
+    'phone' => 'Mobile number',
+    'birth_date' => 'Date of birth',
+    'birth_date_hint' => 'Used later for birthday rewards and personalized offers.',
+    'remember_me' => 'Remember me',
+    'have_account' => 'Already have an account?',
+    'no_account' => "Don't have an account?",
+    'create_one' => 'Create one',
+    'sign_in' => 'Sign in',
+
+    // Sections
+    'overview' => 'Overview',
+    'profile' => 'Profile',
+    'orders' => 'My orders',
+    'my_orders' => 'My orders',
+    'addresses' => 'Addresses',
+    'wishlist' => 'Wishlist',
+    'preferences' => 'Preferences',
+    'notifications' => 'Notifications',
+    'settings' => 'Settings',
+
+    // Dashboard
+    'recent_orders' => 'Recent orders',
+    'total_orders' => 'Total orders',
+    'saved_addresses' => 'Saved addresses',
+    'wishlist_items' => 'Wishlist items',
+    'unread_notifications' => 'Unread notifications',
+    'view_all' => 'View all',
+
+    // Orders
+    'order_number' => 'Order number',
+    'order_date' => 'Date',
+    'order_status' => 'Status',
+    'order_total' => 'Total',
+    'items_count' => 'Items',
+    'track_order' => 'Track order',
+    'reorder' => 'Reorder',
+    'reorder_added' => ':count item(s) added to your cart.',
+    'no_orders' => 'No orders yet',
+    'no_orders_hint' => 'Start shopping for your first order.',
+    'order_timeline' => 'Order timeline',
+    'payment_status' => 'Payment status',
+    'shipment_status' => 'Shipment status',
+    'live' => 'Live',
+    'items' => 'Items',
+
+    // Addresses
+    'add_address' => 'Add address',
+    'edit_address' => 'Edit address',
+    'label' => 'Label',
+    'recipient_name' => 'Recipient name',
+    'address_line' => 'Address',
+    'set_default' => 'Set as default',
+    'default' => 'Default',
+    'save' => 'Save',
+    'delete' => 'Delete',
+    'no_addresses' => 'No saved addresses',
+    'address_saved' => 'Address saved.',
+    'address_removed' => 'Address removed.',
+    'address_default_set' => 'Default address set.',
+
+    // Wishlist
+    'no_wishlist' => 'Your wishlist is empty',
+    'no_wishlist_hint' => 'Add products you like to save them here.',
+    'wishlist_added' => 'Added to wishlist.',
+    'wishlist_removed' => 'Removed from wishlist.',
+    'add_to_wishlist' => 'Add to wishlist',
+    'in_wishlist' => 'In wishlist',
+
+    // Preferences
+    'preferred_language' => 'Preferred language',
+    'preferred_branch' => 'Preferred branch',
+    'communication_preferences' => 'Communication preferences',
+    'channel_whatsapp' => 'WhatsApp',
+    'channel_email' => 'Email',
+    'channel_sms' => 'SMS',
+    'channel_push' => 'Push notifications',
+    'preferences_saved' => 'Preferences saved.',
+    'none' => 'None',
+
+    // Profile / settings
+    'profile_saved' => 'Profile saved.',
+    'change_password' => 'Change password',
+    'password_saved' => 'Password updated.',
+    'update' => 'Update',
+
+    // Notifications
+    'no_notifications' => 'No notifications',
+    'mark_read' => 'Mark as read',
+    'mark_all_read' => 'Mark all as read',
+    'notifications_all_read' => 'All notifications marked as read.',
+    'welcome_title' => 'Welcome to Tawfeer Online',
+    'welcome_body' => 'Your account was created successfully. Enjoy a smooth shopping experience.',
+];

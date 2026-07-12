@@ -4,6 +4,7 @@
     'canonical' => null,
     'image' => null,
     'pageEvent' => null,
+    'noindex' => false,
 ])
 
 @php
@@ -25,6 +26,9 @@
     {{-- SEO --}}
     <title>{{ $pageTitle }}</title>
     <meta name="description" content="{{ $metaDescription }}">
+    @if ($noindex)
+        <meta name="robots" content="noindex, nofollow">
+    @endif
     <link rel="canonical" href="{{ $canonicalUrl }}">
 
     {{-- Open Graph / social sharing --}}
@@ -96,6 +100,12 @@
                     <a href="{{ route('storefront.locale', $locale === 'ar' ? 'en' : 'ar') }}"
                        class="px-2 py-1.5 rounded-md text-sm text-gray-600 hover:bg-gray-100" aria-label="{{ __('storefront.language') }}">
                         {{ $locale === 'ar' ? 'EN' : 'ع' }}
+                    </a>
+
+                    {{-- الحساب --}}
+                    <a href="{{ auth()->check() ? route('account.dashboard') : route('account.login') }}"
+                       class="p-2 rounded-md text-gray-700 hover:bg-gray-100" aria-label="{{ __('account.my_account') }}">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M17.98 19.5a6 6 0 0 0-11.96 0M12 12.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z"/></svg>
                     </a>
 
                     {{-- السلة --}}
