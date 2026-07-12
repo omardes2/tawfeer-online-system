@@ -52,6 +52,8 @@ class DatabaseSeeder extends Seeder
             // Phase 4.3 — محرّك حالة التوصيل القانوني + عمليات التوصيل
             DeliveryStatusPermissionSeeder::class,
             DeliveryExceptionCategorySeeder::class,
+            // Phase 4.4 — المرتجعات والاستبدال (RMA)
+            ReturnsPermissionSeeder::class,
         ]);
     }
 }

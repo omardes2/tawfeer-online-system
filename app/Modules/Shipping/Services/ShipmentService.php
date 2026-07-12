@@ -75,6 +75,40 @@ class ShipmentService
         });
     }
 
+    /**
+     * شحنة **مرتبطة** للمرتجع/الاستبدال (Phase 4.4 / ADR-040) — **دون تعديل الشحنة الأصلية**.
+     * تتجاوز حارس «شحنة واحدة لكل طلب» وشرط حالة الطلب (الأصل قائم كما هو).
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function createLinkedShipment(Order $order, string $kind, array $data, int $year, ?Shipment $parent = null): Shipment
+    {
+        return DB::transaction(function () use ($order, $kind, $data, $year, $parent) {
+            $shipment = Shipment::create([
+                'number' => NumberGenerator::next('shipments', 'number', 'SHP', $year),
+                'order_id' => $order->id,
+                'parent_shipment_id' => $parent?->id,
+                'kind' => $kind,
+                'branch_id' => $order->branch_id,
+                'warehouse_id' => $order->warehouse_id,
+                'status' => 'not_shipped',
+                'carrier_name' => $data['carrier_name'] ?? $parent?->carrier_name,
+                'tracking_number' => $data['tracking_number'] ?? null,
+                'recipient_name' => $data['recipient_name'] ?? $order->customer_name,
+                'recipient_phone' => $data['recipient_phone'] ?? $order->customer_phone,
+                'address_text' => $data['address_text'] ?? $order->shipping_address,
+                'delivery_provider_id' => $data['delivery_provider_id'] ?? $parent?->delivery_provider_id,
+                'shipping_cost' => 0,
+                'cost_source' => 'linked',
+                'notes' => $data['notes'] ?? null,
+                'created_by' => auth()->id(),
+            ]);
+            $this->recordEvent($shipment, null, 'not_shipped', 'system', __('شحنة مرتبطة: :kind', ['kind' => $kind]));
+
+            return $shipment;
+        });
+    }
+
     public function dispatch(Shipment $shipment): Shipment
     {
         $this->transition($shipment, ['not_shipped', 'preparing'], 'in_transit', function () use ($shipment) {

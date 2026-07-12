@@ -74,6 +74,22 @@ class InventoryService
         return $this->tx(fn () => $this->record($variant, $warehouse, 'purchase_return_out', 'on_hand', -$qty, null, false, $opts));
     }
 
+    /** مرتجع عميل صالح → إعادة للمخزون (return_in) — يزيد on_hand ويعيد حساب WAC (BR-RET-04). */
+    public function returnToStock(ProductVariant $variant, Warehouse $warehouse, float $qty, ?float $unitCost = null, array $opts = []): InventoryMovement
+    {
+        $this->assertPositive($qty);
+
+        return $this->tx(fn () => $this->record($variant, $warehouse, 'return_in', 'on_hand', $qty, $unitCost, $unitCost !== null, $opts));
+    }
+
+    /** مرتجع عميل تالف → دلو damaged (damage_out) — لا يُحتسب متاحًا للبيع (BR-RET-04). */
+    public function returnToDamaged(ProductVariant $variant, Warehouse $warehouse, float $qty, array $opts = []): InventoryMovement
+    {
+        $this->assertPositive($qty);
+
+        return $this->tx(fn () => $this->record($variant, $warehouse, 'damage_out', 'damaged', $qty, null, false, $opts));
+    }
+
     /** حجز — يزيد دلو reserved (لا يمسّ on_hand). */
     public function reserve(ProductVariant $variant, Warehouse $warehouse, float $qty, array $opts = []): InventoryMovement
     {

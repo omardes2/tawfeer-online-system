@@ -205,6 +205,17 @@
 - **التكلفة المُحمّلة (Landed Cost — BR-PUR-06):** `goods_receipts.additional_cost` تُوزَّع على البنود بنسبة قيمة السطر قبل احتساب WAC.
 - **FK مؤجّلة:** `suppliers.governorate_id/city_id/currency_id` (جداولها غير مُنشأة) — أعمدة nullable بلا قيد الآن.
 
+## ADR-040 — المرتجعات والاستبدال RMA (Returns & Exchanges) [مُعتمد في Phase 4.4]
+- **السياق:** تفعيل تدفّق ADR-011/BR-RET-* فعليًا: طلب مرتجع/استبدال/إبدال مرتبط بطلب مُسلَّم، بسير موافقات ووجهة مخزون/مالية عكسية. **إضافي بالكامل**؛ يُعيد استخدام الخدمات القائمة دون تكرار.
+- **إعادة الاستخدام (المبدأ 12، لا تكرار منطق):** المخزون عبر `InventoryService` (طريقتان مُضافتان `returnToStock`=`return_in`→on_hand و`returnToDamaged`=`damage_out`→damaged — تستخدمان محرّك الحركات القائم؛ كل حركة مسجَّلة في الحركات/الدفتر)؛ الاسترداد عبر `PaymentService::refund`؛ عكس العمولة عبر `CommissionService::reverseForOrder` (كامل) / `adjustForReturn` (جزئي تناسبي، BR-RET-09)؛ حالة الطلب عبر `OrderService::markReturned/markPartiallyReturned/markExchanged` (مُضافة — تُفعّل مفاتيح `returned/partially_returned/exchanged` القانونية)؛ الشحنة المرتبطة عبر `ShipmentService::createLinkedShipment`.
+- **التدفّق القانوني (المتطلّب):** `return_request → approved → received → inspected → completed` (+ `rejected`/`cancelled`) بانتقالات محروسة. مسار الموافقة **مبيعات → مشرف مبيعات → مستودع → قرار نهائي** ممثَّل بالمراحل والصلاحيات.
+- **الأنواع/الأسباب:** أنواع `return`/`exchange`/`replacement`؛ أسباب مُصنّفة (`wrong_item`, `damaged`, `missing_item`, `customer_refused`, `delivery_company_issue`, `internal_warehouse_mistake`, `changed_mind`, `other`)؛ تسويات `refund`/`no_refund`/`store_credit`/`replacement`. مدعوم: إرجاع كامل/جزئي، استرداد/بلا استرداد، استبدال كامل/جزئي، إبدال فقط.
+- **الفحص وتوجيه المخزون (BR-RET-04):** لكل بند نتيجة (`sellable/damaged/wrong_item/missing_parts/quarantine`) وتوجيه (`restock`→on_hand، `damaged`→دلو التالف، `none`). تتبّع `order_items.returned_qty` يمنع تجاوز الإرجاع ويميّز الكامل عن الجزئي.
+- **شحنة مرتبطة لا تعديل للأصل (المتطلّب):** إن استلزمت شركة التوصيل شحنة مختلفة للمرتجع/الاستبدال، تُنشأ `shipments` جديدة بـ`kind` (`return_pickup`/`exchange_delivery`) و`parent_shipment_id` — **الأصل يبقى دون مسّ** (تجاوز حارس «شحنة واحدة لكل طلب» عبر `createLinkedShipment` المخصّصة).
+- **لا حذف — بل عكس (BR-RET-11)، والذرّية (BR-RET-12):** كل خطوة ذات أثر داخل معاملة؛ الأثر عبر حركات جديدة. الصور اختيارية (`return_request_photos`)، الخطّ الزمني/سجلّ الحالة والتدقيق كاملان (`return_request_events` + Auditable).
+- **الصلاحيات/الأدوار:** `returns.{view,create,approve,receive,inspect,finalize,refund}` (ADR-021) موزّعة على sales/sales_supervisor/warehouse/finance/manager. واجهات API + لوحة RTL موبايل-أوّلًا.
+- **مؤجّل (موثّق):** دفتر الرصيد الدائن الفعلي (`store_credit`/credit_note — BR-RET-08)، وإعادة احتساب عمولة البيع الجديد للبديل (تُستحقّ عند تسليم/إغلاق شحنة الاستبدال).
+
 ## ADR-039 — بنية عمليات التوصيل (استثناءات · Webhook · مزامنة · رسوم · خطّ زمني) [مُعتمد في Phase 4.3]
 - **السياق:** إكمال Phase 4.3 فوق محرّك الحالات (ADR-038) بالبنية التشغيلية للمزوّد. كلّها **عبر طبقة تجريد المزوّد** (`DeliveryProviderManager` + `DeliveryProviderInterface`) — لا منطق مزوّد في وحدات الأعمال، ودعم عدّة مزوّدين دون تغيير المنطق.
 - **مُحلّل متعدّد المزوّدين:** `DeliveryProviderManager::driver(code)`/`forShipment()` يحلّ الـDriver من `config/shipping.php` بحسب كود مزوّد الشحنة/المسار — استيعاب/مزامنة/webhook كلّها تحلّ المزوّد الصحيح ديناميكيًا.

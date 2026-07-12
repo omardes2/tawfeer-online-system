@@ -15,7 +15,7 @@
 | 4.1 | البيع المُساعد + الأدوار + تعديل السعر اليدوي بالموافقة واللقطات | ✅ مكتملة |
 | **4.2** | عمولات الموظفين + أرباح المسوّقين (دفاتر غير قابلة للتعديل + حالات) | ✅ مكتملة |
 | 4.3 | عمليات التوصيل + تكامل المزوّد (تقديم/webhook/مزامنة) + الاستثناءات | ✅ مكتملة |
-| 4.4 | المرتجعات والاستبدال (RMA) + الفحص وتوجيه المخزون | ⬜ |
+| 4.4 | المرتجعات والاستبدال (RMA) + الفحص وتوجيه المخزون | ✅ مكتملة |
 | 4.5 | مطالبات التوصيل (تلف/كسر/فقد/نقص/تسرّب) | ⬜ |
 | 4.6 | تسويات ومطابقة التوصيل → تفعيل استحقاق العمولات/الأرباح + قيود محاسبية | ⬜ |
 | 4.7 | تقارير العمليات | ⬜ |
@@ -113,8 +113,14 @@
 - **الخطّ الزمني الموحّد:** `ShipmentTimelineService` يدمج كل المصادر زمنيًا (داخلي/مزوّد/تعليق/إجراءات/webhook/مزامنة).
 - **الصلاحيات:** `shipping.delivery.fees` + الاستثناءات تحت `manage`. **15 اختبارًا إضافيًا (إجمالي 4.3 = 30).**
 
-### 4.4 — المرتجعات والاستبدال RMA (المتطلّبان 7، 8)
-- **الجداول:** `return_requests` (مصدر: customer/sales/warehouse/provider؛ نوع: return/exchange؛ حالة `return_request → approved → received → inspected → completed` + `rejected`)؛ `return_request_items` (بند/كمية/نوع الاستبدال/فرق السعر/مالك الرسوم)؛ الفحص (`inspection`): تصنيفات (sellable/open_box/repackage/damaged/broken/missing_parts/wrong_item/quarantine) → توجيه المخزون (on_hand/damaged/quarantine/provider_claim/internal). **لا تعديل غير رسمي للطلب الأصلي** (BR-RET-01). موافقات (مشرف/مستودع/مالية/عمليات). أنواع الاستبدال (نفس/أعلى بتحصيل/أقل باسترداد أو رصيد، جزئي، pickup+replacement متزامن/لاحق). الأثر العكسي عبر Inventory/Accounting القائمين (BR-RET-05).
+### ✅ 4.4 — المرتجعات والاستبدال RMA (المتطلّبان 7، 8) — مكتملة
+> **مُنفَّذ (ADR-040):** وحدة `app/Modules/Returns` — إضافية بالكامل، تُعيد استخدام كل الخدمات دون تكرار.
+- **الجداول:** `return_requests` (نوع return/exchange/replacement؛ سبب مُصنّف؛ تسوية refund/no_refund/store_credit/replacement؛ حالة `return_request → approved → received → inspected → completed` + rejected/cancelled؛ مسار موافقة بالحقول requested/approved/received/inspected/decided_by)؛ `return_request_items` (لقطة سعر/تكلفة + نتيجة فحص + توجيه مخزون + بديل/فرق سعر)؛ `return_request_photos` (اختيارية، append-only)؛ `return_request_events` (خطّ زمني/سجلّ حالة، append-only). `order_items.returned_qty` مُضاف (منع تجاوز الإرجاع).
+- **سير الموافقات (المتطلّب):** مبيعات (إنشاء) → مشرف مبيعات (اعتماد/رفض) → مستودع (استلام + فحص وتوجيه) → قرار نهائي (إكمال). صلاحيات `returns.{view,create,approve,receive,inspect,finalize,refund}`.
+- **الفحص والتوجيه (BR-RET-04):** `restock`→on_hand (`InventoryService::returnToStock`=return_in)، `damaged`→دلو التالف (`returnToDamaged`=damage_out)، `none`. **كل حركة مسجَّلة** (movements/ledger).
+- **الأثر العكسي (BR-RET-05/09):** العمولة عبر `reverseForOrder`(كامل)/`adjustForReturn`(جزئي)؛ الاسترداد عبر `PaymentService::refund`؛ حالة الطلب `returned/partially_returned/exchanged` عبر `OrderService`؛ الاستبدال يصرف البديل (`issue`) + **شحنة مرتبطة** (`ShipmentService::createLinkedShipment`، kind=return_pickup/exchange_delivery، **لا تعديل للأصل**).
+- **الاختبارات:** 13 اختبارًا (سير كامل، جزئي، تالف، استرداد، استبدال، شحنة مرتبطة، منع تجاوز، تفويض المراحل، خطّ زمني).
+- **مؤجّل (موثّق):** دفتر الرصيد الدائن الفعلي (BR-RET-08)، عمولة بيع البديل الجديد (تُستحقّ عند إغلاق شحنة الاستبدال).
 
 ### 4.5 — مطالبات التوصيل (المتطلّب 10)
 - **الجداول:** `delivery_claims` (provider, shipment ref, order, item/qty, cost, claimed, accepted, evidence/attachments, status)؛ حالات: `draft → submitted → under_review → accepted`/`partially_accepted`/`rejected → paid → closed`؛ `delivery_claim_payments`.

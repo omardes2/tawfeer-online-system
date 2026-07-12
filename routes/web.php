@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\Purchasing\SupplierController as AdminSupplierCon
 use App\Http\Controllers\Admin\Purchasing\SupplierReturnController as AdminSupplierReturnController;
 use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
+use App\Http\Controllers\Admin\Returns\ReturnController as AdminReturnController;
 use App\Http\Controllers\Admin\Shipping\DeliveryStatusController as AdminDeliveryStatusController;
 use App\Http\Controllers\Admin\Shipping\ShipmentController as AdminShipmentController;
 use App\Http\Controllers\ProfileController;
@@ -220,6 +221,21 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('rules', [AdminCommissionController::class, 'rules'])->name('rules')->middleware('can:commissions.rules.manage');
         Route::post('rules', [AdminCommissionController::class, 'storeRule'])->name('rules.store')->middleware('can:commissions.rules.manage');
         Route::delete('rules/{rule}', [AdminCommissionController::class, 'destroyRule'])->name('rules.destroy')->middleware('can:commissions.rules.manage');
+    });
+
+    // المرتجعات والاستبدال RMA (Phase 4.4)
+    Route::prefix('returns')->name('returns.')->group(function () {
+        Route::get('/', [AdminReturnController::class, 'index'])->name('index')->middleware('can:returns.view');
+        Route::get('create', [AdminReturnController::class, 'create'])->name('create')->middleware('can:returns.create');
+        Route::post('/', [AdminReturnController::class, 'store'])->name('store')->middleware('can:returns.create');
+        Route::get('{return}', [AdminReturnController::class, 'show'])->name('show')->middleware('can:returns.view');
+        Route::post('{return}/photo', [AdminReturnController::class, 'photo'])->name('photo')->middleware('can:returns.create');
+        Route::post('{return}/approve', [AdminReturnController::class, 'approve'])->name('approve')->middleware('can:returns.approve');
+        Route::post('{return}/reject', [AdminReturnController::class, 'reject'])->name('reject')->middleware('can:returns.approve');
+        Route::post('{return}/cancel', [AdminReturnController::class, 'cancel'])->name('cancel')->middleware('can:returns.create');
+        Route::post('{return}/receive', [AdminReturnController::class, 'receive'])->name('receive')->middleware('can:returns.receive');
+        Route::post('{return}/inspect', [AdminReturnController::class, 'inspect'])->name('inspect')->middleware('can:returns.inspect');
+        Route::post('{return}/complete', [AdminReturnController::class, 'complete'])->name('complete')->middleware('can:returns.finalize');
     });
 
     // CRM/العملاء (Phase 2.10)

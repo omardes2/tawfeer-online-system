@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\V1\Sales\AssistedOrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderController;
 use App\Http\Controllers\Api\V1\Sales\OrderTransitionController;
 use App\Http\Controllers\Api\V1\Shipping\GeographyController;
+use App\Http\Controllers\Api\V1\Returns\ReturnController;
 use App\Http\Controllers\Api\V1\Shipping\DeliveryExceptionController;
 use App\Http\Controllers\Api\V1\Shipping\DeliveryFeeController;
 use App\Http\Controllers\Api\V1\Shipping\DeliveryStatusController;
@@ -267,6 +268,23 @@ Route::prefix('v1')->group(function () {
             // رسوم الشحنة المُركّبة (مستقلّة عن المزوّد) — ADR-039
             Route::get('shipments/{shipment}/fees', [DeliveryFeeController::class, 'index'])->middleware('can:shipping.delivery.view');
             Route::post('shipments/{shipment}/fees', [DeliveryFeeController::class, 'store'])->middleware('can:shipping.delivery.fees');
+        });
+
+        /*
+        | Phase 4.4 — المرتجعات والاستبدال RMA (ADR-040)
+        | سير موافقات: مبيعات → مشرف → مستودع → قرار نهائي. الأثر عكسي عبر الخدمات القائمة.
+        */
+        Route::prefix('rma')->group(function () {
+            Route::get('/', [ReturnController::class, 'index'])->middleware('can:returns.view');
+            Route::post('/', [ReturnController::class, 'store'])->middleware('can:returns.create');
+            Route::get('{return}', [ReturnController::class, 'show'])->middleware('can:returns.view');
+            Route::post('{return}/photo', [ReturnController::class, 'photo'])->middleware('can:returns.create');
+            Route::post('{return}/approve', [ReturnController::class, 'approve'])->middleware('can:returns.approve');
+            Route::post('{return}/reject', [ReturnController::class, 'reject'])->middleware('can:returns.approve');
+            Route::post('{return}/cancel', [ReturnController::class, 'cancel'])->middleware('can:returns.create');
+            Route::post('{return}/receive', [ReturnController::class, 'receive'])->middleware('can:returns.receive');
+            Route::post('{return}/inspect', [ReturnController::class, 'inspect'])->middleware('can:returns.inspect');
+            Route::post('{return}/complete', [ReturnController::class, 'complete'])->middleware('can:returns.finalize');
         });
 
         /*

@@ -7,6 +7,7 @@ use App\Modules\Crm\Models\Customer;
 use App\Modules\Inventory\Models\StockReservation;
 use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Inventory\Services\ReservationService;
+use App\Modules\Sales\Events\OrderDelivered;
 use App\Modules\Sales\Models\Order;
 use App\Support\NumberGenerator;
 use Illuminate\Support\Facades\DB;
@@ -220,7 +221,7 @@ class OrderService
         );
 
         // استحقاق العمولة (pending) — Phase 4.2. الاستحقاق النهائي (eligible) عند التسوية (4.6).
-        \App\Modules\Sales\Events\OrderDelivered::dispatch($order);
+        OrderDelivered::dispatch($order);
 
         return $order;
     }
@@ -236,6 +237,30 @@ class OrderService
 
             $order->update(['cancel_reason' => $reason, 'cancelled_at' => now()]);
         }, $reason);
+
+        return $order;
+    }
+
+    /** إرجاع كامل بعد التسليم (BR-RET-10) — تُستدعى من وحدة المرتجعات (RMA). */
+    public function markReturned(Order $order, ?string $note = null): Order
+    {
+        $this->transition($order, ['delivered', 'delivery_failed', 'partially_returned'], 'returned', null, $note);
+
+        return $order;
+    }
+
+    /** إرجاع جزئي بعد التسليم (BR-RET-10) — يبقى الطلب قائمًا للبنود المتبقّية. */
+    public function markPartiallyReturned(Order $order, ?string $note = null): Order
+    {
+        $this->transition($order, ['delivered', 'partially_returned'], 'partially_returned', null, $note);
+
+        return $order;
+    }
+
+    /** استبدال بعد التسليم (BR-RET-07/10). */
+    public function markExchanged(Order $order, ?string $note = null): Order
+    {
+        $this->transition($order, ['delivered', 'partially_returned'], 'exchanged', null, $note);
 
         return $order;
     }

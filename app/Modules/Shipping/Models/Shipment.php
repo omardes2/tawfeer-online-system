@@ -29,7 +29,7 @@ class Shipment extends Model
     use Auditable, HasFactory, HasUuid, SoftDeletes;
 
     protected $fillable = [
-        'number', 'order_id', 'branch_id', 'warehouse_id', 'status',
+        'number', 'order_id', 'parent_shipment_id', 'kind', 'branch_id', 'warehouse_id', 'status',
         'delivery_status', 'provider_status', 'on_hold_reason', 'closed_at',
         'carrier_name', 'tracking_number',
         'recipient_name', 'recipient_phone', 'address_text',

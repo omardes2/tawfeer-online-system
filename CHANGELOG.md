@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4.4 (Returns & Exchanges / RMA)
+- **New `Returns` module (ADR-040)** — fully additive; reuses every existing
+  service with no duplicated business logic.
+- Return requests, exchanges, and replacements with categorized reasons (wrong
+  item, damaged, missing item, customer refused, delivery company issue,
+  internal warehouse mistake, changed mind, other), optional photos, notes,
+  requester, full timeline + status history + audit log.
+- **Approval workflow:** Sales → Sales Supervisor → Warehouse → Final Decision,
+  as an enforced state machine `return_request → approved → received → inspected
+  → completed` (+ rejected/cancelled). Permissions `returns.{view,create,
+  approve,receive,inspect,finalize,refund}`.
+- Supported outcomes: full/partial return, return with/without refund,
+  replacement only, full/partial exchange.
+- **Inventory stays synchronized, every movement logged:** two additive
+  `InventoryService` methods — `returnToStock` (`return_in` → on_hand, WAC
+  recompute) and `returnToDamaged` (`damage_out` → damaged bucket) — routed at
+  inspection per item (restock / damaged / none). `order_items.returned_qty`
+  added to prevent over-return and distinguish full vs partial.
+- **Reversal via reuse:** commission `CommissionService::reverseForOrder`
+  (full) / `adjustForReturn` (partial), refund `PaymentService::refund`, order
+  status `OrderService::markReturned/markPartiallyReturned/markExchanged` (new
+  additive methods activating the `returned/partially_returned/exchanged`
+  statuses).
+- **Linked shipment, never modifies the original:** if the courier needs a
+  separate shipment for the return/exchange, `ShipmentService::createLinked
+  Shipment` creates a new `shipments` row with `kind` (return_pickup /
+  exchange_delivery) + `parent_shipment_id` — the original is untouched.
+- Admin UI (RTL, mobile-first) + Arabic/English lang; API under
+  `/api/v1/rma/*`. Additive schema only.
+- Tests: 13 new RMA tests → 416 passing. Pint clean; frontend build succeeds.
+
 ### Added — Phase 4.3 rest (Delivery operations: exceptions · webhooks · sync · fees · timeline)
 - **Multi-provider abstraction:** `DeliveryProviderManager` resolves the right
   driver by provider code (from `config/shipping.php`) for ingestion/sync/webhook

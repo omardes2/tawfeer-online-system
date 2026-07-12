@@ -288,7 +288,8 @@
 | **الإشعارات** | إشعار العميل بحالة الإرجاع/الاسترداد؛ إشعار المستودع لاستلام/فحص؛ إشعار المسوّق بعكس العمولة. |
 | **متطلبات التدقيق** | **إلزامي:** قيود `inventory_ledger` عكسية + `audit_logs` (السبب، الكميات، حالة الفحص) — عكس لا حذف (ADR-011/016). |
 | **المستمعون والمهام** | **Sync:** إرجاع المخزون + عكس العمولة. **Async:** `ReverseRevenueCogsJob` (Phase 5)، `ProcessRefundJob`، `NotifyReturnJob`. |
-| **الطور** | Phase 3. |
+| **مُنفَّذ (4.4):** | وحدة `Returns` (RMA، ADR-040) تُطلق `ReturnRequested` عند الإنشاء و`ReturnCompleted` عند الإكمال (بعد عكس المخزون/العمولة والتسوية المالية). التوجيه: `restock`→`return_in`/on_hand، `damaged`→`damage_out`/دلو التالف. الاسترداد عبر `PaymentService::refund`، وعكس العمولة عبر `CommissionService::reverse/adjust`، وحالة الطلب `returned/partially_returned/exchanged`. الاستبدال يُنشئ **شحنة مرتبطة** لا يعدّل الأصل. `ReturnCompleted` نقطة امتداد للترحيل المحاسبي العكسي (Phase 5). |
+| **الطور** | Phase 3 (تنفيذ RMA في Phase 4.4). |
 
 ## 5.8 `DeliveryStatusChanged` — *(مُنفَّذ Phase 4.3 / ADR-038)*
 | البند | التفصيل |
