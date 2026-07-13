@@ -108,7 +108,7 @@ class DeliveryRateController extends Controller
 
         $r = $service->sync('opost');
 
-        return back()->with('success', __('اكتملت المزامنة: :synced مدينة (:linked مرتبطة، :priced مُسعّرة من المزوّد).', $r));
+        return back()->with('success', __('اكتملت المزامنة: :cities مدينة و:areas منطقة (:priced مُسعّرة من المزوّد).', $r));
     }
 
     public function destroy(DeliveryCityRate $deliveryRate): RedirectResponse
