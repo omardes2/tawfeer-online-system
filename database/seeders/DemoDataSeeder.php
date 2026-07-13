@@ -3,13 +3,30 @@
 namespace Database\Seeders;
 
 use App\Models\User;
+use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Models\FinancialVoucher;
+use App\Modules\Accounting\Models\Treasury;
+use App\Modules\Accounting\Services\VoucherService;
+use App\Modules\Catalog\Models\Brand;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\ProductTag;
+use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Catalog\Models\Unit;
 use App\Modules\Crm\Models\Customer;
 use App\Modules\Foundation\Models\Branch;
+use App\Modules\Foundation\Models\PaymentMethod;
 use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Inventory\Models\InventoryStock;
+use App\Modules\Inventory\Models\StockAdjustment;
+use App\Modules\Marketing\Models\Campaign;
+use App\Modules\Marketing\Models\CampaignTemplate;
+use App\Modules\Payment\Models\Payment;
+use App\Modules\Purchasing\Models\GoodsReceipt;
+use App\Modules\Purchasing\Models\PurchaseOrder;
+use App\Modules\Purchasing\Models\Supplier;
 use App\Modules\Sales\Models\Order;
+use App\Modules\Shipping\Models\Shipment;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -24,7 +41,7 @@ class DemoDataSeeder extends Seeder
     {
         $branch = Branch::default() ?? Branch::first();
         $warehouse = Warehouse::first();
-        $unit = \App\Modules\Catalog\Models\Unit::first();
+        $unit = Unit::first();
 
         // ─── الفئات ───────────────────────────────────────────────
         $categoryNames = [
@@ -129,7 +146,8 @@ class DemoDataSeeder extends Seeder
 
         // ─── الطلبات ──────────────────────────────────────────────
         $statuses = ['draft', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
-        $variants = \App\Modules\Catalog\Models\ProductVariant::with('product')->get();
+        $variants = ProductVariant::with('product')->get();
+        $orders = [];
         for ($o = 1; $o <= 14; $o++) {
             $customer = $customers[array_rand($customers)];
             $status = $statuses[$o % count($statuses)];
@@ -168,8 +186,172 @@ class DemoDataSeeder extends Seeder
                 ]);
             }
             $order->update(['subtotal' => $subtotal, 'total' => $subtotal]);
+            $orders[] = $order;
         }
 
-        $this->command?->info('Demo data seeded: '.Product::count().' products, '.Customer::count().' customers, '.Order::count().' orders.');
+        // Each module below is guarded so a failure in one never aborts the whole seed.
+        $safe = function (string $label, callable $fn) {
+            try {
+                $fn();
+            } catch (\Throwable $e) {
+                $this->command?->warn("  ~ skipped {$label}: ".$e->getMessage());
+            }
+        };
+
+        // ─── العلامات التجارية + الوسوم ───────────────────────────
+        $safe('brands+tags', function () {
+            $brands = Brand::factory()->count(5)->create();
+            foreach (Product::all() as $i => $p) {
+                $p->update(['brand_id' => $brands[$i % $brands->count()]->id]);
+            }
+            ProductTag::factory()->count(8)->create();
+        });
+
+        // ─── الموردون + أوامر الشراء + الاستلام ────────────────────
+        $safe('purchasing', function () use ($warehouse, $variants) {
+            $suppliers = Supplier::factory()->count(6)->create();
+            $poStatuses = ['draft', 'approved', 'received', 'closed', 'cancelled'];
+            for ($i = 0; $i < 8; $i++) {
+                $po = PurchaseOrder::create([
+                    'number' => 'PO-'.str_pad((string) (100000 + $i), 6, '0', STR_PAD_LEFT),
+                    'supplier_id' => $suppliers[$i % $suppliers->count()]->id,
+                    'warehouse_id' => $warehouse?->id,
+                    'status' => $poStatuses[$i % count($poStatuses)],
+                    'order_date' => now()->subDays(random_int(1, 40))->toDateString(),
+                    'subtotal' => 0, 'total' => 0,
+                ]);
+                $sub = 0;
+                foreach ($variants->random(min(3, $variants->count())) as $v) {
+                    $qty = random_int(5, 30);
+                    $cost = (float) ($v->cost_price ?: 10);
+                    $line = $qty * $cost;
+                    $sub += $line;
+                    $po->items()->create(['variant_id' => $v->id, 'qty_ordered' => $qty, 'unit_cost' => $cost, 'line_total' => $line]);
+                }
+                $po->update(['subtotal' => $sub, 'total' => $sub]);
+                if (in_array($po->status, ['received', 'closed'])) {
+                    GoodsReceipt::create([
+                        'number' => 'GRN-'.str_pad((string) (100000 + $i), 6, '0', STR_PAD_LEFT),
+                        'purchase_order_id' => $po->id, 'warehouse_id' => $warehouse?->id,
+                        'status' => 'posted', 'additional_cost' => 0,
+                    ]);
+                }
+            }
+        });
+
+        // ─── الشحنات + حالات التوصيل ───────────────────────────────
+        $safe('shipments', function () use ($branch, $warehouse, $orders) {
+            $dstatuses = ['not_shipped', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'delivered', 'in_transit'];
+            $shippable = collect($orders)->whereIn('status', ['shipped', 'delivered', 'processing', 'confirmed'])->values();
+            foreach ($shippable as $i => $order) {
+                Shipment::create([
+                    'number' => 'SHP-'.str_pad((string) (100000 + $i), 6, '0', STR_PAD_LEFT),
+                    'order_id' => $order->id, 'branch_id' => $branch?->id, 'warehouse_id' => $warehouse?->id,
+                    'status' => 'shipped', 'delivery_status' => $dstatuses[$i % count($dstatuses)],
+                    'recipient_name' => $order->customer_name, 'recipient_phone' => $order->customer_phone,
+                    'shipping_cost' => random_int(10, 40), 'cost_source' => 'manual',
+                ]);
+            }
+        });
+
+        // ─── المدفوعات ─────────────────────────────────────────────
+        $safe('payments', function () use ($branch, $orders) {
+            $method = PaymentMethod::query()->first();
+            $pstatuses = ['pending', 'captured', 'captured', 'refunded'];
+            foreach (collect($orders)->take(10) as $i => $order) {
+                Payment::create([
+                    'number' => 'PAY-'.str_pad((string) (100000 + $i), 6, '0', STR_PAD_LEFT),
+                    'order_id' => $order->id, 'branch_id' => $branch?->id,
+                    'payment_method_id' => $method?->id, 'amount' => (float) $order->total,
+                    'status' => $pstatuses[$i % count($pstatuses)],
+                ]);
+            }
+        });
+
+        // ─── تسويات المخزون ────────────────────────────────────────
+        $safe('stock-adjustments', function () use ($warehouse) {
+            foreach (['recount', 'damage', 'recount'] as $i => $type) {
+                StockAdjustment::create([
+                    'number' => 'ADJ-'.str_pad((string) (100000 + $i), 6, '0', STR_PAD_LEFT),
+                    'warehouse_id' => $warehouse?->id, 'type' => $type, 'status' => 'draft',
+                ]);
+            }
+        });
+
+        // ─── السندات المحاسبية المُرحّلة (رصيد الخزائن + القسم المالي) ──
+        $safe('accounting-vouchers', function () {
+            $svc = app(VoucherService::class);
+            $cb = Treasury::where('code', 'CB-MAIN')->first();
+            $bnk = Treasury::where('code', 'BNK-MAIN')->first();
+            $admin = User::where('email', 'admin@tawfeer.online')->first();
+            if (! $cb || ! $admin) {
+                return;
+            }
+            auth()->login($admin);
+            $rev = Account::where('code', '4010')->first();
+            $exp = Account::where('code', '5010')->first();
+            $post = function (string $kind, float $amount, $treasury, ?int $counter, string $party) use ($svc) {
+                $v = $svc->create($kind, array_filter([
+                    'treasury_id' => $treasury->id, 'amount' => $amount, 'party_name' => $party,
+                    'counter_account_id' => $counter, 'description' => 'بيانات تجريبية',
+                    'voucher_date' => now()->subDays(random_int(0, 20))->toDateString(),
+                ], fn ($x) => $x !== null));
+                $svc->approve($v);
+                $svc->post($v);
+            };
+            foreach ([1500, 2750, 3200, 900] as $a) {
+                $post('receipt', $a, $cb, $rev?->id, 'عميل نقدي');
+            }
+            foreach ([800, 450] as $a) {
+                $post('payment', $a, $cb, $exp?->id, 'مورد');
+            }
+            foreach ([450, 275, 620] as $a) {
+                $post('expense', $a, $cb, $exp?->id, 'مصروف تشغيلي');
+            }
+            foreach ([600, 350] as $a) {
+                $post('income', $a, $bnk ?? $cb, $rev?->id, 'إيراد آخر');
+            }
+            // بعض السندات غير المُرحّلة (مسودّة) لعرض دورة الاعتماد
+            $draft = $svc->create('receipt', ['treasury_id' => $cb->id, 'amount' => 500, 'party_name' => 'مسودّة', 'counter_account_id' => $rev?->id, 'voucher_date' => now()->toDateString()]);
+        });
+
+        // ─── التسويق: القوالب + الحملات ────────────────────────────
+        $safe('marketing', function () {
+            $tpl = CampaignTemplate::create([
+                'name' => 'ترحيب بالعميل', 'channel' => 'whatsapp',
+                'body_ar' => 'مرحبًا بك في توفير أونلاين!', 'body_en' => 'Welcome to Tawfeer Online!', 'is_active' => true,
+            ]);
+            CampaignTemplate::create([
+                'name' => 'عربة متروكة', 'channel' => 'whatsapp',
+                'body_ar' => 'لديك منتجات في سلّتك 🛒', 'body_en' => 'You left items in your cart 🛒', 'is_active' => true,
+            ]);
+            foreach ([['حملة الترحيب', 'welcome', 'active'], ['استرجاع العربات', 'abandoned_cart', 'active'], ['عروض نهاية الأسبوع', 'broadcast', 'draft']] as [$name, $useCase, $status]) {
+                Campaign::create([
+                    'name' => $name, 'use_case' => $useCase, 'channel' => 'whatsapp', 'status' => $status,
+                    'trigger_type' => 'event', 'body_ar' => 'رسالة تجريبية', 'template_id' => $tpl->id,
+                ]);
+            }
+        });
+
+        // ─── توصيات المنتجات ───────────────────────────────────────
+        $safe('recommendations', function () {
+            $products = Product::limit(6)->get();
+            $types = ['related', 'cross_sell', 'upsell', 'complementary', 'fbt'];
+            foreach ($products as $i => $p) {
+                $target = $products[($i + 1) % $products->count()];
+                if ($p->id === $target->id) {
+                    continue;
+                }
+                \DB::table('product_recommendations')->insertOrIgnore([
+                    'product_id' => $p->id, 'recommended_product_id' => $target->id,
+                    'type' => $types[$i % count($types)], 'kind' => 'include', 'position' => $i,
+                    'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+                ]);
+            }
+        });
+
+        $this->command?->info('Demo data seeded: '.Product::count().' products, '.Customer::count().' customers, '.Order::count().' orders, '
+            .Supplier::count().' suppliers, '.Shipment::count().' shipments, '
+            .FinancialVoucher::where('status', 'posted')->count().' posted vouchers.');
     }
 }
