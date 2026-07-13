@@ -25,6 +25,7 @@ use App\Http\Controllers\Admin\Marketing\CampaignController as AdminCampaignCont
 use App\Http\Controllers\Admin\Marketing\CampaignTemplateController as AdminCampaignTemplateController;
 use App\Http\Controllers\Admin\Payment\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\Purchasing\GoodsReceiptController as AdminGoodsReceiptController;
+use App\Http\Controllers\Admin\Purchasing\PurchaseInvoiceController;
 use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController as AdminPurchaseOrderController;
 use App\Http\Controllers\Admin\Purchasing\SupplierController as AdminSupplierController;
 use App\Http\Controllers\Admin\Purchasing\SupplierReturnController as AdminSupplierReturnController;
@@ -216,6 +217,14 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::resource('returns', AdminSupplierReturnController::class)->only(['index', 'create', 'store', 'show']);
         Route::post('returns/{return}/approve', [AdminSupplierReturnController::class, 'approve'])->name('returns.approve');
         Route::post('returns/{return}/post', [AdminSupplierReturnController::class, 'post'])->name('returns.post');
+
+        // فواتير الموردين/الشراء (REQUIREMENTS §2.5)
+        Route::resource('invoices', PurchaseInvoiceController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
+        Route::post('invoices/{invoice}/approve', [PurchaseInvoiceController::class, 'approve'])->name('invoices.approve');
+        Route::post('invoices/{invoice}/cancel', [PurchaseInvoiceController::class, 'cancel'])->name('invoices.cancel');
+        Route::post('invoices/{invoice}/post', [PurchaseInvoiceController::class, 'post'])->name('invoices.post');
+        Route::post('invoices/{invoice}/pay', [PurchaseInvoiceController::class, 'pay'])->name('invoices.pay');
+        Route::post('invoices/{invoice}/reverse', [PurchaseInvoiceController::class, 'reverse'])->name('invoices.reverse');
     });
 
     // المبيعات (Phase 2.6)

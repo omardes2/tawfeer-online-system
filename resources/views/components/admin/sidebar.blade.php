@@ -52,6 +52,7 @@
             ['admin.inventory.movements', 'حركات المخزون', 'inventory.stocks.view', 'admin.inventory.movements'],
             ['admin.purchasing.suppliers.index', 'الموردون', 'purchasing.suppliers.view', 'admin.purchasing.suppliers.*'],
             ['admin.purchasing.orders.index', 'أوامر الشراء', 'purchasing.orders.view', 'admin.purchasing.orders.*'],
+            ['admin.purchasing.invoices.index', 'فواتير الموردين', 'purchasing.invoices.view', 'admin.purchasing.invoices.*'],
             ['admin.purchasing.receipts.index', 'استلام البضاعة', 'purchasing.receipts.view', 'admin.purchasing.receipts.*'],
             ['admin.purchasing.returns.index', 'مرتجعات الموردين', 'purchasing.returns.view', 'admin.purchasing.returns.*'],
         ]],

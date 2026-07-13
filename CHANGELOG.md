@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Purchase invoices / supplier payables (REQUIREMENTS §2.5)
+- New **purchase invoice** module built on the double-entry engine: supplier
+  invoice with items, lifecycle draft → approved → posted, posting **Dr Inventory
+  (1200) [+ Dr recoverable input tax (1250)] / Cr Accounts Payable (2010)** —
+  no double-count with GRN (which posts no GL). Idempotent posting, reversal
+  (not delete), and partial/full **payments** via the Phase 7.1 payment voucher
+  (Dr AP / Cr treasury) that keep treasury balances derived. Supplier balance /
+  outstanding-payable summary. RTL admin screens (list + status filter, create
+  with live totals, detail with pay form + journal link). 6 permissions
+  (purchasing.invoices.*). Chart of accounts gains 1250 "input tax (recoverable)".
+  8 feature tests (balanced posting, idempotency, payment, reversal, guards).
+
 ### Added — Production deployment kit (Ubuntu 24.04 VPS)
 - `deploy/` automation for a fresh Ubuntu 24.04 server: `provision.sh` (idempotent
   install/config of Nginx, PHP 8.3-FPM + extensions, Composer, MariaDB, Redis,
