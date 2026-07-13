@@ -36,7 +36,10 @@ return new class extends Migration
             $table->decimal('amount', 15, 2);
             $table->timestamps();
 
-            $table->unique(['commission_payout_id', 'commission_entry_id']);
+            $table->unique(
+                ['commission_payout_id', 'commission_entry_id'],
+                'cp_payout_entry_unique'
+            );
             // بند العمولة يُدفَع مرّة واحدة فقط (منع الدفع المزدوج).
             $table->unique('commission_entry_id', 'uniq_entry_paid_once');
         });

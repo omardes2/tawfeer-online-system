@@ -22,7 +22,10 @@ return new class extends Migration
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
-            $table->unique(['product_id', 'recommended_product_id', 'type']);
+            $table->unique(
+                ['product_id', 'recommended_product_id', 'type'],
+                'product_recommendation_unique'
+            );
             $table->index(['product_id', 'type', 'kind']);
         });
     }
