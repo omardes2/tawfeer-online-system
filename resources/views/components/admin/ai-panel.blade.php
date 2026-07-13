@@ -15,6 +15,18 @@
             <span class="text-xs text-gray-400">{{ __('اقتراح فقط — راجِع وطبّق يدويًا') }}</span>
         </div>
 
+        {{-- زر واحد لتوليد حزمة محتوى كاملة (وصف/مختصر/SEO/كلمات/وسوم/فئة) --}}
+        <div class="mb-4 p-3 rounded-lg bg-fuchsia-50 border border-fuchsia-100 flex flex-wrap items-center gap-3">
+            <button type="button" @click="generateBundle()" :disabled="bundleLoading"
+                    class="px-4 py-2 bg-fuchsia-600 text-white text-sm rounded-md hover:bg-fuchsia-700 disabled:opacity-50 inline-flex items-center gap-2">
+                <span>✦</span>
+                <span x-show="!bundleLoading">{{ __('توليد بالذكاء الاصطناعي') }}</span>
+                <span x-show="bundleLoading">{{ __('جارٍ التوليد…') }}</span>
+            </button>
+            <p class="text-xs text-gray-500 flex-1">{{ __('يملأ الوصف والوصف المختصر و SEO والكلمات والوسوم والفئة المقترحة في النموذج — لا يُحفظ تلقائيًا.') }}</p>
+            <span class="text-xs text-gray-400" x-text="bundleMsg"></span>
+        </div>
+
         <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-3">
             <div>
                 <label class="block text-xs text-gray-600 mb-1">{{ __('نوع المحتوى') }}</label>
@@ -88,6 +100,54 @@
                     return {
                         type: 'title_ar', locale: 'ar', tone: '', useImage: false,
                         loading: false, suggestion: '', error: '', meta: '', productId,
+                        bundleLoading: false, bundleMsg: '',
+                        setField(name, value) {
+                            if (value === null || value === undefined) return;
+                            const el = document.querySelector(`[name="${name}"]`);
+                            if (el) { el.value = value; el.dispatchEvent(new Event('input')); }
+                        },
+                        async generateBundle() {
+                            this.bundleLoading = true; this.bundleMsg = '';
+                            try {
+                                const res = await fetch('{{ route('admin.ai.content.bundle') }}', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                        'Accept': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                        locale: this.locale, inputs: this.gather(),
+                                        product_id: this.productId, use_image: this.useImage,
+                                    }),
+                                });
+                                if (!res.ok) {
+                                    const b = await res.json().catch(() => ({}));
+                                    this.bundleMsg = b.message || '{{ __('تعذّر التوليد.') }}';
+                                    return;
+                                }
+                                const data = await res.json();
+                                const f = data.fields || {};
+                                this.setField('short_description', f.short_description);
+                                const desc = [f.description, f.features, f.specs].filter(Boolean).join('\n\n');
+                                this.setField('description', desc);
+                                this.setField('meta_title', f.seo_title);
+                                this.setField('meta_description', f.meta_description);
+                                this.setField('meta_keywords', f.keywords);
+                                // الفئة المقترحة (إن طابقت فئة موجودة).
+                                if (data.category_id) this.setField('category_id', data.category_id);
+                                // الوسوم المقترحة — تحديد المربّعات المطابقة.
+                                (data.tag_ids || []).forEach((id) => {
+                                    const cb = document.querySelector(`input[name="tag_ids[]"][value="${id}"]`);
+                                    if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
+                                });
+                                this.bundleMsg = `${data.model} · ${data.total_tokens} tokens${data.status !== 'success' ? ' · ' + data.status : ''}`;
+                            } catch (e) {
+                                this.bundleMsg = '{{ __('خطأ في الاتصال.') }}';
+                            } finally {
+                                this.bundleLoading = false;
+                            }
+                        },
                         // خريطة نوع المحتوى ⇄ حقل النموذج المستهدف للتطبيق اليدوي.
                         fieldMap: {
                             title_ar: 'name', title_en: 'name_en',

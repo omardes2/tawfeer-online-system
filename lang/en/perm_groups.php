@@ -1,0 +1,33 @@
+<?php
+
+// Permission group headings (roles management) — by module.
+return [
+    'settings' => 'Settings & Structure',
+    'catalog' => 'Catalog',
+    'products' => 'Products',
+    'pricing' => 'Pricing',
+    'inventory' => 'Inventory',
+    'purchasing' => 'Purchasing',
+    'sales' => 'Sales',
+    'orders' => 'Orders',
+    'shipping' => 'Shipping & Delivery',
+    'payments' => 'Payments',
+    'accounting' => 'Accounting',
+    'crm' => 'Customers',
+    'commissions' => 'Commissions',
+    'affiliate' => 'Affiliates',
+    'returns' => 'Returns',
+    'settlements' => 'Settlements',
+    'reports' => 'Reports',
+    'kpis' => 'KPIs',
+    'dashboard' => 'Dashboard',
+    'marketing' => 'Marketing',
+    'ai' => 'AI',
+    'recommendations' => 'Recommendations',
+    'messaging' => 'Messaging',
+    'audit' => 'Audit Log',
+    'statuses' => 'Statuses',
+    'roles' => 'Roles',
+    'users' => 'Users',
+    'branches' => 'Branches',
+];

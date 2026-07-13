@@ -57,6 +57,9 @@
                     @can('reports.view')
                         <x-nav-link :href="route('admin.reports.index')" :active="request()->routeIs('admin.reports.*')">{{ __('reports.title') }}</x-nav-link>
                     @endcan
+                    @can('dashboard.view')
+                        <x-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')">{{ __('dashboard.title') }}</x-nav-link>
+                    @endcan
                     @can('kpis.view')
                         <x-nav-link :href="route('admin.kpis')" :active="request()->routeIs('admin.kpis')">{{ __('reports.kpis') }}</x-nav-link>
                     @endcan
@@ -100,6 +103,16 @@
                         <x-dropdown-link :href="route('profile.edit')">
                             {{ __('Profile') }}
                         </x-dropdown-link>
+
+                        @can('settings.users.view')
+                            <x-dropdown-link :href="route('admin.users.index')">{{ __('المستخدمون') }}</x-dropdown-link>
+                        @endcan
+                        @can('settings.roles.view')
+                            <x-dropdown-link :href="route('admin.roles.index')">{{ __('roles.management') }}</x-dropdown-link>
+                        @endcan
+                        @can('settings.system.view')
+                            <x-dropdown-link :href="route('admin.settings.edit')">{{ __('settings.title') }}</x-dropdown-link>
+                        @endcan
 
                         <!-- Authentication -->
                         <form method="POST" action="{{ route('logout') }}">

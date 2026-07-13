@@ -60,6 +60,8 @@ class DatabaseSeeder extends Seeder
             AiPermissionSeeder::class,
             RecommendationsPermissionSeeder::class,
             MarketingPermissionSeeder::class,
+            // الإدارة — المستخدمون/الأدوار/الإعدادات/لوحة التحكّم (Production)
+            AdministrationPermissionSeeder::class,
         ]);
     }
 }

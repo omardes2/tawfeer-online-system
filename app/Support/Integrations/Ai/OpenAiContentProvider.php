@@ -56,6 +56,85 @@ class OpenAiContentProvider implements AiContentProviderInterface
         }
     }
 
+    public function generateBundle(AiContentRequest $request, array $context = []): AiContentResult
+    {
+        $key = config('services.openai.key');
+        $model = config('ai.model', 'gpt-4o-mini');
+
+        if (empty($key)) {
+            return (new NullAiContentProvider)->generateBundle($request, $context);
+        }
+
+        try {
+            $response = Http::withToken($key)
+                ->timeout((int) config('ai.timeout', 30))
+                ->retry((int) config('ai.max_retries', 2), 500)
+                ->baseUrl((string) config('services.openai.base_url'))
+                ->post('/chat/completions', [
+                    'model' => $model,
+                    'messages' => $this->bundleMessages($request, $context),
+                    'temperature' => 0.7,
+                    'response_format' => ['type' => 'json_object'],
+                ]);
+
+            if ($response->failed()) {
+                return $this->bundleFallback($request, $context, 'http '.$response->status());
+            }
+
+            $data = $response->json();
+            $content = trim((string) ($data['choices'][0]['message']['content'] ?? ''));
+            // تأكيد أنّه JSON صالح، وإلا تراجع.
+            if ($content === '' || json_decode($content, true) === null) {
+                return $this->bundleFallback($request, $context, 'invalid json');
+            }
+            $usage = $data['usage'] ?? [];
+
+            return new AiContentResult(
+                content: $content,
+                model: (string) ($data['model'] ?? $model),
+                promptTokens: (int) ($usage['prompt_tokens'] ?? 0),
+                completionTokens: (int) ($usage['completion_tokens'] ?? 0),
+                status: 'success',
+            );
+        } catch (Throwable $e) {
+            return $this->bundleFallback($request, $context, mb_substr($e->getMessage(), 0, 200));
+        }
+    }
+
+    private function bundleFallback(AiContentRequest $request, array $context, string $error): AiContentResult
+    {
+        $draft = (new NullAiContentProvider)->generateBundle($request, $context);
+
+        return new AiContentResult(content: $draft->content, model: 'openai:fallback', status: 'fallback', error: $error);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function bundleMessages(AiContentRequest $request, array $context): array
+    {
+        $lang = $request->locale === 'ar' ? 'Arabic' : 'English';
+        $categories = implode(', ', array_map('strval', $context['categories'] ?? []));
+        $tags = implode(', ', array_map('strval', $context['tags'] ?? []));
+
+        $system = "You write e-commerce product content in {$lang}. Use ONLY the provided facts; "
+            .'do NOT invent specifications, measurements, or claims not supplied or clearly visible. '
+            .'Return a STRICT JSON object with keys: title, title_en, short_description, description, '
+            .'features, specs, seo_title, meta_description, keywords, tags (array of strings), category (string). '
+            .($categories !== '' ? "Choose category ONLY from this list (or empty if none fit): {$categories}. " : '')
+            .($tags !== '' ? "Choose tags ONLY from this list where relevant: {$tags}. " : '')
+            .'seo_title <= 60 chars, meta_description <= 155 chars. No preamble, JSON only.';
+
+        $user = 'Inputs:'.PHP_EOL.json_encode($request->inputs, JSON_UNESCAPED_UNICODE);
+        $content = [['type' => 'text', 'text' => $user]];
+        if ($request->imageUrl && config('ai.vision')) {
+            $content[] = ['type' => 'image_url', 'image_url' => ['url' => $request->imageUrl]];
+        }
+
+        return [
+            ['role' => 'system', 'content' => $system],
+            ['role' => 'user', 'content' => $content],
+        ];
+    }
+
     /** تراجع رشيق: قالب آمن مع تعليم الحالة (fallback). */
     private function fallback(AiContentRequest $request, string $error): AiContentResult
     {

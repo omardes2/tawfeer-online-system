@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\Catalog\ProductTagController;
 use App\Http\Controllers\Admin\Catalog\UnitController;
 use App\Http\Controllers\Admin\Commissions\CommissionController as AdminCommissionController;
 use App\Http\Controllers\Admin\Crm\CustomerController as AdminCustomerController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\Inventory\InventoryController;
 use App\Http\Controllers\Admin\Inventory\InventoryCountController as AdminInventoryCountController;
 use App\Http\Controllers\Admin\Inventory\StockAdjustmentController as AdminStockAdjustmentController;
@@ -26,11 +27,14 @@ use App\Http\Controllers\Admin\Recommendations\RecommendationRuleController as A
 use App\Http\Controllers\Admin\Reports\KpiController as AdminKpiController;
 use App\Http\Controllers\Admin\Reports\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\Returns\ReturnController as AdminReturnController;
+use App\Http\Controllers\Admin\Roles\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
+use App\Http\Controllers\Admin\Settings\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Admin\Settlements\SettlementController as AdminSettlementController;
 use App\Http\Controllers\Admin\Shipping\DeliveryStatusController as AdminDeliveryStatusController;
 use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
 use App\Http\Controllers\Admin\Shipping\ShipmentController as AdminShipmentController;
+use App\Http\Controllers\Admin\Users\UserController as AdminUserController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Storefront\Account\AccountController;
 use App\Http\Controllers\Storefront\Account\AddressController;
@@ -46,13 +50,14 @@ use App\Http\Controllers\Storefront\Account\SocialAuthController;
 use App\Http\Controllers\Storefront\Account\WishlistController;
 use App\Http\Controllers\Storefront\RecommendationTrackingController;
 use App\Http\Controllers\Storefront\StorefrontController;
+use App\Http\Middleware\EnforceMaintenanceMode;
 use Illuminate\Support\Facades\Route;
 
 /*
 | واجهة المتجر العامّة (Phase 3.3 / ADR-034) — SSR للـSEO، عربي RTL + إنجليزي.
 | قراءة عبر StorefrontService؛ السلة/الإتمام عبر واجهات API (3.1/3.2) من العميل.
 */
-Route::middleware('storefront.locale')->group(function () {
+Route::middleware(['storefront.locale', EnforceMaintenanceMode::class])->group(function () {
     Route::get('/', [StorefrontController::class, 'home'])->name('storefront.home');
     Route::get('/shop', [StorefrontController::class, 'index'])->name('storefront.shop');
     Route::get('/search', [StorefrontController::class, 'search'])->name('storefront.search');
@@ -270,11 +275,45 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('returns', [AdminReportController::class, 'returns'])->name('returns');
     });
 
+    // لوحة التحكّم التنفيذية (Production) — للقراءة فقط
+    Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('dashboard')->middleware('can:dashboard.view');
+
     // لوحات مؤشّرات الأداء الموسّعة (Phase 6 / ADR-047) — للقراءة فقط
     Route::get('kpis', [AdminKpiController::class, 'index'])->name('kpis')->middleware('can:kpis.view');
 
+    // إدارة المستخدمين/الموظّفين (Production)
+    Route::prefix('users')->name('users.')->group(function () {
+        Route::get('/', [AdminUserController::class, 'index'])->name('index')->middleware('can:settings.users.view');
+        Route::get('create', [AdminUserController::class, 'create'])->name('create')->middleware('can:settings.users.create');
+        Route::post('/', [AdminUserController::class, 'store'])->name('store')->middleware('can:settings.users.create');
+        Route::get('{user}/edit', [AdminUserController::class, 'edit'])->name('edit')->middleware('can:settings.users.update');
+        Route::put('{user}', [AdminUserController::class, 'update'])->name('update')->middleware('can:settings.users.update');
+        Route::delete('{user}', [AdminUserController::class, 'destroy'])->name('destroy')->middleware('can:settings.users.delete');
+        Route::post('{user}/toggle', [AdminUserController::class, 'toggleActive'])->name('toggle')->middleware('can:settings.users.update');
+        Route::post('{user}/reset-password', [AdminUserController::class, 'resetPassword'])->name('reset_password')->middleware('can:settings.users.update');
+    });
+
+    // إدارة الأدوار والصلاحيات (Production)
+    Route::prefix('roles')->name('roles.')->group(function () {
+        Route::get('/', [AdminRoleController::class, 'index'])->name('index')->middleware('can:settings.roles.view');
+        Route::get('create', [AdminRoleController::class, 'create'])->name('create')->middleware('can:settings.roles.manage');
+        Route::post('/', [AdminRoleController::class, 'store'])->name('store')->middleware('can:settings.roles.manage');
+        Route::get('{role}/edit', [AdminRoleController::class, 'edit'])->name('edit')->middleware('can:settings.roles.manage');
+        Route::put('{role}', [AdminRoleController::class, 'update'])->name('update')->middleware('can:settings.roles.manage');
+        Route::post('{role}/copy', [AdminRoleController::class, 'copy'])->name('copy')->middleware('can:settings.roles.manage');
+        Route::delete('{role}', [AdminRoleController::class, 'destroy'])->name('destroy')->middleware('can:settings.roles.manage');
+    });
+
+    // إعدادات النظام (Production) — ديناميكية من قاعدة البيانات
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('/', [AdminSettingsController::class, 'edit'])->name('edit')->middleware('can:settings.system.view');
+        Route::put('/', [AdminSettingsController::class, 'update'])->name('update')->middleware('can:settings.system.manage');
+    });
+
     // مساعد محتوى المنتجات بالذكاء الاصطناعي (Phase 6 / ADR-044) — اقتراح فقط
     Route::post('ai/content/generate', [AiContentController::class, 'generate'])->name('ai.content.generate')->middleware('can:ai.content.use');
+    // زر «توليد بالذكاء الاصطناعي» — حزمة محتوى منتج كاملة (اقتراح فقط)
+    Route::post('ai/content/bundle', [AiContentController::class, 'bundle'])->name('ai.content.bundle')->middleware('can:ai.content.use');
 
     // محرّك التوصيات — قواعد يدوية واستثناءات (Phase 6 / ADR-045)
     Route::prefix('recommendations')->name('recommendations.')->middleware('can:recommendations.manage')->group(function () {

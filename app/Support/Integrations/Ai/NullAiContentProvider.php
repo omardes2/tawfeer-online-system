@@ -90,6 +90,41 @@ class NullAiContentProvider implements AiContentProviderInterface
         return $lines ? implode("\n", $lines) : ($ar ? '(لا مواصفات مُعطاة)' : '(no specs supplied)');
     }
 
+    public function generateBundle(AiContentRequest $request, array $context = []): AiContentResult
+    {
+        $field = fn (string $type) => $this->generate(new AiContentRequest($type, 'generate', $request->locale, $request->inputs))->content;
+
+        $in = $request->inputs;
+        $tags = array_values(array_filter(array_unique([
+            trim((string) ($in['brand'] ?? '')),
+            trim((string) ($in['category'] ?? '')),
+        ])));
+
+        $bundle = [
+            'title' => $field('title_ar'),
+            'title_en' => $field('title_en'),
+            'short_description' => $field('short_description'),
+            'description' => $field('description'),
+            'features' => $field('features'),
+            'specs' => $field('specs'),
+            'seo_title' => $field('seo_title'),
+            'meta_description' => $field('meta_description'),
+            'keywords' => $field('keywords'),
+            'tags' => $tags,                          // اقتراح بسيط من المدخلات
+            'category' => trim((string) ($in['category'] ?? '')), // بلا اختراع
+        ];
+
+        $content = json_encode($bundle, JSON_UNESCAPED_UNICODE);
+
+        return new AiContentResult(
+            content: $content,
+            model: 'null-template',
+            promptTokens: (int) ceil(mb_strlen(json_encode($in)) / 4),
+            completionTokens: (int) ceil(mb_strlen($content) / 4),
+            status: 'success',
+        );
+    }
+
     public function name(): string
     {
         return 'null';

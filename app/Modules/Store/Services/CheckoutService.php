@@ -4,6 +4,7 @@ namespace App\Modules\Store\Services;
 
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\PaymentMethod;
+use App\Modules\Foundation\Services\Settings;
 use App\Modules\Payment\Services\PaymentService;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
@@ -146,6 +147,14 @@ class CheckoutService
             $this->orders->reserveStock($order);
 
             $order->refresh();
+
+            // رسوم التوصيل من الإعدادات (Production): افتراضي 0 إن لم تُضبط — سلوك متطابق.
+            $shipping = $this->deliveryFee((float) $order->subtotal);
+            if ($shipping > 0) {
+                $this->orders->applyShippingTotal($order, $shipping);
+                $order->refresh();
+            }
+
             // بدء الدفع بكامل قيمة الطلب (COD يبقى pending حتى التحصيل عند التسليم — ADR-028).
             $this->payments->initiate($order, $method, (float) $order->total, $year);
 
@@ -160,5 +169,23 @@ class CheckoutService
         if ($session->status !== 'pending') {
             throw ValidationException::withMessages(['checkout' => __('جلسة الإتمام لم تعد قابلة للتعديل.')]);
         }
+    }
+
+    /**
+     * رسوم التوصيل المطبَّقة عند الإتمام (Production) — من إعدادات النظام الديناميكية.
+     * افتراضي 0 (غير مضبوطة). مجّانية إن بلغ المجموع الفرعي عتبة الشحن المجاني.
+     */
+    private function deliveryFee(float $subtotal): float
+    {
+        $fee = (float) Settings::get('delivery.default_fee', 0);
+        if ($fee <= 0) {
+            return 0.0;
+        }
+        $threshold = Settings::get('delivery.free_threshold');
+        if ($threshold !== null && $threshold !== '' && $subtotal >= (float) $threshold) {
+            return 0.0;
+        }
+
+        return round($fee, 2);
     }
 }

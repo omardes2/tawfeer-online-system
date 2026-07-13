@@ -62,6 +62,31 @@ class AiContentService
         return $result;
     }
 
+    /**
+     * توليد حزمة محتوى منتج كاملة بنداء واحد (زر «توليد بالذكاء الاصطناعي»).
+     * **اقتراح فقط — لا يمسّ المنتج**. يُرجِع النتيجة (محتوى JSON بالحقول).
+     *
+     * @param  array<string, mixed>  $inputs
+     * @param  array<string, mixed>  $context  categories/tags المتاحة
+     */
+    public function generateBundle(
+        string $locale = 'ar',
+        array $inputs = [],
+        array $context = [],
+        ?Product $product = null,
+        ?string $imageUrl = null,
+        ?User $actor = null,
+    ): AiContentResult {
+        $this->assertRateLimit($actor);
+
+        $request = new AiContentRequest('bundle', 'generate', $locale, $inputs, null, $imageUrl);
+        $result = $this->provider->generateBundle($request, $context);
+
+        $this->log($request, $result, $product, $actor);
+
+        return $result;
+    }
+
     private function assertRateLimit(?User $actor): void
     {
         $key = 'ai-content:'.($actor?->id ?? 'guest');

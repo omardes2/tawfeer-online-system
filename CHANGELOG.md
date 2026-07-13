@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Production Admin Modules (Users · Roles · Settings · Dashboard · AI Generator) — ADR-049
+- **Users / Employees management:** full CRUD (`UserAdminService`) with employee
+  profile (department, job title — additive migration), active/inactive toggle,
+  temporary-password reset, role assignment, search + role/status filters, audit
+  logging. Self-delete and last-admin-delete are blocked. Permissions
+  `settings.users.*`.
+- **Roles & Permissions management UI:** `RoleAdminService` — create/edit/**copy**/
+  safe-delete (protected `admin`, blocks roles with assigned users), permissions
+  grouped by module with search, select-all per group. Permissions
+  `settings.roles.*`.
+- **System Settings (database-driven):** General (store name/company/logo/favicon),
+  OpenAI (enable/model/key), Email SMTP, WhatsApp, Delivery/Opost, SEO meta, System
+  (maintenance/timezone/currency/language). **Secrets (API keys, SMTP/WhatsApp
+  tokens) are stored encrypted and masked; `.env` keeps runtime priority** via a
+  config bridge in `FoundationServiceProvider`. Dynamic maintenance-mode middleware
+  (admins bypass). Permissions `settings.system.*`.
+- **Executive Dashboard:** read-only `DashboardController` over `ReportingService`/
+  `WarehouseService` — today's & monthly sales, orders, revenue, gross profit, top
+  products, low stock, latest orders, delivery status summary, sales-employee and
+  marketing performance, warehouse summary, CSS charts. RTL + responsive. Permission
+  `dashboard.view` (all staff roles).
+- **One-click "Generate with AI":** product create/edit page button generates a full
+  content bundle in one call — description, short description, SEO title/description,
+  keywords, suggested tags, and suggested category — matched to existing tags/category
+  IDs (no auto-create). Content fills the form for editing; **never auto-saved**.
+  Provider contract extended (`generateBundle`) on Null + OpenAI drivers.
+- **Checkout delivery fee:** now applied from settings (`delivery.default_fee` /
+  `delivery.free_threshold`), defaulting to 0 (unchanged behaviour) with
+  free-shipping above the threshold.
+- **24 new tests** (users, roles, settings incl. secret-encryption, dashboard, AI
+  bundle, checkout delivery fee). Arabic RTL + English throughout.
+
 ### Added / Changed — Production Readiness (Security · Performance · Queues · Deploy) — ADR-048
 - **Recommendation event tracking wired (completes ADR-045).** Storefront reco
   sections now emit **impression** events (IntersectionObserver, once per section)
