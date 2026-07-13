@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 7.1: Operational Accounting (Cashboxes · Banks · Vouchers · Expenses · Other Income · Transfers) — ADR-050
+- **Built entirely on the existing double-entry engine** (`AccountingService`,
+  chart of accounts, journal, fiscal years/periods, audit) — the foundation was
+  not rebuilt. Every posting goes through `postEntry`/`reverse` (balanced entry,
+  closed-period enforcement, audit). **No direct balance storage** — treasury
+  balances are always derived from posted journal lines.
+- **Cashboxes & Bank Accounts** (`treasuries`): unified `cash|bank` model, each
+  linked to a **dedicated unique GL account** (auto-created or linked). Opening
+  balance is posted as an entry (debit treasury / credit equity). Movement history,
+  safe delete (blocked when any movement/voucher exists). Bank fields (name,
+  account no., IBAN, SWIFT). Cash↔bank deposits/withdrawals via transfers.
+- **Vouchers** (`financial_vouchers`, unified `receipt|payment|expense|income|
+  transfer`): guarded workflow draft → approved → posted (+ rejected/cancelled
+  before posting, reversed after). **Idempotent posting** (unique
+  `idempotency_key`, no double journal). **Posted vouchers are immutable —
+  corrections via reversing entries only.** Attachments, optional customer/
+  supplier/employee, print-ready voucher pages.
+- **Transfers**: cashbox↔cashbox, bank↔bank, cashbox↔bank — one balanced journal
+  entry each, idempotent, reversible.
+- **Reports** (all from posted entries): treasury/bank statements with running
+  balance, voucher report, daily cash movement, monthly expense/income summary —
+  date filters, CSV export, browser print.
+- **Dashboard** expanded with a finance section: cashbox/bank totals, today's
+  receipts/payments, monthly expenses/other income, unposted/reversed voucher
+  counts, recent movements, cash-movement chart.
+- **Permissions**: `accounting.{cashboxes,banks}.{view,manage}` +
+  `accounting.{receipts,payments,expenses,income,transfers}.{view,create,approve,post}`.
+- **20 tests** (posting/reversal/idempotency/closed-period/permissions/safe-delete
+  + HTTP workflow). Arabic RTL + English, mobile responsive.
+- **Documented as next accounting phases (not built):** customer receivables,
+  supplier payables, customer/supplier statements, aging, income statement,
+  balance sheet, cash-flow statement, bank reconciliation, year-end closing.
+
 ### Added — Production Admin Modules (Users · Roles · Settings · Dashboard · AI Generator) — ADR-049
 - **Users / Employees management:** full CRUD (`UserAdminService`) with employee
   profile (department, job title — additive migration), active/inactive toggle,

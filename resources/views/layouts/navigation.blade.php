@@ -73,7 +73,16 @@
                         <x-nav-link :href="route('admin.payments.index')" :active="request()->routeIs('admin.payments.*')">{{ __('المدفوعات') }}</x-nav-link>
                     @endcan
                     @can('accounting.journal.view')
-                        <x-nav-link :href="route('admin.accounting.journal.index')" :active="request()->routeIs('admin.accounting.*')">{{ __('المحاسبة') }}</x-nav-link>
+                        <x-nav-link :href="route('admin.accounting.journal.index')" :active="request()->routeIs('admin.accounting.journal.*')">{{ __('المحاسبة') }}</x-nav-link>
+                    @endcan
+                    @can('accounting.cashboxes.view')
+                        <x-nav-link :href="route('admin.accounting.cashboxes.index')" :active="request()->routeIs('admin.accounting.cashboxes.*')">{{ __('الخزائن') }}</x-nav-link>
+                    @endcan
+                    @can('accounting.banks.view')
+                        <x-nav-link :href="route('admin.accounting.banks.index')" :active="request()->routeIs('admin.accounting.banks.*')">{{ __('البنوك') }}</x-nav-link>
+                    @endcan
+                    @can('accounting.receipts.view')
+                        <x-nav-link :href="route('admin.accounting.vouchers.index', 'receipt')" :active="request()->routeIs('admin.accounting.vouchers.*') || request()->routeIs('admin.accounting.transfers.*')">{{ __('السندات') }}</x-nav-link>
                     @endcan
                     @can('crm.customers.view')
                         <x-nav-link :href="route('admin.crm.customers.index')" :active="request()->routeIs('admin.crm.*')">{{ __('العملاء') }}</x-nav-link>

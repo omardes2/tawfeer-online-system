@@ -29,6 +29,64 @@
             @endforeach
         </div>
 
+        {{-- القسم المالي (Phase 7.1) — من السندات/القيود المُرحّلة --}}
+        @isset($finance)
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                @foreach ([
+                    ['label' => __('إجمالي الخزائن'), 'value' => number_format($finance['cashbox_total'], 2), 'bar' => 'bg-emerald-500'],
+                    ['label' => __('إجمالي البنوك'), 'value' => number_format($finance['bank_total'], 2), 'bar' => 'bg-sky-500'],
+                    ['label' => __('قبض اليوم'), 'value' => number_format($finance['today_receipts'], 2), 'bar' => 'bg-teal-500'],
+                    ['label' => __('صرف اليوم'), 'value' => number_format($finance['today_payments'], 2), 'bar' => 'bg-rose-500'],
+                    ['label' => __('مصروفات الشهر'), 'value' => number_format($finance['monthly_expenses'], 2), 'bar' => 'bg-amber-500'],
+                    ['label' => __('إيرادات أخرى (شهر)'), 'value' => number_format($finance['monthly_income'], 2), 'bar' => 'bg-indigo-500'],
+                    ['label' => __('سندات غير مُرحّلة'), 'value' => $finance['unposted'], 'bar' => 'bg-fuchsia-500'],
+                    ['label' => __('سندات معكوسة'), 'value' => $finance['reversed'], 'bar' => 'bg-violet-500'],
+                ] as $card)
+                    <div class="bg-white shadow-sm rounded-lg border border-gray-100 p-4">
+                        <div class="h-1 w-8 rounded {{ $card['bar'] }} mb-2"></div>
+                        <p class="text-xl font-bold text-gray-900">{{ $card['value'] }}</p>
+                        <p class="text-xs text-gray-500 mt-1">{{ $card['label'] }}</p>
+                    </div>
+                @endforeach
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-white shadow-sm rounded-lg p-5">
+                    <h3 class="font-semibold text-gray-700 mb-4">{{ __('حركة النقد (الشهر)') }}</h3>
+                    @php $fmax = max(1, $finance['cash_daily']->max(fn ($r) => max($r->inflow, $r->outflow)) ?? 1); @endphp
+                    @if ($finance['cash_daily']->isNotEmpty())
+                        <div class="flex items-end gap-1 h-32 overflow-x-auto">
+                            @foreach ($finance['cash_daily'] as $r)
+                                <div class="flex flex-col items-center justify-end flex-1 min-w-[8px]" title="{{ $r->d }}">
+                                    <div class="w-full bg-emerald-500 rounded-t" style="height: {{ (int) round(($r->inflow / $fmax) * 100) }}%"></div>
+                                    <div class="w-full bg-rose-400" style="height: {{ (int) round(($r->outflow / $fmax) * 60) }}%"></div>
+                                </div>
+                            @endforeach
+                        </div>
+                        <div class="flex gap-4 mt-2 text-xs text-gray-500"><span>■ {{ __('وارد') }}</span><span class="text-rose-400">■ {{ __('صادر') }}</span></div>
+                    @else
+                        <p class="text-sm text-gray-400 py-8 text-center">{{ __('dashboard.no_data') }}</p>
+                    @endif
+                </div>
+                <div class="bg-white shadow-sm rounded-lg p-5">
+                    <h3 class="font-semibold text-gray-700 mb-3">{{ __('أحدث الحركات المالية') }}</h3>
+                    <table class="w-full text-sm">
+                        <tbody>
+                            @forelse ($finance['recent'] as $v)
+                                <tr class="border-b last:border-0">
+                                    <td class="py-1.5 text-xs">{{ __('accounting.kind.'.$v->kind) }}</td>
+                                    <td class="py-1.5 text-gray-500 text-xs">{{ $v->treasury?->name }}</td>
+                                    <td class="py-1.5 text-end font-medium">{{ number_format($v->amount, 2) }}</td>
+                                </tr>
+                            @empty
+                                <tr><td class="py-3 text-gray-400">{{ __('dashboard.no_data') }}</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endisset
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {{-- مخطّط مبيعات الشهر (أعمدة CSS، RTL، قابل للطباعة) --}}
             <div class="lg:col-span-2 bg-white shadow-sm rounded-lg p-5">

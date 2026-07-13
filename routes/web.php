@@ -1,7 +1,12 @@
 <?php
 
 use App\Http\Controllers\Admin\Accounting\AccountingController as AdminAccountingController;
+use App\Http\Controllers\Admin\Accounting\BankController as AdminBankController;
+use App\Http\Controllers\Admin\Accounting\CashboxController as AdminCashboxController;
+use App\Http\Controllers\Admin\Accounting\FinanceReportController as AdminFinanceReportController;
 use App\Http\Controllers\Admin\Accounting\JournalEntryController as AdminJournalEntryController;
+use App\Http\Controllers\Admin\Accounting\TransferController as AdminTransferController;
+use App\Http\Controllers\Admin\Accounting\VoucherController as AdminVoucherController;
 use App\Http\Controllers\Admin\Ai\AiContentController;
 use App\Http\Controllers\Admin\Catalog\BrandController;
 use App\Http\Controllers\Admin\Catalog\CategoryController;
@@ -382,6 +387,51 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::resource('journal', AdminJournalEntryController::class)->only(['index', 'create', 'store', 'show'])->parameters(['journal' => 'journalEntry']);
         Route::post('journal/{journalEntry}/post', [AdminJournalEntryController::class, 'post'])->name('journal.post');
         Route::post('journal/{journalEntry}/reverse', [AdminJournalEntryController::class, 'reverse'])->name('journal.reverse');
+
+        /*
+        | Phase 7.1 — المحاسبة التشغيلية: خزائن/بنوك/سندات/تحويلات/تقارير مالية.
+        | كل ترحيل يمرّ عبر AccountingService (قيد متوازن). الصلاحيات داخل المتحكّمات.
+        */
+        // الخزائن النقدية
+        Route::resource('cashboxes', AdminCashboxController::class)->parameters(['cashboxes' => 'treasury']);
+        // الحسابات البنكية
+        Route::resource('banks', AdminBankController::class)->parameters(['banks' => 'treasury']);
+
+        // السندات (قبض/صرف/مصروف/إيراد آخر) — موحّدة حسب النوع
+        Route::prefix('vouchers/{kind}')->name('vouchers.')->whereIn('kind', ['receipt', 'payment', 'expense', 'income'])->group(function () {
+            Route::get('/', [AdminVoucherController::class, 'index'])->name('index');
+            Route::get('create', [AdminVoucherController::class, 'create'])->name('create');
+            Route::post('/', [AdminVoucherController::class, 'store'])->name('store');
+            Route::get('export', [AdminVoucherController::class, 'export'])->name('export');
+            Route::get('{voucher}', [AdminVoucherController::class, 'show'])->name('show');
+            Route::get('{voucher}/print', [AdminVoucherController::class, 'print'])->name('print');
+            Route::post('{voucher}/approve', [AdminVoucherController::class, 'approve'])->name('approve');
+            Route::post('{voucher}/reject', [AdminVoucherController::class, 'reject'])->name('reject');
+            Route::post('{voucher}/cancel', [AdminVoucherController::class, 'cancel'])->name('cancel');
+            Route::post('{voucher}/post', [AdminVoucherController::class, 'post'])->name('post');
+            Route::post('{voucher}/reverse', [AdminVoucherController::class, 'reverse'])->name('reverse');
+        });
+
+        // التحويلات بين الخزائن/البنوك
+        Route::prefix('transfers')->name('transfers.')->group(function () {
+            Route::get('/', [AdminTransferController::class, 'index'])->name('index');
+            Route::get('create', [AdminTransferController::class, 'create'])->name('create');
+            Route::post('/', [AdminTransferController::class, 'store'])->name('store');
+            Route::get('{transfer}', [AdminTransferController::class, 'show'])->name('show');
+            Route::post('{transfer}/approve', [AdminTransferController::class, 'approve'])->name('approve');
+            Route::post('{transfer}/cancel', [AdminTransferController::class, 'cancel'])->name('cancel');
+            Route::post('{transfer}/post', [AdminTransferController::class, 'post'])->name('post');
+            Route::post('{transfer}/reverse', [AdminTransferController::class, 'reverse'])->name('reverse');
+        });
+
+        // التقارير المالية (Phase 7.1) — للقراءة فقط
+        Route::prefix('finance-reports')->name('finance_reports.')->middleware('can:accounting.reports.view')->group(function () {
+            Route::get('/', [AdminFinanceReportController::class, 'index'])->name('index');
+            Route::get('cashbox/{treasury}', [AdminFinanceReportController::class, 'treasuryStatement'])->name('treasury_statement');
+            Route::get('vouchers', [AdminFinanceReportController::class, 'vouchers'])->name('vouchers');
+            Route::get('daily-cash', [AdminFinanceReportController::class, 'dailyCash'])->name('daily_cash');
+            Route::get('monthly-summary', [AdminFinanceReportController::class, 'monthlySummary'])->name('monthly_summary');
+        });
     });
 });
 
