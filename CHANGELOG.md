@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Production deployment kit (Ubuntu 24.04 VPS)
+- `deploy/` automation for a fresh Ubuntu 24.04 server: `provision.sh` (idempotent
+  install/config of Nginx, PHP 8.3-FPM + extensions, Composer, MariaDB, Redis,
+  Supervisor, Node.js 22, Git, UFW firewall, OPcache, Certbot), `deploy.sh`
+  (first deploy), `update.sh` (routine `git pull → composer → migrate → build →
+  optimize` inside a maintenance window with graceful worker restart).
+- Config templates: Nginx vhost (gzip, static caching, security headers, SSL-ready),
+  dedicated PHP-FPM pool, Supervisor queue workers, scheduler cron, and a
+  production `.env` template. All parameters/secrets live in a git-ignored
+  server-side `deploy/deploy.env`. Runbook: `docs/DEPLOYMENT_UBUNTU.md`.
+
+### Fixed — Storefront 500 on warm cache (cache serialization hardening)
+- `config/cache.php` `serializable_classes` was `false`, which set
+  `unserialize(..., ['allowed_classes' => false])` and turned every cached
+  Eloquent collection into `__PHP_Incomplete_Class` on read — crashing the
+  storefront (home/shop/category/search) on any persistent cache store. Replaced
+  with a curated allow-list (framework collections/Carbon + the cached
+  `Category`/`Brand` models), preserving gadget-chain protection while letting the
+  app's own cached values rehydrate. Verified 200 across repeated warm-cache hits.
+
 ### Added — Phase 7.1: Operational Accounting (Cashboxes · Banks · Vouchers · Expenses · Other Income · Transfers) — ADR-050
 - **Built entirely on the existing double-entry engine** (`AccountingService`,
   chart of accounts, journal, fiscal years/periods, audit) — the foundation was

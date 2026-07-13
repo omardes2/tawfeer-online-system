@@ -1,5 +1,10 @@
 <?php
 
+use App\Modules\Catalog\Models\Brand;
+use App\Modules\Catalog\Models\Category;
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 return [
@@ -125,12 +130,29 @@ return [
     | Serializable Classes
     |--------------------------------------------------------------------------
     |
-    | This value determines the classes that can be unserialized from cache
-    | storage. By default, no PHP classes will be unserialized from your
-    | cache to prevent gadget chain attacks if your APP_KEY is leaked.
+    | Passed to unserialize() as the `allowed_classes` whitelist when reading
+    | from the cache — mitigates gadget-chain attacks if APP_KEY leaks by
+    | refusing to instantiate arbitrary classes from cached payloads.
+    |
+    | IMPORTANT: `false` blocks ALL classes, which turns every cached object
+    | (e.g. an Eloquent collection) into __PHP_Incomplete_Class on read and
+    | throws a TypeError in typed getters. We therefore whitelist exactly the
+    | value types this app caches. If you cache a new model/value-object,
+    | add its class here — otherwise its cached reads will 500.
+    |
+    | Currently cached: storefront category/brand collections
+    | (StorefrontService); settings are cached as a plain array (always safe).
     |
     */
 
-    'serializable_classes' => false,
+    'serializable_classes' => [
+        Collection::class,
+        Illuminate\Database\Eloquent\Collection::class,
+        Carbon::class,
+        CarbonImmutable::class,
+        Illuminate\Support\Carbon::class,
+        Category::class,
+        Brand::class,
+    ],
 
 ];
