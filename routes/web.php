@@ -36,6 +36,7 @@ use App\Http\Controllers\Admin\Roles\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\Settings\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Admin\Settlements\SettlementController as AdminSettlementController;
+use App\Http\Controllers\Admin\Shipping\DeliveryRateController;
 use App\Http\Controllers\Admin\Shipping\DeliveryStatusController as AdminDeliveryStatusController;
 use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
 use App\Http\Controllers\Admin\Shipping\ShipmentController as AdminShipmentController;
@@ -246,6 +247,13 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('delivery/{shipment}/exceptions', [AdminDeliveryStatusController::class, 'openException'])->name('delivery.exceptions.open')->middleware('can:shipping.delivery.manage');
         Route::post('delivery/exceptions/{exception}/resolve', [AdminDeliveryStatusController::class, 'resolveException'])->name('delivery.exceptions.resolve')->middleware('can:shipping.delivery.manage');
         Route::post('delivery/{shipment}/fees', [AdminDeliveryStatusController::class, 'addFee'])->name('delivery.fees.add')->middleware('can:shipping.delivery.fees');
+
+        // أسعار توصيل شركة التوصيل لكل مدينة (نمط Opost) — عرض/تعديل + مزامنة.
+        Route::get('delivery-rates', [DeliveryRateController::class, 'index'])->name('delivery_rates.index')->middleware('can:settings.geography.view');
+        Route::post('delivery-rates', [DeliveryRateController::class, 'store'])->name('delivery_rates.store')->middleware('can:settings.geography.manage');
+        Route::put('delivery-rates', [DeliveryRateController::class, 'update'])->name('delivery_rates.update')->middleware('can:settings.geography.manage');
+        Route::post('delivery-rates/sync', [DeliveryRateController::class, 'sync'])->name('delivery_rates.sync')->middleware('can:settings.geography.manage');
+        Route::delete('delivery-rates/{deliveryRate}', [DeliveryRateController::class, 'destroy'])->name('delivery_rates.destroy')->middleware('can:settings.geography.manage');
     });
 
     // المدفوعات (Phase 2.8)

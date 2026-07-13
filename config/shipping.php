@@ -1,9 +1,11 @@
 <?php
 
+use App\Support\Integrations\Shipping\LocalShippingQuoteProvider;
 use App\Support\Integrations\Shipping\NullDeliveryProvider;
 use App\Support\Integrations\Shipping\NullGeographySyncProvider;
 use App\Support\Integrations\Shipping\NullShippingQuoteProvider;
 use App\Support\Integrations\Shipping\OpostDeliveryProvider;
+use App\Support\Integrations\Shipping\OpostGeographySyncProvider;
 
 return [
     /*
@@ -22,8 +24,9 @@ return [
         // Opost: يوفّر تعيين الحالات القانونية (ADR-038)؛ الـAPI الحيّ يُربط عبر .env لاحقًا.
         'opost' => [
             'delivery' => OpostDeliveryProvider::class,
-            'quote' => NullShippingQuoteProvider::class,
-            'geography_sync' => NullGeographySyncProvider::class,
+            // التسعير محلّي (أسعار المدن تُدار في لوحة التحكّم) — يقرأ delivery_city_rates.
+            'quote' => LocalShippingQuoteProvider::class,
+            'geography_sync' => OpostGeographySyncProvider::class,
         ],
     ],
 ];

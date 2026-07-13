@@ -54,4 +54,11 @@ return [
         'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
     ],
 
+    // شركة التوصيل Opost (طبقة التكامل — المبدأ 13). الأسرار في .env فقط، لا تُرفع للـGit.
+    'opost' => [
+        'base_url' => env('OPOST_BASE_URL', 'https://opost.ps/api'),
+        'token' => env('OPOST_API_TOKEN'),
+        'business_id' => env('OPOST_BUSINESS_ID'),
+    ],
+
 ];
