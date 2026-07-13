@@ -26,7 +26,7 @@
                     </x-admin.field>
                     <label class="flex items-center gap-2 text-sm pb-2 pt-6">
                         <input type="hidden" name="is_active" value="0" />
-                        <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $user->exists ? $user->is_active : true)) class="rounded border-gray-300 text-indigo-600" />
+                        <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $user->exists ? $user->is_active : true)) class="rounded border-gray-300 text-emerald-600" />
                         {{ __('نشط') }}
                     </label>
                 </div>
@@ -37,7 +37,7 @@
                 </div>
 
                 <div class="flex gap-2 pt-2">
-                    <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('حفظ') }}</button>
+                    <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('حفظ') }}</button>
                     <a href="{{ route('admin.users.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a>
                 </div>
             </form>

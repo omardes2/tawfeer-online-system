@@ -6,17 +6,17 @@
             <form method="POST" action="{{ $attribute->exists ? route('admin.attributes.update', $attribute) : route('admin.attributes.store') }}" class="space-y-5">
                 @csrf @if ($attribute->exists) @method('PUT') @endif
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <x-admin.field :label="__('الاسم')" name="name"><input type="text" name="name" value="{{ old('name', $attribute->name) }}" required class="w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500" /></x-admin.field>
+                    <x-admin.field :label="__('الاسم')" name="name"><input type="text" name="name" value="{{ old('name', $attribute->name) }}" required class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" /></x-admin.field>
                     <x-admin.field :label="__('النوع')" name="type">
-                        <select name="type" class="w-full rounded-md border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+                        <select name="type" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
                             @foreach (['select' => 'قائمة', 'color' => 'لون', 'text' => 'نص', 'number' => 'رقم'] as $val => $lbl)
                                 <option value="{{ $val }}" @selected(old('type', $attribute->type ?? 'select') === $val)>{{ __($lbl) }}</option>
                             @endforeach
                         </select>
                     </x-admin.field>
                 </div>
-                <label class="flex items-center gap-2 text-sm"><input type="hidden" name="is_active" value="0" /><input type="checkbox" name="is_active" value="1" @checked(old('is_active', $attribute->is_active ?? true)) class="rounded border-gray-300 text-indigo-600" />{{ __('مفعّل') }}</label>
-                <div class="flex gap-2 pt-2"><button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('حفظ') }}</button><a href="{{ route('admin.attributes.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a></div>
+                <label class="flex items-center gap-2 text-sm"><input type="hidden" name="is_active" value="0" /><input type="checkbox" name="is_active" value="1" @checked(old('is_active', $attribute->is_active ?? true)) class="rounded border-gray-300 text-emerald-600" />{{ __('مفعّل') }}</label>
+                <div class="flex gap-2 pt-2"><button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('حفظ') }}</button><a href="{{ route('admin.attributes.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a></div>
             </form>
         </div>
 

@@ -1,209 +1,202 @@
-<x-app-layout>
-    <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <h2 class="font-semibold text-xl text-gray-800">{{ __('dashboard.title') }}</h2>
-            @can('reports.view')<a href="{{ route('admin.reports.index') }}" class="text-sm text-indigo-600 hover:underline">{{ __('dashboard.view_reports') }}</a>@endcan
-        </div>
-    </x-slot>
+<x-app-layout :title="__('dashboard.title')">
+    @php
+        // Read-only aggregates for the operations cards (real data; no writes).
+        $byStatus = \App\Modules\Sales\Models\Order::selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status');
+        $count = fn (...$s) => (int) collect($s)->sum(fn ($k) => (int) ($byStatus[$k] ?? 0));
 
-    @php $cur = \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', config('app.currency', '')); @endphp
+        $ops = [
+            ['label' => __('مبيعات اليوم'), 'value' => $todaySales, 'money' => true, 'tone' => 'green',
+             'icon' => 'M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0z'],
+            ['label' => __('طلبات جديدة اليوم'), 'value' => $todayOrders, 'tone' => 'blue',
+             'icon' => 'M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z'],
+            ['label' => __('قيد التجهيز'), 'value' => $count('processing'), 'tone' => 'amber',
+             'icon' => 'M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z'],
+            ['label' => __('جاهزة للشحن'), 'value' => $count('confirmed'), 'tone' => 'blue',
+             'icon' => 'M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z'],
+            ['label' => __('قيد التوصيل'), 'value' => $count('shipped'), 'tone' => 'blue',
+             'icon' => 'M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-6m6 0V4.5A1.5 1.5 0 0015 3h-9A1.5 1.5 0 004.5 4.5v13.5H2.25'],
+            ['label' => __('مُسلّمة'), 'value' => $count('delivered'), 'tone' => 'green',
+             'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+            ['label' => __('مرتجعة/ملغاة'), 'value' => $count('cancelled', 'returned'), 'tone' => 'red',
+             'icon' => 'M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3'],
+            ['label' => __('أصناف منخفضة'), 'value' => $warehouse['low_stock'] ?? ($month['low_stock']->count() ?? 0), 'tone' => 'amber',
+             'icon' => 'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z'],
+        ];
+    @endphp
 
-    <div class="py-6 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-        {{-- بطاقات المؤشّرات الرئيسة --}}
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            @foreach ([
-                ['label' => __('dashboard.today_sales'), 'value' => number_format($todaySales, 2), 'bar' => 'bg-emerald-500'],
-                ['label' => __('dashboard.month_sales'), 'value' => number_format($month['sales']['total'], 2), 'bar' => 'bg-indigo-500'],
-                ['label' => __('dashboard.orders'), 'value' => $month['sales']['orders'], 'bar' => 'bg-sky-500'],
-                ['label' => __('dashboard.revenue'), 'value' => number_format($month['sales']['collected'], 2), 'bar' => 'bg-teal-500'],
-                ['label' => __('dashboard.profit'), 'value' => number_format($month['sales']['gross_profit'], 2), 'bar' => 'bg-fuchsia-500'],
-                ['label' => __('dashboard.aov'), 'value' => number_format($month['sales']['avg_order_value'], 2), 'bar' => 'bg-amber-500'],
-                ['label' => __('dashboard.campaigns_sent'), 'value' => $month['campaigns']['sent'], 'bar' => 'bg-rose-500'],
-                ['label' => __('dashboard.reco_clicks'), 'value' => $month['recommendations']['clicks'], 'bar' => 'bg-violet-500'],
-            ] as $card)
-                <div class="bg-white shadow-sm rounded-lg border border-gray-100 p-4">
-                    <div class="h-1 w-8 rounded {{ $card['bar'] }} mb-2"></div>
-                    <p class="text-2xl font-bold text-gray-900">{{ $card['value'] }}</p>
-                    <p class="text-xs text-gray-500 mt-1">{{ $card['label'] }}</p>
-                </div>
-            @endforeach
-        </div>
+    <x-admin.header
+        :title="__('dashboard.title')"
+        :description="__('نظرة عامة على أداء المتجر والعمليات اليومية')"
+        :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('dashboard.title') => null]">
+        @can('reports.view')
+            <a href="{{ route('admin.reports.index') }}" class="btn-secondary btn-sm">{{ __('dashboard.view_reports') }}</a>
+        @endcan
+        @can('kpis.view')
+            <a href="{{ route('admin.kpis') }}" class="btn-primary btn-sm">{{ __('reports.kpis') }}</a>
+        @endcan
+    </x-admin.header>
 
-        {{-- القسم المالي (Phase 7.1) — من السندات/القيود المُرحّلة --}}
+    {{-- Operations KPIs --}}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        @foreach ($ops as $c)
+            <x-admin.stat-card :label="$c['label']" :value="$c['value']" :tone="$c['tone']" :icon="$c['icon']" :money="$c['money'] ?? false" />
+        @endforeach
+    </div>
+
+    {{-- Finance (only for finance-permitted roles) --}}
+    @can('accounting.reports.view')
         @isset($finance)
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                @foreach ([
-                    ['label' => __('إجمالي الخزائن'), 'value' => number_format($finance['cashbox_total'], 2), 'bar' => 'bg-emerald-500'],
-                    ['label' => __('إجمالي البنوك'), 'value' => number_format($finance['bank_total'], 2), 'bar' => 'bg-sky-500'],
-                    ['label' => __('قبض اليوم'), 'value' => number_format($finance['today_receipts'], 2), 'bar' => 'bg-teal-500'],
-                    ['label' => __('صرف اليوم'), 'value' => number_format($finance['today_payments'], 2), 'bar' => 'bg-rose-500'],
-                    ['label' => __('مصروفات الشهر'), 'value' => number_format($finance['monthly_expenses'], 2), 'bar' => 'bg-amber-500'],
-                    ['label' => __('إيرادات أخرى (شهر)'), 'value' => number_format($finance['monthly_income'], 2), 'bar' => 'bg-indigo-500'],
-                    ['label' => __('سندات غير مُرحّلة'), 'value' => $finance['unposted'], 'bar' => 'bg-fuchsia-500'],
-                    ['label' => __('سندات معكوسة'), 'value' => $finance['reversed'], 'bar' => 'bg-violet-500'],
-                ] as $card)
-                    <div class="bg-white shadow-sm rounded-lg border border-gray-100 p-4">
-                        <div class="h-1 w-8 rounded {{ $card['bar'] }} mb-2"></div>
-                        <p class="text-xl font-bold text-gray-900">{{ $card['value'] }}</p>
-                        <p class="text-xs text-gray-500 mt-1">{{ $card['label'] }}</p>
-                    </div>
-                @endforeach
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-2 bg-white shadow-sm rounded-lg p-5">
-                    <h3 class="font-semibold text-gray-700 mb-4">{{ __('حركة النقد (الشهر)') }}</h3>
-                    @php $fmax = max(1, $finance['cash_daily']->max(fn ($r) => max($r->inflow, $r->outflow)) ?? 1); @endphp
-                    @if ($finance['cash_daily']->isNotEmpty())
-                        <div class="flex items-end gap-1 h-32 overflow-x-auto">
-                            @foreach ($finance['cash_daily'] as $r)
-                                <div class="flex flex-col items-center justify-end flex-1 min-w-[8px]" title="{{ $r->d }}">
-                                    <div class="w-full bg-emerald-500 rounded-t" style="height: {{ (int) round(($r->inflow / $fmax) * 100) }}%"></div>
-                                    <div class="w-full bg-rose-400" style="height: {{ (int) round(($r->outflow / $fmax) * 60) }}%"></div>
-                                </div>
-                            @endforeach
-                        </div>
-                        <div class="flex gap-4 mt-2 text-xs text-gray-500"><span>■ {{ __('وارد') }}</span><span class="text-rose-400">■ {{ __('صادر') }}</span></div>
-                    @else
-                        <p class="text-sm text-gray-400 py-8 text-center">{{ __('dashboard.no_data') }}</p>
+            @php $pendingCommissions = \Illuminate\Support\Facades\Gate::allows('commissions.view_team') ? (float) \App\Modules\Commissions\Models\CommissionEntry::whereIn('state', ['pending', 'approved'])->sum('amount') : null; @endphp
+            <div class="mt-6">
+                <h2 class="text-sm font-semibold text-gray-500 mb-3">{{ __('الملخّص المالي') }}</h2>
+                <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
+                    <x-admin.stat-card :label="__('إجمالي الخزائن')" :value="$finance['cashbox_total']" money tone="green" />
+                    <x-admin.stat-card :label="__('إجمالي البنوك')" :value="$finance['bank_total']" money tone="blue" />
+                    <x-admin.stat-card :label="__('قبض اليوم')" :value="$finance['today_receipts']" money tone="green" />
+                    <x-admin.stat-card :label="__('صرف اليوم')" :value="$finance['today_payments']" money tone="red" />
+                    <x-admin.stat-card :label="__('المبالغ المُحصّلة (شهر)')" :value="$month['sales']['collected']" money tone="green" />
+                    @if ($pendingCommissions !== null)
+                        <x-admin.stat-card :label="__('عمولات مستحقّة')" :value="$pendingCommissions" money tone="amber" />
                     @endif
-                </div>
-                <div class="bg-white shadow-sm rounded-lg p-5">
-                    <h3 class="font-semibold text-gray-700 mb-3">{{ __('أحدث الحركات المالية') }}</h3>
-                    <table class="w-full text-sm">
-                        <tbody>
-                            @forelse ($finance['recent'] as $v)
-                                <tr class="border-b last:border-0">
-                                    <td class="py-1.5 text-xs">{{ __('accounting.kind.'.$v->kind) }}</td>
-                                    <td class="py-1.5 text-gray-500 text-xs">{{ $v->treasury?->name }}</td>
-                                    <td class="py-1.5 text-end font-medium">{{ number_format($v->amount, 2) }}</td>
-                                </tr>
-                            @empty
-                                <tr><td class="py-3 text-gray-400">{{ __('dashboard.no_data') }}</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
                 </div>
             </div>
         @endisset
+    @endcan
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {{-- مخطّط مبيعات الشهر (أعمدة CSS، RTL، قابل للطباعة) --}}
-            <div class="lg:col-span-2 bg-white shadow-sm rounded-lg p-5">
-                <h3 class="font-semibold text-gray-700 mb-4">{{ __('dashboard.sales_chart') }}</h3>
-                @php $max = max(1, $salesDaily->max('t') ?? 1); @endphp
-                @if ($salesDaily->isNotEmpty())
-                    <div class="flex items-end gap-1 h-40 overflow-x-auto">
-                        @foreach ($salesDaily as $row)
-                            <div class="flex flex-col items-center justify-end flex-1 min-w-[10px]" title="{{ $row->d }}: {{ number_format($row->t, 2) }}">
-                                <div class="w-full bg-indigo-500 rounded-t" style="height: {{ max(2, (int) round(($row->t / $max) * 100)) }}%"></div>
-                                <span class="text-[9px] text-gray-400 mt-1">{{ \Illuminate\Support\Str::afterLast($row->d, '-') }}</span>
-                            </div>
-                        @endforeach
-                    </div>
-                @else
-                    <p class="text-sm text-gray-400 py-8 text-center">{{ __('dashboard.no_data') }}</p>
-                @endif
+    {{-- Sales chart + order status overview --}}
+    <div class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        <div class="admin-card admin-card-pad lg:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold text-gray-800">{{ __('dashboard.sales_chart') }}</h3>
+                <span class="text-xs text-gray-400">{{ __('آخر 30 يومًا') }}</span>
             </div>
-
-            {{-- ملخّص المستودع --}}
-            <div class="bg-white shadow-sm rounded-lg p-5">
-                <h3 class="font-semibold text-gray-700 mb-4">{{ __('dashboard.warehouse') }}</h3>
-                @if ($warehouse)
-                    <dl class="grid grid-cols-2 gap-3 text-sm">
-                        <div><dt class="text-gray-500">{{ __('dashboard.skus') }}</dt><dd class="font-bold">{{ $warehouse['skus'] }}</dd></div>
-                        <div><dt class="text-gray-500">{{ __('dashboard.available') }}</dt><dd class="font-bold">{{ rtrim(rtrim(number_format($warehouse['available'], 2), '0'), '.') }}</dd></div>
-                        <div><dt class="text-gray-500">{{ __('dashboard.reserved') }}</dt><dd class="font-bold">{{ rtrim(rtrim(number_format($warehouse['reserved'], 2), '0'), '.') }}</dd></div>
-                        <div><dt class="text-gray-500">{{ __('dashboard.low_stock') }}</dt><dd class="font-bold text-rose-600">{{ $warehouse['low_stock'] }}</dd></div>
-                        <div class="col-span-2"><dt class="text-gray-500">{{ __('dashboard.stock_value') }}</dt><dd class="font-bold">{{ number_format($warehouse['stock_value'], 2) }}</dd></div>
-                    </dl>
-                @else
-                    <p class="text-sm text-gray-400">{{ __('dashboard.no_data') }}</p>
-                @endif
-            </div>
+            @php $max = max(1, $salesDaily->max('t') ?? 1); @endphp
+            @if ($salesDaily->isNotEmpty())
+                <div class="flex items-end gap-1 h-44 overflow-x-auto">
+                    @foreach ($salesDaily as $row)
+                        <div class="group flex flex-col items-center justify-end flex-1 min-w-[10px]" title="{{ $row->d }}: {{ number_format($row->t, 2) }}">
+                            <div class="w-full bg-emerald-500 hover:bg-emerald-600 rounded-t transition-all" style="height: {{ max(2, (int) round(($row->t / $max) * 100)) }}%"></div>
+                            <span class="text-[9px] text-gray-400 mt-1">{{ \Illuminate\Support\Str::afterLast($row->d, '-') }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <x-admin.empty-state :title="__('dashboard.no_data')" :description="__('ستظهر مبيعات الأيام هنا فور تسجيل أول طلب.')" />
+            @endif
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {{-- أحدث الطلبات --}}
-            <div class="bg-white shadow-sm rounded-lg p-5">
-                <h3 class="font-semibold text-gray-700 mb-3">{{ __('dashboard.latest_orders') }}</h3>
-                <table class="w-full text-sm">
-                    <tbody>
-                        @forelse ($latestOrders as $o)
-                            <tr class="border-b last:border-0">
-                                <td class="py-1.5 font-mono text-xs">{{ $o->number }}</td>
-                                <td class="py-1.5"><x-sales.status :status="$o->status" /></td>
-                                <td class="py-1.5 text-end font-medium">{{ number_format($o->total, 2) }}</td>
-                                <td class="py-1.5 text-end text-gray-400 text-xs">{{ \Illuminate\Support\Carbon::parse($o->created_at)->format('m-d H:i') }}</td>
-                            </tr>
-                        @empty
-                            <tr><td class="py-3 text-gray-400">{{ __('dashboard.no_data') }}</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            {{-- ملخّص حالات التوصيل --}}
-            <div class="bg-white shadow-sm rounded-lg p-5">
-                <h3 class="font-semibold text-gray-700 mb-3">{{ __('dashboard.delivery_summary') }}</h3>
-                @if ($deliveryByStatus->isNotEmpty())
-                    <div class="space-y-2">
-                        @php $dmax = max(1, $deliveryByStatus->max()); @endphp
-                        @foreach ($deliveryByStatus as $status => $count)
-                            <div class="flex items-center gap-2 text-sm">
-                                <span class="w-28 text-gray-600 shrink-0">{{ $status }}</span>
-                                <div class="flex-1 bg-gray-100 rounded h-3"><div class="bg-sky-500 h-3 rounded" style="width: {{ (int) round(($count / $dmax) * 100) }}%"></div></div>
-                                <span class="w-8 text-end text-gray-500">{{ $count }}</span>
-                            </div>
-                        @endforeach
-                    </div>
-                @else
-                    <p class="text-sm text-gray-400">{{ __('dashboard.no_data') }}</p>
-                @endif
-            </div>
-
-            {{-- الأعلى مبيعًا --}}
-            <div class="bg-white shadow-sm rounded-lg p-5">
-                <h3 class="font-semibold text-gray-700 mb-3">{{ __('dashboard.top_products') }}</h3>
-                <table class="w-full text-sm">
-                    <tbody>
-                        @forelse ($month['top_products'] as $p)
-                            <tr class="border-b last:border-0"><td class="py-1.5">{{ $p->name }}</td><td class="py-1.5 text-end">{{ number_format($p->revenue, 2) }}</td></tr>
-                        @empty
-                            <tr><td class="py-3 text-gray-400">{{ __('dashboard.no_data') }}</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            {{-- أداء موظفي المبيعات --}}
-            <div class="bg-white shadow-sm rounded-lg p-5">
-                <h3 class="font-semibold text-gray-700 mb-3">{{ __('dashboard.sales_employees') }}</h3>
-                <table class="w-full text-sm">
-                    <tbody>
-                        @forelse ($month['employees'] as $e)
-                            <tr class="border-b last:border-0"><td class="py-1.5">{{ $e->name }}</td><td class="py-1.5 text-end">{{ number_format($e->sales_total, 2) }}</td><td class="py-1.5 text-end text-gray-400">{{ number_format($e->commissions, 2) }}</td></tr>
-                        @empty
-                            <tr><td class="py-3 text-gray-400">{{ __('dashboard.no_data') }}</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+        <div class="admin-card admin-card-pad">
+            <h3 class="font-semibold text-gray-800 mb-4">{{ __('نظرة على حالات الطلبات') }}</h3>
+            @php $omax = max(1, $byStatus->max() ?? 1); @endphp
+            @if ($byStatus->isNotEmpty())
+                <div class="space-y-3">
+                    @foreach ($byStatus as $status => $c)
+                        <div class="flex items-center gap-2 text-sm">
+                            <span class="w-20 shrink-0"><x-sales.status :status="$status" /></span>
+                            <div class="flex-1 bg-gray-100 rounded-full h-2"><div class="bg-emerald-500 h-2 rounded-full" style="width: {{ (int) round(($c / $omax) * 100) }}%"></div></div>
+                            <span class="w-8 text-end text-gray-600 tabular-nums">{{ $c }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <x-admin.empty-state :title="__('dashboard.no_data')" />
+            @endif
         </div>
+    </div>
 
-        {{-- أصناف منخفضة المخزون --}}
-        <div class="bg-white shadow-sm rounded-lg p-5">
-            <h3 class="font-semibold text-gray-700 mb-3">{{ __('dashboard.low_stock') }}</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                @forelse ($month['low_stock'] as $item)
-                    <div class="flex items-center justify-between text-sm border rounded-md px-3 py-2">
-                        <span class="text-gray-700 truncate">{{ $item->name }}</span>
-                        <span class="text-rose-600 font-medium">{{ rtrim(rtrim(number_format($item->on_hand, 2), '0'), '.') }}</span>
-                    </div>
+    {{-- Latest orders + delivery status --}}
+    <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        <x-admin.table :title="__('dashboard.latest_orders')">
+            <thead><tr><th>{{ __('رقم الطلب') }}</th><th>{{ __('الحالة') }}</th><th class="text-start">{{ __('الإجمالي') }}</th><th class="text-start">{{ __('التاريخ') }}</th></tr></thead>
+            <tbody>
+                @forelse ($latestOrders as $o)
+                    <tr>
+                        <td class="font-mono text-xs">{{ $o->number }}</td>
+                        <td><x-sales.status :status="$o->status" /></td>
+                        <td class="text-start font-medium tabular-nums">{{ number_format($o->total, 2) }}</td>
+                        <td class="text-start text-gray-400 text-xs">{{ \Illuminate\Support\Carbon::parse($o->created_at)->format('m-d H:i') }}</td>
+                    </tr>
                 @empty
-                    <p class="text-sm text-gray-400">{{ __('dashboard.no_data') }}</p>
+                    <tr><td colspan="4" class="!p-0"><x-admin.empty-state :title="__('لا توجد طلبات بعد')" /></td></tr>
                 @endforelse
-            </div>
+            </tbody>
+        </x-admin.table>
+
+        <div class="admin-card admin-card-pad">
+            <h3 class="font-semibold text-gray-800 mb-4">{{ __('dashboard.delivery_summary') }}</h3>
+            @if ($deliveryByStatus->isNotEmpty())
+                <div class="space-y-3">
+                    @php $dmax = max(1, $deliveryByStatus->max()); @endphp
+                    @foreach ($deliveryByStatus as $status => $c)
+                        <div class="flex items-center gap-2 text-sm">
+                            <span class="w-32 text-gray-600 shrink-0 truncate">{{ __('delivery_status.'.$status) !== 'delivery_status.'.$status ? __('delivery_status.'.$status) : $status }}</span>
+                            <div class="flex-1 bg-gray-100 rounded-full h-2"><div class="bg-sky-500 h-2 rounded-full" style="width: {{ (int) round(($c / $dmax) * 100) }}%"></div></div>
+                            <span class="w-8 text-end text-gray-600 tabular-nums">{{ $c }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <x-admin.empty-state :title="__('لا توجد شحنات بعد')" :description="__('ستظهر حالات التوصيل هنا عند إنشاء أول شحنة.')" />
+            @endif
         </div>
+    </div>
+
+    {{-- Warehouse summary --}}
+    <div class="mt-6 admin-card admin-card-pad">
+        <h3 class="font-semibold text-gray-800 mb-4">{{ __('dashboard.warehouse') }}</h3>
+        @if ($warehouse)
+            <dl class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div><dt class="text-sm text-gray-500">{{ __('dashboard.skus') }}</dt><dd class="mt-1 text-xl font-bold text-gray-900 tabular-nums">{{ $warehouse['skus'] }}</dd></div>
+                <div><dt class="text-sm text-gray-500">{{ __('dashboard.available') }}</dt><dd class="mt-1 text-xl font-bold text-gray-900 tabular-nums">{{ rtrim(rtrim(number_format($warehouse['available'], 2), '0'), '.') }}</dd></div>
+                <div><dt class="text-sm text-gray-500">{{ __('dashboard.reserved') }}</dt><dd class="mt-1 text-xl font-bold text-gray-900 tabular-nums">{{ rtrim(rtrim(number_format($warehouse['reserved'], 2), '0'), '.') }}</dd></div>
+                <div><dt class="text-sm text-gray-500">{{ __('dashboard.low_stock') }}</dt><dd class="mt-1 text-xl font-bold text-rose-600 tabular-nums">{{ $warehouse['low_stock'] }}</dd></div>
+                <div><dt class="text-sm text-gray-500">{{ __('dashboard.stock_value') }}</dt><dd class="mt-1 text-xl font-bold text-emerald-600 tabular-nums">{{ number_format($warehouse['stock_value'], 2) }}</dd></div>
+            </dl>
+        @else
+            <x-admin.empty-state :title="__('dashboard.warehouse')" :description="__('dashboard.no_data')" />
+        @endif
+    </div>
+
+    {{-- Best sellers + staff performance --}}
+    <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        <x-admin.table :title="__('dashboard.top_products')">
+            <thead><tr><th>{{ __('المنتج') }}</th><th class="text-start">{{ __('الإيراد') }}</th></tr></thead>
+            <tbody>
+                @forelse ($month['top_products'] as $p)
+                    <tr><td class="text-gray-800">{{ $p->name }}</td><td class="text-start font-medium tabular-nums">{{ number_format($p->revenue, 2) }}</td></tr>
+                @empty
+                    <tr><td colspan="2" class="!p-0"><x-admin.empty-state :title="__('dashboard.no_data')" /></td></tr>
+                @endforelse
+            </tbody>
+        </x-admin.table>
+
+        <x-admin.table :title="__('dashboard.sales_employees')">
+            <thead><tr><th>{{ __('الموظف') }}</th><th class="text-start">{{ __('المبيعات') }}</th><th class="text-start">{{ __('العمولة') }}</th></tr></thead>
+            <tbody>
+                @forelse ($month['employees'] as $e)
+                    <tr><td class="text-gray-800">{{ $e->name }}</td><td class="text-start font-medium tabular-nums">{{ number_format($e->sales_total, 2) }}</td><td class="text-start text-gray-400 tabular-nums">{{ number_format($e->commissions, 2) }}</td></tr>
+                @empty
+                    <tr><td colspan="3" class="!p-0"><x-admin.empty-state :title="__('dashboard.no_data')" :description="__('لا توجد بيانات أداء ضمن هذه الفترة.')" /></td></tr>
+                @endforelse
+            </tbody>
+        </x-admin.table>
+    </div>
+
+    {{-- Low-stock products --}}
+    <div class="mt-6 admin-card admin-card-pad">
+        <h3 class="font-semibold text-gray-800 mb-4">{{ __('dashboard.low_stock') }}</h3>
+        @if ($month['low_stock']->isNotEmpty())
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                @foreach ($month['low_stock'] as $item)
+                    <div class="flex items-center justify-between gap-2 text-sm border border-gray-200 rounded-lg px-3 py-2">
+                        <span class="text-gray-700 truncate">{{ $item->name }}</span>
+                        <x-admin.badge tone="red" :label="rtrim(rtrim(number_format($item->on_hand, 2), '0'), '.')" :icon="false" />
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <x-admin.empty-state :title="__('المخزون بحالة جيدة')" :description="__('لا توجد أصناف تحت حدّ إعادة الطلب حاليًا.')"
+                :icon="'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'" />
+        @endif
     </div>
 </x-app-layout>

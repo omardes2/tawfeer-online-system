@@ -21,7 +21,7 @@
                 <div>
                     <div class="flex items-center justify-between mb-2">
                         <label class="block text-sm font-medium text-gray-700">{{ __('السطور') }}</label>
-                        <button type="button" @click="rows.push({ account: '', debit: 0, credit: 0 })" class="text-sm text-indigo-600 hover:underline">+ {{ __('إضافة سطر') }}</button>
+                        <button type="button" @click="rows.push({ account: '', debit: 0, credit: 0 })" class="text-sm text-emerald-600 hover:underline">+ {{ __('إضافة سطر') }}</button>
                     </div>
                     <template x-for="(row, i) in rows" :key="i">
                         <div class="flex flex-wrap gap-2 mb-2 items-end">
@@ -47,7 +47,7 @@
                 </label>
 
                 <div class="flex gap-2 pt-2">
-                    <button :disabled="!balanced" :class="balanced ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-300 cursor-not-allowed'" class="px-4 py-2 text-white text-sm rounded-md">{{ __('حفظ') }}</button>
+                    <button :disabled="!balanced" :class="balanced ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-gray-300 cursor-not-allowed'" class="px-4 py-2 text-white text-sm rounded-md">{{ __('حفظ') }}</button>
                     <a href="{{ route('admin.accounting.journal.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a>
                 </div>
             </form>

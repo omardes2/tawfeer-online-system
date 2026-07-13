@@ -3,13 +3,13 @@
     <div class="py-8 max-w-6xl mx-auto sm:px-6 lg:px-8 space-y-6">
         <div class="bg-white shadow-sm sm:rounded-lg p-4 sm:p-6">
             <x-admin.flash />
-            <a href="{{ route('admin.settlements.index') }}" class="text-sm text-gray-500 hover:text-indigo-600">← {{ __('settlements.settlements') }}</a>
+            <a href="{{ route('admin.settlements.index') }}" class="text-sm text-gray-500 hover:text-emerald-600">← {{ __('settlements.settlements') }}</a>
             @if ($errors->any())
                 <div class="mt-3 rounded-md bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3">{{ $errors->first() }}</div>
             @endif
 
             <div class="flex items-center gap-3 my-3">
-                <span class="inline-block px-3 py-1 rounded-md bg-indigo-50 text-indigo-700 text-sm">{{ __('settlements.status_label.'.$settlement->status) }}</span>
+                <span class="inline-block px-3 py-1 rounded-md bg-emerald-50 text-emerald-700 text-sm">{{ __('settlements.status_label.'.$settlement->status) }}</span>
                 <span class="text-sm text-gray-500">{{ $settlement->provider?->name }}</span>
                 @if ($settlement->accounting_entry_id)<span class="text-xs text-emerald-600">{{ __('settlements.accounting_entry') }} #{{ $settlement->accounting_entry_id }}</span>@endif
             </div>
@@ -48,7 +48,7 @@
             <div class="flex flex-wrap gap-2 mt-4 border-t pt-4">
                 @if ($settlement->status === 'draft')
                     @can('settlements.reconcile')
-                        <form method="POST" action="{{ route('admin.settlements.reconcile', $settlement) }}">@csrf<button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('settlements.reconcile') }}</button></form>
+                        <form method="POST" action="{{ route('admin.settlements.reconcile', $settlement) }}">@csrf<button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('settlements.reconcile') }}</button></form>
                     @endcan
                 @elseif ($settlement->status === 'reconciled')
                     @can('settlements.post')
@@ -113,7 +113,7 @@
                             <p class="text-gray-400 text-sm">{{ __('settlements.no_closed_shipments') }}</p>
                         @endforelse
                         @if ($closedShipments->isNotEmpty())
-                            <button class="mt-2 px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('settlements.add') }}</button>
+                            <button class="mt-2 px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('settlements.add') }}</button>
                         @endif
                     </form>
                 @endcan

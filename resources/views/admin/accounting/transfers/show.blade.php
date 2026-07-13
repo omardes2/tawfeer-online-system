@@ -10,7 +10,7 @@
                         @can('accounting.transfers.approve')<form method="POST" action="{{ route('admin.accounting.transfers.approve', $transfer) }}">@csrf<button class="px-3 py-1.5 bg-emerald-600 text-white text-sm rounded-md">{{ __('اعتماد') }}</button></form>@endcan
                         @can('accounting.transfers.create')<form method="POST" action="{{ route('admin.accounting.transfers.cancel', $transfer) }}">@csrf<button class="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</button></form>@endcan
                     @elseif ($transfer->status === 'approved')
-                        @can('accounting.transfers.post')<form method="POST" action="{{ route('admin.accounting.transfers.post', $transfer) }}">@csrf<button class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-md">{{ __('ترحيل') }}</button></form>@endcan
+                        @can('accounting.transfers.post')<form method="POST" action="{{ route('admin.accounting.transfers.post', $transfer) }}">@csrf<button class="px-3 py-1.5 bg-emerald-600 text-white text-sm rounded-md">{{ __('ترحيل') }}</button></form>@endcan
                     @elseif ($transfer->status === 'posted')
                         @can('accounting.transfers.post')<form method="POST" action="{{ route('admin.accounting.transfers.reverse', $transfer) }}" onsubmit="return confirm('{{ __('عكس التحويل؟') }}')">@csrf<button class="px-3 py-1.5 bg-fuchsia-600 text-white text-sm rounded-md">{{ __('عكس') }}</button></form>@endcan
                     @endif

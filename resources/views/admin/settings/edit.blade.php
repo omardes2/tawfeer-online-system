@@ -7,7 +7,7 @@
             {{-- تبويبات --}}
             <div class="flex flex-wrap gap-1 border-b mb-6 -mx-2 px-2 overflow-x-auto">
                 @foreach (['general' => 'settings.tab_general', 'openai' => 'settings.tab_openai', 'email' => 'settings.tab_email', 'whatsapp' => 'settings.tab_whatsapp', 'delivery' => 'settings.tab_delivery', 'seo' => 'settings.tab_seo', 'system' => 'settings.tab_system'] as $key => $label)
-                    <button type="button" @click="tab = '{{ $key }}'" :class="tab === '{{ $key }}' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'" class="px-3 py-2 text-sm border-b-2 whitespace-nowrap">{{ __($label) }}</button>
+                    <button type="button" @click="tab = '{{ $key }}'" :class="tab === '{{ $key }}' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-500'" class="px-3 py-2 text-sm border-b-2 whitespace-nowrap">{{ __($label) }}</button>
                 @endforeach
             </div>
 
@@ -32,7 +32,7 @@
 
                 {{-- OpenAI --}}
                 <div x-show="tab === 'openai'" x-cloak class="space-y-4">
-                    <label class="flex items-center gap-2 text-sm"><input type="hidden" name="openai_enabled" value="0" /><input type="checkbox" name="openai_enabled" value="1" @checked(old('openai_enabled', $values['openai_enabled'])) class="rounded border-gray-300 text-indigo-600" />{{ __('settings.ai_enable') }}</label>
+                    <label class="flex items-center gap-2 text-sm"><input type="hidden" name="openai_enabled" value="0" /><input type="checkbox" name="openai_enabled" value="1" @checked(old('openai_enabled', $values['openai_enabled'])) class="rounded border-gray-300 text-emerald-600" />{{ __('settings.ai_enable') }}</label>
                     <x-admin.field :label="__('settings.ai_model')" name="openai_model">
                         <select name="openai_model" class="w-full rounded-md border-gray-300">
                             @foreach (['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-4.1'] as $m)<option value="{{ $m }}" @selected(old('openai_model', $values['openai_model'] ?: 'gpt-4o-mini') === $m)>{{ $m }}</option>@endforeach
@@ -61,7 +61,7 @@
 
                 {{-- واتساب --}}
                 <div x-show="tab === 'whatsapp'" x-cloak class="space-y-4">
-                    <label class="flex items-center gap-2 text-sm"><input type="hidden" name="whatsapp_enabled" value="0" /><input type="checkbox" name="whatsapp_enabled" value="1" @checked(old('whatsapp_enabled', $values['whatsapp_enabled'])) class="rounded border-gray-300 text-indigo-600" />{{ __('settings.wa_enable') }}</label>
+                    <label class="flex items-center gap-2 text-sm"><input type="hidden" name="whatsapp_enabled" value="0" /><input type="checkbox" name="whatsapp_enabled" value="1" @checked(old('whatsapp_enabled', $values['whatsapp_enabled'])) class="rounded border-gray-300 text-emerald-600" />{{ __('settings.wa_enable') }}</label>
                     <x-admin.field :label="__('settings.wa_endpoint')" name="whatsapp_endpoint"><input type="url" name="whatsapp_endpoint" value="{{ old('whatsapp_endpoint', $values['whatsapp_endpoint']) }}" class="w-full rounded-md border-gray-300" /></x-admin.field>
                     <x-admin.field :label="__('settings.wa_token')" name="whatsapp_token"><input type="password" name="whatsapp_token" placeholder="{{ $values['whatsapp_token'] ? __('settings.secret_set') : __('settings.secret_unset') }}" autocomplete="new-password" class="w-full rounded-md border-gray-300" /></x-admin.field>
                 </div>
@@ -102,7 +102,7 @@
 
                 @can('settings.system.manage')
                     <div class="flex gap-2 pt-4 border-t">
-                        <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('حفظ الإعدادات') }}</button>
+                        <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('حفظ الإعدادات') }}</button>
                     </div>
                 @endcan
             </form>

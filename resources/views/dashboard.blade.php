@@ -13,7 +13,7 @@
                 <div class="p-6 text-gray-900">
                     <p class="text-lg font-semibold">{{ __('app.welcome') }}، {{ auth()->user()->name }}</p>
                     <div class="mt-3 flex flex-wrap gap-2 text-sm">
-                        <span class="inline-flex items-center px-3 py-1 rounded-full bg-indigo-100 text-indigo-800">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">
                             {{ __('app.role') }}:
                             @forelse (auth()->user()->getRoleNames() as $role)
                                 {{ __('app.roles.'.$role) }}@if(!$loop->last)،@endif
@@ -34,7 +34,7 @@
                     $modules = [
                         ['perm' => 'catalog.view',    'label' => 'app.modules.catalog',    'color' => 'bg-blue-500'],
                         ['perm' => 'inventory.view',  'label' => 'app.modules.inventory',  'color' => 'bg-amber-500'],
-                        ['perm' => 'orders.view',     'label' => 'app.modules.orders',     'color' => 'bg-indigo-500'],
+                        ['perm' => 'orders.view',     'label' => 'app.modules.orders',     'color' => 'bg-emerald-500'],
                         ['perm' => 'purchasing.view', 'label' => 'app.modules.purchasing', 'color' => 'bg-teal-500'],
                         ['perm' => 'accounting.view', 'label' => 'app.modules.accounting', 'color' => 'bg-rose-500'],
                         ['perm' => 'crm.view',        'label' => 'app.modules.crm',        'color' => 'bg-purple-500'],

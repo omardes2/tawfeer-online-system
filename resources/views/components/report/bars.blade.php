@@ -10,7 +10,7 @@
                     <span class="font-medium text-gray-900">{{ $money ? number_format((float) $r['value'], 2) : $r['value'] }}</span>
                 </div>
                 <div class="h-2 bg-gray-100 rounded overflow-hidden">
-                    <div class="h-2 bg-indigo-500 rounded" style="width: {{ max(2, round((float) $r['value'] / $max * 100)) }}%"></div>
+                    <div class="h-2 bg-emerald-500 rounded" style="width: {{ max(2, round((float) $r['value'] / $max * 100)) }}%"></div>
                 </div>
             </div>
         @empty

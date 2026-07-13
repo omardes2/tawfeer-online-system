@@ -3,13 +3,13 @@
     <div class="py-8 max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-6">
         <div class="bg-white shadow-sm sm:rounded-lg p-4 sm:p-6">
             <x-admin.flash />
-            <a href="{{ route('admin.returns.index') }}" class="text-sm text-gray-500 hover:text-indigo-600">← {{ __('returns.rma') }}</a>
+            <a href="{{ route('admin.returns.index') }}" class="text-sm text-gray-500 hover:text-emerald-600">← {{ __('returns.rma') }}</a>
             @if ($errors->any())
                 <div class="mt-3 rounded-md bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3">{{ $errors->first() }}</div>
             @endif
 
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 my-4">
-                <div class="rounded-lg border p-3"><p class="text-xs text-gray-500">{{ __('returns.status') }}</p><p class="font-bold text-indigo-700">{{ __('returns.status_label.'.$return->status) }}</p></div>
+                <div class="rounded-lg border p-3"><p class="text-xs text-gray-500">{{ __('returns.status') }}</p><p class="font-bold text-emerald-700">{{ __('returns.status_label.'.$return->status) }}</p></div>
                 <div class="rounded-lg border p-3"><p class="text-xs text-gray-500">{{ __('returns.type') }}</p><p class="font-medium">{{ __('returns.type_label.'.$return->type) }}</p></div>
                 <div class="rounded-lg border p-3"><p class="text-xs text-gray-500">{{ __('returns.resolution') }}</p><p class="font-medium">{{ __('returns.resolution_label.'.$return->resolution) }}</p></div>
                 <div class="rounded-lg border p-3"><p class="text-xs text-gray-500">{{ __('returns.order') }}</p><p class="font-mono text-sm">{{ $return->order?->number }}</p></div>
@@ -32,7 +32,7 @@
                     @can('returns.receive')
                         <form method="POST" action="{{ route('admin.returns.receive', $return) }}" class="flex items-center gap-2">@csrf
                             <label class="text-xs text-gray-500 flex items-center gap-1"><input type="checkbox" name="create_linked_shipment" value="1" class="rounded border-gray-300">{{ __('returns.create_linked_shipment') }}</label>
-                            <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('returns.receive') }}</button>
+                            <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('returns.receive') }}</button>
                         </form>
                     @endcan
                 @elseif ($return->status === 'inspected')
@@ -93,7 +93,7 @@
                 </div>
                 @if ($return->status === 'received')
                     @can('returns.inspect')
-                        <button class="mt-3 px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('returns.apply_inspection') }}</button>
+                        <button class="mt-3 px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('returns.apply_inspection') }}</button>
                     @endcan
                 @endif
             </form>
@@ -124,7 +124,7 @@
             <ol class="relative border-s border-gray-200 space-y-3 ps-4">
                 @foreach ($return->events as $e)
                     <li class="text-sm">
-                        <span class="absolute -start-1.5 mt-1.5 h-3 w-3 rounded-full bg-indigo-500"></span>
+                        <span class="absolute -start-1.5 mt-1.5 h-3 w-3 rounded-full bg-emerald-500"></span>
                         {{ $e->from_status ? __('returns.status_label.'.$e->from_status) : '—' }} → {{ __('returns.status_label.'.$e->to_status) }}
                         <span class="text-xs text-gray-400">({{ $e->stage }}{{ $e->actor ? ' — '.$e->actor->name : '' }})</span>
                         @if ($e->note)<span class="text-xs text-gray-500"> — {{ $e->note }}</span>@endif

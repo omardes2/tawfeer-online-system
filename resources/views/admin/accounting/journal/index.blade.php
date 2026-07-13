@@ -12,7 +12,7 @@
                         <a href="{{ route('admin.accounting.reports.trial_balance') }}" class="inline-flex px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md hover:bg-gray-200">{{ __('ميزان المراجعة') }}</a>
                     @endcan
                     @can('create', \App\Modules\Accounting\Models\JournalEntry::class)
-                        <a href="{{ route('admin.accounting.journal.create') }}" class="inline-flex px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('قيد جديد') }}</a>
+                        <a href="{{ route('admin.accounting.journal.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('قيد جديد') }}</a>
                     @endcan
                 </div>
             </x-admin.header>
@@ -36,7 +36,7 @@
                                 <td class="py-2 px-3">
                                     <span class="inline-flex px-2 py-0.5 rounded-full text-xs {{ $e->status === 'posted' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600' }}">{{ $e->status === 'posted' ? __('مُرحّل') : __('مسودّة') }}</span>
                                 </td>
-                                <td class="py-2 px-3"><a href="{{ route('admin.accounting.journal.show', $e) }}" class="text-indigo-600 hover:underline">{{ __('عرض') }}</a></td>
+                                <td class="py-2 px-3"><a href="{{ route('admin.accounting.journal.show', $e) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a></td>
                             </tr>
                         @empty
                             <tr><td colspan="6" class="py-6 text-center text-gray-400">{{ __('لا توجد قيود.') }}</td></tr>

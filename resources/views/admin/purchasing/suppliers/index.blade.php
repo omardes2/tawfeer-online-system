@@ -5,7 +5,7 @@
             <x-admin.flash />
             <x-admin.header :title="__('الموردون')">
                 @can('create', \App\Modules\Purchasing\Models\Supplier::class)
-                    <a href="{{ route('admin.purchasing.suppliers.create') }}" class="inline-flex px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('مورد جديد') }}</a>
+                    <a href="{{ route('admin.purchasing.suppliers.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('مورد جديد') }}</a>
                 @endcan
             </x-admin.header>
 
@@ -34,7 +34,7 @@
                                 </td>
                                 <td class="py-2 px-3 flex gap-3">
                                     @can('update', $s)
-                                        <a href="{{ route('admin.purchasing.suppliers.edit', $s) }}" class="text-indigo-600 hover:underline">{{ __('تعديل') }}</a>
+                                        <a href="{{ route('admin.purchasing.suppliers.edit', $s) }}" class="text-emerald-600 hover:underline">{{ __('تعديل') }}</a>
                                     @endcan
                                     @can('delete', $s)
                                         <form method="POST" action="{{ route('admin.purchasing.suppliers.destroy', $s) }}" onsubmit="return confirm('{{ __('حذف المورد؟') }}')">@csrf @method('DELETE')<button class="text-rose-600 hover:underline">{{ __('حذف') }}</button></form>

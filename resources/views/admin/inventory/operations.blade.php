@@ -59,7 +59,7 @@
                     <select name="to_warehouse" required class="w-full rounded-md border-gray-300 text-sm">@foreach ($warehouses as $wh)<option value="{{ $wh->uuid }}">{{ $wh->name }}</option>@endforeach</select>
                 </x-admin.field>
                 <x-admin.field :label="__('الكمية')" name="qty"><input type="number" step="0.001" min="0.001" name="qty" required class="w-full rounded-md border-gray-300 text-sm" /></x-admin.field>
-                <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('تحويل') }}</button>
+                <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('تحويل') }}</button>
             </form>
         </div>
         @endcan

@@ -9,7 +9,7 @@
                         <a href="{{ route('admin.shipping.geography.index') }}" class="inline-flex px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md hover:bg-gray-200">{{ __('الجغرافيا') }}</a>
                     @endcan
                     @can('create', \App\Modules\Shipping\Models\Shipment::class)
-                        <a href="{{ route('admin.shipping.shipments.create') }}" class="inline-flex px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('شحنة جديدة') }}</a>
+                        <a href="{{ route('admin.shipping.shipments.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('شحنة جديدة') }}</a>
                     @endcan
                 </div>
             </x-admin.header>
@@ -31,7 +31,7 @@
                                 <td class="py-2 px-3 text-gray-500">{{ $s->recipient_name }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ $s->shipping_cost }} <span class="text-xs text-gray-400">({{ $s->cost_source }})</span></td>
                                 <td class="py-2 px-3"><x-shipping.status :status="$s->status" /></td>
-                                <td class="py-2 px-3"><a href="{{ route('admin.shipping.shipments.show', $s) }}" class="text-indigo-600 hover:underline">{{ __('عرض') }}</a></td>
+                                <td class="py-2 px-3"><a href="{{ route('admin.shipping.shipments.show', $s) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a></td>
                             </tr>
                         @empty
                             <tr><td colspan="6" class="py-6 text-center text-gray-400">{{ __('لا توجد شحنات.') }}</td></tr>

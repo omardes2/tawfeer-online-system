@@ -7,7 +7,7 @@
                 @can('inventory.counts.manage')
                     <form method="POST" action="{{ route('admin.inventory.counts.store') }}">
                         @csrf
-                        <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('warehouse.new_count') }}</button>
+                        <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('warehouse.new_count') }}</button>
                     </form>
                 @endcan
             </div>
@@ -24,9 +24,9 @@
                         @forelse ($counts as $c)
                             <tr class="border-b hover:bg-gray-50">
                                 <td class="py-2 px-3 font-mono text-xs">{{ $c->number }}</td>
-                                <td class="py-2 px-3"><span class="inline-block px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs">{{ __('warehouse.status_label.'.$c->status) }}</span></td>
+                                <td class="py-2 px-3"><span class="inline-block px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-xs">{{ __('warehouse.status_label.'.$c->status) }}</span></td>
                                 <td class="py-2 px-3">{{ $c->adjusted_count }}</td>
-                                <td class="py-2 px-3"><a href="{{ route('admin.inventory.counts.show', $c) }}" class="text-indigo-600 hover:underline">{{ __('عرض') }}</a></td>
+                                <td class="py-2 px-3"><a href="{{ route('admin.inventory.counts.show', $c) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a></td>
                             </tr>
                         @empty
                             <tr><td colspan="4" class="py-6 text-center text-gray-400">{{ __('warehouse.no_counts') }}</td></tr>

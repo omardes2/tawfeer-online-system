@@ -9,7 +9,7 @@
                 <span>{{ __('التصنيف') }}: {{ $customer->category ?: '—' }}</span>
                 @if ($customer->is_blocked)<span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-rose-100 text-rose-700">{{ __('محظور') }}: {{ $customer->blocked_reason }}</span>@endif
                 @can('update', $customer)
-                    <a href="{{ route('admin.crm.customers.edit', $customer) }}" class="text-indigo-600 hover:underline">{{ __('تعديل') }}</a>
+                    <a href="{{ route('admin.crm.customers.edit', $customer) }}" class="text-emerald-600 hover:underline">{{ __('تعديل') }}</a>
                 @endcan
             </div>
 
@@ -55,7 +55,7 @@
                 @can('update', $customer)
                     <form method="POST" action="{{ route('admin.crm.customers.notes.store', $customer) }}" class="flex gap-2 mb-3">@csrf
                         <input type="text" name="body" required placeholder="{{ __('أضف ملاحظة') }}" class="rounded-md border-gray-300 text-sm flex-1" />
-                        <button class="px-3 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('إضافة') }}</button>
+                        <button class="px-3 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('إضافة') }}</button>
                     </form>
                 @endcan
                 <ul class="text-sm space-y-1">
@@ -75,7 +75,7 @@
                 @else
                     <ul class="text-sm space-y-1">
                         @foreach ($customer->orders as $o)
-                            <li><a href="{{ route('admin.sales.orders.show', $o) }}" class="text-indigo-600 hover:underline">{{ $o->number }}</a> — {{ $o->status }} — {{ $o->total }}</li>
+                            <li><a href="{{ route('admin.sales.orders.show', $o) }}" class="text-emerald-600 hover:underline">{{ $o->number }}</a> — {{ $o->status }} — {{ $o->total }}</li>
                         @endforeach
                     </ul>
                 @endif

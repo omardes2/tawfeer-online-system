@@ -5,7 +5,7 @@
             <x-admin.flash />
             <x-admin.header :title="__('المستخدمون')">
                 @can('settings.users.create')
-                    <a href="{{ route('admin.users.create') }}" class="inline-flex px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('مستخدم جديد') }}</a>
+                    <a href="{{ route('admin.users.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('مستخدم جديد') }}</a>
                 @endcan
             </x-admin.header>
 
@@ -43,7 +43,7 @@
                                 <td class="py-2 px-3 text-gray-500">{{ $u->department ?: '—' }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ $u->job_title ?: '—' }}</td>
                                 <td class="py-2 px-3">
-                                    @foreach ($u->roles as $role)<span class="inline-flex px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs"><x-admin.role-label :name="$role->name" /></span>@endforeach
+                                    @foreach ($u->roles as $role)<span class="inline-flex px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs"><x-admin.role-label :name="$role->name" /></span>@endforeach
                                 </td>
                                 <td class="py-2 px-3">
                                     <span class="inline-flex px-2 py-0.5 rounded-full text-xs {{ $u->is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600' }}">{{ $u->is_active ? __('نشط') : __('غير نشط') }}</span>
@@ -51,7 +51,7 @@
                                 <td class="py-2 px-3">
                                     <div class="flex flex-wrap gap-2">
                                         @can('settings.users.update')
-                                            <a href="{{ route('admin.users.edit', $u) }}" class="text-indigo-600 hover:underline">{{ __('تعديل') }}</a>
+                                            <a href="{{ route('admin.users.edit', $u) }}" class="text-emerald-600 hover:underline">{{ __('تعديل') }}</a>
                                             <form method="POST" action="{{ route('admin.users.toggle', $u) }}">@csrf<button class="text-amber-600 hover:underline">{{ $u->is_active ? __('تعطيل') : __('تفعيل') }}</button></form>
                                             <form method="POST" action="{{ route('admin.users.reset_password', $u) }}" onsubmit="return confirm('{{ __('توليد كلمة مرور مؤقّتة؟') }}')">@csrf<button class="text-sky-600 hover:underline">{{ __('كلمة مرور') }}</button></form>
                                         @endcan

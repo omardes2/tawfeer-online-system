@@ -13,7 +13,7 @@
                         @foreach ($openOrders as $po)
                             <li class="py-2 flex items-center justify-between">
                                 <span>{{ $po->number }} — {{ $po->supplier?->name }} <x-purchasing.status :status="$po->status" /></span>
-                                <a href="{{ route('admin.purchasing.receipts.create', ['purchase_order' => $po->uuid]) }}" class="text-indigo-600 hover:underline">{{ __('استلام') }}</a>
+                                <a href="{{ route('admin.purchasing.receipts.create', ['purchase_order' => $po->uuid]) }}" class="text-emerald-600 hover:underline">{{ __('استلام') }}</a>
                             </li>
                         @endforeach
                     </ul>
@@ -69,7 +69,7 @@
                     </div>
 
                     <div class="flex gap-2 pt-2">
-                        <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('حفظ الاستلام (مسودّة)') }}</button>
+                        <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('حفظ الاستلام (مسودّة)') }}</button>
                         <a href="{{ route('admin.purchasing.orders.show', $order) }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a>
                     </div>
                 </form>

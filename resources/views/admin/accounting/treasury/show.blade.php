@@ -12,7 +12,7 @@
         <div class="bg-white shadow-sm sm:rounded-lg p-6">
             <div class="flex items-center justify-between mb-3">
                 <h3 class="font-semibold text-gray-700">{{ __('حركة الخزينة') }}</h3>
-                <a href="{{ route('admin.accounting.finance_reports.treasury_statement', $treasury) }}" class="text-sm text-indigo-600 hover:underline">{{ __('كشف حساب مفصّل') }}</a>
+                <a href="{{ route('admin.accounting.finance_reports.treasury_statement', $treasury) }}" class="text-sm text-emerald-600 hover:underline">{{ __('كشف حساب مفصّل') }}</a>
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm text-right">

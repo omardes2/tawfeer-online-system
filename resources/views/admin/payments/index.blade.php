@@ -5,7 +5,7 @@
             <x-admin.flash />
             <x-admin.header :title="__('المدفوعات')">
                 @can('create', \App\Modules\Payment\Models\Payment::class)
-                    <a href="{{ route('admin.payments.create') }}" class="inline-flex px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('دفعة جديدة') }}</a>
+                    <a href="{{ route('admin.payments.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('دفعة جديدة') }}</a>
                 @endcan
             </x-admin.header>
             <div class="overflow-x-auto">
@@ -26,7 +26,7 @@
                                 <td class="py-2 px-3 text-gray-500">{{ $p->method?->name }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ $p->amount }}</td>
                                 <td class="py-2 px-3"><x-payment.status :status="$p->status" /></td>
-                                <td class="py-2 px-3"><a href="{{ route('admin.payments.show', $p) }}" class="text-indigo-600 hover:underline">{{ __('عرض') }}</a></td>
+                                <td class="py-2 px-3"><a href="{{ route('admin.payments.show', $p) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a></td>
                             </tr>
                         @empty
                             <tr><td colspan="6" class="py-6 text-center text-gray-400">{{ __('لا توجد مدفوعات.') }}</td></tr>

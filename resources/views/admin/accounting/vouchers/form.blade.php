@@ -47,7 +47,7 @@
                 <x-admin.field :label="__('مرفقات (PDF/صور)')" name="attachments"><input type="file" name="attachments[]" multiple accept=".pdf,image/*" class="text-sm" /></x-admin.field>
 
                 @foreach ($errors->all() as $e)<p class="text-xs text-rose-600">{{ $e }}</p>@endforeach
-                <div class="flex gap-2 pt-2"><button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('حفظ كمسودّة') }}</button><a href="{{ route('admin.accounting.vouchers.index', $kind) }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a></div>
+                <div class="flex gap-2 pt-2"><button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('حفظ كمسودّة') }}</button><a href="{{ route('admin.accounting.vouchers.index', $kind) }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a></div>
             </form>
         </div>
     </div>

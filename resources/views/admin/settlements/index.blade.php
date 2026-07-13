@@ -7,18 +7,18 @@
             <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
                 <div class="flex flex-wrap gap-1">
                     <a href="{{ route('admin.settlements.index') }}"
-                       @class(['px-3 py-1.5 rounded-md text-sm', 'bg-indigo-600 text-white' => ! $status, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => (bool) $status])>
+                       @class(['px-3 py-1.5 rounded-md text-sm', 'bg-emerald-600 text-white' => ! $status, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => (bool) $status])>
                         {{ __('settlements.all_statuses') }}
                     </a>
                     @foreach ($statuses as $s)
                         <a href="{{ route('admin.settlements.index', ['status' => $s]) }}"
-                           @class(['px-3 py-1.5 rounded-md text-sm', 'bg-indigo-600 text-white' => $status === $s, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => $status !== $s])>
+                           @class(['px-3 py-1.5 rounded-md text-sm', 'bg-emerald-600 text-white' => $status === $s, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => $status !== $s])>
                             {{ __('settlements.status_label.'.$s) }}
                         </a>
                     @endforeach
                 </div>
                 @can('settlements.manage')
-                    <a href="{{ route('admin.settlements.create') }}" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('settlements.new') }}</a>
+                    <a href="{{ route('admin.settlements.create') }}" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('settlements.new') }}</a>
                 @endcan
             </div>
 
@@ -42,8 +42,8 @@
                                     <td class="py-2 px-3">{{ $s->provider?->name ?? '—' }}</td>
                                     <td class="py-2 px-3">{{ number_format((float) $s->computed_net, 2) }}</td>
                                     <td class="py-2 px-3 {{ (float) $s->variance != 0.0 ? 'text-rose-600 font-bold' : 'text-gray-400' }}">{{ number_format((float) $s->variance, 2) }}</td>
-                                    <td class="py-2 px-3"><span class="inline-block px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs">{{ __('settlements.status_label.'.$s->status) }}</span></td>
-                                    <td class="py-2 px-3"><a href="{{ route('admin.settlements.show', $s) }}" class="text-indigo-600 hover:underline">{{ __('عرض') }}</a></td>
+                                    <td class="py-2 px-3"><span class="inline-block px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-xs">{{ __('settlements.status_label.'.$s->status) }}</span></td>
+                                    <td class="py-2 px-3"><a href="{{ route('admin.settlements.show', $s) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a></td>
                                 </tr>
                             @endforeach
                         </tbody>

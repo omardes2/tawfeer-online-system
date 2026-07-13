@@ -5,7 +5,7 @@
             <x-admin.flash />
             <x-admin.header :title="__('مرتجعات الموردين')">
                 @can('create', \App\Modules\Purchasing\Models\SupplierReturn::class)
-                    <a href="{{ route('admin.purchasing.returns.create') }}" class="inline-flex px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('مرتجع جديد') }}</a>
+                    <a href="{{ route('admin.purchasing.returns.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('مرتجع جديد') }}</a>
                 @endcan
             </x-admin.header>
             <div class="overflow-x-auto">
@@ -24,7 +24,7 @@
                                 <td class="py-2 px-3 text-gray-500">{{ $r->supplier?->name }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ $r->warehouse?->name }}</td>
                                 <td class="py-2 px-3"><x-purchasing.status :status="$r->status" /></td>
-                                <td class="py-2 px-3"><a href="{{ route('admin.purchasing.returns.show', $r) }}" class="text-indigo-600 hover:underline">{{ __('عرض') }}</a></td>
+                                <td class="py-2 px-3"><a href="{{ route('admin.purchasing.returns.show', $r) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a></td>
                             </tr>
                         @empty
                             <tr><td colspan="5" class="py-6 text-center text-gray-400">{{ __('لا توجد مرتجعات.') }}</td></tr>

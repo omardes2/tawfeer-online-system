@@ -13,7 +13,7 @@
                         @foreach ($shippableOrders as $o)
                             <li class="py-2 flex items-center justify-between">
                                 <span>{{ $o->number }} — {{ $o->customer_name }}</span>
-                                <a href="{{ route('admin.shipping.shipments.create', ['order' => $o->uuid]) }}" class="text-indigo-600 hover:underline">{{ __('إنشاء شحنة') }}</a>
+                                <a href="{{ route('admin.shipping.shipments.create', ['order' => $o->uuid]) }}" class="text-emerald-600 hover:underline">{{ __('إنشاء شحنة') }}</a>
                             </li>
                         @endforeach
                     </ul>
@@ -49,7 +49,7 @@
                         <textarea name="notes" rows="2" class="w-full rounded-md border-gray-300 text-sm">{{ old('notes') }}</textarea>
                     </x-admin.field>
                     <div class="flex gap-2 pt-2">
-                        <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('إنشاء الشحنة') }}</button>
+                        <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('إنشاء الشحنة') }}</button>
                         <a href="{{ route('admin.shipping.shipments.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a>
                     </div>
                 </form>

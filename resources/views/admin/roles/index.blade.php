@@ -5,7 +5,7 @@
             <x-admin.flash />
             <x-admin.header :title="__('roles.title')">
                 @can('settings.roles.manage')
-                    <a href="{{ route('admin.roles.create') }}" class="inline-flex px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('roles.new') }}</a>
+                    <a href="{{ route('admin.roles.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('roles.new') }}</a>
                 @endcan
             </x-admin.header>
 
@@ -31,7 +31,7 @@
                                 <td class="py-2 px-3">
                                     @can('settings.roles.manage')
                                         <div class="flex flex-wrap gap-2 items-center">
-                                            <a href="{{ route('admin.roles.edit', $role) }}" class="text-indigo-600 hover:underline">{{ __('تعديل') }}</a>
+                                            <a href="{{ route('admin.roles.edit', $role) }}" class="text-emerald-600 hover:underline">{{ __('تعديل') }}</a>
                                             <button type="button" @click="copy = !copy" class="text-sky-600 hover:underline">{{ __('نسخ') }}</button>
                                             @unless (in_array($role->name, ['admin']))
                                                 <form method="POST" action="{{ route('admin.roles.destroy', $role) }}" onsubmit="return confirm('{{ __('حذف الدور؟') }}')">@csrf @method('DELETE')<button class="text-rose-600 hover:underline">{{ __('حذف') }}</button></form>

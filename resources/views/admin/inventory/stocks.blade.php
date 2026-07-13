@@ -4,7 +4,7 @@
         <div class="bg-white shadow-sm sm:rounded-lg p-6">
             <x-admin.flash />
             <x-admin.header :title="__('أرصدة المخزون')">
-                <a href="{{ route('admin.inventory.operations') }}" class="inline-flex px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('عمليات المخزون') }}</a>
+                <a href="{{ route('admin.inventory.operations') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('عمليات المخزون') }}</a>
             </x-admin.header>
             <form method="GET" class="mb-4">
                 <select name="warehouse" class="rounded-md border-gray-300 text-sm" onchange="this.form.submit()">

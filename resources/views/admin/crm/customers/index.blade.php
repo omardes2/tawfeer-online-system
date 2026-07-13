@@ -5,7 +5,7 @@
             <x-admin.flash />
             <x-admin.header :title="__('العملاء')">
                 @can('create', \App\Modules\Crm\Models\Customer::class)
-                    <a href="{{ route('admin.crm.customers.create') }}" class="inline-flex px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('عميل جديد') }}</a>
+                    <a href="{{ route('admin.crm.customers.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('عميل جديد') }}</a>
                 @endcan
             </x-admin.header>
 
@@ -36,7 +36,7 @@
                                     @elseif ($c->is_high_risk)<span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">{{ __('عالي الخطورة') }}</span>
                                     @else<span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700">{{ __('نشط') }}</span>@endif
                                 </td>
-                                <td class="py-2 px-3"><a href="{{ route('admin.crm.customers.show', $c) }}" class="text-indigo-600 hover:underline">{{ __('عرض') }}</a></td>
+                                <td class="py-2 px-3"><a href="{{ route('admin.crm.customers.show', $c) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a></td>
                             </tr>
                         @empty
                             <tr><td colspan="6" class="py-6 text-center text-gray-400">{{ __('لا يوجد عملاء.') }}</td></tr>

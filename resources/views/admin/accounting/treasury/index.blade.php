@@ -5,7 +5,7 @@
             <x-admin.flash />
             <x-admin.header :title="$isBank ? __('البنوك') : __('الخزائن')">
                 @can('accounting.'.($isBank ? 'banks' : 'cashboxes').'.manage')
-                    <a href="{{ route('admin.accounting.'.$rp.'.create') }}" class="inline-flex px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('إضافة') }}</a>
+                    <a href="{{ route('admin.accounting.'.$rp.'.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('إضافة') }}</a>
                 @endcan
             </x-admin.header>
 
@@ -37,7 +37,7 @@
                                     <div class="flex flex-wrap gap-2">
                                         <a href="{{ route('admin.accounting.'.$rp.'.show', $t) }}" class="text-sky-600 hover:underline">{{ __('كشف') }}</a>
                                         @can('accounting.'.($isBank ? 'banks' : 'cashboxes').'.manage')
-                                            <a href="{{ route('admin.accounting.'.$rp.'.edit', $t) }}" class="text-indigo-600 hover:underline">{{ __('تعديل') }}</a>
+                                            <a href="{{ route('admin.accounting.'.$rp.'.edit', $t) }}" class="text-emerald-600 hover:underline">{{ __('تعديل') }}</a>
                                             <form method="POST" action="{{ route('admin.accounting.'.$rp.'.destroy', $t) }}" onsubmit="return confirm('{{ __('حذف؟') }}')">@csrf @method('DELETE')<button class="text-rose-600 hover:underline">{{ __('حذف') }}</button></form>
                                         @endcan
                                     </div>

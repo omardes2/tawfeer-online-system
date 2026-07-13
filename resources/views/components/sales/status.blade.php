@@ -6,6 +6,7 @@
         'awaiting_contact' => 'bg-amber-100 text-amber-700',
         'awaiting_confirmation' => 'bg-amber-100 text-amber-700',
         'confirmed' => 'bg-blue-100 text-blue-700',
+        'processing' => 'bg-amber-100 text-amber-700',
         'stock_reserved' => 'bg-indigo-100 text-indigo-700',
         'preparing' => 'bg-indigo-100 text-indigo-700',
         'ready_to_ship' => 'bg-violet-100 text-violet-700',
@@ -22,7 +23,7 @@
     ];
     $labels = [
         'draft' => 'مسودّة', 'new' => 'جديد', 'awaiting_contact' => 'بانتظار التواصل',
-        'awaiting_confirmation' => 'بانتظار التأكيد', 'confirmed' => 'مؤكّد',
+        'awaiting_confirmation' => 'بانتظار التأكيد', 'confirmed' => 'مؤكّد', 'processing' => 'قيد المعالجة',
         'stock_reserved' => 'محجوز المخزون', 'preparing' => 'قيد التجهيز',
         'ready_to_ship' => 'جاهز للشحن', 'shipped' => 'مُشحَن', 'out_for_delivery' => 'خرج للتوصيل',
         'delivered' => 'مُسلَّم', 'delayed' => 'مؤجّل', 'customer_unavailable' => 'العميل غير متاح',

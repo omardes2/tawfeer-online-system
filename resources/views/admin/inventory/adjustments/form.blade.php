@@ -22,7 +22,7 @@
                 <div>
                     <div class="flex items-center justify-between mb-2">
                         <label class="block text-sm font-medium text-gray-700">{{ __('البنود (العدّ الفعلي)') }}</label>
-                        <button type="button" @click="rows.push({})" class="text-sm text-indigo-600 hover:underline">+ {{ __('إضافة بند') }}</button>
+                        <button type="button" @click="rows.push({})" class="text-sm text-emerald-600 hover:underline">+ {{ __('إضافة بند') }}</button>
                     </div>
                     <template x-for="(row, i) in rows" :key="i">
                         <div class="flex flex-wrap gap-2 mb-2 items-end">
@@ -36,7 +36,7 @@
                 </div>
 
                 <div class="flex gap-2 pt-2">
-                    <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('حفظ كمسودّة') }}</button>
+                    <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('حفظ كمسودّة') }}</button>
                     <a href="{{ route('admin.inventory.adjustments.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a>
                 </div>
             </form>

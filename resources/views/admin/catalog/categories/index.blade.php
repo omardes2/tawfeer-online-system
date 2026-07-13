@@ -8,13 +8,13 @@
             <x-admin.flash />
             <x-admin.header :title="__('الفئات')">
                 @can('create', \App\Modules\Catalog\Models\Category::class)
-                    <a href="{{ route('admin.categories.create') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('فئة جديدة') }}</a>
+                    <a href="{{ route('admin.categories.create') }}" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('فئة جديدة') }}</a>
                 @endcan
             </x-admin.header>
 
             <form method="GET" class="mb-4">
                 <input type="text" name="search" value="{{ request('search') }}" placeholder="{{ __('بحث بالاسم...') }}"
-                    class="w-full sm:w-72 rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                    class="w-full sm:w-72 rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
             </form>
 
             <div class="overflow-x-auto">
@@ -42,7 +42,7 @@
                                 <td class="py-2 px-3">
                                     <div class="flex items-center gap-2">
                                         @can('update', $category)
-                                            <a href="{{ route('admin.categories.edit', $category) }}" class="text-indigo-600 hover:underline">{{ __('تعديل') }}</a>
+                                            <a href="{{ route('admin.categories.edit', $category) }}" class="text-emerald-600 hover:underline">{{ __('تعديل') }}</a>
                                         @endcan
                                         @can('delete', $category)
                                             <form method="POST" action="{{ route('admin.categories.destroy', $category) }}" onsubmit="return confirm('{{ __('تأكيد الحذف؟') }}')">

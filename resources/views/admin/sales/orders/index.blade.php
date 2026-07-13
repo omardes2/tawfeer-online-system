@@ -5,7 +5,7 @@
             <x-admin.flash />
             <x-admin.header :title="__('طلبات البيع')">
                 @can('create', \App\Modules\Sales\Models\Order::class)
-                    <a href="{{ route('admin.sales.orders.create') }}" class="inline-flex px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('طلب جديد') }}</a>
+                    <a href="{{ route('admin.sales.orders.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('طلب جديد') }}</a>
                 @endcan
             </x-admin.header>
             <div class="overflow-x-auto">
@@ -26,7 +26,7 @@
                                 <td class="py-2 px-3 text-gray-500">{{ $o->warehouse?->name }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ $o->total }}</td>
                                 <td class="py-2 px-3"><x-sales.status :status="$o->status" /></td>
-                                <td class="py-2 px-3"><a href="{{ route('admin.sales.orders.show', $o) }}" class="text-indigo-600 hover:underline">{{ __('عرض') }}</a></td>
+                                <td class="py-2 px-3"><a href="{{ route('admin.sales.orders.show', $o) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a></td>
                             </tr>
                         @empty
                             <tr><td colspan="6" class="py-6 text-center text-gray-400">{{ __('لا توجد طلبات.') }}</td></tr>

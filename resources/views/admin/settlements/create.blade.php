@@ -40,7 +40,7 @@
                     <textarea name="notes" rows="2" class="w-full rounded-md border-gray-300 text-sm"></textarea>
                 </div>
 
-                <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('settlements.create') }}</button>
+                <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('settlements.create') }}</button>
             </form>
         </div>
     </div>

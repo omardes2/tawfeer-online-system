@@ -5,7 +5,7 @@
             <x-admin.flash />
             <x-admin.header :title="__('تسويات الجرد')">
                 @can('create', \App\Modules\Inventory\Models\StockAdjustment::class)
-                    <a href="{{ route('admin.inventory.adjustments.create') }}" class="inline-flex px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('تسوية جديدة') }}</a>
+                    <a href="{{ route('admin.inventory.adjustments.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('تسوية جديدة') }}</a>
                 @endcan
             </x-admin.header>
             <div class="overflow-x-auto">
@@ -24,7 +24,7 @@
                                 <td class="py-2 px-3 text-gray-500">{{ $a->warehouse?->name }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ $a->type }}</td>
                                 <td class="py-2 px-3"><span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-700">{{ $a->status }}</span></td>
-                                <td class="py-2 px-3"><a href="{{ route('admin.inventory.adjustments.show', $a) }}" class="text-indigo-600 hover:underline">{{ __('عرض') }}</a></td>
+                                <td class="py-2 px-3"><a href="{{ route('admin.inventory.adjustments.show', $a) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a></td>
                             </tr>
                         @empty
                             <tr><td colspan="5" class="py-6 text-center text-gray-400">{{ __('لا توجد تسويات.') }}</td></tr>

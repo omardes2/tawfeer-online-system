@@ -8,7 +8,7 @@
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
                     <span class="text-sm text-gray-500">{{ __('الحالة') }}:</span>
-                    <span class="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-sm">{{ __('marketing.status.'.$campaign->status) }}</span>
+                    <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-sm">{{ __('marketing.status.'.$campaign->status) }}</span>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     @if ($campaign->status === 'draft')
@@ -42,7 +42,7 @@
             <form method="POST" action="{{ route('admin.marketing.campaigns.test', $campaign) }}" class="flex items-end gap-2">
                 @csrf
                 <div><label class="block text-xs text-gray-600 mb-1">{{ __('معرّف العميل') }}</label><input type="number" name="customer_id" required class="rounded-md border-gray-300 text-sm" /></div>
-                <button class="px-3 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('إرسال تجريبي') }}</button>
+                <button class="px-3 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('إرسال تجريبي') }}</button>
             </form>
         </div>
 

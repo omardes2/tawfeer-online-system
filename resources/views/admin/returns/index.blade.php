@@ -7,18 +7,18 @@
             <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
                 <div class="flex flex-wrap gap-1">
                     <a href="{{ route('admin.returns.index') }}"
-                       @class(['px-3 py-1.5 rounded-md text-sm', 'bg-indigo-600 text-white' => ! $status, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => (bool) $status])>
+                       @class(['px-3 py-1.5 rounded-md text-sm', 'bg-emerald-600 text-white' => ! $status, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => (bool) $status])>
                         {{ __('returns.all_statuses') }}
                     </a>
                     @foreach ($statuses as $s)
                         <a href="{{ route('admin.returns.index', ['status' => $s]) }}"
-                           @class(['px-3 py-1.5 rounded-md text-sm', 'bg-indigo-600 text-white' => $status === $s, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => $status !== $s])>
+                           @class(['px-3 py-1.5 rounded-md text-sm', 'bg-emerald-600 text-white' => $status === $s, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => $status !== $s])>
                             {{ __('returns.status_label.'.$s) }}
                         </a>
                     @endforeach
                 </div>
                 @can('returns.create')
-                    <a href="{{ route('admin.returns.create') }}" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('returns.new') }}</a>
+                    <a href="{{ route('admin.returns.create') }}" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('returns.new') }}</a>
                 @endcan
             </div>
 
@@ -42,8 +42,8 @@
                                     <td class="py-2 px-3">{{ $r->order?->number }}</td>
                                     <td class="py-2 px-3">{{ __('returns.type_label.'.$r->type) }}</td>
                                     <td class="py-2 px-3 text-xs">{{ __('returns.reason_label.'.$r->reason_code) }}</td>
-                                    <td class="py-2 px-3"><span class="inline-block px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs">{{ __('returns.status_label.'.$r->status) }}</span></td>
-                                    <td class="py-2 px-3"><a href="{{ route('admin.returns.show', $r) }}" class="text-indigo-600 hover:underline">{{ __('عرض') }}</a></td>
+                                    <td class="py-2 px-3"><span class="inline-block px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-xs">{{ __('returns.status_label.'.$r->status) }}</span></td>
+                                    <td class="py-2 px-3"><a href="{{ route('admin.returns.show', $r) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a></td>
                                 </tr>
                             @endforeach
                         </tbody>

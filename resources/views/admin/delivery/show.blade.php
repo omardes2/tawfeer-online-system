@@ -3,7 +3,7 @@
     <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
         <div class="bg-white shadow-sm sm:rounded-lg p-6">
             <x-admin.flash />
-            <a href="{{ route('admin.shipping.delivery.index') }}" class="text-sm text-gray-500 hover:text-indigo-600">← {{ __('delivery.engine') }}</a>
+            <a href="{{ route('admin.shipping.delivery.index') }}" class="text-sm text-gray-500 hover:text-emerald-600">← {{ __('delivery.engine') }}</a>
 
             @if ($errors->any())
                 <div class="mt-3 rounded-md bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3">{{ $errors->first() }}</div>
@@ -12,7 +12,7 @@
             {{-- الحالة الحالية: قانونية منفصلة عن المزوّد --}}
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 my-4">
                 <div class="rounded-lg border border-gray-200 p-4">
-                    <p class="text-lg font-bold text-indigo-700">{{ __('delivery.status.'.$shipment->delivery_status) }}</p>
+                    <p class="text-lg font-bold text-emerald-700">{{ __('delivery.status.'.$shipment->delivery_status) }}</p>
                     <p class="text-xs text-gray-500 mt-1">{{ __('delivery.delivery_status') }}</p>
                 </div>
                 <div class="rounded-lg border border-gray-200 p-4">
@@ -60,7 +60,7 @@
                             <label class="block text-xs text-gray-500 mb-1">{{ __('delivery.note') }}</label>
                             <input type="text" name="note" class="rounded-md border-gray-300 text-sm w-48">
                         </div>
-                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('delivery.apply') }}</button>
+                        <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('delivery.apply') }}</button>
                     </form>
                 @endif
             @endcan
@@ -141,13 +141,13 @@
                     <li class="text-sm">
                         <span class="absolute -start-1.5 mt-1.5 h-3 w-3 rounded-full
                             @class([
-                                'bg-indigo-500' => $item['type'] === 'status',
+                                'bg-emerald-500' => $item['type'] === 'status',
                                 'bg-gray-400' => $item['type'] === 'provider_status',
                                 'bg-sky-500' => $item['type'] === 'webhook',
                                 'bg-amber-500' => $item['type'] === 'sync',
                             ])"></span>
                         @if ($item['type'] === 'status')
-                            <span class="font-medium text-indigo-700">{{ __('delivery.timeline_status') }}</span>:
+                            <span class="font-medium text-emerald-700">{{ __('delivery.timeline_status') }}</span>:
                             {{ $item['from'] ? __('delivery.status.'.$item['from']) : '—' }} → {{ __('delivery.status.'.$item['to']) }}
                             <span class="text-xs text-gray-400">({{ __('delivery.actor.'.$item['actor_type']) }})</span>
                             @if ($item['reason_code'])<span class="text-amber-700 text-xs"> — {{ __('delivery.reason_label.'.$item['reason_code']) }}</span>@endif
@@ -207,7 +207,7 @@
                         <label class="block text-xs text-gray-500 mb-1">{{ __('delivery.note') }}</label>
                         <input type="text" name="note" class="rounded-md border-gray-300 text-sm w-48">
                     </div>
-                    <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('delivery.open_exception') }}</button>
+                    <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('delivery.open_exception') }}</button>
                 </form>
             @endcan
         </div>
@@ -242,7 +242,7 @@
                         <label class="block text-xs text-gray-500 mb-1">{{ __('delivery.fee_amount') }}</label>
                         <input type="number" step="0.01" name="amount" required class="rounded-md border-gray-300 text-sm w-28">
                     </div>
-                    <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('delivery.add_fee') }}</button>
+                    <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('delivery.add_fee') }}</button>
                 </form>
             @endcan
         </div>

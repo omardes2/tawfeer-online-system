@@ -52,7 +52,7 @@
                 <div class="border-t pt-4">
                     <div class="flex items-center justify-between mb-2">
                         <label class="block text-sm font-medium text-gray-700">{{ __('جهات الاتصال') }}</label>
-                        <button type="button" @click="contacts.push({ is_primary: false })" class="text-sm text-indigo-600 hover:underline">+ {{ __('إضافة جهة') }}</button>
+                        <button type="button" @click="contacts.push({ is_primary: false })" class="text-sm text-emerald-600 hover:underline">+ {{ __('إضافة جهة') }}</button>
                     </div>
                     <template x-for="(c, i) in contacts" :key="i">
                         <div class="flex flex-wrap gap-2 mb-2 items-center">
@@ -69,7 +69,7 @@
                 </div>
 
                 <div class="flex gap-2 pt-2">
-                    <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('حفظ') }}</button>
+                    <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('حفظ') }}</button>
                     <a href="{{ route('admin.purchasing.suppliers.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a>
                 </div>
             </form>

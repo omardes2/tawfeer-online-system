@@ -2,7 +2,7 @@
     <x-slot name="header"><h2 class="font-semibold text-xl text-gray-800">{{ __('commissions.statement') }}</h2></x-slot>
     <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8">
         <div class="bg-white shadow-sm sm:rounded-lg p-6">
-            <a href="{{ route('admin.commissions.index') }}" class="text-sm text-gray-500 hover:text-indigo-600">← {{ __('commissions.ledger') }}</a>
+            <a href="{{ route('admin.commissions.index') }}" class="text-sm text-gray-500 hover:text-emerald-600">← {{ __('commissions.ledger') }}</a>
 
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 my-4">
                 @foreach (['pending', 'eligible', 'approved', 'paid'] as $k)

@@ -13,7 +13,7 @@
                         @foreach ($payableOrders as $o)
                             <li class="py-2 flex items-center justify-between">
                                 <span>{{ $o->number }} — {{ $o->customer_name }} <x-payment.status :status="$o->payment_status" /> ({{ $o->amount_paid }} / {{ $o->total }})</span>
-                                <a href="{{ route('admin.payments.create', ['order' => $o->uuid]) }}" class="text-indigo-600 hover:underline">{{ __('دفعة') }}</a>
+                                <a href="{{ route('admin.payments.create', ['order' => $o->uuid]) }}" class="text-emerald-600 hover:underline">{{ __('دفعة') }}</a>
                             </li>
                         @endforeach
                     </ul>
@@ -42,7 +42,7 @@
                         <input type="text" name="notes" value="{{ old('notes') }}" class="w-full rounded-md border-gray-300 text-sm" />
                     </x-admin.field>
                     <div class="flex gap-2 pt-2">
-                        <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('إنشاء الدفعة') }}</button>
+                        <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('إنشاء الدفعة') }}</button>
                         <a href="{{ route('admin.payments.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a>
                     </div>
                 </form>

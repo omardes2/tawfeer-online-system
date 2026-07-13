@@ -54,12 +54,12 @@
                 @endif
                 @if ($order->status === 'confirmed')
                     @can('reserve', $order)
-                        <form method="POST" action="{{ route('admin.sales.orders.reserve', $order) }}">@csrf<button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('حجز المخزون') }}</button></form>
+                        <form method="POST" action="{{ route('admin.sales.orders.reserve', $order) }}">@csrf<button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('حجز المخزون') }}</button></form>
                     @endcan
                 @endif
                 @if ($order->status === 'stock_reserved')
                     @can('ship', $order)
-                        <form method="POST" action="{{ route('admin.sales.orders.prepare', $order) }}">@csrf<button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('بدء التجهيز') }}</button></form>
+                        <form method="POST" action="{{ route('admin.sales.orders.prepare', $order) }}">@csrf<button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('بدء التجهيز') }}</button></form>
                     @endcan
                 @endif
                 @if ($order->status === 'preparing')

@@ -53,7 +53,7 @@
                     <input type="date" name="period_end" value="{{ old('period_end') }}" class="w-full rounded-md border-gray-300 text-sm">
                 </div>
                 <div class="col-span-2 md:col-span-4">
-                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('commissions.save') }}</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('commissions.save') }}</button>
                 </div>
             </form>
 

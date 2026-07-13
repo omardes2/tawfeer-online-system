@@ -14,7 +14,7 @@
                 <div class="flex gap-1">
                     @foreach (['day', 'week', 'month'] as $p)
                         <a href="{{ request()->fullUrlWithQuery(['preset' => $p, 'from' => null, 'to' => null]) }}"
-                           @class(['px-3 py-1.5 rounded-md text-sm', 'bg-indigo-600 text-white' => $range->preset === $p, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => $range->preset !== $p])>
+                           @class(['px-3 py-1.5 rounded-md text-sm', 'bg-emerald-600 text-white' => $range->preset === $p, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => $range->preset !== $p])>
                             {{ __('reports.preset_'.$p) }}
                         </a>
                     @endforeach
@@ -34,7 +34,7 @@
                         <input type="text" name="q" value="{{ request('q') }}" class="rounded-md border-gray-300 text-sm">
                     </div>
                 @endif
-                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('reports.apply') }}</button>
+                <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('reports.apply') }}</button>
                 @if ($exportable)
                     <a href="{{ request()->fullUrlWithQuery(['export' => 'csv']) }}" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('reports.export_excel') }}</a>
                 @endif

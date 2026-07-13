@@ -3,13 +3,13 @@
     <div class="py-6 max-w-5xl mx-auto sm:px-6 lg:px-8 space-y-6">
         <div class="bg-white shadow-sm sm:rounded-lg p-4 sm:p-6">
             <x-admin.flash />
-            <a href="{{ route('admin.inventory.counts.index') }}" class="text-sm text-gray-500 hover:text-indigo-600">← {{ __('warehouse.counts') }}</a>
+            <a href="{{ route('admin.inventory.counts.index') }}" class="text-sm text-gray-500 hover:text-emerald-600">← {{ __('warehouse.counts') }}</a>
             @if ($errors->any())
                 <div class="mt-3 rounded-md bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3">{{ $errors->first() }}</div>
             @endif
 
             <div class="flex items-center gap-3 my-3">
-                <span class="inline-block px-3 py-1 rounded-md bg-indigo-50 text-indigo-700 text-sm">{{ __('warehouse.status_label.'.$count->status) }}</span>
+                <span class="inline-block px-3 py-1 rounded-md bg-emerald-50 text-emerald-700 text-sm">{{ __('warehouse.status_label.'.$count->status) }}</span>
                 <span class="text-sm text-gray-500">{{ $count->warehouse?->name }}</span>
             </div>
 
@@ -17,7 +17,7 @@
             @can('inventory.counts.manage')
                 <div class="flex flex-wrap gap-2 border-t pt-4">
                     @if ($count->status === 'counting')
-                        <form method="POST" action="{{ route('admin.inventory.counts.review', $count) }}">@csrf<button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('warehouse.review') }}</button></form>
+                        <form method="POST" action="{{ route('admin.inventory.counts.review', $count) }}">@csrf<button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('warehouse.review') }}</button></form>
                     @elseif ($count->status === 'review')
                         <form method="POST" action="{{ route('admin.inventory.counts.complete', $count) }}" onsubmit="return confirm('{{ __('warehouse.complete') }}?')">@csrf<button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('warehouse.complete') }}</button></form>
                     @endif
@@ -37,7 +37,7 @@
                         @csrf
                         <div><label class="block text-xs text-gray-500 mb-1">{{ __('warehouse.barcode') }}</label><input type="text" name="barcode" required class="rounded-md border-gray-300 text-sm"></div>
                         <div><label class="block text-xs text-gray-500 mb-1">{{ __('warehouse.counted_qty') }}</label><input type="number" step="0.001" min="0" name="counted_qty" required class="w-28 rounded-md border-gray-300 text-sm"></div>
-                        <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('warehouse.record') }}</button>
+                        <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('warehouse.record') }}</button>
                     </form>
                 </div>
             @endcan

@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+        <title>{{ ($title ?? null) ? $title.' — '.config('app.name') : config('app.name', 'Laravel') }}</title>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
@@ -14,23 +14,36 @@
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="font-sans antialiased">
-        <div class="min-h-screen bg-gray-100">
-            @include('layouts.navigation')
+    <body class="font-sans antialiased text-gray-800">
+        <div
+            x-data="{ sidebarOpen: false, collapsed: (localStorage.getItem('admin_sidebar_collapsed') === 'true') }"
+            @keydown.escape.window="sidebarOpen = false"
+            class="admin-scope min-h-screen bg-gray-50"
+        >
+            <!-- Mobile backdrop -->
+            <div x-show="sidebarOpen" x-cloak x-transition.opacity @click="sidebarOpen = false"
+                 class="fixed inset-0 z-30 bg-slate-900/50 md:hidden"></div>
 
-            <!-- Page Heading -->
-            @isset($header)
-                <header class="bg-white shadow">
-                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <!-- Sidebar -->
+            <x-admin.sidebar />
+
+            <!-- Main column (offset by sidebar width on desktop) -->
+            <div class="min-h-screen transition-all duration-200"
+                 :class="collapsed ? 'md:ms-[76px]' : 'md:ms-64'">
+                <x-admin.topbar :title="$title ?? null" />
+
+                <!-- Optional page heading slot (Breeze dashboard/profile) -->
+                @isset($header)
+                    <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-4">
                         {{ $header }}
                     </div>
-                </header>
-            @endisset
+                @endisset
 
-            <!-- Page Content -->
-            <main>
-                {{ $slot }}
-            </main>
+                <!-- Page content -->
+                <main class="p-4 md:p-6 max-w-[1600px] mx-auto">
+                    {{ $slot }}
+                </main>
+            </div>
         </div>
         @stack('scripts')
     </body>

@@ -7,4 +7,59 @@
     html {
         font-family: 'Tajawal', ui-sans-serif, system-ui, sans-serif;
     }
+    [x-cloak] { display: none !important; }
+}
+
+/* ==========================================================================
+   Admin design system — reusable component classes.
+   Applied globally so existing admin tables/forms/buttons inherit a
+   consistent look without rewriting every page. Tawfeer-green accent,
+   light-gray canvas, subtle borders + shadows, rounded cards.
+   ========================================================================== */
+@layer components {
+    /* Surfaces */
+    .admin-card {
+        @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+    }
+    .admin-card-pad { @apply p-5; }
+
+    /* Buttons */
+    .btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed; }
+    .btn-primary { @apply btn bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500; }
+    .btn-secondary { @apply btn bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-gray-300; }
+    .btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500; }
+    .btn-ghost { @apply btn text-gray-600 hover:bg-gray-100 focus:ring-gray-200; }
+    .btn-sm { @apply px-3 py-1.5 text-[13px] rounded-md; }
+
+    /* Status badges */
+    .badge { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset; }
+    .badge-green { @apply bg-emerald-50 text-emerald-700 ring-emerald-200; }
+    .badge-amber { @apply bg-amber-50 text-amber-700 ring-amber-200; }
+    .badge-blue  { @apply bg-sky-50 text-sky-700 ring-sky-200; }
+    .badge-red   { @apply bg-rose-50 text-rose-700 ring-rose-200; }
+    .badge-gray  { @apply bg-gray-100 text-gray-600 ring-gray-200; }
+
+    /* Data table */
+    .admin-table { @apply w-full text-sm text-right; }
+    .admin-table thead th { @apply bg-gray-50 text-gray-500 font-semibold text-xs uppercase tracking-wide px-4 py-3 border-b border-gray-200 whitespace-nowrap; }
+    .admin-table tbody td { @apply px-4 py-3 border-b border-gray-100 text-gray-700 align-middle; }
+    .admin-table tbody tr:last-child td { @apply border-b-0; }
+    .admin-table tbody tr:hover { @apply bg-gray-50/70; }
+
+    /* Custom scrollbar for the dark sidebar */
+    .admin-scroll::-webkit-scrollbar { width: 6px; }
+    .admin-scroll::-webkit-scrollbar-thumb { @apply bg-white/10 rounded-full; }
+    .admin-scroll::-webkit-scrollbar-track { background: transparent; }
+}
+
+/* Nudge legacy inline indigo focus/controls toward the Tawfeer-green accent
+   without touching every Blade file. (Utility classes still win where present;
+   this covers native/unstyled controls and any missed spots.) */
+@layer base {
+    .admin-scope input:not([type="checkbox"]):not([type="radio"]):focus,
+    .admin-scope select:focus,
+    .admin-scope textarea:focus {
+        --tw-ring-color: theme('colors.emerald.500');
+        border-color: theme('colors.emerald.500');
+    }
 }

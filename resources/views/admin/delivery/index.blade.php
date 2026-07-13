@@ -22,12 +22,12 @@
             {{-- فلترة بالحالة القانونية --}}
             <div class="flex flex-wrap gap-1 mb-4">
                 <a href="{{ route('admin.shipping.delivery.index') }}"
-                   @class(['px-3 py-1.5 rounded-md text-sm', 'bg-indigo-600 text-white' => ! $status, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => (bool) $status])>
+                   @class(['px-3 py-1.5 rounded-md text-sm', 'bg-emerald-600 text-white' => ! $status, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => (bool) $status])>
                     {{ __('delivery.all_statuses') }}
                 </a>
                 @foreach ($statuses as $s)
                     <a href="{{ route('admin.shipping.delivery.index', ['delivery_status' => $s]) }}"
-                       @class(['px-3 py-1.5 rounded-md text-sm', 'bg-indigo-600 text-white' => $status === $s, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => $status !== $s])>
+                       @class(['px-3 py-1.5 rounded-md text-sm', 'bg-emerald-600 text-white' => $status === $s, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => $status !== $s])>
                         {{ __('delivery.status.'.$s) }}
                     </a>
                 @endforeach
@@ -51,11 +51,11 @@
                                     <td class="py-2 px-3 font-mono text-xs">{{ $shipment->number }}</td>
                                     <td class="py-2 px-3">{{ $shipment->order?->number }}</td>
                                     <td class="py-2 px-3">
-                                        <span class="inline-block px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs">{{ __('delivery.status.'.$shipment->delivery_status) }}</span>
+                                        <span class="inline-block px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-xs">{{ __('delivery.status.'.$shipment->delivery_status) }}</span>
                                     </td>
                                     <td class="py-2 px-3 text-gray-400 text-xs">{{ $shipment->provider_status ?? '—' }}</td>
                                     <td class="py-2 px-3">
-                                        <a href="{{ route('admin.shipping.delivery.show', $shipment) }}" class="text-indigo-600 hover:underline">{{ __('delivery.view') }}</a>
+                                        <a href="{{ route('admin.shipping.delivery.show', $shipment) }}" class="text-emerald-600 hover:underline">{{ __('delivery.view') }}</a>
                                     </td>
                                 </tr>
                             @endforeach

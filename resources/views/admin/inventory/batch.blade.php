@@ -33,7 +33,7 @@
 
                 <div class="flex gap-2">
                     <button type="button" @click="rows.push({})" class="px-3 py-2 bg-gray-200 text-gray-700 text-sm rounded-md">{{ __('warehouse.add_line') }}</button>
-                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('warehouse.apply') }}</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('warehouse.apply') }}</button>
                 </div>
             </form>
         </div>

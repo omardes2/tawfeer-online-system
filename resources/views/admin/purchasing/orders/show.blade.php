@@ -79,7 +79,7 @@
                     <h3 class="text-sm font-medium text-gray-700 mb-2">{{ __('إيصالات الاستلام') }}</h3>
                     <ul class="text-sm space-y-1">
                         @foreach ($order->receipts as $r)
-                            <li><a href="{{ route('admin.purchasing.receipts.show', $r) }}" class="text-indigo-600 hover:underline">{{ $r->number }}</a> — <x-purchasing.status :status="$r->status" /></li>
+                            <li><a href="{{ route('admin.purchasing.receipts.show', $r) }}" class="text-emerald-600 hover:underline">{{ $r->number }}</a> — <x-purchasing.status :status="$r->status" /></li>
                         @endforeach
                     </ul>
                 </div>

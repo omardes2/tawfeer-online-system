@@ -19,7 +19,7 @@
                             </select>
                         </x-admin.field>
                     @endunless
-                    <label class="flex items-center gap-2 text-sm pt-6"><input type="hidden" name="is_active" value="0" /><input type="checkbox" name="is_active" value="1" @checked(old('is_active', $treasury->exists ? $treasury->is_active : true)) class="rounded border-gray-300 text-indigo-600" />{{ __('نشط') }}</label>
+                    <label class="flex items-center gap-2 text-sm pt-6"><input type="hidden" name="is_active" value="0" /><input type="checkbox" name="is_active" value="1" @checked(old('is_active', $treasury->exists ? $treasury->is_active : true)) class="rounded border-gray-300 text-emerald-600" />{{ __('نشط') }}</label>
                 </div>
 
                 @if ($isBank)
@@ -33,7 +33,7 @@
                 @endif
 
                 @foreach ($errors->all() as $e)<p class="text-xs text-rose-600">{{ $e }}</p>@endforeach
-                <div class="flex gap-2 pt-2"><button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('حفظ') }}</button><a href="{{ route('admin.accounting.'.$rp.'.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a></div>
+                <div class="flex gap-2 pt-2"><button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('حفظ') }}</button><a href="{{ route('admin.accounting.'.$rp.'.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a></div>
             </form>
         </div>
     </div>

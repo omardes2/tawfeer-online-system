@@ -5,7 +5,7 @@
             <x-admin.flash />
             <x-admin.header :title="__('المنتجات')">
                 @can('create', \App\Modules\Catalog\Models\Product::class)
-                    <a href="{{ route('admin.products.create') }}" class="inline-flex px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('منتج جديد') }}</a>
+                    <a href="{{ route('admin.products.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('منتج جديد') }}</a>
                 @endcan
             </x-admin.header>
 
@@ -45,10 +45,10 @@
                                 <td class="py-2 px-3">
                                     @php $map = ['active' => ['bg-emerald-100 text-emerald-700','مفعّل'], 'draft' => ['bg-amber-100 text-amber-700','مسودّة'], 'archived' => ['bg-gray-100 text-gray-500','مؤرشف']]; @endphp
                                     <span class="inline-flex px-2 py-0.5 rounded-full text-xs {{ $map[$product->status][0] ?? '' }}">{{ __($map[$product->status][1] ?? $product->status) }}</span>
-                                    @if ($product->is_featured)<span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-700">{{ __('مميّز') }}</span>@endif
+                                    @if ($product->is_featured)<span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700">{{ __('مميّز') }}</span>@endif
                                 </td>
                                 <td class="py-2 px-3"><div class="flex gap-2">
-                                    @can('update', $product)<a href="{{ route('admin.products.edit', $product) }}" class="text-indigo-600 hover:underline">{{ __('تعديل') }}</a>@endcan
+                                    @can('update', $product)<a href="{{ route('admin.products.edit', $product) }}" class="text-emerald-600 hover:underline">{{ __('تعديل') }}</a>@endcan
                                     @can('delete', $product)<form method="POST" action="{{ route('admin.products.destroy', $product) }}" onsubmit="return confirm('{{ __('تأكيد الحذف؟') }}')">@csrf @method('DELETE')<button class="text-rose-600 hover:underline">{{ __('حذف') }}</button></form>@endcan
                                 </div></td>
                             </tr>

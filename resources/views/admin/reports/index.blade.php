@@ -25,7 +25,7 @@
             <h3 class="text-sm font-semibold text-gray-600 mb-2">{{ __('reports.dashboards') }}</h3>
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 @foreach ($dashboards as [$route, $key, $icon])
-                    <a href="{{ route('admin.reports.'.$route) }}" class="bg-white shadow-sm rounded-lg border border-gray-100 p-4 hover:border-indigo-300 transition">
+                    <a href="{{ route('admin.reports.'.$route) }}" class="bg-white shadow-sm rounded-lg border border-gray-100 p-4 hover:border-emerald-300 transition">
                         <div class="text-2xl mb-1">{{ $icon }}</div>
                         <div class="text-sm font-medium text-gray-800">{{ __($key) }}</div>
                     </a>
@@ -37,7 +37,7 @@
             <h3 class="text-sm font-semibold text-gray-600 mb-2">{{ __('reports.reports_list') }}</h3>
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 @foreach ($list as [$route, $key, $icon])
-                    <a href="{{ route('admin.reports.'.$route) }}" class="bg-white shadow-sm rounded-lg border border-gray-100 p-4 hover:border-indigo-300 transition">
+                    <a href="{{ route('admin.reports.'.$route) }}" class="bg-white shadow-sm rounded-lg border border-gray-100 p-4 hover:border-emerald-300 transition">
                         <div class="text-2xl mb-1">{{ $icon }}</div>
                         <div class="text-sm font-medium text-gray-800">{{ __($key) }}</div>
                     </a>

@@ -8,13 +8,13 @@
                 <div class="flex flex-wrap gap-1">
                     @foreach (['pending', 'eligible', 'approved', 'paid', 'reversed'] as $s)
                         <a href="{{ route('admin.commissions.index', ['state' => $s]) }}"
-                           @class(['px-3 py-1.5 rounded-md text-sm', 'bg-indigo-600 text-white' => $state === $s, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => $state !== $s])>
+                           @class(['px-3 py-1.5 rounded-md text-sm', 'bg-emerald-600 text-white' => $state === $s, 'bg-gray-100 text-gray-700 hover:bg-gray-200' => $state !== $s])>
                             {{ __('commissions.'.$s) }}
                         </a>
                     @endforeach
                 </div>
                 @can('commissions.rules.manage')
-                    <a href="{{ route('admin.commissions.rules') }}" class="text-sm text-indigo-600 hover:underline">{{ __('commissions.rules') }}</a>
+                    <a href="{{ route('admin.commissions.rules') }}" class="text-sm text-emerald-600 hover:underline">{{ __('commissions.rules') }}</a>
                 @endcan
             </div>
 
@@ -42,7 +42,7 @@
                                             @endif
                                         </td>
                                         <td class="py-2 px-3">
-                                            <a href="{{ route('admin.commissions.statement', ['earnerId' => $e->earner_id, 'earner_type' => $e->earner_type]) }}" class="text-indigo-600 hover:underline">{{ $e->earner?->name }}</a>
+                                            <a href="{{ route('admin.commissions.statement', ['earnerId' => $e->earner_id, 'earner_type' => $e->earner_type]) }}" class="text-emerald-600 hover:underline">{{ $e->earner?->name }}</a>
                                         </td>
                                         <td class="py-2 px-3">{{ __('commissions.'.$e->earner_type) }}</td>
                                         <td class="py-2 px-3">{{ $e->order?->number }}</td>
@@ -85,7 +85,7 @@
                             @foreach ($entries as $e)
                                 <input type="hidden" name="entry_ids[]" value="{{ $e->id }}">
                             @endforeach
-                            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('commissions.payout_selected') }}</button>
+                            <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('commissions.payout_selected') }}</button>
                         </form>
                     @endcan
                 @endif

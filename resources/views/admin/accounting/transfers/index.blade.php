@@ -4,7 +4,7 @@
         <div class="bg-white shadow-sm sm:rounded-lg p-6">
             <x-admin.flash />
             <x-admin.header :title="__('التحويلات')">
-                @can('accounting.transfers.create')<a href="{{ route('admin.accounting.transfers.create') }}" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('تحويل جديد') }}</a>@endcan
+                @can('accounting.transfers.create')<a href="{{ route('admin.accounting.transfers.create') }}" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('تحويل جديد') }}</a>@endcan
             </x-admin.header>
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm text-right">
@@ -18,7 +18,7 @@
                                 <td class="py-2 px-3">{{ $t->counterTreasury?->name }}</td>
                                 <td class="py-2 px-3 font-bold">{{ number_format($t->amount, 2) }}</td>
                                 <td class="py-2 px-3"><x-accounting.status :status="$t->status" /></td>
-                                <td class="py-2 px-3"><a href="{{ route('admin.accounting.transfers.show', $t) }}" class="text-indigo-600 hover:underline">{{ __('عرض') }}</a></td>
+                                <td class="py-2 px-3"><a href="{{ route('admin.accounting.transfers.show', $t) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a></td>
                             </tr>
                         @empty
                             <tr><td colspan="7" class="py-6 text-center text-gray-400">{{ __('لا توجد تحويلات.') }}</td></tr>

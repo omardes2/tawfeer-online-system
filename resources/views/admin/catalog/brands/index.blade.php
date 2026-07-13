@@ -5,7 +5,7 @@
             <x-admin.flash />
             <x-admin.header :title="__('العلامات التجارية')">
                 @can('create', \App\Modules\Catalog\Models\Brand::class)
-                    <a href="{{ route('admin.brands.create') }}" class="inline-flex px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('علامة جديدة') }}</a>
+                    <a href="{{ route('admin.brands.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('علامة جديدة') }}</a>
                 @endcan
             </x-admin.header>
             <form method="GET" class="mb-4"><input type="text" name="search" value="{{ request('search') }}" placeholder="{{ __('بحث...') }}" class="w-full sm:w-72 rounded-md border-gray-300 text-sm" /></form>
@@ -24,7 +24,7 @@
                                 <td class="py-2 px-3 text-gray-500">{{ $brand->slug }}</td>
                                 <td class="py-2 px-3"><span class="inline-flex px-2 py-0.5 rounded-full text-xs {{ $brand->is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500' }}">{{ $brand->is_active ? __('مفعّل') : __('معطّل') }}</span></td>
                                 <td class="py-2 px-3"><div class="flex gap-2">
-                                    @can('update', $brand)<a href="{{ route('admin.brands.edit', $brand) }}" class="text-indigo-600 hover:underline">{{ __('تعديل') }}</a>@endcan
+                                    @can('update', $brand)<a href="{{ route('admin.brands.edit', $brand) }}" class="text-emerald-600 hover:underline">{{ __('تعديل') }}</a>@endcan
                                     @can('delete', $brand)<form method="POST" action="{{ route('admin.brands.destroy', $brand) }}" onsubmit="return confirm('{{ __('تأكيد الحذف؟') }}')">@csrf @method('DELETE')<button class="text-rose-600 hover:underline">{{ __('حذف') }}</button></form>@endcan
                                 </div></td>
                             </tr>

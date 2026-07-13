@@ -33,7 +33,7 @@
                 <div class="border-t pt-4">
                     <div class="flex items-center justify-between mb-2">
                         <label class="block text-sm font-medium text-gray-700">{{ __('هواتف إضافية') }}</label>
-                        <button type="button" @click="phones.push({ phone: '', is_primary: false })" class="text-sm text-indigo-600 hover:underline">+ {{ __('إضافة هاتف') }}</button>
+                        <button type="button" @click="phones.push({ phone: '', is_primary: false })" class="text-sm text-emerald-600 hover:underline">+ {{ __('إضافة هاتف') }}</button>
                     </div>
                     <template x-for="(p, i) in phones" :key="i">
                         <div class="flex flex-wrap gap-2 mb-2 items-center">
@@ -48,7 +48,7 @@
                 <div class="border-t pt-4">
                     <div class="flex items-center justify-between mb-2">
                         <label class="block text-sm font-medium text-gray-700">{{ __('العناوين') }}</label>
-                        <button type="button" @click="addresses.push({ label: '', address_line: '', is_default: false })" class="text-sm text-indigo-600 hover:underline">+ {{ __('إضافة عنوان') }}</button>
+                        <button type="button" @click="addresses.push({ label: '', address_line: '', is_default: false })" class="text-sm text-emerald-600 hover:underline">+ {{ __('إضافة عنوان') }}</button>
                     </div>
                     <template x-for="(a, i) in addresses" :key="i">
                         <div class="flex flex-wrap gap-2 mb-2 items-center">
@@ -61,7 +61,7 @@
                 </div>
 
                 <div class="flex gap-2 pt-2 border-t">
-                    <button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('حفظ') }}</button>
+                    <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('حفظ') }}</button>
                     <a href="{{ route('admin.crm.customers.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a>
                 </div>
             </form>

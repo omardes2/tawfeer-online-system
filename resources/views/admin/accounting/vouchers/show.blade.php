@@ -18,7 +18,7 @@
                         <form method="POST" action="{{ route('admin.accounting.vouchers.reject', [$kind, $voucher]) }}">@csrf<button class="px-3 py-1.5 bg-rose-600 text-white text-sm rounded-md">{{ __('رفض') }}</button></form>@endcan
                         @can('accounting.'.$res.'.create')<form method="POST" action="{{ route('admin.accounting.vouchers.cancel', [$kind, $voucher]) }}">@csrf<button class="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</button></form>@endcan
                     @elseif ($voucher->status === 'approved')
-                        @can('accounting.'.$res.'.post')<form method="POST" action="{{ route('admin.accounting.vouchers.post', [$kind, $voucher]) }}">@csrf<button class="px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-md">{{ __('ترحيل') }}</button></form>@endcan
+                        @can('accounting.'.$res.'.post')<form method="POST" action="{{ route('admin.accounting.vouchers.post', [$kind, $voucher]) }}">@csrf<button class="px-3 py-1.5 bg-emerald-600 text-white text-sm rounded-md">{{ __('ترحيل') }}</button></form>@endcan
                         @can('accounting.'.$res.'.create')<form method="POST" action="{{ route('admin.accounting.vouchers.cancel', [$kind, $voucher]) }}">@csrf<button class="px-3 py-1.5 bg-gray-200 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</button></form>@endcan
                     @elseif ($voucher->status === 'posted')
                         @can('accounting.'.$res.'.post')

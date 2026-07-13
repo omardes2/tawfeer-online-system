@@ -22,7 +22,7 @@
                     <x-admin.field :label="__('البيان')" name="description"><input type="text" name="description" value="{{ old('description') }}" class="w-full rounded-md border-gray-300" /></x-admin.field>
                 </div>
                 @foreach ($errors->all() as $e)<p class="text-xs text-rose-600">{{ $e }}</p>@endforeach
-                <div class="flex gap-2 pt-2"><button class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md">{{ __('حفظ كمسودّة') }}</button><a href="{{ route('admin.accounting.transfers.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a></div>
+                <div class="flex gap-2 pt-2"><button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('حفظ كمسودّة') }}</button><a href="{{ route('admin.accounting.transfers.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a></div>
             </form>
         </div>
     </div>

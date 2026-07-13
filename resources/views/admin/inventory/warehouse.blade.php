@@ -34,7 +34,7 @@
             @endphp
             @foreach ($links as [$route, $key, $icon, $perm])
                 @can($perm)
-                    <a href="{{ route($route) }}" class="bg-white shadow-sm rounded-lg border border-gray-100 p-4 hover:border-indigo-300 transition text-center">
+                    <a href="{{ route($route) }}" class="bg-white shadow-sm rounded-lg border border-gray-100 p-4 hover:border-emerald-300 transition text-center">
                         <div class="text-2xl mb-1">{{ $icon }}</div>
                         <div class="text-sm font-medium text-gray-800">{{ __('warehouse.'.$key) }}</div>
                     </a>

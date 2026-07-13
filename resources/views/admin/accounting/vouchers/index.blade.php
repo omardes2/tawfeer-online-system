@@ -7,7 +7,7 @@
                 <div class="flex gap-2">
                     <a href="{{ route('admin.accounting.vouchers.export', array_merge(['kind' => $kind], $filters)) }}" class="px-3 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('تصدير Excel') }}</a>
                     @can('accounting.'.($kind === 'income' ? 'income' : $kind.'s').'.create')
-                        <a href="{{ route('admin.accounting.vouchers.create', $kind) }}" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700">{{ __('جديد') }}</a>
+                        <a href="{{ route('admin.accounting.vouchers.create', $kind) }}" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('جديد') }}</a>
                     @endcan
                 </div>
             </x-admin.header>
@@ -39,7 +39,7 @@
                                 <td class="py-2 px-3 text-gray-600">{{ $v->party_name ?: ($v->counterAccount?->name) }}</td>
                                 <td class="py-2 px-3 font-bold">{{ number_format($v->amount, 2) }}</td>
                                 <td class="py-2 px-3"><x-accounting.status :status="$v->status" /></td>
-                                <td class="py-2 px-3"><a href="{{ route('admin.accounting.vouchers.show', [$kind, $v]) }}" class="text-indigo-600 hover:underline">{{ __('عرض') }}</a></td>
+                                <td class="py-2 px-3"><a href="{{ route('admin.accounting.vouchers.show', [$kind, $v]) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a></td>
                             </tr>
                         @empty
                             <tr><td colspan="7" class="py-6 text-center text-gray-400">{{ __('لا توجد سندات.') }}</td></tr>
