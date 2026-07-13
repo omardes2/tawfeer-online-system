@@ -12,18 +12,34 @@ use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class OrderController extends Controller
 {
+    /** حالات الطلب القانونية للفلترة (بالترتيب المنطقي). */
+    private const STATUSES = ['draft', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+
     public function __construct(private readonly OrderService $service) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
         $this->authorize('viewAny', Order::class);
 
+        $status = $request->query('status');
+        $status = in_array($status, self::STATUSES, true) ? $status : null;
+
+        $query = Order::with('assignee')->latest('id');
+        if ($status !== null) {
+            $query->where('status', $status);
+        }
+
         return view('admin.sales.orders.index', [
-            'orders' => Order::with(['warehouse'])->latest('id')->paginate(20),
+            'orders' => $query->paginate(20)->withQueryString(),
+            'statuses' => self::STATUSES,
+            'activeStatus' => $status,
+            'statusCounts' => Order::selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status'),
+            'totalCount' => Order::count(),
         ]);
     }
 
