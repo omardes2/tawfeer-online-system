@@ -4,7 +4,9 @@ namespace App\Modules\Sales\Models;
 
 use App\Models\User;
 use App\Modules\Crm\Models\Customer;
+use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\Branch;
+use App\Modules\Foundation\Models\City;
 use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Payment\Models\Payment;
 use App\Modules\Shipping\Models\Shipment;
@@ -30,6 +32,8 @@ class Order extends Model
     protected $fillable = [
         'number', 'branch_id', 'warehouse_id', 'customer_id',
         'customer_name', 'customer_phone', 'customer_email', 'shipping_address',
+        'city_id', 'area_id', 'has_return', 'return_notes',
+        'tracking_number', 'delivery_external_id', 'delivery_status',
         'channel', 'status', 'payment_status', 'assigned_to', 'affiliate_id',
         'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'total', 'amount_paid',
         'notes', 'cancel_reason',
@@ -38,6 +42,7 @@ class Order extends Model
     ];
 
     protected $casts = [
+        'has_return' => 'boolean',
         'subtotal' => 'decimal:2',
         'discount_total' => 'decimal:2',
         'tax_total' => 'decimal:2',
@@ -77,6 +82,18 @@ class Order extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class, 'customer_id');
+    }
+
+    /** مدينة التوصيل المُعيَّنة (نمط Opost). */
+    public function city(): BelongsTo
+    {
+        return $this->belongsTo(City::class, 'city_id');
+    }
+
+    /** منطقة التوصيل المُعيَّنة (نمط Opost). */
+    public function area(): BelongsTo
+    {
+        return $this->belongsTo(Area::class, 'area_id');
     }
 
     /** أحدث شحنة للطلب (اسم المستلم يؤخذ منها). */

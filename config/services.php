@@ -59,6 +59,8 @@ return [
         'base_url' => env('OPOST_BASE_URL', 'https://opost.ps/api'),
         'token' => env('OPOST_API_TOKEN'),
         'business_id' => env('OPOST_BUSINESS_ID'),
+        'business_address_id' => env('OPOST_BUSINESS_ADDRESS_ID'),
+        'shipment_type_id' => env('OPOST_SHIPMENT_TYPE_ID', 1),
         // المحافظة الحاوية لمدن المزوّد المستوردة (تُبنى تلقائيًا عند المزامنة).
         'country_name' => env('OPOST_COUNTRY_NAME', 'فلسطين'),
         'country_code' => env('OPOST_COUNTRY_CODE', 'PS'),

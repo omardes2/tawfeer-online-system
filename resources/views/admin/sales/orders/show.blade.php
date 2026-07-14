@@ -8,8 +8,17 @@
                 <span>{{ __('المستودع') }}: <b>{{ $order->warehouse?->name }}</b></span>
                 <span>{{ __('الحالة') }}: <x-sales.status :status="$order->status" /></span>
             </div>
+            <div class="flex flex-wrap gap-4 text-sm">
+                @if ($order->city)<span>{{ __('المدينة') }}: <b>{{ $order->city->name }}</b></span>@endif
+                @if ($order->area)<span>{{ __('المنطقة') }}: <b>{{ $order->area->name }}</b></span>@endif
+                @if ($order->shipping_total > 0)<span>{{ __('رسوم التوصيل') }}: <b>{{ $order->shipping_total }}</b></span>@endif
+                @if ($order->tracking_number)<span>{{ __('رقم التتبّع') }}: <b class="font-mono">{{ $order->tracking_number }}</b></span>@endif
+            </div>
             @if ($order->shipping_address)
-                <p class="text-sm text-gray-500">{{ __('عنوان الشحن') }}: {{ $order->shipping_address }}</p>
+                <p class="text-sm text-gray-500">{{ __('العنوان') }}: {{ $order->shipping_address }}</p>
+            @endif
+            @if ($order->has_return)
+                <p class="text-sm text-amber-700">{{ __('يوجد مرتجع') }}@if ($order->return_notes) — {{ $order->return_notes }}@endif</p>
             @endif
 
             <div class="overflow-x-auto">
