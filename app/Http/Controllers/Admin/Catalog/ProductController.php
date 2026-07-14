@@ -120,7 +120,18 @@ class ProductController extends Controller
     public function storeImage(StoreProductImageRequest $request, Product $product): RedirectResponse
     {
         $this->authorize('update', $product);
-        $this->imageService->store($product, $request->file('image'), $request->safe()->except('image'));
+
+        // ألبوم الصور: عدة ملفات دفعة واحدة (لا تُعيَّن أساسية).
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $file) {
+                $this->imageService->store($product, $file, ['is_primary' => false]);
+            }
+
+            return back()->with('success', __('تمت إضافة الصور إلى الألبوم.'));
+        }
+
+        // صورة مفردة (المصغّرة).
+        $this->imageService->store($product, $request->file('image'), $request->safe()->except(['image', 'images']));
 
         return back()->with('success', __('تم رفع الصورة.'));
     }

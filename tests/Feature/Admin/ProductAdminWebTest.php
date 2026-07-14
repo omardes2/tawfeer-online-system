@@ -144,4 +144,39 @@ class ProductAdminWebTest extends TestCase
 
         $this->assertSame(1, $product->images()->count());
     }
+
+    public function test_admin_uploads_thumbnail_marks_primary(): void
+    {
+        Storage::fake('public');
+        $product = Product::factory()->create();
+
+        $this->actingAs($this->admin())
+            ->from(route('admin.products.edit', $product))
+            ->post(route('admin.products.images.store', $product), [
+                'image' => UploadedFile::fake()->image('thumb.jpg'),
+                'is_primary' => 1,
+            ])->assertRedirect();
+
+        $this->assertTrue($product->images()->first()->is_primary);
+    }
+
+    public function test_admin_uploads_multiple_gallery_images(): void
+    {
+        Storage::fake('public');
+        $product = Product::factory()->create();
+
+        $this->actingAs($this->admin())
+            ->from(route('admin.products.edit', $product))
+            ->post(route('admin.products.images.store', $product), [
+                'images' => [
+                    UploadedFile::fake()->image('g1.jpg'),
+                    UploadedFile::fake()->image('g2.jpg'),
+                    UploadedFile::fake()->image('g3.jpg'),
+                ],
+            ])->assertRedirect();
+
+        $this->assertSame(3, $product->images()->count());
+        // أول صورة تصبح أساسية تلقائيًا؛ الباقي ألبوم.
+        $this->assertSame(1, $product->images()->where('is_primary', true)->count());
+    }
 }

@@ -68,16 +68,59 @@
 
                 {{-- الأسعار (تُزامَن مع المتغيّر الافتراضي وتظهر في الموقع) --}}
                 @php($v = $product->defaultVariant)
-                <div class="border-t border-gray-100 pt-4 mt-2">
-                    <h3 class="text-sm font-semibold text-gray-700 mb-1">{{ __('الأسعار') }}</h3>
-                    <p class="text-xs text-gray-400 mb-3">{{ __('إذا مُلئ «سعر العرض» بأقل من «سعر البيع»، يظهر خصم على المنتج في الموقع تلقائيًا.') }}</p>
-                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                        <x-admin.field :label="__('سعر البيع')" name="retail_price">
-                            <input type="number" step="0.01" min="0" name="retail_price" value="{{ old('retail_price', $v->retail_price ?? $product->retail_price) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
-                        </x-admin.field>
-                        <x-admin.field :label="__('سعر العرض (خصم)')" name="promo_price">
-                            <input type="number" step="0.01" min="0" name="promo_price" value="{{ old('promo_price', $v->promo_price ?? $product->promo_price) }}" placeholder="{{ __('اتركه فارغًا إن لا يوجد عرض') }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
-                        </x-admin.field>
+                <div class="border-t border-gray-100 pt-4 mt-2"
+                    x-data="{
+                        retail: Number('{{ old('retail_price', $v->retail_price ?? $product->retail_price) }}') || 0,
+                        promo: Number('{{ old('promo_price', $v->promo_price ?? $product->promo_price) }}') || 0,
+                        get onSale() { return this.promo > 0 && this.promo < this.retail; },
+                        get percent() { return this.onSale ? Math.round((1 - this.promo / this.retail) * 100) : 0; },
+                    }">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-3">{{ __('الأسعار') }}</h3>
+
+                    {{-- جدول السعر الأصلي --}}
+                    <div class="rounded-lg border border-gray-200 overflow-hidden mb-3">
+                        <div class="flex items-center justify-between bg-gray-50 px-4 py-2 border-b border-gray-200">
+                            <span class="text-sm font-medium text-gray-700">{{ __('السعر الأصلي') }}</span>
+                            <span class="text-xs text-gray-400">{{ __('السعر المعروض قبل الخصم') }}</span>
+                        </div>
+                        <div class="px-4 py-3">
+                            <div class="relative max-w-xs">
+                                <input type="number" step="0.01" min="0" name="retail_price" x-model.number="retail"
+                                    value="{{ old('retail_price', $v->retail_price ?? $product->retail_price) }}"
+                                    class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500 ps-12" />
+                                <span class="absolute inset-y-0 start-0 flex items-center px-3 text-gray-400 text-sm">{{ __('₪') }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- جدول سعر الخصم (يظهر تحت السعر الأصلي) --}}
+                    <div class="rounded-lg border border-rose-200 overflow-hidden mb-2">
+                        <div class="flex items-center justify-between bg-rose-50 px-4 py-2 border-b border-rose-200">
+                            <span class="text-sm font-medium text-rose-700">{{ __('سعر الخصم (العرض)') }}</span>
+                            <span class="text-xs text-rose-400" x-show="onSale" x-cloak>
+                                {{ __('خصم') }} <span x-text="percent"></span>%
+                            </span>
+                            <span class="text-xs text-gray-400" x-show="!onSale">{{ __('اتركه فارغًا إن لا يوجد عرض') }}</span>
+                        </div>
+                        <div class="px-4 py-3">
+                            <div class="relative max-w-xs">
+                                <input type="number" step="0.01" min="0" name="promo_price" x-model.number="promo"
+                                    value="{{ old('promo_price', $v->promo_price ?? $product->promo_price) }}"
+                                    placeholder="{{ __('مثال: 80') }}"
+                                    class="w-full rounded-md border-gray-300 focus:border-rose-400 focus:ring-rose-400 ps-12" />
+                                <span class="absolute inset-y-0 start-0 flex items-center px-3 text-gray-400 text-sm">{{ __('₪') }}</span>
+                            </div>
+                            <p class="mt-2 text-xs text-gray-500" x-show="onSale" x-cloak>
+                                {{ __('سيظهر في الموقع:') }}
+                                <span class="text-gray-400 line-through" x-text="retail"></span>
+                                <span class="text-rose-600 font-semibold mx-1" x-text="promo"></span>
+                                {{ __('₪') }}
+                            </p>
+                        </div>
+                    </div>
+
+                    {{-- الجملة والتكلفة --}}
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
                         <x-admin.field :label="__('سعر الجملة')" name="wholesale_price">
                             <input type="number" step="0.01" min="0" name="wholesale_price" value="{{ old('wholesale_price', $v->wholesale_price ?? $product->wholesale_price) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
                         </x-admin.field>
@@ -131,34 +174,75 @@
         {{-- مساعد المحتوى بالذكاء الاصطناعي (Phase 6 / ADR-044) — اقتراح فقط --}}
         <x-admin.ai-panel :product="$product->exists ? $product : null" />
 
-        {{-- معرض الصور (بعد الإنشاء) --}}
+        {{-- الملفات والوسائط (بعد الإنشاء) — على نمط Files & Media --}}
         @if ($product->exists)
+            @php
+                $thumbnail = $product->images->firstWhere('is_primary', true);
+                $gallery = $product->images->where('is_primary', false);
+            @endphp
             <div class="bg-white shadow-sm sm:rounded-lg p-6">
-                <h3 class="font-semibold text-gray-800 mb-4">{{ __('صور المنتج') }}</h3>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                    @forelse ($product->images as $image)
-                        <div class="relative border rounded-lg overflow-hidden group">
-                            <img src="{{ $image->url() }}" alt="{{ $image->alt }}" class="w-full h-28 object-cover bg-gray-100" />
-                            @if ($image->is_primary)<span class="absolute top-1 start-1 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-xs">{{ __('أساسية') }}</span>@endif
-                            <div class="absolute bottom-0 inset-x-0 bg-black/40 flex justify-center gap-2 p-1 opacity-0 group-hover:opacity-100 transition">
-                                @unless ($image->is_primary)
-                                    <form method="POST" action="{{ route('admin.products.images.primary', [$product, $image]) }}">@csrf<button class="text-white text-xs hover:underline">{{ __('تعيين أساسية') }}</button></form>
-                                @endunless
-                                <form method="POST" action="{{ route('admin.products.images.destroy', [$product, $image]) }}" onsubmit="return confirm('{{ __('حذف الصورة؟') }}')">@csrf @method('DELETE')<button class="text-white text-xs hover:underline">{{ __('حذف') }}</button></form>
+                <h3 class="font-semibold text-gray-800 mb-1">{{ __('الملفات والوسائط') }}</h3>
+                <p class="text-xs text-gray-400 mb-5">{{ __('الصورة المصغّرة تظهر في قوائم الموقع وبطاقة المنتج، وألبوم الصور يظهر داخل صفحة المنتج.') }}</p>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {{-- الصورة المصغّرة (Thumbnail) --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ __('الصورة المصغّرة') }}</label>
+                        @if ($thumbnail)
+                            <div class="relative w-40 h-40 rounded-lg border border-gray-200 overflow-hidden group">
+                                <img src="{{ $thumbnail->url() }}" alt="{{ $thumbnail->alt }}" class="w-full h-full object-cover bg-gray-100" />
+                                <div class="absolute inset-x-0 bottom-0 bg-black/50 flex justify-center gap-3 p-1.5 opacity-0 group-hover:opacity-100 transition">
+                                    <form method="POST" action="{{ route('admin.products.images.destroy', [$product, $thumbnail]) }}" onsubmit="return confirm('{{ __('حذف الصورة المصغّرة؟') }}')">@csrf @method('DELETE')<button class="text-white text-xs hover:underline">{{ __('حذف') }}</button></form>
+                                </div>
                             </div>
+                            <form method="POST" action="{{ route('admin.products.images.store', $product) }}" enctype="multipart/form-data" class="mt-2">
+                                @csrf
+                                <input type="hidden" name="is_primary" value="1" />
+                                <input type="file" name="image" accept="image/*" class="hidden" id="thumb-replace" onchange="this.form.submit()" />
+                                <label for="thumb-replace" class="text-xs text-emerald-600 hover:underline cursor-pointer">{{ __('استبدال الصورة المصغّرة') }}</label>
+                            </form>
+                        @else
+                            <form method="POST" action="{{ route('admin.products.images.store', $product) }}" enctype="multipart/form-data">
+                                @csrf
+                                <input type="hidden" name="is_primary" value="1" />
+                                <input type="file" name="image" accept="image/*" class="hidden" id="thumb-add" onchange="this.form.submit()" />
+                                <label for="thumb-add" class="flex flex-col items-center justify-center w-40 h-40 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-emerald-400 hover:text-emerald-500 cursor-pointer transition">
+                                    <svg class="w-8 h-8 mb-1" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                                    <span class="text-xs">{{ __('إضافة صورة مصغّرة') }}</span>
+                                    <span class="text-[10px] text-gray-300 mt-0.5">300 × 300</span>
+                                </label>
+                            </form>
+                        @endif
+                    </div>
+
+                    {{-- ألبوم الصور (Gallery) --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">{{ __('ألبوم الصور') }}</label>
+                        <div class="flex flex-wrap gap-3">
+                            @foreach ($gallery as $image)
+                                <div class="relative w-24 h-24 rounded-lg border border-gray-200 overflow-hidden group">
+                                    <img src="{{ $image->url() }}" alt="{{ $image->alt }}" class="w-full h-full object-cover bg-gray-100" />
+                                    <div class="absolute inset-x-0 bottom-0 bg-black/50 flex justify-center gap-2 p-1 opacity-0 group-hover:opacity-100 transition">
+                                        <form method="POST" action="{{ route('admin.products.images.primary', [$product, $image]) }}" title="{{ __('تعيين كصورة مصغّرة') }}">@csrf<button class="text-white text-[10px] hover:underline">{{ __('مصغّرة') }}</button></form>
+                                        <form method="POST" action="{{ route('admin.products.images.destroy', [$product, $image]) }}" onsubmit="return confirm('{{ __('حذف الصورة؟') }}')">@csrf @method('DELETE')<button class="text-white text-[10px] hover:underline">{{ __('حذف') }}</button></form>
+                                    </div>
+                                </div>
+                            @endforeach
+
+                            <form method="POST" action="{{ route('admin.products.images.store', $product) }}" enctype="multipart/form-data">
+                                @csrf
+                                <input type="file" name="images[]" accept="image/*" multiple class="hidden" id="gallery-add" onchange="this.form.submit()" />
+                                <label for="gallery-add" class="flex flex-col items-center justify-center w-24 h-24 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-emerald-400 hover:text-emerald-500 cursor-pointer transition">
+                                    <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                                    <span class="text-[10px] mt-0.5">800 × 800</span>
+                                </label>
+                            </form>
                         </div>
-                    @empty
-                        <p class="text-sm text-gray-400 col-span-full">{{ __('لا توجد صور بعد.') }}</p>
-                    @endforelse
+                    </div>
                 </div>
-                <form method="POST" action="{{ route('admin.products.images.store', $product) }}" enctype="multipart/form-data" class="flex flex-wrap items-end gap-3">
-                    @csrf
-                    <div><label class="block text-xs text-gray-600 mb-1">{{ __('صورة') }}</label><input type="file" name="image" accept="image/*" required class="text-sm" /></div>
-                    <div><label class="block text-xs text-gray-600 mb-1">{{ __('نص بديل') }}</label><input type="text" name="alt" class="rounded-md border-gray-300 text-sm" /></div>
-                    <label class="flex items-center gap-1 text-sm"><input type="checkbox" name="is_primary" value="1" class="rounded border-gray-300 text-emerald-600" />{{ __('أساسية') }}</label>
-                    <button class="px-3 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('رفع') }}</button>
-                    @error('image')<p class="w-full text-xs text-rose-600">{{ $message }}</p>@enderror
-                </form>
+
+                @error('image')<p class="mt-3 text-xs text-rose-600">{{ $message }}</p>@enderror
+                @error('images.*')<p class="mt-3 text-xs text-rose-600">{{ $message }}</p>@enderror
             </div>
         @endif
     </div>

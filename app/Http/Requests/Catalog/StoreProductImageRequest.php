@@ -14,7 +14,10 @@ class StoreProductImageRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'image' => ['required', 'file', 'image', 'mimes:jpeg,jpg,png,webp', 'max:4096'],
+            // صورة مفردة (المصغّرة) أو عدة صور للألبوم — يجب توفّر إحداهما.
+            'image' => ['required_without:images', 'nullable', 'file', 'image', 'mimes:jpeg,jpg,png,webp', 'max:4096'],
+            'images' => ['required_without:image', 'nullable', 'array'],
+            'images.*' => ['file', 'image', 'mimes:jpeg,jpg,png,webp', 'max:4096'],
             'alt' => ['nullable', 'string', 'max:200'],
             'is_primary' => ['boolean'],
             'sort_order' => ['integer', 'min:0'],
