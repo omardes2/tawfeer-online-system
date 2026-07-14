@@ -33,12 +33,15 @@
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                 @foreach ($perms as $perm)
-                                    <label data-perm x-show="q === '' || '{{ $perm->name }}'.toLowerCase().includes(q.toLowerCase())"
-                                        class="inline-flex items-center gap-2 text-sm">
+                                    <label data-perm x-show="q === '' || '{{ $perm->name }}'.toLowerCase().includes(q.toLowerCase()) || '{{ \App\Support\PermissionLabel::for($perm->name) }}'.includes(q)"
+                                        class="inline-flex items-start gap-2 text-sm">
                                         <input type="checkbox" name="permissions[]" value="{{ $perm->name }}"
                                             @checked(in_array($perm->name, old('permissions', $assigned)))
-                                            class="rounded border-gray-300 text-emerald-600" />
-                                        <span class="text-gray-600 font-mono text-xs">{{ $perm->name }}</span>
+                                            class="mt-0.5 rounded border-gray-300 text-emerald-600" />
+                                        <span class="leading-tight">
+                                            <span class="text-gray-800">{{ \App\Support\PermissionLabel::for($perm->name) }}</span>
+                                            <span class="block text-gray-400 font-mono text-[10px]">{{ $perm->name }}</span>
+                                        </span>
                                     </label>
                                 @endforeach
                             </div>
