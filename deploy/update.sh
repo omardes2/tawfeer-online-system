@@ -22,6 +22,8 @@ source "$ENV_FILE"
 : "${APP_PATH:?}"; : "${REPO_BRANCH:?}"; : "${PHP_VERSION:?}"; : "${DEPLOY_USER:?}"
 
 cd "${APP_PATH}"
+# يسمح بتشغيل composer عند النشر بمستخدم root دون توقّف على سؤال تأكيد.
+export COMPOSER_ALLOW_SUPERUSER=1
 log() { echo -e "\n\033[1;34m==> $*\033[0m"; }
 
 log "Maintenance mode ON"
