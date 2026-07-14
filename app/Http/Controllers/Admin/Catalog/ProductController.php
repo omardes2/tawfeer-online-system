@@ -30,12 +30,30 @@ class ProductController extends Controller
     {
         $this->authorize('viewAny', Product::class);
 
-        $products = Product::query()->with(['category', 'brand', 'unit', 'primaryImage'])
-            ->when($request->filled('search'), fn ($q) => $q->where('name', 'like', '%'.$request->string('search').'%')->orWhere('sku', 'like', '%'.$request->string('search').'%'))
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
-            ->orderBy('sort_order')->paginate(15)->withQueryString();
+        $sort = (string) $request->query('sort');
 
-        return view('admin.catalog.products.index', compact('products'));
+        $query = Product::query()
+            ->with(['category', 'primaryImage', 'defaultVariant'])
+            ->withSum('stocks', 'on_hand')       // stocks_sum_on_hand
+            ->withSum('stocks', 'reserved')      // stocks_sum_reserved
+            ->withSum('orderItems', 'qty_shipped') // order_items_sum_qty_shipped (المباع)
+            ->when($request->filled('search'), fn ($q) => $q->where(fn ($w) => $w
+                ->where('name', 'like', '%'.$request->string('search').'%')
+                ->orWhere('sku', 'like', '%'.$request->string('search').'%')))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')));
+
+        match ($sort) {
+            'price_asc' => $query->orderBy('retail_price'),
+            'price_desc' => $query->orderByDesc('retail_price'),
+            'qty_asc' => $query->orderByRaw('COALESCE(stocks_sum_on_hand, 0) asc'),
+            'qty_desc' => $query->orderByRaw('COALESCE(stocks_sum_on_hand, 0) desc'),
+            default => $query->orderBy('sort_order')->orderBy('name'),
+        };
+
+        return view('admin.catalog.products.index', [
+            'products' => $query->paginate(20)->withQueryString(),
+            'activeSort' => $sort,
+        ]);
     }
 
     public function create(): View
@@ -86,6 +104,17 @@ class ProductController extends Controller
         $this->service->delete($product);
 
         return redirect()->route('admin.products.index')->with('success', __('تم حذف المنتج.'));
+    }
+
+    /** تبديل إظهار المنتج على الموقع (visible ⇄ hidden). */
+    public function toggleVisibility(Product $product): RedirectResponse
+    {
+        $this->authorize('update', $product);
+
+        $show = $product->visibility !== 'visible';
+        $product->update(['visibility' => $show ? 'visible' : 'hidden']);
+
+        return back()->with('success', $show ? __('أصبح المنتج ظاهرًا على الموقع.') : __('أُخفي المنتج من الموقع.'));
     }
 
     public function storeImage(StoreProductImageRequest $request, Product $product): RedirectResponse

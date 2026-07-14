@@ -53,6 +53,28 @@ class ProductAdminWebTest extends TestCase
         $res->assertSee('المنتجات');
     }
 
+    public function test_index_shows_price_stock_sold_columns(): void
+    {
+        $product = Product::factory()->create(['name' => 'صنف مخزون', 'retail_price' => 99]);
+        $res = $this->actingAs($this->admin())->get('/admin/products');
+        $res->assertOk();
+        $res->assertSee('صنف مخزون');
+        $res->assertSee(__('المتوفّرة'));
+        $res->assertSee(__('المباعة'));
+        $res->assertSee(__('إظهار على الموقع'));
+    }
+
+    public function test_toggle_visibility_hides_and_shows_product(): void
+    {
+        $product = Product::factory()->create(['visibility' => 'visible']);
+
+        $this->actingAs($this->admin())->post(route('admin.products.toggle-visibility', $product))->assertRedirect();
+        $this->assertSame('hidden', $product->fresh()->visibility);
+
+        $this->actingAs($this->admin())->post(route('admin.products.toggle-visibility', $product))->assertRedirect();
+        $this->assertSame('visible', $product->fresh()->visibility);
+    }
+
     public function test_sales_cannot_open_create(): void
     {
         $u = User::factory()->create(['branch_id' => Branch::default()->id]);

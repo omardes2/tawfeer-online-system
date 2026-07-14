@@ -166,6 +166,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
 
     // المنتجات ووسائطها (Phase 2.3)
     Route::resource('products', ProductController::class)->except('show');
+    Route::post('products/{product}/toggle-visibility', [ProductController::class, 'toggleVisibility'])->name('products.toggle-visibility');
     Route::post('products/{product}/images', [ProductController::class, 'storeImage'])->name('products.images.store');
     Route::post('products/{product}/images/{image}/primary', [ProductController::class, 'setPrimaryImage'])->name('products.images.primary');
     Route::delete('products/{product}/images/{image}', [ProductController::class, 'destroyImage'])->name('products.images.destroy');

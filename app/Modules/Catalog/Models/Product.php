@@ -3,6 +3,8 @@
 namespace App\Modules\Catalog\Models;
 
 use App\Modules\Foundation\Models\Branch;
+use App\Modules\Inventory\Models\InventoryStock;
+use App\Modules\Sales\Models\OrderItem;
 use App\Support\Concerns\Auditable;
 use App\Support\Concerns\HasUuid;
 use Database\Factories\Catalog\ProductFactory;
@@ -12,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -93,6 +96,26 @@ class Product extends Model
     public function defaultVariant(): HasOne
     {
         return $this->hasOne(ProductVariant::class)->where('is_default', true);
+    }
+
+    /** أرصدة المخزون لكل متغيّرات المنتج (عبر ProductVariant) — لتجميع المتوفّر. */
+    public function stocks(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            InventoryStock::class,
+            ProductVariant::class,
+            'product_id', 'variant_id', 'id', 'id',
+        );
+    }
+
+    /** بنود الطلبات لكل متغيّرات المنتج (عبر ProductVariant) — لتجميع المباع. */
+    public function orderItems(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            OrderItem::class,
+            ProductVariant::class,
+            'product_id', 'variant_id', 'id', 'id',
+        );
     }
 
     public function tags(): BelongsToMany
