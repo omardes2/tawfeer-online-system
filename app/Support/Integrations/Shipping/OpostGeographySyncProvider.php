@@ -15,12 +15,29 @@ use Illuminate\Support\Facades\Log;
  */
 class OpostGeographySyncProvider implements GeographySyncProviderInterface
 {
-    private function client()
+    private function client(?string $token)
     {
-        return Http::withToken((string) config('services.opost.token'))
+        return Http::withToken((string) $token)
             ->acceptJson()
             ->timeout(30)
             ->baseUrl(rtrim((string) config('services.opost.base_url', 'https://opost.ps/api'), '/'));
+    }
+
+    /**
+     * GET مع تجديد تلقائي للتوكن عند 401 (OAuth2 قصير الصلاحية).
+     *
+     * @param  array<string, mixed>  $query
+     */
+    private function get(string $path, array $query = [])
+    {
+        $auth = app(OpostTokenProvider::class);
+        $res = $this->client($auth->token())->get($path, $query);
+        if ($res->status() === 401) {
+            // توكن منتهٍ ⇒ أعد المصادقة مرّة واحدة وأعد المحاولة.
+            $res = $this->client($auth->token(true))->get($path, $query);
+        }
+
+        return $res;
     }
 
     /** استخراج مصفوفة السجلّات من مغلّفات شائعة ({data:[...]} أو [...] أو {cities:[...]}). */
@@ -59,7 +76,7 @@ class OpostGeographySyncProvider implements GeographySyncProviderInterface
     public function pullCities(string $governorateExternalId = ''): iterable
     {
         try {
-            $res = $this->client()->get('/resources/cities');
+            $res = $this->get('/resources/cities');
             if (! $res->successful()) {
                 Log::warning('Opost cities sync failed', ['status' => $res->status()]);
 
@@ -97,7 +114,7 @@ class OpostGeographySyncProvider implements GeographySyncProviderInterface
     public function pullAreas(string $cityExternalId): iterable
     {
         try {
-            $res = $this->client()->get('/resources/areas', ['city' => $cityExternalId]);
+            $res = $this->get('/resources/areas', ['city' => $cityExternalId]);
             if (! $res->successful()) {
                 return [];
             }

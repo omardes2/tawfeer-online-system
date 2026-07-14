@@ -5,6 +5,7 @@ namespace App\Support\Integrations\Shipping;
 use App\Modules\Shipping\Support\DeliveryStatus;
 use App\Support\Contracts\Shipping\DeliveryProviderInterface;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -37,12 +38,28 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
         'close' => DeliveryStatus::CLOSED,
     ];
 
-    private function client(): PendingRequest
+    private function client(?string $token): PendingRequest
     {
-        return Http::withToken((string) config('services.opost.token'))
+        return Http::withToken((string) $token)
             ->acceptJson()
             ->timeout(30)
             ->baseUrl(rtrim((string) config('services.opost.base_url', 'https://opost.ps/api'), '/'));
+    }
+
+    /**
+     * تنفيذ طلب مع تجديد تلقائي للتوكن عند 401 (OAuth2 قصير الصلاحية).
+     *
+     * @param  callable(PendingRequest): Response  $call
+     */
+    private function send(callable $call): Response
+    {
+        $auth = app(OpostTokenProvider::class);
+        $res = $call($this->client($auth->token()));
+        if ($res->status() === 401) {
+            $res = $call($this->client($auth->token(true)));
+        }
+
+        return $res;
     }
 
     /**
@@ -52,8 +69,8 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
      */
     public function createShipment(array $payload): array
     {
-        $token = (string) config('services.opost.token');
-        if ($token === '') {
+        $auth = app(OpostTokenProvider::class);
+        if ($auth->token() === null) {
             return ['status' => 'failed', 'message' => __('لم تُضبط بيانات اعتماد شركة التوصيل.'), 'driver' => $this->name()];
         }
 
@@ -75,7 +92,7 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
             'notes' => $payload['notes'] ?? null,
         ], fn ($v) => $v !== null && $v !== '');
 
-        $res = $this->client()->asForm()->post('/resources/shipments', $body);
+        $res = $this->send(fn (PendingRequest $c) => $c->asForm()->post('/resources/shipments', $body));
 
         if (! $res->successful()) {
             Log::warning('Opost createShipment failed', ['status' => $res->status(), 'body' => $res->body()]);
@@ -99,7 +116,7 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
     public function track(string $trackingNumber): array
     {
         try {
-            $res = $this->client()->get('/resources/shipments/'.rawurlencode($trackingNumber));
+            $res = $this->send(fn (PendingRequest $c) => $c->get('/resources/shipments/'.rawurlencode($trackingNumber)));
             if (! $res->successful()) {
                 return ['provider_status' => null, 'external_id' => $trackingNumber, 'driver' => $this->name()];
             }
@@ -121,7 +138,7 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
     public function cancel(string $reference): bool
     {
         try {
-            return $this->client()->delete('/resources/shipments/'.rawurlencode($reference))->successful();
+            return $this->send(fn (PendingRequest $c) => $c->delete('/resources/shipments/'.rawurlencode($reference)))->successful();
         } catch (\Throwable $e) {
             Log::warning('Opost cancel error: '.$e->getMessage());
 

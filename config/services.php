@@ -57,6 +57,14 @@ return [
     // شركة التوصيل Opost (طبقة التكامل — المبدأ 13). الأسرار في .env فقط، لا تُرفع للـGit.
     'opost' => [
         'base_url' => env('OPOST_BASE_URL', 'https://opost.ps/api'),
+        // OAuth2 (Password Grant): التوكن يُصدَر ويُجدَّد آليًا — لا حاجة لتوكن ثابت.
+        'oauth_url' => env('OPOST_OAUTH_URL', 'https://opost.ps/oauth/token'),
+        'client_id' => env('OPOST_CLIENT_ID'),
+        'client_secret' => env('OPOST_CLIENT_SECRET'),
+        'username' => env('OPOST_USERNAME'),   // بريد الحساب في Opost
+        'password' => env('OPOST_PASSWORD'),
+        'scope' => env('OPOST_SCOPE', ''),
+        // توكن ثابت اختياري (تجاوز يدوي/طوارئ) — يُستخدم فقط إن لم تُضبط بيانات OAuth.
         'token' => env('OPOST_API_TOKEN'),
         'business_id' => env('OPOST_BUSINESS_ID'),
         'business_address_id' => env('OPOST_BUSINESS_ADDRESS_ID'),
