@@ -22,7 +22,7 @@
             <p class="text-sm text-gray-500 truncate">{{ $label }}</p>
             <p class="mt-1.5 text-2xl font-bold text-gray-900 tabular-nums">
                 {{ $money ? number_format((float) $value, 2) : $value }}
-                @if ($money)<span class="text-sm font-medium text-gray-400">{{ __('ر.س') }}</span>@endif
+                @if ($money)<span class="text-sm font-medium text-gray-400">{{ \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪') }}</span>@endif
             </p>
             @if ($hint)<p class="mt-1 text-xs text-gray-400">{{ $hint }}</p>@endif
         </div>

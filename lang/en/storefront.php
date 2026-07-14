@@ -4,7 +4,7 @@
 return [
     'site_name' => 'Tawfeer Online',
     'tagline' => 'Everything you need in one place',
-    'currency' => 'SAR',
+    'currency' => '₪',
 
     // Navigation
     'home' => 'Home',
@@ -68,7 +68,7 @@ return [
     'best_sellers' => 'Best sellers',
     'shop_by_category' => 'Shop by category',
     'shop_by_brand' => 'Shop by brand',
-    'free_shipping_hint' => 'Spend SAR :amount more for free shipping',
+    'free_shipping_hint' => 'Spend ₪:amount more for free shipping',
 
     // Cart & checkout
     'empty_cart' => 'Your cart is empty',

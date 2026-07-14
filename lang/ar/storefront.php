@@ -4,7 +4,7 @@
 return [
     'site_name' => 'توفير أونلاين',
     'tagline' => 'كل ما تحتاجه في مكان واحد',
-    'currency' => 'ر.س',
+    'currency' => '₪',
 
     // تنقّل
     'home' => 'الرئيسية',
@@ -68,7 +68,7 @@ return [
     'best_sellers' => 'الأكثر مبيعًا',
     'shop_by_category' => 'تسوّق حسب الفئة',
     'shop_by_brand' => 'تسوّق حسب العلامة',
-    'free_shipping_hint' => 'أنفق :amount ر.س أكثر للحصول على شحن مجّاني',
+    'free_shipping_hint' => 'أنفق :amount ₪ أكثر للحصول على شحن مجّاني',
 
     // السلة والإتمام
     'empty_cart' => 'سلّتك فارغة',

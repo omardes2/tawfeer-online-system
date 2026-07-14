@@ -15,8 +15,8 @@ class SettingsSeeder extends Seeder
         $defaults = [
             ['key' => 'store.name', 'value' => 'توفير أونلاين', 'group' => 'store'],
             ['key' => 'store.email', 'value' => 'hello@tawfeer.online', 'group' => 'store'],
-            ['key' => 'store.currency', 'value' => 'SAR', 'group' => 'store'],
-            ['key' => 'store.currency_symbol', 'value' => 'ر.س', 'group' => 'store'],
+            ['key' => 'store.currency', 'value' => 'ILS', 'group' => 'store'],
+            ['key' => 'store.currency_symbol', 'value' => '₪', 'group' => 'store'],
             ['key' => 'store.default_locale', 'value' => 'ar', 'group' => 'localization'],
             ['key' => 'tax.enabled', 'value' => true, 'group' => 'tax', 'type' => 'boolean'],
             ['key' => 'tax.rate', 'value' => 15, 'group' => 'tax', 'type' => 'integer'],

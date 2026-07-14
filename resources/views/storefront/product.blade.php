@@ -199,7 +199,7 @@
             'offers' => [
                 '@type' => 'Offer',
                 'price' => number_format($price, 2, '.', ''),
-                'priceCurrency' => 'SAR',
+                'priceCurrency' => \App\Modules\Foundation\Services\Settings::get('store.currency', 'ILS'),
                 'availability' => $inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
                 'url' => route('storefront.product', $product->slug),
             ],

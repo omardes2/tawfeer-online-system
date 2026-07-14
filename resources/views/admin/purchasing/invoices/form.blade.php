@@ -69,7 +69,7 @@
                 <div class="text-sm text-gray-600 space-y-0.5 text-start">
                     <div>{{ __('الإجمالي الفرعي') }}: <span class="font-medium tabular-nums" x-text="subtotal().toFixed(2)"></span></div>
                     <div>{{ __('الضريبة') }}: <span class="font-medium tabular-nums" x-text="tax().toFixed(2)"></span></div>
-                    <div class="text-base font-bold text-gray-900">{{ __('الإجمالي') }}: <span class="tabular-nums" x-text="total().toFixed(2)"></span> {{ __('ر.س') }}</div>
+                    <div class="text-base font-bold text-gray-900">{{ __('الإجمالي') }}: <span class="tabular-nums" x-text="total().toFixed(2)"></span> {{ \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪') }}</div>
                 </div>
             </div>
             @error('items')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror

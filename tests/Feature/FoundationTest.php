@@ -68,7 +68,7 @@ class FoundationTest extends TestCase
     public function test_settings_are_read_from_database(): void
     {
         // المبدأ 9: إعدادات ديناميكية.
-        $this->assertSame('SAR', Settings::get('store.currency'));
+        $this->assertSame('ILS', Settings::get('store.currency'));
         $this->assertSame(15, Settings::get('tax.rate'));
         $this->assertNull(Settings::get('non.existent.key'));
     }

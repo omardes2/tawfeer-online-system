@@ -69,7 +69,7 @@ class PurchaseInvoiceService
                 'subtotal' => round($subtotal, 2),
                 'tax_amount' => round($tax, 2),
                 'total' => round($subtotal + $tax, 2),
-                'currency' => $data['currency'] ?? 'SAR',
+                'currency' => $data['currency'] ?? config('app.currency', 'ILS'),
                 'notes' => $data['notes'] ?? null,
             ]);
 

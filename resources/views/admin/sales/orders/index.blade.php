@@ -82,7 +82,7 @@
                             <x-admin.badge tone="amber" :label="__('غير مدفوع')" />
                         @endif
                     </td>
-                    <td class="text-start font-medium tabular-nums whitespace-nowrap">{{ number_format($o->total, 2) }} {{ __('ر.س') }}</td>
+                    <td class="text-start font-medium tabular-nums whitespace-nowrap">{{ number_format($o->total, 2) }} {{ \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪') }}</td>
                     <td class="text-end whitespace-nowrap">
                         <div class="inline-flex items-center gap-3">
                             @if ($o->status === 'draft')
