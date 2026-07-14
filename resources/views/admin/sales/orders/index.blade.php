@@ -1,11 +1,10 @@
 <x-app-layout :title="__('الطلبات')">
     <x-admin.header
         :title="__('طلبات البيع')"
-        :description="__('إدارة طلبات المبيعات ومتابعة حالاتها.')"
         :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('المبيعات') => null, __('الطلبات') => null]">
         @can('create', \App\Modules\Sales\Models\Order::class)
             <a href="{{ route('admin.sales.orders.direct.create') }}" class="btn-secondary btn-sm">{{ __('مبيعات مباشرة') }}</a>
-            <a href="{{ route('admin.sales.orders.create') }}" class="btn-primary btn-sm">{{ __('طلب جديد') }}</a>
+            <a href="{{ route('admin.sales.orders.create') }}" class="btn-primary btn-sm">{{ __('انشاء اوردر') }}</a>
         @endcan
     </x-admin.header>
 
@@ -42,7 +41,6 @@
         <input type="hidden" name="search" value="{{ $activeSearch }}" />
 
         <div>
-            <label class="block text-xs text-gray-500 mb-1">{{ __('نوع البيع') }}</label>
             <select name="sale_type" onchange="this.form.submit()" class="{{ $selectCls }}">
                 <option value="">{{ __('كل المبيعات') }}</option>
                 <option value="normal" @selected(($activeSaleType ?? null) === 'normal')>{{ __('مبيعات عادية') }}</option>
@@ -50,7 +48,6 @@
             </select>
         </div>
         <div>
-            <label class="block text-xs text-gray-500 mb-1">{{ __('الحالة') }}</label>
             <select name="status" onchange="this.form.submit()" class="{{ $selectCls }}">
                 <option value="">{{ __('كل الحالات') }} ({{ $totalCount }})</option>
                 @foreach ($statuses as $s)
@@ -62,7 +59,6 @@
         </div>
 
         <div>
-            <label class="block text-xs text-gray-500 mb-1">{{ __('حالة أوبتيموس') }}</label>
             <select name="delivery_status" onchange="this.form.submit()" class="{{ $selectCls }}">
                 <option value="">{{ __('كل حالات أوبتيموس') }}</option>
                 @foreach ($deliveryLabels as $key => $label)
@@ -72,7 +68,6 @@
         </div>
 
         <div>
-            <label class="block text-xs text-gray-500 mb-1">{{ __('حالة الدفع') }}</label>
             <select name="payment_status" onchange="this.form.submit()" class="{{ $selectCls }}">
                 <option value="">{{ __('كل حالات الدفع') }}</option>
                 <option value="paid" @selected(($activePaymentStatus ?? null) === 'paid')>{{ __('مدفوع') }}</option>
