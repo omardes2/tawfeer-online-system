@@ -8,8 +8,12 @@ use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\City;
 use App\Modules\Foundation\Models\DeliveryCityRate;
+use App\Modules\Foundation\Models\DeliveryProvider;
 use App\Modules\Foundation\Models\Governorate;
+use App\Modules\Foundation\Models\Warehouse;
+use App\Modules\Inventory\Models\InventoryStock;
 use App\Modules\Sales\Models\Order;
+use App\Modules\Sales\Services\OrderService;
 use App\Modules\Shipping\Jobs\CancelOrderShipment;
 use App\Modules\Shipping\Jobs\DispatchOrderShipment;
 use App\Modules\Shipping\Models\Shipment;
@@ -151,6 +155,58 @@ class SalesAdminWebTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertSame('0599001122', Order::latest('id')->first()->customer_phone);
+    }
+
+    public function test_receive_return_restocks_only_when_returned_with_driver(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create()->defaultVariant;
+
+        $order = app(OrderService::class)->create([
+            'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id,
+            'customer_name' => 'راجع', 'customer_phone' => '0599000000',
+        ], [['variant_id' => $variant->id, 'qty' => 3, 'unit_price' => 10]], 2026);
+
+        $provider = DeliveryProvider::firstOrCreate(['code' => 'opost'], ['name' => 'Opost', 'driver' => 'opost']);
+        Shipment::create([
+            'number' => 'SHP-'.$order->id, 'order_id' => $order->id, 'branch_id' => $order->branch_id,
+            'warehouse_id' => $order->warehouse_id, 'status' => 'not_shipped',
+            'recipient_name' => 'راجع', 'recipient_phone' => '0599000000',
+            'delivery_provider_id' => $provider->id, 'provider_status' => 'delivered', // مرتجع مع السائق
+        ]);
+
+        $stock = fn () => (float) (InventoryStock::where('variant_id', $variant->id)
+            ->where('warehouse_id', $warehouse->id)->value('on_hand') ?? 0);
+        $before = $stock();
+
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.receive_return', $order))->assertRedirect();
+
+        $this->assertEqualsWithDelta($before + 3, $stock(), 0.001);
+        $this->assertNotNull($order->fresh()->return_received_at);
+
+        // idempotent — نداء ثانٍ لا يزيد المخزون مجددًا.
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.receive_return', $order));
+        $this->assertEqualsWithDelta($before + 3, $stock(), 0.001);
+    }
+
+    public function test_receive_return_blocked_when_status_not_returned_with_driver(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $order = app(OrderService::class)->create([
+            'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id,
+            'customer_name' => 'ع', 'customer_phone' => '0599000000',
+        ], [], 2026);
+        $provider = DeliveryProvider::firstOrCreate(['code' => 'opost'], ['name' => 'Opost', 'driver' => 'opost']);
+        Shipment::create([
+            'number' => 'SHP2-'.$order->id, 'order_id' => $order->id, 'branch_id' => $order->branch_id,
+            'warehouse_id' => $order->warehouse_id, 'status' => 'not_shipped',
+            'recipient_name' => 'ع', 'recipient_phone' => '0599000000',
+            'delivery_provider_id' => $provider->id, 'provider_status' => 'picked_up',
+        ]);
+
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.receive_return', $order))
+            ->assertSessionHas('error');
+        $this->assertNull($order->fresh()->return_received_at);
     }
 
     public function test_confirm_without_live_provider_just_confirms(): void

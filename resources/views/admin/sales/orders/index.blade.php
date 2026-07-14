@@ -103,7 +103,28 @@
                     <td class="whitespace-nowrap text-xs">
                         @php $ps = $o->latestShipment?->provider_status; @endphp
                         @if ($ps)
-                            <span class="inline-flex items-center rounded-md bg-sky-50 text-sky-700 px-2 py-0.5">{{ \App\Modules\Shipping\Support\OpostStatus::label($ps) }}</span>
+                            <div class="flex flex-col items-start gap-1">
+                                <span class="inline-flex items-center rounded-md bg-sky-50 text-sky-700 px-2 py-0.5">{{ \App\Modules\Shipping\Support\OpostStatus::label($ps) }}</span>
+                                @if ($ps === 'delivered')
+                                    @if ($o->return_received_at)
+                                        <span class="inline-flex items-center gap-1 text-[11px] text-emerald-600">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                            {{ __('استُلم في المستودع') }}
+                                        </span>
+                                    @else
+                                        @can('update', $o)
+                                            <x-admin.confirm
+                                                :action="route('admin.sales.orders.receive_return', $o)"
+                                                method="POST"
+                                                tone="green"
+                                                :trigger="__('تأكيد استلام المرتجع')"
+                                                :title="__('تأكيد استلام المرتجع')"
+                                                :confirm="__('تأكيد وإرجاع للمخزون')"
+                                                :message="__('سيتم تأكيد رجوع الطلب للمستودع وإعادة كمياته إلى المخزون. لا يمكن التراجع.')" />
+                                        @endcan
+                                    @endif
+                                @endif
+                            </div>
                         @else
                             <span class="text-gray-300">—</span>
                         @endif

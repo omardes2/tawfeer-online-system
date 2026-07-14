@@ -11,6 +11,7 @@ use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\City;
 use App\Modules\Foundation\Models\DeliveryCityRate;
 use App\Modules\Foundation\Models\Warehouse;
+use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
 use App\Modules\Shipping\Jobs\CancelOrderShipment;
@@ -20,6 +21,7 @@ use App\Modules\Shipping\Support\OpostStatus;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class OrderController extends Controller
@@ -166,6 +168,49 @@ class OrderController extends Controller
         }
 
         return back()->with('success', __('تم تأكيد الطلب.'));
+    }
+
+    /**
+     * تأكيد استلام المرتجع في المستودع — متاح فقط عندما تكون حالة أوبتيموس «مرتجع مع السائق»
+     * (delivered). عندها فقط تُعاد كميات الأصناف إلى المخزون (تظهر في سجل المخزن لكل صنف). idempotent.
+     */
+    public function receiveReturn(Order $order, InventoryService $inventory): RedirectResponse
+    {
+        $this->authorize('update', $order);
+
+        if ($order->latestShipment?->provider_status !== 'delivered') {
+            return back()->with('error', __('يتاح تأكيد الاستلام فقط عندما تكون حالة أوبتيموس «مرتجع مع السائق».'));
+        }
+        if ($order->return_received_at !== null) {
+            return back()->with('error', __('سبق تأكيد استلام مرتجع هذا الطلب.'));
+        }
+
+        $warehouse = $order->warehouse
+            ?? Warehouse::where('is_default', true)->first()
+            ?? Warehouse::orderBy('id')->first();
+
+        if (! $warehouse) {
+            return back()->with('error', __('لا يوجد مستودع لإرجاع الكميات إليه.'));
+        }
+
+        DB::transaction(function () use ($order, $inventory, $warehouse) {
+            foreach ($order->items as $item) {
+                if (! $item->variant_id) {
+                    continue;
+                }
+                $variant = ProductVariant::find($item->variant_id);
+                if ($variant) {
+                    $inventory->returnToStock($variant, $warehouse, (float) $item->qty, null, [
+                        'reference_type' => Order::class,
+                        'reference_id' => $order->id,
+                        'reason' => 'order_return:'.$order->number,
+                    ]);
+                }
+            }
+            $order->update(['return_received_at' => now()]);
+        });
+
+        return back()->with('success', __('تم تأكيد استلام المرتجع وإرجاع الكميات إلى المخزون.'));
     }
 
     /** حذف الطلب — مسموح فقط إذا كانت حالته «ملغى» وحالة توصيله «ملغاة». */
