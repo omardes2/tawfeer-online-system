@@ -56,8 +56,8 @@
         ['الشحن والتوصيل', 'truck', [
             ['admin.shipping.shipments.index', 'الشحنات', 'shipping.shipments.view', 'admin.shipping.shipments.*'],
             ['admin.shipping.delivery.index', 'محرّك التوصيل', 'shipping.delivery.view', 'admin.shipping.delivery.*'],
-            ['admin.shipping.geography.index', 'مناطق الشحن', 'shipping.shipments.view', 'admin.shipping.geography.*'],
-            ['admin.shipping.delivery_rates.index', 'أسعار التوصيل للمدن', 'settings.geography.view', 'admin.shipping.delivery_rates.*'],
+            ['admin.shipping.delivery_rates.index', 'المدن وأسعار التوصيل', 'settings.geography.view', 'admin.shipping.delivery_rates.*'],
+            ['admin.shipping.areas.index', 'مناطق الشحن', 'settings.geography.view', 'admin.shipping.areas.*'],
             ['admin.returns.index', 'المرتجعات', 'returns.view', 'admin.returns.*'],
         ]],
         ['المالية والمحاسبة', 'wallet', [

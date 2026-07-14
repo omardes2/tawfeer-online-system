@@ -37,6 +37,7 @@ use App\Http\Controllers\Admin\Roles\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\Settings\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Admin\Settlements\SettlementController as AdminSettlementController;
+use App\Http\Controllers\Admin\Shipping\AreaController;
 use App\Http\Controllers\Admin\Shipping\DeliveryRateController;
 use App\Http\Controllers\Admin\Shipping\DeliveryStatusController as AdminDeliveryStatusController;
 use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
@@ -269,6 +270,12 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::put('delivery-rates', [DeliveryRateController::class, 'update'])->name('delivery_rates.update')->middleware('can:settings.geography.manage');
         Route::post('delivery-rates/sync', [DeliveryRateController::class, 'sync'])->name('delivery_rates.sync')->middleware('can:settings.geography.manage');
         Route::delete('delivery-rates/{deliveryRate}', [DeliveryRateController::class, 'destroy'])->name('delivery_rates.destroy')->middleware('can:settings.geography.manage');
+
+        // مناطق الشحن (المناطق الفرعية داخل كل مدينة) — إضافة/تعديل/حذف.
+        Route::get('areas', [AreaController::class, 'index'])->name('areas.index')->middleware('can:settings.geography.view');
+        Route::post('areas', [AreaController::class, 'store'])->name('areas.store')->middleware('can:settings.geography.manage');
+        Route::put('areas', [AreaController::class, 'update'])->name('areas.update')->middleware('can:settings.geography.manage');
+        Route::delete('areas/{area}', [AreaController::class, 'destroy'])->name('areas.destroy')->middleware('can:settings.geography.manage');
     });
 
     // المدفوعات (Phase 2.8)

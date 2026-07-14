@@ -3,7 +3,9 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\User;
+use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\Branch;
+use App\Modules\Foundation\Models\City;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -64,5 +66,38 @@ class ShippingAdminWebTest extends TestCase
     public function test_affiliate_cannot_view_shipments(): void
     {
         $this->actingAs($this->withRole('affiliate'))->get('/admin/shipping/shipments')->assertForbidden();
+    }
+
+    public function test_areas_page_renders_and_supports_crud(): void
+    {
+        $city = City::orderBy('id')->firstOrFail();
+
+        $this->actingAs($this->admin())->get(route('admin.shipping.areas.index', ['city' => $city->id]))
+            ->assertOk()->assertSee('مناطق الشحن');
+
+        // إضافة منطقة
+        $this->actingAs($this->admin())->post(route('admin.shipping.areas.store'), [
+            'city_id' => $city->id, 'name' => 'منطقة اختبار',
+        ])->assertRedirect();
+        $area = Area::where('name', 'منطقة اختبار')->firstOrFail();
+        $this->assertEquals($city->id, $area->city_id);
+
+        // تعديل + تفعيل
+        $this->actingAs($this->admin())->put(route('admin.shipping.areas.update'), [
+            'areas' => [$area->id => ['name' => 'منطقة معدّلة', 'is_active' => '1']],
+        ])->assertRedirect();
+        $this->assertEquals('منطقة معدّلة', $area->fresh()->name);
+
+        // حذف
+        $this->actingAs($this->admin())->delete(route('admin.shipping.areas.destroy', $area))->assertRedirect();
+        $this->assertNull(Area::find($area->id));
+    }
+
+    public function test_area_manage_requires_permission(): void
+    {
+        $city = City::orderBy('id')->firstOrFail();
+        $this->actingAs($this->withRole('affiliate'))->post(route('admin.shipping.areas.store'), [
+            'city_id' => $city->id, 'name' => 'x',
+        ])->assertForbidden();
     }
 }
