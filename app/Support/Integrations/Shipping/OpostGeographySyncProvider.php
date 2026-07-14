@@ -40,16 +40,37 @@ class OpostGeographySyncProvider implements GeographySyncProviderInterface
         return $res;
     }
 
-    /** استخراج مصفوفة السجلّات من مغلّفات شائعة ({data:[...]} أو [...] أو {cities:[...]}). */
+    /**
+     * استخراج مصفوفة السجلّات من ردّ Opost. شكله الفعلي: [ { "data": [ ...records... ] } ]
+     * (قائمة عناصرها تحمل مفتاح data). ندعم أيضًا المغلّفات الشائعة الأخرى للمرونة.
+     */
     private function rows(array $json, string $key): array
     {
+        // شكل Opost: قائمة عناصرها {data:[...]} — نجمع كل أجزاء data.
+        if (array_is_list($json)) {
+            $merged = [];
+            $wrapped = false;
+            foreach ($json as $part) {
+                if (is_array($part) && isset($part['data']) && is_array($part['data'])) {
+                    $merged = array_merge($merged, $part['data']);
+                    $wrapped = true;
+                }
+            }
+            if ($wrapped) {
+                return $merged;
+            }
+
+            return $json; // قائمة سجلّات مباشرة
+        }
+
+        // مغلّفات شائعة: {data:[...]} أو {cities:[...]} ...
         foreach ([$key, 'data', 'results', 'items'] as $k) {
             if (isset($json[$k]) && is_array($json[$k])) {
                 return $json[$k];
             }
         }
 
-        return array_is_list($json) ? $json : [];
+        return [];
     }
 
     private function pick(array $row, array $keys, mixed $default = null): mixed
@@ -76,7 +97,7 @@ class OpostGeographySyncProvider implements GeographySyncProviderInterface
     public function pullCities(string $governorateExternalId = ''): iterable
     {
         try {
-            $res = $this->get('/resources/cities');
+            $res = $this->get('/resources/cities', ['limit' => 200]);
             if (! $res->successful()) {
                 Log::warning('Opost cities sync failed', ['status' => $res->status()]);
 
@@ -114,7 +135,7 @@ class OpostGeographySyncProvider implements GeographySyncProviderInterface
     public function pullAreas(string $cityExternalId): iterable
     {
         try {
-            $res = $this->get('/resources/areas', ['city' => $cityExternalId]);
+            $res = $this->get('/resources/areas', ['city' => $cityExternalId, 'limit' => 1000]);
             if (! $res->successful()) {
                 return [];
             }

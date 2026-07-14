@@ -51,13 +51,14 @@ class OpostAuthTest extends TestCase
         $calls = 0;
         Http::fake([
             'opost.ps/oauth/token' => Http::response(['access_token' => 'TKN-FRESH', 'expires_in' => 3600], 200),
-            'opost.ps/api/resources/cities' => function () use (&$calls) {
+            'opost.ps/api/resources/cities*' => function () use (&$calls) {
                 $calls++;
 
                 // أول نداء 401 (توكن منتهٍ)، الثاني ينجح بعد التجديد.
+                // شكل Opost الفعلي: قائمة عناصرها {data:[...]}.
                 return $calls === 1
                     ? Http::response(['message' => 'Unauthenticated.'], 401)
-                    : Http::response(['data' => [['id' => 5, 'name' => 'رام الله']]], 200);
+                    : Http::response([['data' => [['id' => 5, 'name' => 'رام الله']]]], 200);
             },
             'opost.ps/api/resources/areas*' => Http::response(['data' => []], 200),
         ]);

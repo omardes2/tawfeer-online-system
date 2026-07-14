@@ -27,15 +27,21 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
      */
     private const STATUS_MAP = [
         'draft' => DeliveryStatus::DRAFT,
+        // أسماء Opost الفعلية (submitted/cancelled/…) + المختصرة (submit/cancel/…) كمرادفات.
         'submit' => DeliveryStatus::READY_FOR_PICKUP,
+        'submitted' => DeliveryStatus::READY_FOR_PICKUP,
         'cancel' => DeliveryStatus::CANCELLED,
+        'cancelled' => DeliveryStatus::CANCELLED,
         'pickup' => DeliveryStatus::PICKED_UP,
+        'picked_up' => DeliveryStatus::PICKED_UP,
         'pending' => DeliveryStatus::ON_HOLD,
         'cod_pickup' => DeliveryStatus::DELIVERED_COD_HELD,
         'in_accounting' => DeliveryStatus::FUNDS_AT_ACCOUNTING,
         'return' => DeliveryStatus::RETURNING_TO_COURIER,
+        'returned' => DeliveryStatus::RETURN_IN_TRANSIT,
         'delivered' => DeliveryStatus::RETURN_IN_TRANSIT,
         'close' => DeliveryStatus::CLOSED,
+        'closed' => DeliveryStatus::CLOSED,
     ];
 
     private function client(?string $token): PendingRequest
@@ -116,16 +122,17 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
     public function track(string $trackingNumber): array
     {
         try {
-            $res = $this->send(fn (PendingRequest $c) => $c->get('/resources/shipments/'.rawurlencode($trackingNumber)));
+            // Opost يتتبّع بالمعرّف عبر ?id= ويعيد [ { data: [ {shipment} ] } ]، والحالة في last_status.
+            $res = $this->send(fn (PendingRequest $c) => $c->get('/resources/shipments', ['id' => $trackingNumber]));
             if (! $res->successful()) {
                 return ['provider_status' => null, 'external_id' => $trackingNumber, 'driver' => $this->name()];
             }
-            $data = $res->json('data') ?? $res->json() ?? [];
+            $shipment = $this->firstShipment($res->json() ?? []);
 
             return [
-                'provider_status' => $data['status'] ?? null,
-                'external_id' => isset($data['id']) ? (string) $data['id'] : $trackingNumber,
-                'raw' => $data,
+                'provider_status' => $shipment['last_status']['status'] ?? $shipment['status'] ?? null,
+                'external_id' => isset($shipment['id']) ? (string) $shipment['id'] : $trackingNumber,
+                'raw' => $shipment,
                 'driver' => $this->name(),
             ];
         } catch (\Throwable $e) {
@@ -133,6 +140,22 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
 
             return ['provider_status' => null, 'external_id' => $trackingNumber, 'driver' => $this->name()];
         }
+    }
+
+    /** فكّ غلاف Opost لأول شحنة: [ { data: [ {shipment}, ... ] } ] ⇒ {shipment}. */
+    private function firstShipment(array $json): array
+    {
+        if (isset($json[0]['data'][0]) && is_array($json[0]['data'][0])) {
+            return $json[0]['data'][0];
+        }
+        if (isset($json['data'][0]) && is_array($json['data'][0])) {
+            return $json['data'][0];
+        }
+        if (isset($json['data']) && is_array($json['data'])) {
+            return $json['data'];
+        }
+
+        return $json;
     }
 
     public function cancel(string $reference): bool
@@ -173,8 +196,8 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
     {
         return [
             'event_id' => $payload['event_id'] ?? $payload['id'] ?? null,
-            'external_id' => $payload['tracking_number'] ?? $payload['external_id'] ?? null,
-            'provider_status' => $payload['status'] ?? $payload['state'] ?? null,
+            'external_id' => $payload['tracking_number'] ?? $payload['external_id'] ?? $payload['id'] ?? null,
+            'provider_status' => $payload['status'] ?? $payload['last_status']['status'] ?? $payload['state'] ?? null,
         ];
     }
 
