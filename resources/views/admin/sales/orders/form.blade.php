@@ -26,7 +26,9 @@
 
                 <x-admin.field :label="__('رقم الهاتف')" name="customer_phone" :required="true">
                     <input type="text" name="customer_phone" value="{{ old('customer_phone') }}" required inputmode="tel"
+                           placeholder="0599123456"
                            class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                    <p class="mt-1 text-xs text-gray-400">{{ __('رقم فلسطيني من 10 أرقام (يبدأ بـ 05).') }}</p>
                 </x-admin.field>
 
                 <x-admin.field :label="__('المدينة')" name="city_id" :required="true">
@@ -53,8 +55,8 @@
                 </x-admin.field>
 
                 <div class="md:col-span-2">
-                    <x-admin.field :label="__('العنوان التفصيلي')" name="shipping_address">
-                        <textarea name="shipping_address" rows="2"
+                    <x-admin.field :label="__('العنوان التفصيلي')" name="shipping_address" :required="true">
+                        <textarea name="shipping_address" rows="2" required
                                   class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
                                   placeholder="{{ __('الشارع، رقم البناية، أقرب معلم…') }}">{{ old('shipping_address') }}</textarea>
                     </x-admin.field>

@@ -22,12 +22,17 @@ class StoreOrderRequest extends FormRequest
             'warehouse' => ['nullable', 'string', 'exists:warehouses,uuid'],
             'customer' => ['nullable', 'string', 'exists:customers,uuid'], // ربط اختياري بعميل CRM
             'customer_name' => [$admin ? 'required' : 'required_without:customer', 'string', 'max:180'],
-            'customer_phone' => [$admin ? 'required' : 'required_without:customer', 'string', 'max:40'],
+            // رقم فلسطيني صحيح 10 خانات (يُطبَّع في prepareForValidation) — شرط Opost.
+            'customer_phone' => array_filter([
+                $admin ? 'required' : 'required_without:customer', 'string', 'max:40',
+                $admin ? 'regex:/^\d{10}$/' : null,
+            ]),
             'customer_email' => ['nullable', 'email', 'max:180'],
             // مدينة/منطقة التوصيل المُعيَّنة (نمط Opost — بالمعرّف لا الاسم).
             'city_id' => [$admin ? 'required' : 'nullable', 'integer', 'exists:cities,id'],
             'area_id' => [$admin ? 'required' : 'nullable', 'integer', 'exists:areas,id'],
-            'shipping_address' => ['nullable', 'string', 'max:1000'],
+            // العنوان إجباري على شاشة الإدارة (Opost يرفض الشحنة بلا عنوان).
+            'shipping_address' => [$admin ? 'required' : 'nullable', 'string', 'max:1000'],
             'has_return' => ['sometimes', 'boolean'],
             'return_notes' => ['nullable', 'string', 'max:1000'],
             'channel' => ['sometimes', Rule::in(['web', 'manual', 'marketer', 'pos'])],
@@ -48,6 +53,8 @@ class StoreOrderRequest extends FormRequest
             'customer_name.required_without' => __('اسم العميل مطلوب.'),
             'customer_phone.required' => __('رقم الهاتف مطلوب.'),
             'customer_phone.required_without' => __('رقم الهاتف مطلوب.'),
+            'customer_phone.regex' => __('رقم الهاتف يجب أن يكون 10 أرقام (مثال: 0599123456).'),
+            'shipping_address.required' => __('العنوان مطلوب.'),
             'city_id.required' => __('المدينة مطلوبة.'),
             'city_id.exists' => __('المدينة المختارة غير صالحة.'),
             'area_id.required' => __('المنطقة مطلوبة.'),
@@ -77,6 +84,29 @@ class StoreOrderRequest extends FormRequest
         // خانة التبديل ترسل "on"/"1"/غياب — نُطبّعها إلى boolean.
         $this->merge([
             'has_return' => $this->boolean('has_return'),
+            'customer_phone' => $this->normalizePhone($this->input('customer_phone')),
         ]);
+    }
+
+    /** تطبيع الهاتف لصيغة 10 خانات محلّية (إزالة الرموز، تحويل 970/00970، إضافة صفر بادئ). */
+    private function normalizePhone(mixed $phone): mixed
+    {
+        if (! is_string($phone) || $phone === '') {
+            return $phone;
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+
+        if (str_starts_with($digits, '00970')) {
+            $digits = '0'.substr($digits, 5);
+        } elseif (str_starts_with($digits, '970')) {
+            $digits = '0'.substr($digits, 3);
+        }
+
+        if (strlen($digits) === 9 && $digits[0] !== '0') {
+            $digits = '0'.$digits;
+        }
+
+        return $digits;
     }
 }

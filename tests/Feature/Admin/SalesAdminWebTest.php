@@ -49,7 +49,7 @@ class SalesAdminWebTest extends TestCase
         $city = City::firstOrCreate(['governorate_id' => $gov->id, 'name' => 'رام الله'], ['is_active' => true]);
         $area = Area::firstOrCreate(['city_id' => $city->id, 'name' => 'المصيون'], ['is_active' => true]);
 
-        return ['city_id' => $city->id, 'area_id' => $area->id];
+        return ['city_id' => $city->id, 'area_id' => $area->id, 'shipping_address' => 'شارع رام الله'];
     }
 
     public function test_guest_redirected_to_login(): void
@@ -122,6 +122,35 @@ class SalesAdminWebTest extends TestCase
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'items' => [],
         ])->assertSessionHasErrors(['customer_name', 'customer_phone', 'city_id', 'area_id', 'items']);
+    }
+
+    public function test_admin_order_requires_valid_phone_and_address(): void
+    {
+        $variant = Product::factory()->create()->defaultVariant;
+
+        // هاتف قصير + بلا عنوان ⇒ أخطاء تحقّق (لا يُنشأ طلب يفشل لاحقًا في Opost).
+        $this->actingAs($this->admin())->post('/admin/sales/orders', [
+            'customer_name' => 'خالد',
+            'customer_phone' => '12345',
+            'city_id' => $this->geo()['city_id'],
+            'area_id' => $this->geo()['area_id'],
+            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 50]],
+        ])->assertSessionHasErrors(['customer_phone', 'shipping_address']);
+    }
+
+    public function test_admin_order_normalizes_phone_to_ten_digits(): void
+    {
+        Queue::fake();
+        $variant = Product::factory()->create()->defaultVariant;
+
+        $this->actingAs($this->admin())->post('/admin/sales/orders', [
+            'customer_name' => 'ليان',
+            'customer_phone' => '+970 59 900 1122', // مقدّمة دولة + فراغات
+            ...$this->geo(),
+            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 50]],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame('0599001122', Order::latest('id')->first()->customer_phone);
     }
 
     public function test_confirm_without_live_provider_just_confirms(): void
