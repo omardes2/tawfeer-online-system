@@ -376,7 +376,9 @@ class SalesAdminWebTest extends TestCase
 
     public function test_confirm_without_live_provider_just_confirms(): void
     {
-        // بلا مزوّد مُفعّل (config الافتراضي 'null') ⇒ تأكيد فقط دون إرسال ولا مهمة.
+        // بلا مزوّد مُفعّل ⇒ تأكيد فقط دون إرسال ولا مهمة. نضبط القيمة صراحةً
+        // حتى لا يعتمد الاختبار على ترتيب التنفيذ (تفادي تسرّب config من اختبار آخر).
+        config()->set('shipping.provider', 'null');
         Queue::fake();
         $variant = Product::factory()->create()->defaultVariant;
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
