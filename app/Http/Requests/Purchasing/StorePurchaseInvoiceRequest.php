@@ -24,6 +24,9 @@ class StorePurchaseInvoiceRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
+            // صنف جديد يُعرَّف من الفاتورة (يُنشأ منتج + متغيّر تلقائيًا).
+            'items.*.new_name' => ['nullable', 'required_without_all:items.*.variant_id,items.*.description', 'string', 'max:180'],
+            'items.*.sell_price' => ['nullable', 'numeric', 'min:0'],
             'items.*.description' => ['nullable', 'string', 'max:255'],
             'items.*.qty' => ['required', 'numeric', 'gt:0'],
             'items.*.unit_cost' => ['required', 'numeric', 'min:0'],

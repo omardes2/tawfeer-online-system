@@ -5,12 +5,17 @@ namespace App\Http\Controllers\Admin\Purchasing;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Purchasing\StorePurchaseInvoiceRequest;
 use App\Modules\Accounting\Models\Treasury;
+use App\Modules\Catalog\Models\Category;
+use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Catalog\Models\Unit;
+use App\Modules\Catalog\Services\ProductService;
 use App\Modules\Purchasing\Models\PurchaseInvoice;
 use App\Modules\Purchasing\Models\Supplier;
 use App\Modules\Purchasing\Services\PurchaseInvoiceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -21,7 +26,10 @@ class PurchaseInvoiceController extends Controller
 {
     private const STATUSES = ['draft', 'approved', 'posted', 'cancelled', 'reversed'];
 
-    public function __construct(private readonly PurchaseInvoiceService $service) {}
+    public function __construct(
+        private readonly PurchaseInvoiceService $service,
+        private readonly ProductService $products,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -58,9 +66,44 @@ class PurchaseInvoiceController extends Controller
 
     public function store(StorePurchaseInvoiceRequest $request): RedirectResponse
     {
-        $invoice = $this->service->create($request->safe()->except('items'), $request->validated('items'));
+        // تعريف الأصناف الجديدة من الفاتورة: إنشاء منتج + متغيّر ثم استخدام معرّفه في البند.
+        $items = collect($request->validated('items'))->map(function (array $it) {
+            if (empty($it['variant_id']) && ! empty($it['new_name'])) {
+                $it['variant_id'] = $this->createProductFrom($it)->id;
+            }
+            unset($it['new_name'], $it['sell_price']);
+
+            return $it;
+        })->all();
+
+        $invoice = $this->service->create($request->safe()->except('items'), $items);
 
         return redirect()->route('admin.purchasing.invoices.show', $invoice)->with('success', __('أُنشئت فاتورة الشراء.'));
+    }
+
+    /** ينشئ منتجًا جديدًا من بند فاتورة (اسم + سعر بيع + تكلفة) ويُعيد متغيّره الافتراضي. */
+    private function createProductFrom(array $item): ProductVariant
+    {
+        $product = $this->products->create([
+            'name' => $item['new_name'],
+            'sku' => $this->uniqueSku(),
+            'category_id' => Category::orderBy('id')->value('id'),
+            'unit_id' => Unit::orderBy('id')->value('id'),
+            'status' => 'active',
+            'retail_price' => $item['sell_price'] ?? $item['unit_cost'],
+            'cost_price' => $item['unit_cost'],
+        ]);
+
+        return $product->defaultVariant()->firstOrFail();
+    }
+
+    private function uniqueSku(): string
+    {
+        do {
+            $sku = 'P-'.Str::upper(Str::random(8));
+        } while (Product::where('sku', $sku)->exists());
+
+        return $sku;
     }
 
     public function show(PurchaseInvoice $invoice): View

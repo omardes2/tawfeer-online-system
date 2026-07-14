@@ -5,6 +5,9 @@ namespace App\Modules\Purchasing\Services;
 use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Services\AccountingService;
 use App\Modules\Accounting\Services\VoucherService;
+use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Foundation\Models\Warehouse;
+use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Purchasing\Models\PurchaseInvoice;
 use App\Support\NumberGenerator;
 use Illuminate\Support\Carbon;
@@ -21,6 +24,7 @@ class PurchaseInvoiceService
     public function __construct(
         private readonly AccountingService $accounting,
         private readonly VoucherService $vouchers,
+        private readonly InventoryService $inventory,
     ) {}
 
     /**
@@ -130,6 +134,27 @@ class PurchaseInvoiceService
                 'posted_by' => auth()->id(),
                 'posted_at' => now(),
             ]);
+
+            // إدخال البضاعة للمخزون: كل بند بمتغيّر يزيد الكمية بالتكلفة (WAC) في المستودع الافتراضي.
+            if ($invoice->goods_receipt_id === null) {
+                $warehouse = Warehouse::where('is_default', true)->first() ?? Warehouse::orderBy('id')->first();
+                if ($warehouse) {
+                    foreach ($invoice->items as $item) {
+                        if (! $item->variant_id) {
+                            continue;
+                        }
+                        $variant = ProductVariant::find($item->variant_id);
+                        if (! $variant) {
+                            continue;
+                        }
+                        $this->inventory->receive($variant, $warehouse, (float) $item->qty, (float) $item->unit_cost, [
+                            'reference_type' => PurchaseInvoice::class,
+                            'reference_id' => $invoice->id,
+                            'reason' => 'purchase_invoice:'.$invoice->number,
+                        ]);
+                    }
+                }
+            }
 
             return $invoice;
         });

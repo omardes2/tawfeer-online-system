@@ -46,13 +46,32 @@
                         <template x-for="(row, i) in rows" :key="i">
                             <tr>
                                 <td>
-                                    <select :name="`items[${i}][variant_id]`" x-model="row.variant_id" class="w-full rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
-                                        <option value="">{{ __('— صنف حرّ (وصف) —') }}</option>
-                                        @foreach ($variants as $v)
-                                            <option value="{{ $v->id }}">{{ $v->product?->name }} — {{ $v->sku }}</option>
-                                        @endforeach
-                                    </select>
-                                    <input type="text" :name="`items[${i}][description]`" x-model="row.description" placeholder="{{ __('وصف (اختياري)') }}" class="mt-1 w-full rounded-md border-gray-200 text-xs focus:border-emerald-500 focus:ring-emerald-500" />
+                                    <label class="flex items-center gap-1.5 text-xs text-emerald-700 mb-1 cursor-pointer">
+                                        <input type="checkbox" x-model="row.is_new" @change="row.is_new ? (row.variant_id = '') : (row.new_name = '', row.sell_price = 0)" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                                        {{ __('هذا منتج جديد سجله في المخزن') }}
+                                    </label>
+
+                                    {{-- صنف موجود --}}
+                                    <template x-if="!row.is_new">
+                                        <div>
+                                            <select :name="`items[${i}][variant_id]`" x-model="row.variant_id" class="w-full rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                                <option value="">{{ __('— صنف حرّ (وصف) —') }}</option>
+                                                @foreach ($variants as $v)
+                                                    <option value="{{ $v->id }}">{{ $v->product?->name }} — {{ $v->sku }}</option>
+                                                @endforeach
+                                            </select>
+                                            <input type="text" :name="`items[${i}][description]`" x-model="row.description" placeholder="{{ __('وصف (اختياري)') }}" class="mt-1 w-full rounded-md border-gray-200 text-xs focus:border-emerald-500 focus:ring-emerald-500" />
+                                        </div>
+                                    </template>
+
+                                    {{-- صنف جديد يُعرَّف من الفاتورة --}}
+                                    <template x-if="row.is_new">
+                                        <div class="grid grid-cols-2 gap-1.5">
+                                            <input type="text" :name="`items[${i}][new_name]`" x-model="row.new_name" placeholder="{{ __('اسم المنتج الجديد') }}" class="col-span-2 w-full rounded-md border-emerald-300 bg-emerald-50/40 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+                                            <input type="number" step="0.01" min="0" :name="`items[${i}][sell_price]`" x-model.number="row.sell_price" placeholder="{{ __('سعر البيع') }}" class="w-full rounded-md border-emerald-300 bg-emerald-50/40 text-xs focus:border-emerald-500 focus:ring-emerald-500" />
+                                            <span class="text-[11px] text-gray-500 self-center">{{ __('تُنشأ بطاقة صنف تلقائيًا') }}</span>
+                                        </div>
+                                    </template>
                                 </td>
                                 <td><input type="number" step="0.001" min="0.001" :name="`items[${i}][qty]`" x-model.number="row.qty" class="w-full rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" /></td>
                                 <td><input type="number" step="0.01" min="0" :name="`items[${i}][unit_cost]`" x-model.number="row.unit_cost" class="w-full rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" /></td>
@@ -65,7 +84,7 @@
                 </table>
             </div>
             <div class="flex items-center justify-between mt-3">
-                <button type="button" @click="rows.push({variant_id:'',description:'',qty:1,unit_cost:0,tax_rate:0})" class="btn-secondary btn-sm">+ {{ __('إضافة بند') }}</button>
+                <button type="button" @click="rows.push({is_new:false,variant_id:'',new_name:'',sell_price:0,description:'',qty:1,unit_cost:0,tax_rate:0})" class="btn-secondary btn-sm">+ {{ __('إضافة بند') }}</button>
                 <div class="text-sm text-gray-600 space-y-0.5 text-start">
                     <div>{{ __('الإجمالي الفرعي') }}: <span class="font-medium tabular-nums" x-text="subtotal().toFixed(2)"></span></div>
                     <div>{{ __('الضريبة') }}: <span class="font-medium tabular-nums" x-text="tax().toFixed(2)"></span></div>
@@ -89,7 +108,7 @@
         <script>
             function invoiceForm() {
                 return {
-                    rows: [{ variant_id: '', description: '', qty: 1, unit_cost: 0, tax_rate: 0 }],
+                    rows: [{ is_new: false, variant_id: '', new_name: '', sell_price: 0, description: '', qty: 1, unit_cost: 0, tax_rate: 0 }],
                     lineTotal(r) { return (Number(r.qty) || 0) * (Number(r.unit_cost) || 0); },
                     lineTax(r) { return this.lineTotal(r) * (Number(r.tax_rate) || 0) / 100; },
                     subtotal() { return this.rows.reduce((s, r) => s + this.lineTotal(r), 0); },

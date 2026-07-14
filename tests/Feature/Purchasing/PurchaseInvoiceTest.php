@@ -6,8 +6,11 @@ use App\Models\User;
 use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Accounting\Services\AccountingService;
+use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Foundation\Models\Branch;
+use App\Modules\Foundation\Models\Warehouse;
+use App\Modules\Inventory\Models\InventoryStock;
 use App\Modules\Purchasing\Models\PurchaseInvoice;
 use App\Modules\Purchasing\Models\Supplier;
 use App\Modules\Purchasing\Services\PurchaseInvoiceService;
@@ -76,6 +79,49 @@ class PurchaseInvoiceTest extends TestCase
         $this->assertEqualsWithDelta(500, $this->balance('1200'), 0.01); // inventory
         $this->assertEqualsWithDelta(75, $this->balance('1250'), 0.01);  // recoverable input tax (asset)
         $this->assertEqualsWithDelta(575, $this->balance('2010'), 0.01); // accounts payable
+    }
+
+    public function test_post_increases_warehouse_stock(): void
+    {
+        $warehouse = Warehouse::where('is_default', true)->firstOrFail();
+        $before = (float) (InventoryStock::where('variant_id', $this->variant->id)
+            ->where('warehouse_id', $warehouse->id)->value('on_hand') ?? 0);
+
+        $inv = $this->makeInvoice(50, 10, 15);
+        $this->service->approve($inv);
+        $this->service->post($inv);
+
+        $after = (float) InventoryStock::where('variant_id', $this->variant->id)
+            ->where('warehouse_id', $warehouse->id)->value('on_hand');
+        $this->assertEqualsWithDelta($before + 10, $after, 0.001);
+    }
+
+    public function test_store_defines_new_product_from_invoice_line(): void
+    {
+        $admin = User::whereHas('roles', fn ($q) => $q->where('name', 'admin'))->first();
+        $this->actingAs($admin);
+
+        $this->post(route('admin.purchasing.invoices.store'), [
+            'supplier_id' => $this->supplier->id,
+            'invoice_date' => now()->toDateString(),
+            'items' => [['new_name' => 'صنف جديد للاختبار', 'sell_price' => 120, 'qty' => 5, 'unit_cost' => 80, 'tax_rate' => 0]],
+        ])->assertRedirect();
+
+        $product = Product::where('name', 'صنف جديد للاختبار')->first();
+        $this->assertNotNull($product);
+        $this->assertEqualsWithDelta(120, (float) $product->retail_price, 0.01);
+        $variant = $product->defaultVariant()->firstOrFail();
+
+        $inv = PurchaseInvoice::latest('id')->first();
+        $this->assertEquals($variant->id, $inv->items->first()->variant_id);
+
+        $this->service->approve($inv);
+        $this->service->post($inv->fresh());
+
+        $warehouse = Warehouse::where('is_default', true)->firstOrFail();
+        $onHand = (float) InventoryStock::where('variant_id', $variant->id)
+            ->where('warehouse_id', $warehouse->id)->value('on_hand');
+        $this->assertEqualsWithDelta(5, $onHand, 0.001);
     }
 
     public function test_post_is_idempotent(): void
