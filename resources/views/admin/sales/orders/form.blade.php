@@ -161,11 +161,52 @@
                     </span>
                 </label>
 
-                <div x-show="hasReturn" x-transition x-cloak>
-                    <x-admin.field :label="__('ملاحظات المرتجع')" name="return_notes">
-                        <textarea name="return_notes" rows="2"
-                                  class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">{{ old('return_notes') }}</textarea>
-                    </x-admin.field>
+                <div x-show="hasReturn" x-transition x-cloak class="space-y-3">
+                    {{-- اختيار الأصناف المرتجعة --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('الأصناف المرتجعة') }}</label>
+                        <div class="relative">
+                            <input type="text" x-model="returnQuery" @focus="showReturnResults = true" @click.outside="showReturnResults = false"
+                                   placeholder="{{ __('ابحث عن صنف لإضافته للمرتجع...') }}"
+                                   class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+                            <div x-show="showReturnResults && filteredReturnProducts.length" x-cloak
+                                 class="absolute z-20 mt-1 w-full max-h-56 overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                                <template x-for="p in filteredReturnProducts" :key="p.variant">
+                                    <button type="button" @click="addReturn(p)"
+                                            class="w-full flex items-center gap-2 px-3 py-2 hover:bg-emerald-50 text-start">
+                                        <span class="text-sm text-gray-800 truncate" x-text="p.name"></span>
+                                        <span class="text-xs text-gray-400" x-text="p.sku"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- جدول الأصناف المرتجعة المختارة --}}
+                    <div x-show="returnRows.length" class="rounded-lg border border-gray-100 divide-y divide-gray-100">
+                        <template x-for="(r, i) in returnRows" :key="r.variant">
+                            <div class="flex items-center gap-2 px-3 py-2">
+                                <span class="flex-1 min-w-0 text-sm text-gray-800 truncate" x-text="r.name"></span>
+                                <label class="text-xs text-gray-400">{{ __('الكمية') }}</label>
+                                <input type="number" min="1" step="1" x-model.number="r.qty" class="w-16 rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+                                <button type="button" @click="removeReturn(i)" class="text-rose-500 hover:text-rose-700" title="{{ __('إزالة') }}">&times;</button>
+                            </div>
+                        </template>
+                    </div>
+
+                    {{-- ملاحظات إضافية على المرتجع --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('ملاحظات المرتجع') }}</label>
+                        <textarea x-model="returnFreeNote" rows="2"
+                                  placeholder="{{ __('سبب الإرجاع أو أي تفاصيل...') }}"
+                                  class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"></textarea>
+                    </div>
+
+                    {{-- ما سيُحفظ فعليًا (ملخّص المرتجع + الملاحظات) --}}
+                    <input type="hidden" name="return_notes" :value="composedReturnNotes" />
+                    <template x-if="composedReturnNotes.trim()">
+                        <p class="text-xs text-gray-500 bg-gray-50 rounded-md p-2 whitespace-pre-line" x-text="composedReturnNotes"></p>
+                    </template>
                 </div>
 
                 <x-admin.field :label="__('ملاحظات الطلب')" name="notes">
@@ -217,6 +258,44 @@
                     areaId: @js(old('area_id') ? (int) old('area_id') : ''),
                     hasReturn: @js((bool) old('has_return')),
                     rows: [],
+                    returnRows: [],
+                    returnQuery: '',
+                    showReturnResults: false,
+                    returnFreeNote: @js(old('return_notes') ?? ''),
+
+                    get filteredReturnProducts() {
+                        const q = this.returnQuery.trim().toLowerCase();
+                        const list = q === ''
+                            ? this.products
+                            : this.products.filter(p =>
+                                (p.name || '').toLowerCase().includes(q) ||
+                                (p.sku || '').toLowerCase().includes(q));
+                        return list.slice(0, 30);
+                    },
+                    get returnSummary() {
+                        return this.returnRows
+                            .map(r => `${r.name} ×${Number(r.qty) || 1}`)
+                            .join('، ');
+                    },
+                    get composedReturnNotes() {
+                        const parts = [];
+                        if (this.returnRows.length) parts.push('{{ __('الأصناف المرتجعة') }}: ' + this.returnSummary);
+                        if (this.returnFreeNote.trim()) parts.push(this.returnFreeNote.trim());
+                        return parts.join('\n');
+                    },
+                    addReturn(p) {
+                        const existing = this.returnRows.find(r => r.variant === p.variant);
+                        if (existing) {
+                            existing.qty = (Number(existing.qty) || 0) + 1;
+                        } else {
+                            this.returnRows.push({ variant: p.variant, name: p.name, sku: p.sku, qty: 1 });
+                        }
+                        this.returnQuery = '';
+                        this.showReturnResults = false;
+                    },
+                    removeReturn(i) {
+                        this.returnRows.splice(i, 1);
+                    },
 
                     get filteredProducts() {
                         const q = this.query.trim().toLowerCase();
