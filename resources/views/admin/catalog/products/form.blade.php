@@ -66,26 +66,28 @@
                     <label class="flex items-center gap-2 text-sm pb-2"><input type="hidden" name="is_featured" value="0" /><input type="checkbox" name="is_featured" value="1" @checked(old('is_featured', $product->is_featured)) class="rounded border-gray-300 text-emerald-600" />{{ __('مميّز') }}</label>
                 </div>
 
-                {{-- الأسعار (تُزامَن مع المتغيّر الافتراضي وتظهر في الموقع) --}}
-                @php($v = $product->defaultVariant)
-                <div class="border-t border-gray-100 pt-4 mt-2"
-                    x-data="{
-                        retail: {{ (float) old('retail_price', $v?->retail_price ?? $product->retail_price) }},
-                        promo: {{ (float) old('promo_price', $v?->promo_price ?? $product->promo_price) }},
-                        onSale() { return this.promo > 0 && this.promo < this.retail; },
-                        percent() { return this.onSale() ? Math.round((1 - this.promo / this.retail) * 100) : 0; }
-                    }">
+                {{-- الأسعار (تُزامَن مع المتغيّر الافتراضي وتظهر في الموقع والمخزن) --}}
+                @php
+                    $v = $product->defaultVariant;
+                    // «سعر البيع» = السعر الأصلي المعروض في صفحة المخزن (products.retail_price المُزامَن مع المتغيّر).
+                    $sellPrice = old('retail_price', $v?->retail_price ?? $product->retail_price);
+                    $promoPrice = old('promo_price', $v?->promo_price ?? $product->promo_price);
+                    $hasDiscount = is_numeric($sellPrice) && is_numeric($promoPrice)
+                        && (float) $promoPrice > 0 && (float) $promoPrice < (float) $sellPrice;
+                    $discountPct = $hasDiscount ? (int) round((1 - $promoPrice / $sellPrice) * 100) : 0;
+                @endphp
+                <div class="border-t border-gray-100 pt-4 mt-2">
                     <h3 class="text-sm font-semibold text-gray-700 mb-3">{{ __('الأسعار') }}</h3>
 
-                    {{-- جدول السعر الأصلي --}}
+                    {{-- جدول السعر الأصلي (نفس «سعر البيع» في صفحة المخزن) --}}
                     <div class="rounded-lg border border-gray-200 overflow-hidden mb-3">
                         <div class="flex items-center justify-between bg-gray-50 px-4 py-2 border-b border-gray-200">
-                            <span class="text-sm font-medium text-gray-700">{{ __('السعر الأصلي') }}</span>
+                            <span class="text-sm font-medium text-gray-700">{{ __('السعر الأصلي (سعر البيع)') }}</span>
                             <span class="text-xs text-gray-400">{{ __('السعر المعروض قبل الخصم') }}</span>
                         </div>
                         <div class="px-4 py-3">
                             <div class="relative max-w-xs">
-                                <input type="number" step="0.01" min="0" name="retail_price" x-model.number="retail"
+                                <input type="number" step="0.01" min="0" name="retail_price" value="{{ $sellPrice }}"
                                     class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500 ps-12" />
                                 <span class="absolute inset-y-0 start-0 flex items-center px-3 text-gray-400 text-sm">{{ __('₪') }}</span>
                             </div>
@@ -96,24 +98,27 @@
                     <div class="rounded-lg border border-rose-200 overflow-hidden">
                         <div class="flex items-center justify-between bg-rose-50 px-4 py-2 border-b border-rose-200">
                             <span class="text-sm font-medium text-rose-700">{{ __('سعر الخصم (العرض)') }}</span>
-                            <span class="text-xs text-rose-500" x-show="onSale()" x-cloak>
-                                {{ __('خصم') }} <span x-text="percent()"></span>%
-                            </span>
-                            <span class="text-xs text-gray-400" x-show="!onSale()">{{ __('اتركه فارغًا إن لا يوجد عرض') }}</span>
+                            @if ($hasDiscount)
+                                <span class="text-xs text-rose-500">{{ __('خصم') }} {{ $discountPct }}%</span>
+                            @else
+                                <span class="text-xs text-gray-400">{{ __('اتركه فارغًا إن لا يوجد عرض') }}</span>
+                            @endif
                         </div>
                         <div class="px-4 py-3">
                             <div class="relative max-w-xs">
-                                <input type="number" step="0.01" min="0" name="promo_price" x-model.number="promo"
+                                <input type="number" step="0.01" min="0" name="promo_price" value="{{ $promoPrice }}"
                                     placeholder="{{ __('مثال: 80') }}"
                                     class="w-full rounded-md border-gray-300 focus:border-rose-400 focus:ring-rose-400 ps-12" />
                                 <span class="absolute inset-y-0 start-0 flex items-center px-3 text-gray-400 text-sm">{{ __('₪') }}</span>
                             </div>
-                            <p class="mt-2 text-xs text-gray-500" x-show="onSale()" x-cloak>
-                                {{ __('سيظهر في الموقع:') }}
-                                <span class="text-gray-400 line-through" x-text="retail"></span>
-                                <span class="text-rose-600 font-semibold mx-1" x-text="promo"></span>
-                                {{ __('₪') }}
-                            </p>
+                            @if ($hasDiscount)
+                                <p class="mt-2 text-xs text-gray-500">
+                                    {{ __('سيظهر في الموقع:') }}
+                                    <span class="text-gray-400 line-through">{{ $sellPrice }}</span>
+                                    <span class="text-rose-600 font-semibold mx-1">{{ $promoPrice }}</span>
+                                    {{ __('₪') }}
+                                </p>
+                            @endif
                         </div>
                     </div>
                 </div>

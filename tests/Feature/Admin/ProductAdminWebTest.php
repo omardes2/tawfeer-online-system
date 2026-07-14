@@ -132,6 +132,21 @@ class ProductAdminWebTest extends TestCase
         ]))->assertSessionHasErrors('promo_price');
     }
 
+    public function test_edit_page_prefills_sell_price_and_compiles(): void
+    {
+        $product = Product::factory()->create(['retail_price' => 100]);
+        $product->defaultVariant?->update(['retail_price' => 100]);
+
+        $expected = $product->fresh()->defaultVariant->retail_price;
+        $res = $this->actingAs($this->admin())->get(route('admin.products.edit', $product));
+        $res->assertOk();
+        // السعر الأصلي مملوء مسبقًا بسعر البيع (نفس قيمة صفحة المخزن).
+        $res->assertSee('name="retail_price" value="'.$expected.'"', false);
+        // لا يتسرّب Blade خام في قسم الأسعار (المشكلة السابقة مع Alpine).
+        $res->assertDontSee('{{ __(', false);
+        $res->assertDontSee('{{-- ', false);
+    }
+
     public function test_admin_uploads_image_via_web(): void
     {
         Storage::fake('public');
