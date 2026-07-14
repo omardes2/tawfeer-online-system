@@ -41,6 +41,7 @@ use App\Http\Controllers\Admin\Shipping\DeliveryRateController;
 use App\Http\Controllers\Admin\Shipping\DeliveryStatusController as AdminDeliveryStatusController;
 use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
 use App\Http\Controllers\Admin\Shipping\ShipmentController as AdminShipmentController;
+use App\Http\Controllers\Admin\System\ClearCacheController;
 use App\Http\Controllers\Admin\Users\UserController as AdminUserController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Storefront\Account\AccountController;
@@ -333,6 +334,10 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('/', [AdminSettingsController::class, 'edit'])->name('edit')->middleware('can:settings.system.view');
         Route::put('/', [AdminSettingsController::class, 'update'])->name('update')->middleware('can:settings.system.manage');
     });
+
+    // مسح كاش التطبيق من اللوحة (تحديثات الواجهة/الإعدادات) — بلا سطر أوامر.
+    Route::post('system/clear-cache', ClearCacheController::class)
+        ->name('system.clear-cache')->middleware('can:settings.system.manage');
 
     // مساعد محتوى المنتجات بالذكاء الاصطناعي (Phase 6 / ADR-044) — اقتراح فقط
     Route::post('ai/content/generate', [AiContentController::class, 'generate'])->name('ai.content.generate')->middleware('can:ai.content.use');

@@ -74,4 +74,18 @@ class SettingsTest extends TestCase
         $u->assignRole('sales');
         $this->actingAs($u)->put(route('admin.settings.update'), ['store_name' => 'x'])->assertForbidden();
     }
+
+    public function test_admin_can_clear_cache_from_panel(): void
+    {
+        $this->actingAs($this->admin())->post(route('admin.system.clear-cache'))
+            ->assertRedirect()
+            ->assertSessionHas('success');
+    }
+
+    public function test_clear_cache_requires_manage_permission(): void
+    {
+        $u = User::factory()->create(['branch_id' => Branch::default()->id]);
+        $u->assignRole('sales');
+        $this->actingAs($u)->post(route('admin.system.clear-cache'))->assertForbidden();
+    }
 }

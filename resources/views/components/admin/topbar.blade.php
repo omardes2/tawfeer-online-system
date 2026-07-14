@@ -43,6 +43,18 @@
         </div>
     </div>
 
+    {{-- Clear cache (icon) --}}
+    @can('settings.system.manage')
+        <form method="POST" action="{{ route('admin.system.clear-cache') }}"
+              onsubmit="return confirm('{{ __('مسح كاش النظام الآن؟') }}')">
+            @csrf
+            <button type="submit" class="grid place-items-center w-10 h-10 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-emerald-600"
+                    title="{{ __('مسح الكاش') }}" aria-label="{{ __('مسح الكاش') }}">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992V4.356M2.985 19.644v-4.992h4.992m11.667-3.696a8.25 8.25 0 01-13.803 3.7L2.985 14.65m0 0h4.992m-4.992 0v4.992m0-9.348a8.25 8.25 0 0113.803-3.7l3.181 3.005m0 0h-4.992m4.992 0V4.356"/></svg>
+            </button>
+        </form>
+    @endcan
+
     {{-- Language switcher --}}
     @php $otherLocale = app()->getLocale() === 'ar' ? 'en' : 'ar'; @endphp
     <a href="{{ url('/lang/'.$otherLocale) }}"
