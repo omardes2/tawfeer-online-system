@@ -40,7 +40,40 @@ class InventoryAdminWebTest extends TestCase
         $res = $this->actingAs($this->admin())->get('/admin/inventory/stocks');
         $res->assertOk();
         $res->assertSee('dir="rtl"', false);
-        $res->assertSee('أرصدة المخزون');
+        $res->assertSee('المخزن');
+        $res->assertSee('اسم الصنف');
+    }
+
+    public function test_product_ledger_page_renders(): void
+    {
+        $product = Product::factory()->create();
+        app(InventoryService::class)->receive($product->defaultVariant, $this->warehouse, 12, 4);
+
+        $res = $this->actingAs($this->admin())->get(route('admin.inventory.products.show', $product));
+        $res->assertOk();
+        $res->assertSee('سجل المخزن');
+        $res->assertSee($product->name);
+        $res->assertSee('إدخال (شراء)');
+    }
+
+    public function test_admin_can_quick_edit_product_prices(): void
+    {
+        $product = Product::factory()->create();
+
+        $this->actingAs($this->admin())->get(route('admin.inventory.products.edit', $product))->assertOk();
+
+        $this->actingAs($this->admin())->put(route('admin.inventory.products.update', $product), [
+            'sku' => $product->sku,
+            'category_id' => $product->category_id,
+            'cost_price' => 30,
+            'retail_price' => 55,
+            'wholesale_price' => 45,
+        ])->assertRedirect(route('admin.inventory.stocks'));
+
+        $product->refresh();
+        $this->assertEquals(55, (float) $product->retail_price);
+        $this->assertEquals(45, (float) $product->wholesale_price);
+        $this->assertEquals(30, (float) $product->cost_price);
     }
 
     public function test_admin_can_receive_via_web(): void

@@ -175,6 +175,9 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     // المخزون (Phase 2.4)
     Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('stocks', [InventoryController::class, 'stocks'])->name('stocks');
+        Route::get('products/{product}', [InventoryController::class, 'showProduct'])->name('products.show');
+        Route::get('products/{product}/edit', [InventoryController::class, 'editProduct'])->name('products.edit')->middleware('can:catalog.products.update');
+        Route::put('products/{product}', [InventoryController::class, 'updateProduct'])->name('products.update')->middleware('can:catalog.products.update');
         Route::get('movements', [InventoryController::class, 'movements'])->name('movements');
         Route::get('reservations', [InventoryController::class, 'reservations'])->name('reservations');
         Route::post('reservations/{reservation}/release', [InventoryController::class, 'releaseReservation'])->name('reservations.release');

@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventory\IssueStockRequest;
 use App\Http\Requests\Inventory\ReceiveStockRequest;
 use App\Http\Requests\Inventory\TransferStockRequest;
+use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Catalog\Services\ProductService;
 use App\Modules\Foundation\Models\Warehouse;
+use App\Modules\Inventory\Models\InventoryLedger;
 use App\Modules\Inventory\Models\InventoryMovement;
 use App\Modules\Inventory\Models\InventoryStock;
 use App\Modules\Inventory\Models\StockReservation;
@@ -24,17 +27,81 @@ class InventoryController extends Controller
     public function __construct(
         private readonly InventoryService $inventory,
         private readonly ReservationService $reservations,
+        private readonly ProductService $products,
     ) {}
 
+    /** صفحة «المخزن»: عرض الأصناف بالأسعار والكمية المتوفرة (متمركزة حول المنتج). */
     public function stocks(Request $request): View
     {
         $this->authorize('inventory.stocks.view');
 
-        $stocks = InventoryStock::query()->with(['variant.product', 'warehouse'])
-            ->when($request->filled('warehouse'), fn ($q) => $q->where('warehouse_id', $request->integer('warehouse')))
-            ->orderByDesc('updated_at')->paginate(20)->withQueryString();
+        $products = Product::query()->with('category:id,name')
+            ->withSum('stocks as on_hand_sum', 'on_hand')
+            ->withSum('stocks as reserved_sum', 'reserved')
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $term = '%'.$request->string('search').'%';
+                $q->where(fn ($w) => $w->where('name', 'like', $term)->orWhere('sku', 'like', $term));
+            })
+            ->when($request->filled('category'), fn ($q) => $q->where('category_id', $request->integer('category')))
+            ->orderBy('name')->paginate(20)->withQueryString();
 
-        return view('admin.inventory.stocks', ['stocks' => $stocks, 'warehouses' => Warehouse::orderBy('name')->get()]);
+        return view('admin.inventory.stocks', [
+            'products' => $products,
+            'categories' => Category::orderBy('name')->get(['id', 'name']),
+            'search' => $request->input('search'),
+            'activeCategory' => $request->integer('category') ?: null,
+        ]);
+    }
+
+    /** كرت الصنف: بياناته + سجل المخزن (كل حركات المخزون على الصنف). */
+    public function showProduct(Product $product): View
+    {
+        $this->authorize('inventory.stocks.view');
+
+        $variantIds = $product->variants()->pluck('id');
+
+        $ledger = InventoryLedger::query()
+            ->whereIn('variant_id', $variantIds)
+            ->with(['warehouse:id,name', 'movement:id,reason,reference_type,reference_id'])
+            ->latest('id')->paginate(20);
+
+        $onHand = (float) InventoryStock::whereIn('variant_id', $variantIds)->sum('on_hand');
+        $reserved = (float) InventoryStock::whereIn('variant_id', $variantIds)->sum('reserved');
+
+        return view('admin.inventory.product-ledger', [
+            'product' => $product->load('category:id,name'),
+            'ledger' => $ledger,
+            'available' => $onHand - $reserved,
+            'onHand' => $onHand,
+        ]);
+    }
+
+    /** صفحة تعديل سريع لصنف من المخزن: الفئة، كود المنتج، سعر الشراء/البيع/الجملة. */
+    public function editProduct(Product $product): View
+    {
+        $this->authorize('update', $product);
+
+        return view('admin.inventory.product-edit', [
+            'product' => $product,
+            'categories' => Category::orderBy('name')->get(['id', 'name']),
+        ]);
+    }
+
+    public function updateProduct(Request $request, Product $product): RedirectResponse
+    {
+        $this->authorize('update', $product);
+
+        $data = $request->validate([
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'sku' => ['required', 'string', 'max:64', 'unique:products,sku,'.$product->id],
+            'cost_price' => ['nullable', 'numeric', 'min:0'],
+            'retail_price' => ['nullable', 'numeric', 'min:0'],
+            'wholesale_price' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $this->products->update($product, $data);
+
+        return redirect()->route('admin.inventory.stocks')->with('success', __('حُدّث الصنف.'));
     }
 
     public function movements(Request $request): View
