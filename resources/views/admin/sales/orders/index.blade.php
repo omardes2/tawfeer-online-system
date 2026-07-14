@@ -48,6 +48,7 @@
                 <th>{{ __('اسم المستلم') }}</th>
                 <th>{{ __('المستخدم') }}</th>
                 <th>{{ __('الحالة') }}</th>
+                <th>{{ __('حالة التوصيل') }}</th>
                 <th>{{ __('حالة الدفع') }}</th>
                 <th class="text-start">{{ __('الإجمالي') }}</th>
                 <th></th>
@@ -83,6 +84,14 @@
                         @endif
                     </td>
                     <td><x-sales.status :status="$o->status" /></td>
+                    <td class="whitespace-nowrap text-xs">
+                        @php $ds = $o->latestShipment?->delivery_status; @endphp
+                        @if ($ds)
+                            <span class="inline-flex items-center rounded-md bg-sky-50 text-sky-700 px-2 py-0.5">{{ \App\Modules\Shipping\Support\DeliveryStatus::label($ds) }}</span>
+                        @else
+                            <span class="text-gray-300">—</span>
+                        @endif
+                    </td>
                     <td>
                         @if ($o->payment_status === 'paid')
                             <x-admin.badge tone="green" :label="__('مدفوع')" />
@@ -106,7 +115,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="8" class="!p-0">
+                <tr><td colspan="9" class="!p-0">
                     <x-admin.empty-state
                         :title="__('لا توجد طلبات')"
                         :description="($activeStatus ?? null) ? __('لا توجد طلبات بهذه الحالة.') : __('ابدأ بإنشاء أول طلب بيع.')"

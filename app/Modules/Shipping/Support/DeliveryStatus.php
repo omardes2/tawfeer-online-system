@@ -77,6 +77,26 @@ final class DeliveryStatus
     /** الحالات النهائية. */
     public const TERMINAL = [self::CLOSED, self::CANCELLED];
 
+    /** تسميات عربية لعرض حالة التوصيل في الواجهة. */
+    public const LABELS = [
+        self::DRAFT => 'مسودّة',
+        self::READY_FOR_PICKUP => 'جاهزة للاستلام',
+        self::PICKED_UP => 'استلمها المندوب',
+        self::ON_HOLD => 'معلّقة',
+        self::DELIVERED_COD_HELD => 'سُلّمت (تحصيل)',
+        self::FUNDS_AT_ACCOUNTING => 'في محاسبة المندوب',
+        self::RETURNING_TO_COURIER => 'مرتجعة للمندوب',
+        self::RETURN_IN_TRANSIT => 'مرتجع عائد',
+        self::CLOSED => 'مُغلقة',
+        self::CANCELLED => 'ملغاة',
+    ];
+
+    /** التسمية العربية لحالة التوصيل (أو المفتاح نفسه إن لم تُعرّف). */
+    public static function label(?string $status): string
+    {
+        return $status === null ? '—' : (self::LABELS[$status] ?? $status);
+    }
+
     /** @return list<string> */
     public static function all(): array
     {
