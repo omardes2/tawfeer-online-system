@@ -30,10 +30,11 @@ class DeliveryWebhookService
         $providerRecord = DeliveryProvider::where('code', $providerCode)->orWhere('driver', $providerCode)->first();
         $parsed = $driver->parseWebhookEvent($payload);
 
-        // التحقّق من التوقيع (إن دعمه المزوّد وتوفّر سرّ).
+        // التحقّق من التوقيع يُفرض فقط عند ضبط سرّ للمزوّد. بلا سرّ ⇒ يُقبل (توقيع اختياري)،
+        // فيعمل الـwebhook فورًا حتى لو لم يوقّع المزوّد. أضف السرّ لاحقًا لتفعيل الحماية.
         $signatureValid = null;
-        if ($driver->supportsWebhookSignature()) {
-            $secret = config("delivery.webhook.secrets.$providerCode");
+        $secret = config("delivery.webhook.secrets.$providerCode");
+        if ($driver->supportsWebhookSignature() && ! empty($secret)) {
             $signatureValid = $driver->verifyWebhookSignature($rawPayload, $headers, $secret);
         }
 
