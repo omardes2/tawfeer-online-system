@@ -43,7 +43,7 @@
     <x-admin.table>
         <thead>
             <tr>
-                <th>{{ __('رقم الطلب') }}</th>
+                <th>{{ __('رقم التتبّع') }}</th>
                 <th>{{ __('التاريخ والوقت') }}</th>
                 <th>{{ __('اسم المستلم') }}</th>
                 <th>{{ __('المستخدم') }}</th>
@@ -56,7 +56,15 @@
         <tbody>
             @forelse ($orders as $o)
                 <tr>
-                    <td class="font-mono text-xs text-gray-800">{{ $o->number }}</td>
+                    <td class="font-mono text-xs">
+                        @if ($o->tracking_number)
+                            <div class="font-semibold text-gray-900">{{ $o->tracking_number }}</div>
+                            <div class="text-[11px] text-gray-400">{{ $o->number }}</div>
+                        @else
+                            <div class="text-gray-800">{{ $o->number }}</div>
+                            <div class="text-[11px] text-amber-500">{{ __('بانتظار التتبّع') }}</div>
+                        @endif
+                    </td>
                     <td class="whitespace-nowrap text-gray-600">
                         <div>{{ \Illuminate\Support\Carbon::parse($o->created_at)->format('Y-m-d') }}</div>
                         <div class="text-xs text-gray-400">{{ \Illuminate\Support\Carbon::parse($o->created_at)->format('h:i A') }}</div>
