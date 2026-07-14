@@ -209,6 +209,34 @@ class SalesAdminWebTest extends TestCase
         $this->assertNull($order->fresh()->return_received_at);
     }
 
+    public function test_cancel_awaiting_pickup_order_cancels_and_dispatches_provider_cancel(): void
+    {
+        config()->set('shipping.provider', 'opost');
+        Queue::fake();
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+
+        $order = app(OrderService::class)->create([
+            'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id,
+            'customer_name' => 'س', 'customer_phone' => '0599000000',
+        ], [], 2026);
+        // أُرسل للمزوّد (له رقم تتبّع) وحالته أوبتيموس «بانتظار الاستلام».
+        $order->update(['status' => 'confirmed', 'tracking_number' => 'TRK-1']);
+        $provider = DeliveryProvider::firstOrCreate(['code' => 'opost'], ['name' => 'Opost', 'driver' => 'opost']);
+        Shipment::create([
+            'number' => 'SHPX-'.$order->id, 'order_id' => $order->id, 'branch_id' => $order->branch_id,
+            'warehouse_id' => $order->warehouse_id, 'status' => 'not_shipped',
+            'recipient_name' => 'س', 'recipient_phone' => '0599000000',
+            'delivery_provider_id' => $provider->id, 'provider_status' => 'submitted',
+        ]);
+
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.cancel', $order), [
+            'reason' => 'إلغاء قبل الاستلام',
+        ])->assertRedirect();
+
+        $this->assertSame('cancelled', $order->fresh()->status);
+        Queue::assertPushed(CancelOrderShipment::class);
+    }
+
     public function test_confirm_without_live_provider_just_confirms(): void
     {
         // بلا مزوّد مُفعّل (config الافتراضي 'null') ⇒ تأكيد فقط دون إرسال ولا مهمة.

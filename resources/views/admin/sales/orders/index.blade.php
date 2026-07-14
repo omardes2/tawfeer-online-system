@@ -148,6 +148,17 @@
                                 @endcan
                             @endif
                             <a href="{{ route('admin.sales.orders.show', $o) }}" class="text-emerald-600 hover:underline text-sm">{{ __('عرض') }}</a>
+                            {{-- إلغاء طلب ما زال «بانتظار الاستلام» لدى أوبتيموس — يُلغي الشحنة من الشركة أيضًا --}}
+                            @if (in_array($o->latestShipment?->provider_status, ['submitted', 'submit', 'pending'], true) && $o->status !== 'cancelled')
+                                @can('cancel', $o)
+                                    <form method="POST" action="{{ route('admin.sales.orders.cancel', $o) }}"
+                                          onsubmit="return confirm('{{ __('إلغاء الطلب وإلغاء الشحنة من شركة التوصيل؟') }}')">
+                                        @csrf
+                                        <input type="hidden" name="reason" value="{{ __('إلغاء قبل الاستلام') }}" />
+                                        <button type="submit" class="text-rose-600 hover:underline text-sm">{{ __('إلغاء الطلب') }}</button>
+                                    </form>
+                                @endcan
+                            @endif
                             @if (\App\Http\Controllers\Admin\Sales\OrderController::isDeletable($o))
                                 @can('delete', $o)
                                     <form method="POST" action="{{ route('admin.sales.orders.destroy', $o) }}"
