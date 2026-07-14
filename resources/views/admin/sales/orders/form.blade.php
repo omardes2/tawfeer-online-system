@@ -29,8 +29,8 @@
                            class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
                 </x-admin.field>
 
-                <x-admin.field :label="__('المدينة')" name="city_id">
-                    <select name="city_id" x-model.number="cityId" @change="areaId = ''"
+                <x-admin.field :label="__('المدينة')" name="city_id" :required="true">
+                    <select name="city_id" x-model.number="cityId" @change="areaId = ''" required
                             class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">{{ __('— اختر المدينة —') }}</option>
                         @foreach ($cities as $c)
@@ -39,8 +39,8 @@
                     </select>
                 </x-admin.field>
 
-                <x-admin.field :label="__('المنطقة')" name="area_id">
-                    <select name="area_id" x-model.number="areaId"
+                <x-admin.field :label="__('المنطقة')" name="area_id" :required="true">
+                    <select name="area_id" x-model.number="areaId" required
                             class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
                         <option value="">{{ __('— اختر المنطقة —') }}</option>
                         <template x-for="a in areasForCity" :key="a.id">
@@ -213,9 +213,9 @@
                     cityRates: cityRates || {},
                     query: '',
                     showResults: false,
-                    cityId: '',
-                    areaId: '',
-                    hasReturn: false,
+                    cityId: @js(old('city_id') ? (int) old('city_id') : ''),
+                    areaId: @js(old('area_id') ? (int) old('area_id') : ''),
+                    hasReturn: @js((bool) old('has_return')),
                     rows: [],
 
                     get filteredProducts() {

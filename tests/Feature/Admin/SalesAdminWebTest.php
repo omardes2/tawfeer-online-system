@@ -42,6 +42,16 @@ class SalesAdminWebTest extends TestCase
         return $u;
     }
 
+    /** مدينة + منطقة صالحتان (التوصيل إجباري على شاشة الإدارة). */
+    private function geo(): array
+    {
+        $gov = Governorate::firstOrCreate(['name' => 'فلسطين'], ['country_code' => 'PS', 'is_active' => true]);
+        $city = City::firstOrCreate(['governorate_id' => $gov->id, 'name' => 'رام الله'], ['is_active' => true]);
+        $area = Area::firstOrCreate(['city_id' => $city->id, 'name' => 'المصيون'], ['is_active' => true]);
+
+        return ['city_id' => $city->id, 'area_id' => $area->id];
+    }
+
     public function test_guest_redirected_to_login(): void
     {
         $this->get('/admin/sales/orders')->assertRedirect('/login');
@@ -106,6 +116,14 @@ class SalesAdminWebTest extends TestCase
         $this->assertEqualsWithDelta(220.0, (float) $order->total, 0.001); // 200 + 20 توصيل
     }
 
+    public function test_create_order_requires_name_phone_city_area_and_item(): void
+    {
+        // حقول مفقودة ⇒ أخطاء تحقّق لكل حقل (لا يُنشأ طلب).
+        $this->actingAs($this->admin())->post('/admin/sales/orders', [
+            'items' => [],
+        ])->assertSessionHasErrors(['customer_name', 'customer_phone', 'city_id', 'area_id', 'items']);
+    }
+
     public function test_confirm_without_live_provider_just_confirms(): void
     {
         // بلا مزوّد مُفعّل (config الافتراضي 'null') ⇒ تأكيد فقط دون إرسال ولا مهمة.
@@ -114,6 +132,7 @@ class SalesAdminWebTest extends TestCase
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'customer_name' => 'سارة',
             'customer_phone' => '0599111111',
+            ...$this->geo(),
             'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 50]],
         ])->assertRedirect();
 
@@ -135,6 +154,7 @@ class SalesAdminWebTest extends TestCase
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'customer_name' => 'خالد',
             'customer_phone' => '0599222222',
+            ...$this->geo(),
             'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 50]],
         ])->assertRedirect();
 
@@ -155,6 +175,7 @@ class SalesAdminWebTest extends TestCase
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'customer_name' => 'ليان',
             'customer_phone' => '0599333333',
+            ...$this->geo(),
             'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 50]],
         ])->assertRedirect();
 
@@ -173,7 +194,7 @@ class SalesAdminWebTest extends TestCase
     {
         $variant = Product::factory()->create()->defaultVariant;
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
-            'customer_name' => 'نور', 'customer_phone' => '0599444444',
+            'customer_name' => 'نور', 'customer_phone' => '0599444444', ...$this->geo(),
             'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 50]],
         ])->assertRedirect();
         $order = Order::latest('id')->first(); // draft — غير قابل للحذف
@@ -187,7 +208,7 @@ class SalesAdminWebTest extends TestCase
     {
         $variant = Product::factory()->create()->defaultVariant;
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
-            'customer_name' => 'رامي', 'customer_phone' => '0599555555',
+            'customer_name' => 'رامي', 'customer_phone' => '0599555555', ...$this->geo(),
             'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 50]],
         ])->assertRedirect();
         $order = Order::latest('id')->first();

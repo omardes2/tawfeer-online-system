@@ -33,9 +33,9 @@
         </div>
 
         <div>
-            <label class="block text-xs text-gray-500 mb-1">{{ __('حالة التوصيل') }}</label>
+            <label class="block text-xs text-gray-500 mb-1">{{ __('حالة أوبتيموس') }}</label>
             <select name="delivery_status" onchange="this.form.submit()" class="{{ $selectCls }}">
-                <option value="">{{ __('كل حالات التوصيل') }}</option>
+                <option value="">{{ __('كل حالات أوبتيموس') }}</option>
                 @foreach ($deliveryLabels as $key => $label)
                     <option value="{{ $key }}" @selected(($activeDeliveryStatus ?? null) === $key)>{{ $label }}</option>
                 @endforeach
@@ -66,7 +66,7 @@
                 <th>{{ __('اسم المستلم') }}</th>
                 <th>{{ __('المستخدم') }}</th>
                 <th>{{ __('الحالة') }}</th>
-                <th>{{ __('حالة التوصيل') }}</th>
+                <th>{{ __('حالة أوبتيموس') }}</th>
                 <th>{{ __('حالة الدفع') }}</th>
                 <th class="text-start">{{ __('الإجمالي') }}</th>
                 <th></th>
@@ -77,11 +77,9 @@
                 <tr>
                     <td class="font-mono text-xs">
                         @if ($o->tracking_number)
-                            <div class="font-semibold text-gray-900">{{ $o->tracking_number }}</div>
-                            <div class="text-[11px] text-gray-400">{{ $o->number }}</div>
+                            <span class="font-semibold text-gray-900">{{ $o->tracking_number }}</span>
                         @else
-                            <div class="text-gray-800">{{ $o->number }}</div>
-                            <div class="text-[11px] text-amber-500">{{ __('بانتظار التتبّع') }}</div>
+                            <span class="text-amber-500">{{ __('بانتظار التتبّع') }}</span>
                         @endif
                     </td>
                     <td class="whitespace-nowrap text-gray-600">
@@ -91,10 +89,10 @@
                     <td class="font-medium text-gray-800">{{ $o->latestShipment?->recipient_name ?: ($o->customer_name ?: '—') }}</td>
                     <td>
                         @php $staff = $o->assignee ?? ($o->channel === 'manual' ? $o->creator : null); @endphp
-                        @if ($staff)
-                            <span class="text-gray-700">{{ $staff->name }}</span>
-                        @elseif ($o->channel === 'manual')
-                            <span class="text-gray-700">{{ __('موظف المبيعات') }}</span>
+                        @if ($staff || $o->channel === 'manual')
+                            {{-- موظف مبيعات: نُظهر الوصف واسمه أسفله --}}
+                            <span class="block text-xs text-gray-400">{{ __('موظف المبيعات') }}</span>
+                            <span class="text-gray-700">{{ $staff?->name ?? '—' }}</span>
                         @elseif ($o->customer?->user_id)
                             <span class="text-gray-700">{{ $o->customer->name }}</span>
                         @else

@@ -88,8 +88,11 @@ class OrderController extends Controller
             // مستودع افتراضي واحد (مخفيّ في الواجهة) — يُحلّ تلقائيًا.
             'warehouse' => $this->defaultWarehouse(),
             'products' => $products,
-            'cities' => City::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
-            'areas' => Area::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'city_id']),
+            // مدن أوبتيموس فقط (المزامَنة ولها سعر) — تضمن وجود ربط خارجي (تفادي رفض 422).
+            'cities' => City::whereIn('id', DeliveryCityRate::where('is_active', true)->pluck('city_id')->filter())
+                ->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
+            'areas' => Area::whereIn('city_id', DeliveryCityRate::where('is_active', true)->pluck('city_id')->filter())
+                ->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'city_id']),
             // خريطة سعر التوصيل لكل مدينة (نمط Opost) لحساب حيّ في الواجهة.
             'cityRates' => DeliveryCityRate::where('is_active', true)->pluck('delivery_fee', 'city_id'),
         ]);
