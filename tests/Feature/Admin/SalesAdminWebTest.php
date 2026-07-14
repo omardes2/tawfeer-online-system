@@ -287,6 +287,41 @@ class SalesAdminWebTest extends TestCase
         $this->assertSame('0599777888', $order->customer_phone);
     }
 
+    public function test_orders_search_by_recipient_and_tracking(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $a = app(OrderService::class)->create(['branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id, 'customer_name' => 'سالم المطر', 'customer_phone' => '0599000000'], [], 2026);
+        $a->update(['tracking_number' => 'TRK-9911']);
+        app(OrderService::class)->create(['branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id, 'customer_name' => 'ليلى', 'customer_phone' => '0599000001'], [], 2026);
+
+        // بحث بالاسم
+        $this->actingAs($this->admin())->get('/admin/sales/orders?search='.urlencode('سالم'))
+            ->assertOk()->assertSee('سالم المطر')->assertDontSee('ليلى');
+
+        // بحث برقم التتبّع
+        $this->actingAs($this->admin())->get('/admin/sales/orders?search=TRK-9911')
+            ->assertOk()->assertSee('سالم المطر')->assertDontSee('ليلى');
+    }
+
+    public function test_orders_filter_by_sale_type(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 10, 5);
+
+        // بيع مباشر (channel=pos)
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.direct.store'), [
+            'customer_name' => 'زبون مباشر فريد', 'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 20]],
+        ])->assertRedirect();
+        // طلب عادي
+        app(OrderService::class)->create(['branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id, 'customer_name' => 'زبون عادي فريد', 'customer_phone' => '0599000000'], [], 2026);
+
+        $this->actingAs($this->admin())->get('/admin/sales/orders?sale_type=direct')
+            ->assertOk()->assertSee('زبون مباشر فريد')->assertDontSee('زبون عادي فريد');
+        $this->actingAs($this->admin())->get('/admin/sales/orders?sale_type=normal')
+            ->assertOk()->assertSee('زبون عادي فريد')->assertDontSee('زبون مباشر فريد');
+    }
+
     public function test_confirm_without_live_provider_just_confirms(): void
     {
         // بلا مزوّد مُفعّل (config الافتراضي 'null') ⇒ تأكيد فقط دون إرسال ولا مهمة.

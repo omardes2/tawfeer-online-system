@@ -18,9 +18,37 @@
             'shipped' => 'مُشحَن', 'delivered' => 'مُسلَّم', 'cancelled' => 'مُلغى',
         ];
         $selectCls = 'rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500 min-w-[10rem]';
-        $hasFilter = ($activeStatus ?? null) || ($activeDeliveryStatus ?? null) || ($activePaymentStatus ?? null);
+        $hasFilter = ($activeStatus ?? null) || ($activeDeliveryStatus ?? null) || ($activePaymentStatus ?? null) || ($activeSearch ?? null) || ($activeSaleType ?? null);
     @endphp
+
+    {{-- بحث برقم التتبّع أو اسم المستلم أو المستخدم (يحافظ على الفلاتر الحالية) --}}
+    <form method="GET" action="{{ route('admin.sales.orders.index') }}" class="mb-3">
+        <input type="hidden" name="status" value="{{ $activeStatus }}" />
+        <input type="hidden" name="delivery_status" value="{{ $activeDeliveryStatus }}" />
+        <input type="hidden" name="payment_status" value="{{ $activePaymentStatus }}" />
+        <input type="hidden" name="sale_type" value="{{ $activeSaleType }}" />
+        <div class="relative max-w-lg">
+            <span class="absolute inset-y-0 start-0 ps-3 flex items-center text-gray-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
+            </span>
+            <input type="text" name="search" value="{{ $activeSearch }}"
+                   placeholder="{{ __('بحث برقم التتبّع أو اسم المستلم أو المستخدم...') }}"
+                   class="w-full ps-9 pe-24 rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+            <button type="submit" class="absolute inset-y-0 end-0 px-4 text-sm text-emerald-700 hover:text-emerald-900">{{ __('بحث') }}</button>
+        </div>
+    </form>
+
     <form method="GET" action="{{ route('admin.sales.orders.index') }}" class="flex flex-wrap items-end gap-3 mb-5">
+        <input type="hidden" name="search" value="{{ $activeSearch }}" />
+
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">{{ __('نوع البيع') }}</label>
+            <select name="sale_type" onchange="this.form.submit()" class="{{ $selectCls }}">
+                <option value="">{{ __('كل المبيعات') }}</option>
+                <option value="normal" @selected(($activeSaleType ?? null) === 'normal')>{{ __('مبيعات عادية') }}</option>
+                <option value="direct" @selected(($activeSaleType ?? null) === 'direct')>{{ __('مبيعات مباشرة') }}</option>
+            </select>
+        </div>
         <div>
             <label class="block text-xs text-gray-500 mb-1">{{ __('الحالة') }}</label>
             <select name="status" onchange="this.form.submit()" class="{{ $selectCls }}">
@@ -77,7 +105,9 @@
             @forelse ($orders as $o)
                 <tr>
                     <td class="font-mono text-xs">
-                        @if ($o->tracking_number)
+                        @if ($o->channel === 'pos')
+                            <span class="inline-flex items-center rounded-md bg-violet-50 text-violet-700 text-[11px] px-1.5 py-0.5">{{ __('مبيعات مباشرة') }}</span>
+                        @elseif ($o->tracking_number)
                             <span class="font-semibold text-gray-900">{{ $o->tracking_number }}</span>
                         @else
                             <span class="text-amber-500">{{ __('بانتظار التتبّع') }}</span>
@@ -89,9 +119,6 @@
                     </td>
                     <td class="font-medium text-gray-800">
                         {{ $o->latestShipment?->recipient_name ?: ($o->customer_name ?: '—') }}
-                        @if ($o->channel === 'pos')
-                            <span class="inline-flex items-center rounded-md bg-violet-50 text-violet-700 text-[11px] px-1.5 py-0.5 ms-1">{{ __('مبيعات مباشرة') }}</span>
-                        @endif
                     </td>
                     <td>
                         @php $staff = $o->assignee ?? ($o->channel === 'manual' ? $o->creator : null); @endphp
@@ -111,24 +138,11 @@
                         @if ($ps)
                             <div class="flex flex-col items-start gap-1">
                                 <span class="inline-flex items-center rounded-md bg-sky-50 text-sky-700 px-2 py-0.5">{{ \App\Modules\Shipping\Support\OpostStatus::label($ps) }}</span>
-                                @if ($ps === 'delivered')
-                                    @if ($o->return_received_at)
-                                        <span class="inline-flex items-center gap-1 text-[11px] text-emerald-600">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
-                                            {{ __('استُلم في المستودع') }}
-                                        </span>
-                                    @else
-                                        @can('update', $o)
-                                            <x-admin.confirm
-                                                :action="route('admin.sales.orders.receive_return', $o)"
-                                                method="POST"
-                                                tone="green"
-                                                :trigger="__('تأكيد استلام المرتجع')"
-                                                :title="__('تأكيد استلام المرتجع')"
-                                                :confirm="__('تأكيد وإرجاع للمخزون')"
-                                                :message="__('سيتم تأكيد رجوع الطلب للمستودع وإعادة كمياته إلى المخزون. لا يمكن التراجع.')" />
-                                        @endcan
-                                    @endif
+                                @if ($ps === 'delivered' && $o->return_received_at)
+                                    <span class="inline-flex items-center gap-1 text-[11px] text-emerald-600">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                        {{ __('استُلم في المستودع') }}
+                                    </span>
                                 @endif
                             </div>
                         @else
@@ -150,6 +164,16 @@
                                     <form method="POST" action="{{ route('admin.sales.orders.confirm', $o) }}">
                                         @csrf
                                         <button type="submit" class="btn-primary btn-sm">{{ __('تأكيد الطلب') }}</button>
+                                    </form>
+                                @endcan
+                            @endif
+                            {{-- مرتجع مع السائق: زر أحمر لتأكيد استلام المرتجع (نفس مكان زر تأكيد الطلب) --}}
+                            @if ($o->latestShipment?->provider_status === 'delivered' && ! $o->return_received_at)
+                                @can('update', $o)
+                                    <form method="POST" action="{{ route('admin.sales.orders.receive_return', $o) }}"
+                                          onsubmit="return confirm('{{ __('تأكيد استلام المرتجع وإعادة الكميات إلى المخزون؟') }}')">
+                                        @csrf
+                                        <button type="submit" class="btn-danger btn-sm">{{ __('تأكيد استلام المرتجع') }}</button>
                                     </form>
                                 @endcan
                             @endif

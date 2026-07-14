@@ -47,7 +47,32 @@ class OrderController extends Controller
         $paymentStatus = $request->query('payment_status');
         $paymentStatus = in_array($paymentStatus, ['paid', 'unpaid', 'partial'], true) ? $paymentStatus : null;
 
+        $search = trim((string) $request->query('search'));
+
+        // نوع البيع: مباشر (channel=pos) أو عادي.
+        $saleType = $request->query('sale_type');
+        $saleType = in_array($saleType, ['direct', 'normal'], true) ? $saleType : null;
+
         $query = Order::with(['assignee', 'creator', 'customer', 'latestShipment'])->latest('id');
+
+        match ($saleType) {
+            'direct' => $query->where('channel', 'pos'),
+            'normal' => $query->where('channel', '!=', 'pos'),
+            default => null,
+        };
+
+        // بحث برقم التتبّع أو اسم المستلم أو اسم المستخدم (الموظف).
+        if ($search !== '') {
+            $like = '%'.$search.'%';
+            $query->where(function ($q) use ($like) {
+                $q->where('customer_name', 'like', $like)
+                    ->orWhere('tracking_number', 'like', $like)
+                    ->orWhereHas('latestShipment', fn ($s) => $s->where('recipient_name', 'like', $like)->orWhere('tracking_number', 'like', $like))
+                    ->orWhereHas('assignee', fn ($u) => $u->where('name', 'like', $like))
+                    ->orWhereHas('creator', fn ($u) => $u->where('name', 'like', $like));
+            });
+        }
+
         if ($status !== null) {
             $query->where('status', $status);
         }
@@ -66,6 +91,8 @@ class OrderController extends Controller
             'activeStatus' => $status,
             'activeDeliveryStatus' => $deliveryStatus,
             'activePaymentStatus' => $paymentStatus,
+            'activeSearch' => $search,
+            'activeSaleType' => $saleType,
             'deliveryLabels' => OpostStatus::options(),
             'statusCounts' => Order::selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status'),
             'totalCount' => Order::count(),

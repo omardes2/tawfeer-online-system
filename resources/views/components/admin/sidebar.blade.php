@@ -30,10 +30,9 @@
     $P = fn ($m) => 'App\\Modules\\'.$m;
     $groups = [
         ['المبيعات', 'cart', [
-            ['admin.sales.orders.index', 'الطلبات', ['viewAny', $P('Sales\\Models\\Order')], 'admin.sales.orders.index'],
-            ['admin.sales.orders.create', 'إنشاء طلب', ['create', $P('Sales\\Models\\Order')], 'admin.sales.orders.create'],
+            ['admin.sales.orders.index', 'المبيعات', ['viewAny', $P('Sales\\Models\\Order')], 'admin.sales.orders.index'],
+            ['admin.sales.orders.create', 'إنشاء اوردر', ['create', $P('Sales\\Models\\Order')], 'admin.sales.orders.create'],
             ['admin.sales.orders.direct.create', 'مبيعات مباشرة', ['create', $P('Sales\\Models\\Order')], 'admin.sales.orders.direct.*'],
-            ['admin.shipping.shipments.index', 'الشحنات الجاهزة', 'shipping.shipments.view', 'admin.shipping.shipments.*'],
             ['admin.returns.index', 'المرتجعات والمرفوضة', 'returns.view', 'admin.returns.*'],
         ]],
         ['الكتالوج', 'box', [
