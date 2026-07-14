@@ -4,6 +4,7 @@
         :description="__('إدارة طلبات المبيعات ومتابعة حالاتها.')"
         :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('المبيعات') => null, __('الطلبات') => null]">
         @can('create', \App\Modules\Sales\Models\Order::class)
+            <a href="{{ route('admin.sales.orders.direct.create') }}" class="btn-secondary btn-sm">{{ __('مبيعات مباشرة') }}</a>
             <a href="{{ route('admin.sales.orders.create') }}" class="btn-primary btn-sm">{{ __('طلب جديد') }}</a>
         @endcan
     </x-admin.header>
@@ -86,7 +87,12 @@
                         <div>{{ \Illuminate\Support\Carbon::parse($o->created_at)->format('Y-m-d') }}</div>
                         <div class="text-xs text-gray-400">{{ \Illuminate\Support\Carbon::parse($o->created_at)->format('h:i A') }}</div>
                     </td>
-                    <td class="font-medium text-gray-800">{{ $o->latestShipment?->recipient_name ?: ($o->customer_name ?: '—') }}</td>
+                    <td class="font-medium text-gray-800">
+                        {{ $o->latestShipment?->recipient_name ?: ($o->customer_name ?: '—') }}
+                        @if ($o->channel === 'pos')
+                            <span class="inline-flex items-center rounded-md bg-violet-50 text-violet-700 text-[11px] px-1.5 py-0.5 ms-1">{{ __('مبيعات مباشرة') }}</span>
+                        @endif
+                    </td>
                     <td>
                         @php $staff = $o->assignee ?? ($o->channel === 'manual' ? $o->creator : null); @endphp
                         @if ($staff || $o->channel === 'manual')

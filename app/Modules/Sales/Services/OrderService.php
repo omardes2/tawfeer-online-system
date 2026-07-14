@@ -102,6 +102,24 @@ class OrderService
         return $order;
     }
 
+    /**
+     * بيع مباشر من المستودع (بلا شركة توصيل): يمرّ بالطلب فورًا حتى «مُسلَّم»
+     * فيخصم المخزون (sale_out/COGS) ويُطلق استحقاق العمولة — كل ذلك في معاملة واحدة.
+     */
+    public function fulfillDirect(Order $order): Order
+    {
+        return DB::transaction(function () use ($order) {
+            $this->confirm($order);
+            $this->reserveStock($order);
+            $this->startPreparing($order);
+            $this->markReady($order);
+            $this->ship($order);
+            $this->deliver($order);
+
+            return $order->fresh();
+        });
+    }
+
     /** التأكيد → الحجز: يحجز كل بند عبر ReservationService (ADR-009، BR-ORD-06). */
     public function reserveStock(Order $order): Order
     {

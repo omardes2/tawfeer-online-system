@@ -12,6 +12,7 @@ use App\Modules\Foundation\Models\DeliveryProvider;
 use App\Modules\Foundation\Models\Governorate;
 use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Inventory\Models\InventoryStock;
+use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
 use App\Modules\Shipping\Jobs\CancelOrderShipment;
@@ -235,6 +236,33 @@ class SalesAdminWebTest extends TestCase
 
         $this->assertSame('cancelled', $order->fresh()->status);
         Queue::assertPushed(CancelOrderShipment::class);
+    }
+
+    public function test_direct_sale_form_renders(): void
+    {
+        $this->actingAs($this->admin())->get(route('admin.sales.orders.direct.create'))
+            ->assertOk()->assertSee('مبيعات مباشرة');
+    }
+
+    public function test_direct_sale_fulfills_and_deducts_stock_without_shipment(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 10, 5);
+
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.direct.store'), [
+            'customer_name' => 'زبون مباشر',
+            'items' => [['variant' => $variant->uuid, 'qty' => 3, 'unit_price' => 20]],
+        ])->assertRedirect();
+
+        $order = Order::latest('id')->first();
+        $this->assertSame('pos', $order->channel);
+        $this->assertSame('delivered', $order->status);       // مُسلَّم فورًا
+        $this->assertEquals(0, $order->shipments()->count());  // بلا شحنة/توصيل
+
+        $onHand = (float) InventoryStock::where('variant_id', $variant->id)
+            ->where('warehouse_id', $warehouse->id)->value('on_hand');
+        $this->assertEqualsWithDelta(7, $onHand, 0.001);       // 10 − 3
     }
 
     public function test_confirm_without_live_provider_just_confirms(): void

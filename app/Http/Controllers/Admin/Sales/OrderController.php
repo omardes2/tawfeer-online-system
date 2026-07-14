@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin\Sales;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Sales\CancelOrderRequest;
+use App\Http\Requests\Sales\StoreDirectSaleRequest;
 use App\Http\Requests\Sales\StoreOrderRequest;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
@@ -138,6 +139,61 @@ class OrderController extends Controller
         ], $items, (int) now()->year);
 
         return redirect()->route('admin.sales.orders.show', $order)->with('success', __('أُنشئ الطلب.'));
+    }
+
+    /** نموذج «مبيعات مباشرة» — بيع من المستودع بلا توصيل خارجي. */
+    public function createDirect(): View
+    {
+        $this->authorize('create', Order::class);
+
+        $products = Product::query()->active()
+            ->with(['defaultVariant', 'primaryImage'])
+            ->orderBy('name')->get()
+            ->filter(fn ($p) => $p->defaultVariant)
+            ->map(fn ($p) => [
+                'name' => $p->name, 'sku' => $p->sku,
+                'variant' => $p->defaultVariant->uuid,
+                'price' => (float) $p->defaultVariant->retail_price,
+                'image' => $p->primaryImage?->url(),
+            ])->values();
+
+        return view('admin.sales.orders.direct', ['products' => $products]);
+    }
+
+    public function storeDirect(StoreDirectSaleRequest $request): RedirectResponse
+    {
+        $this->authorize('create', Order::class);
+
+        $warehouse = $request->filled('warehouse')
+            ? Warehouse::where('uuid', $request->validated('warehouse'))->firstOrFail()
+            : $this->defaultWarehouse();
+
+        abort_if($warehouse === null, 422, __('لا يوجد مستودع مُهيّأ.'));
+
+        $items = collect($request->validated('items'))->map(fn ($i) => [
+            'variant_id' => ProductVariant::where('uuid', $i['variant'])->value('id'),
+            'qty' => $i['qty'],
+            'unit_price' => $i['unit_price'],
+            'discount' => $i['discount'] ?? 0,
+        ])->all();
+
+        $order = $this->service->create([
+            'warehouse_id' => $warehouse->id,
+            'branch_id' => $warehouse->branch_id,
+            'customer_name' => $request->validated('customer_name'),
+            'customer_phone' => $request->validated('customer_phone') ?? '', // اختياري في البيع المباشر (العمود NOT NULL)
+            'channel' => 'pos', // علامة «مبيعات مباشرة»
+            'notes' => $request->validated('notes'),
+        ], $items, (int) now()->year);
+
+        try {
+            $this->service->fulfillDirect($order);
+        } catch (ValidationException $e) {
+            return back()->withInput()->with('error', collect($e->errors())->flatten()->first());
+        }
+
+        return redirect()->route('admin.sales.orders.show', $order)
+            ->with('success', __('تمت المبيعة المباشرة وخُصمت الكميات من المخزون.'));
     }
 
     public function show(Order $order): View
