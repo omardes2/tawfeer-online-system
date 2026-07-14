@@ -35,7 +35,7 @@
             ['admin.sales.orders.direct.create', 'مبيعات مباشرة', ['create', $P('Sales\\Models\\Order')], 'admin.sales.orders.direct.*'],
             ['admin.returns.index', 'المرتجعات والمرفوضة', 'returns.view', 'admin.returns.*'],
         ]],
-        ['الكتالوج', 'box', [
+        ['المنتجات', 'box', [
             ['admin.products.index', 'المنتجات', ['viewAny', $P('Catalog\\Models\\Product')], 'admin.products.*'],
             ['admin.categories.index', 'الفئات', ['viewAny', $P('Catalog\\Models\\Category')], 'admin.categories.*'],
             ['admin.brands.index', 'العلامات التجارية', ['viewAny', $P('Catalog\\Models\\Brand')], 'admin.brands.*'],
