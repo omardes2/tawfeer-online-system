@@ -19,6 +19,7 @@ class ProductService
 
             $attributes['slug'] = $this->resolveSlug($attributes);
             $attributes['is_active'] = ($attributes['status'] ?? 'draft') === 'active';
+            $attributes = $this->normalizePrices($attributes);
 
             $product = Product::create($attributes);
             $product->tags()->sync($tagIds);
@@ -43,6 +44,7 @@ class ProductService
                 $attributes['is_active'] = $attributes['status'] === 'active';
             }
 
+            $attributes = $this->normalizePrices($attributes);
             $product->update($attributes);
             $this->syncVariantPrices($product, $attributes);
 
@@ -56,6 +58,23 @@ class ProductService
 
             return $product;
         });
+    }
+
+    /**
+     * أعمدة السعر غير القابلة للـ null (لها default 0) — لا يجوز كتابة null عليها.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function normalizePrices(array $attributes): array
+    {
+        foreach (['retail_price', 'cost_price'] as $key) {
+            if (array_key_exists($key, $attributes) && $attributes[$key] === null) {
+                $attributes[$key] = 0;
+            }
+        }
+
+        return $attributes;
     }
 
     /**
