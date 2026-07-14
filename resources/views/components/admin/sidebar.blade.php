@@ -46,7 +46,6 @@
         ['المخزون والمشتريات', 'box', [
             ['admin.inventory.stocks', 'أرصدة المخزون', 'inventory.stocks.view', 'admin.inventory.stocks'],
             ['admin.inventory.low_stock', 'تنبيهات النقص', 'inventory.stocks.view', 'admin.inventory.low_stock'],
-            ['admin.inventory.movements', 'حركات المخزون', 'inventory.stocks.view', 'admin.inventory.movements'],
             ['admin.purchasing.suppliers.index', 'الموردون', 'purchasing.suppliers.view', 'admin.purchasing.suppliers.*'],
             ['admin.purchasing.invoices.index', 'فواتير الموردين', 'purchasing.invoices.view', 'admin.purchasing.invoices.*'],
             ['admin.purchasing.returns.index', 'مرتجعات الموردين', 'purchasing.returns.view', 'admin.purchasing.returns.*'],
