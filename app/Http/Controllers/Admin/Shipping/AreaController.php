@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Admin\Shipping;
 use App\Http\Controllers\Controller;
 use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\City;
+use App\Modules\Foundation\Models\DeliveryCityRate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -86,5 +88,20 @@ class AreaController extends Controller
 
         return redirect()->route('admin.shipping.areas.index', ['city' => $cityId])
             ->with('success', __('حُذفت المنطقة.'));
+    }
+
+    /** حذف مدينة بالكامل مع مناطقها وسعر توصيلها (روابط الطلبات تُفرَّغ لا تُحذف). */
+    public function destroyCity(City $city): RedirectResponse
+    {
+        $this->authorize('settings.geography.manage');
+
+        DB::transaction(function () use ($city) {
+            Area::where('city_id', $city->id)->delete();        // areas.city_id = restrictOnDelete
+            DeliveryCityRate::where('city_id', $city->id)->delete();
+            $city->delete();
+        });
+
+        return redirect()->route('admin.shipping.areas.index')
+            ->with('success', __('حُذفت المدينة ومناطقها.'));
     }
 }

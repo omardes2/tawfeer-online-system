@@ -276,6 +276,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('areas', [AreaController::class, 'store'])->name('areas.store')->middleware('can:settings.geography.manage');
         Route::put('areas', [AreaController::class, 'update'])->name('areas.update')->middleware('can:settings.geography.manage');
         Route::delete('areas/{area}', [AreaController::class, 'destroy'])->name('areas.destroy')->middleware('can:settings.geography.manage');
+        Route::delete('cities/{city}', [AreaController::class, 'destroyCity'])->name('cities.destroy')->middleware('can:settings.geography.manage');
     });
 
     // المدفوعات (Phase 2.8)

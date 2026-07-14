@@ -33,15 +33,15 @@ class GeographyApiTest extends TestCase
 
         $this->getJson('/api/v1/geo/governorates')->assertOk()
             ->assertJsonPath('data.0.name', fn ($v) => is_string($v));
-        $gov = Governorate::where('name', 'الرياض')->firstOrFail();
+        $gov = Governorate::where('name', 'القدس')->firstOrFail();
 
         $this->getJson("/api/v1/geo/cities?governorate_id={$gov->id}")->assertOk()
-            ->assertJsonFragment(['name' => 'الدرعية']);
+            ->assertJsonFragment(['name' => 'بيت لحم']);
     }
 
     public function test_local_city_maps_to_multiple_providers_simultaneously(): void
     {
-        $city = City::where('name', 'جدة')->firstOrFail();
+        $city = City::where('name', 'رام الله')->firstOrFail();
 
         $aramex = DeliveryProvider::create(['name' => 'Aramex', 'code' => 'aramex', 'driver' => 'null']);
         $smsa = DeliveryProvider::create(['name' => 'SMSA', 'code' => 'smsa', 'driver' => 'null']);
@@ -59,7 +59,7 @@ class GeographyApiTest extends TestCase
 
         // تعطيل مزوّد لا يفقد الجغرافيا المحلية ولا تعيينات المزوّد الآخر.
         $aramex->update(['is_active' => false]);
-        $this->assertDatabaseHas('cities', ['id' => $city->id, 'name' => 'جدة']);
+        $this->assertDatabaseHas('cities', ['id' => $city->id, 'name' => 'رام الله']);
         $this->assertEquals(1, $city->providerMappings()->whereHas('provider', fn ($q) => $q->where('is_active', true))->count());
     }
 

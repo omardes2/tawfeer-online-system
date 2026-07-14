@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\City;
+use App\Modules\Foundation\Models\Governorate;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -99,5 +100,16 @@ class ShippingAdminWebTest extends TestCase
         $this->actingAs($this->withRole('affiliate'))->post(route('admin.shipping.areas.store'), [
             'city_id' => $city->id, 'name' => 'x',
         ])->assertForbidden();
+    }
+
+    public function test_admin_can_delete_city_with_areas(): void
+    {
+        $city = City::create(['governorate_id' => Governorate::orderBy('id')->value('id'), 'name' => 'مدينة للحذف']);
+        Area::create(['city_id' => $city->id, 'name' => 'منطقة تابعة', 'is_active' => true]);
+
+        $this->actingAs($this->admin())->delete(route('admin.shipping.cities.destroy', $city))->assertRedirect();
+
+        $this->assertNull(City::find($city->id));
+        $this->assertEquals(0, Area::where('city_id', $city->id)->count());
     }
 }

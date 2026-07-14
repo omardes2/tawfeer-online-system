@@ -16,6 +16,17 @@
             </select>
         </x-admin.field>
         <p class="text-sm text-gray-400 pb-2">{{ __('عدد المناطق') }}: <span class="font-semibold text-gray-600">{{ $areas->count() }}</span></p>
+        @can('settings.geography.manage')
+            @if ($cityId)
+                <div class="pb-1">
+                    <x-admin.confirm
+                        :action="route('admin.shipping.cities.destroy', $cityId)"
+                        :title="__('حذف المدينة')"
+                        :trigger="__('حذف هذه المدينة')"
+                        :message="__('ستُحذف المدينة وكل مناطقها وسعر توصيلها نهائيًا.')" />
+                </div>
+            @endif
+        @endcan
     </form>
 
     {{-- إضافة منطقة --}}
