@@ -69,4 +69,25 @@ class PurchasingAdminWebTest extends TestCase
     {
         $this->actingAs($this->withRole('accountant'))->get('/admin/purchasing/suppliers/create')->assertForbidden();
     }
+
+    public function test_supplier_show_page_renders_with_balance_and_tabs(): void
+    {
+        $supplier = Supplier::factory()->create(['opening_balance' => 250]);
+
+        $response = $this->actingAs($this->admin())->get(route('admin.purchasing.suppliers.show', $supplier));
+        $response->assertOk();
+        $response->assertSee($supplier->name);
+        $response->assertSee('الرصيد المتبقّي');
+        $response->assertSee('إجمالي المشتريات');
+        $response->assertSee('كشف الحساب');
+        $response->assertSee('الدفعات');
+    }
+
+    public function test_suppliers_index_with_balance_filter_renders(): void
+    {
+        Supplier::factory()->create(['opening_balance' => 500]);
+        $response = $this->actingAs($this->admin())->get('/admin/purchasing/suppliers?filter=with_balance');
+        $response->assertOk();
+        $response->assertSee('بأرصدة');
+    }
 }

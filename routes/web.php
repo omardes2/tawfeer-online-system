@@ -204,7 +204,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
 
     // المشتريات (Phase 2.5)
     Route::prefix('purchasing')->name('purchasing.')->group(function () {
-        Route::resource('suppliers', AdminSupplierController::class)->except('show');
+        Route::resource('suppliers', AdminSupplierController::class);
 
         Route::resource('orders', AdminPurchaseOrderController::class)->only(['index', 'create', 'store', 'show']);
         Route::post('orders/{order}/submit', [AdminPurchaseOrderController::class, 'submit'])->name('orders.submit');
