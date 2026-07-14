@@ -10,8 +10,10 @@ use App\Modules\Foundation\Models\City;
 use App\Modules\Foundation\Models\DeliveryCityRate;
 use App\Modules\Foundation\Models\Governorate;
 use App\Modules\Sales\Models\Order;
+use App\Modules\Shipping\Jobs\DispatchOrderShipment;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class SalesAdminWebTest extends TestCase
@@ -103,7 +105,8 @@ class SalesAdminWebTest extends TestCase
 
     public function test_confirm_without_live_provider_just_confirms(): void
     {
-        // بلا مزوّد مُفعّل (config الافتراضي 'null') ⇒ تأكيد فقط دون كسر.
+        // بلا مزوّد مُفعّل (config الافتراضي 'null') ⇒ تأكيد فقط دون إرسال ولا مهمة.
+        Queue::fake();
         $variant = Product::factory()->create()->defaultVariant;
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'customer_name' => 'سارة',
@@ -116,5 +119,26 @@ class SalesAdminWebTest extends TestCase
 
         $this->assertSame('confirmed', $order->fresh()->status);
         $this->assertNull($order->fresh()->tracking_number);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_confirm_queues_delivery_dispatch_when_provider_configured(): void
+    {
+        // مزوّد مُفعّل ⇒ التأكيد يضع مهمة إرسال في الطابور (لا اتصال متزامن).
+        config()->set('shipping.provider', 'opost');
+        Queue::fake();
+
+        $variant = Product::factory()->create()->defaultVariant;
+        $this->actingAs($this->admin())->post('/admin/sales/orders', [
+            'customer_name' => 'خالد',
+            'customer_phone' => '0599222222',
+            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 50]],
+        ])->assertRedirect();
+
+        $order = Order::latest('id')->first();
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.confirm', $order))->assertRedirect();
+
+        $this->assertSame('confirmed', $order->fresh()->status);
+        Queue::assertPushed(DispatchOrderShipment::class);
     }
 }

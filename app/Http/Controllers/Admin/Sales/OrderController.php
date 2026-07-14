@@ -13,7 +13,7 @@ use App\Modules\Foundation\Models\DeliveryCityRate;
 use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
-use App\Modules\Shipping\Services\OrderDeliveryDispatcher;
+use App\Modules\Shipping\Jobs\DispatchOrderShipment;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,10 +24,7 @@ class OrderController extends Controller
     /** حالات الطلب القانونية للفلترة (بالترتيب المنطقي). */
     private const STATUSES = ['draft', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
 
-    public function __construct(
-        private readonly OrderService $service,
-        private readonly OrderDeliveryDispatcher $dispatcher,
-    ) {}
+    public function __construct(private readonly OrderService $service) {}
 
     public function index(Request $request): View
     {
@@ -136,18 +133,15 @@ class OrderController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        // عند التأكيد: إرسال الطلب لشركة التوصيل (Opost) وتخزين رقم التتبّع.
-        // فشل التكامل لا يُلغي التأكيد — يُسجَّل تحذيرًا ويُعاد المحاولة لاحقًا.
-        $result = $this->dispatcher->dispatch($order);
+        // عند التأكيد: إرسال الطلب لشركة التوصيل (Opost) في الخلفية عبر الطابور —
+        // لا اتصال متزامن داخل طلب الويب (يتفادى مهلة الانتظار). رقم التتبّع يظهر بعد تنفيذ المهمة.
+        if (empty($order->tracking_number) && config('shipping.provider', 'null') !== 'null') {
+            DispatchOrderShipment::dispatch($order->id);
 
-        if ($result['status'] === 'created') {
-            return back()->with('success', __('تم تأكيد الطلب وإرساله لشركة التوصيل (تتبّع: :n).', ['n' => $result['tracking_number']]));
-        }
-        if ($result['status'] === 'skipped') {
-            return back()->with('success', __('تم تأكيد الطلب.'));
+            return back()->with('success', __('تم تأكيد الطلب، ويجري إرساله لشركة التوصيل (يظهر رقم التتبّع خلال لحظات).'));
         }
 
-        return back()->with('warning', __('تم تأكيد الطلب، لكن تعذّر إرساله لشركة التوصيل: :msg', ['msg' => $result['message'] ?? __('خطأ غير معروف')]));
+        return back()->with('success', __('تم تأكيد الطلب.'));
     }
 
     public function reserve(Order $order): RedirectResponse
