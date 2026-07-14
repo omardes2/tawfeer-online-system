@@ -46,7 +46,7 @@
                 <th>{{ __('رقم الطلب') }}</th>
                 <th>{{ __('التاريخ والوقت') }}</th>
                 <th>{{ __('اسم المستلم') }}</th>
-                <th>{{ __('المسؤول') }}</th>
+                <th>{{ __('المستخدم') }}</th>
                 <th>{{ __('الحالة') }}</th>
                 <th>{{ __('حالة الدفع') }}</th>
                 <th class="text-start">{{ __('الإجمالي') }}</th>
@@ -61,12 +61,17 @@
                         <div>{{ \Illuminate\Support\Carbon::parse($o->created_at)->format('Y-m-d') }}</div>
                         <div class="text-xs text-gray-400">{{ \Illuminate\Support\Carbon::parse($o->created_at)->format('h:i A') }}</div>
                     </td>
-                    <td class="font-medium text-gray-800">{{ $o->customer_name ?: '—' }}</td>
+                    <td class="font-medium text-gray-800">{{ $o->latestShipment?->recipient_name ?: ($o->customer_name ?: '—') }}</td>
                     <td>
-                        @if ($o->channel === 'storefront')
-                            <x-admin.badge tone="blue" :label="__('زبون')" :icon="false" />
+                        @php $staff = $o->assignee ?? ($o->channel === 'manual' ? $o->creator : null); @endphp
+                        @if ($staff)
+                            <span class="text-gray-700">{{ $staff->name }}</span>
+                        @elseif ($o->channel === 'manual')
+                            <span class="text-gray-700">{{ __('موظف المبيعات') }}</span>
+                        @elseif ($o->customer?->user_id)
+                            <span class="text-gray-700">{{ $o->customer->name }}</span>
                         @else
-                            <span class="text-gray-700">{{ $o->assignee?->name ?? __('موظف المبيعات') }}</span>
+                            <x-admin.badge tone="blue" :label="__('زبون')" :icon="false" />
                         @endif
                     </td>
                     <td><x-sales.status :status="$o->status" /></td>

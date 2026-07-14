@@ -3,6 +3,7 @@
 namespace App\Modules\Sales\Models;
 
 use App\Models\User;
+use App\Modules\Crm\Models\Customer;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Payment\Models\Payment;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -63,6 +65,24 @@ class Order extends Model
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    /** مُنشئ الطلب (موظف عند الطلب اليدوي). */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** العميل المرتبط (إن وُجد). */
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class, 'customer_id');
+    }
+
+    /** أحدث شحنة للطلب (اسم المستلم يؤخذ منها). */
+    public function latestShipment(): HasOne
+    {
+        return $this->hasOne(Shipment::class)->latestOfMany();
     }
 
     /** المسوّق المُحيل (Phase 4.1). */

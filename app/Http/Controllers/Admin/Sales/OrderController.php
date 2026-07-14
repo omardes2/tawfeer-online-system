@@ -29,7 +29,7 @@ class OrderController extends Controller
         $status = $request->query('status');
         $status = in_array($status, self::STATUSES, true) ? $status : null;
 
-        $query = Order::with('assignee')->latest('id');
+        $query = Order::with(['assignee', 'creator', 'customer', 'latestShipment'])->latest('id');
         if ($status !== null) {
             $query->where('status', $status);
         }
