@@ -40,6 +40,10 @@ class UpdateProductRequest extends FormRequest
             'sort_order' => ['sometimes', 'integer', 'min:0'],
             'track_inventory' => ['boolean'],
             'weight' => ['nullable', 'numeric', 'min:0'],
+            'retail_price' => ['nullable', 'numeric', 'min:0'],
+            'promo_price' => ['nullable', 'numeric', 'min:0', 'lte:retail_price'],
+            'cost_price' => ['nullable', 'numeric', 'min:0'],
+            'wholesale_price' => ['nullable', 'numeric', 'min:0'],
 
             'meta_title' => ['nullable', 'string', 'max:255'],
             'meta_description' => ['nullable', 'string', 'max:500'],

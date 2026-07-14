@@ -38,6 +38,11 @@ class StoreProductRequest extends FormRequest
             'sort_order' => ['integer', 'min:0'],
             'track_inventory' => ['boolean'],
             'weight' => ['nullable', 'numeric', 'min:0'],
+            // الأسعار (تُزامَن مع المتغيّر الافتراضي — تظهر في الموقع والطلبات).
+            'retail_price' => ['nullable', 'numeric', 'min:0'],
+            'promo_price' => ['nullable', 'numeric', 'min:0', 'lte:retail_price'],
+            'cost_price' => ['nullable', 'numeric', 'min:0'],
+            'wholesale_price' => ['nullable', 'numeric', 'min:0'],
 
             'meta_title' => ['nullable', 'string', 'max:255'],
             'meta_description' => ['nullable', 'string', 'max:500'],

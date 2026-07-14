@@ -8,6 +8,7 @@ use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductTag;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Foundation\Models\Branch;
+use App\Modules\Store\Services\StorefrontService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -101,6 +102,34 @@ class ProductAdminWebTest extends TestCase
         ]))->assertRedirect();
 
         $this->assertSame(0, $product->fresh()->tags()->count());
+    }
+
+    public function test_update_prices_sync_to_variant_and_enable_discount(): void
+    {
+        $product = Product::factory()->create();
+
+        $this->actingAs($this->admin())->put('/admin/products/'.$product->uuid, $this->fields([
+            'sku' => $product->sku,
+            'retail_price' => 100,
+            'promo_price' => 80,
+        ]))->assertRedirect()->assertSessionHasNoErrors();
+
+        $variant = $product->fresh()->defaultVariant;
+        $this->assertEqualsWithDelta(100, (float) $variant->retail_price, 0.01);
+        $this->assertEqualsWithDelta(80, (float) $variant->promo_price, 0.01);
+
+        // ينعكس خصمًا في الموقع.
+        $sf = app(StorefrontService::class);
+        $this->assertTrue($sf->onSale($product->fresh()));
+        $this->assertEqualsWithDelta(80, $sf->sellingPrice($product->fresh()), 0.01);
+    }
+
+    public function test_promo_price_cannot_exceed_retail(): void
+    {
+        $product = Product::factory()->create();
+        $this->actingAs($this->admin())->put('/admin/products/'.$product->uuid, $this->fields([
+            'sku' => $product->sku, 'retail_price' => 100, 'promo_price' => 120,
+        ]))->assertSessionHasErrors('promo_price');
     }
 
     public function test_admin_uploads_image_via_web(): void

@@ -24,6 +24,7 @@ class ProductService
             $product->tags()->sync($tagIds);
             $product->attributes()->sync($attributeIds);
             $this->ensureDefaultVariant($product);
+            $this->syncVariantPrices($product, $attributes);
 
             return $product;
         });
@@ -43,6 +44,7 @@ class ProductService
             }
 
             $product->update($attributes);
+            $this->syncVariantPrices($product, $attributes);
 
             if ($tagIds !== null) {
                 $product->tags()->sync($tagIds);
@@ -54,6 +56,21 @@ class ProductService
 
             return $product;
         });
+    }
+
+    /**
+     * مزامنة أسعار المنتج مع متغيّره الافتراضي — الموقع والطلبات يقرآن سعر المتغيّر.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function syncVariantPrices(Product $product, array $data): void
+    {
+        $priceData = array_intersect_key($data, array_flip(['retail_price', 'promo_price', 'cost_price', 'wholesale_price']));
+        if ($priceData === []) {
+            return;
+        }
+        $variant = $product->defaultVariant()->first();
+        $variant?->update($priceData);
     }
 
     public function delete(Product $product): void

@@ -66,6 +66,27 @@
                     <label class="flex items-center gap-2 text-sm pb-2"><input type="hidden" name="is_featured" value="0" /><input type="checkbox" name="is_featured" value="1" @checked(old('is_featured', $product->is_featured)) class="rounded border-gray-300 text-emerald-600" />{{ __('مميّز') }}</label>
                 </div>
 
+                {{-- الأسعار (تُزامَن مع المتغيّر الافتراضي وتظهر في الموقع) --}}
+                @php($v = $product->defaultVariant)
+                <div class="border-t border-gray-100 pt-4 mt-2">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-1">{{ __('الأسعار') }}</h3>
+                    <p class="text-xs text-gray-400 mb-3">{{ __('إذا مُلئ «سعر العرض» بأقل من «سعر البيع»، يظهر خصم على المنتج في الموقع تلقائيًا.') }}</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <x-admin.field :label="__('سعر البيع')" name="retail_price">
+                            <input type="number" step="0.01" min="0" name="retail_price" value="{{ old('retail_price', $v->retail_price ?? $product->retail_price) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                        </x-admin.field>
+                        <x-admin.field :label="__('سعر العرض (خصم)')" name="promo_price">
+                            <input type="number" step="0.01" min="0" name="promo_price" value="{{ old('promo_price', $v->promo_price ?? $product->promo_price) }}" placeholder="{{ __('اتركه فارغًا إن لا يوجد عرض') }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                        </x-admin.field>
+                        <x-admin.field :label="__('سعر الجملة')" name="wholesale_price">
+                            <input type="number" step="0.01" min="0" name="wholesale_price" value="{{ old('wholesale_price', $v->wholesale_price ?? $product->wholesale_price) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                        </x-admin.field>
+                        <x-admin.field :label="__('سعر الشراء (التكلفة)')" name="cost_price">
+                            <input type="number" step="0.01" min="0" name="cost_price" value="{{ old('cost_price', $v->cost_price ?? $product->cost_price) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                        </x-admin.field>
+                    </div>
+                </div>
+
                 {{-- الوسوم والسمات --}}
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
