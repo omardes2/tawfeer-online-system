@@ -21,6 +21,7 @@
                 <table class="min-w-full text-sm text-right">
                     <thead class="text-gray-500 border-b">
                         <tr>
+                            <th class="py-2 px-3 font-medium">{{ __('الأيقونة') }}</th>
                             <th class="py-2 px-3 font-medium">{{ __('الاسم') }}</th>
                             <th class="py-2 px-3 font-medium">{{ __('الفئة الأب') }}</th>
                             <th class="py-2 px-3 font-medium">{{ __('فرعية') }}</th>
@@ -31,6 +32,13 @@
                     <tbody class="divide-y">
                         @forelse ($categories as $category)
                             <tr>
+                                <td class="py-2 px-3">
+                                    @if ($category->iconUrl())
+                                        <img src="{{ $category->iconUrl() }}" alt="" class="w-10 h-10 rounded-md object-cover bg-gray-100" />
+                                    @else
+                                        <span class="grid place-items-center w-10 h-10 rounded-md bg-gray-100 text-gray-300 text-xs">—</span>
+                                    @endif
+                                </td>
                                 <td class="py-2 px-3 text-gray-800">{{ $category->name }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ $category->parent?->name ?? '—' }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ $category->children_count }}</td>
@@ -54,7 +62,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="py-6 text-center text-gray-400">{{ __('لا توجد فئات.') }}</td></tr>
+                            <tr><td colspan="6" class="py-6 text-center text-gray-400">{{ __('لا توجد فئات.') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>

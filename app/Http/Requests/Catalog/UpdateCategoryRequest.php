@@ -22,6 +22,7 @@ class UpdateCategoryRequest extends FormRequest
             'parent_id' => ['nullable', 'integer', 'exists:categories,id'],
             'description' => ['nullable', 'string'],
             'image' => ['nullable', 'string', 'max:255'],
+            'icon' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp,svg', 'max:1024'], // أيقونة الفئة (≤1MB)
             'sort_order' => ['integer', 'min:0'],
             'is_active' => ['boolean'],
         ];

@@ -10,6 +10,7 @@ use App\Modules\Catalog\Services\CategoryService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class CategoryController extends Controller
@@ -40,7 +41,7 @@ class CategoryController extends Controller
     public function store(StoreCategoryRequest $request): RedirectResponse
     {
         $this->authorize('create', Category::class);
-        $this->service->create($request->validated());
+        $this->service->create($this->withIcon($request));
 
         return redirect()->route('admin.categories.index')->with('success', __('تم إنشاء الفئة بنجاح.'));
     }
@@ -58,9 +59,28 @@ class CategoryController extends Controller
     public function update(UpdateCategoryRequest $request, Category $category): RedirectResponse
     {
         $this->authorize('update', $category);
-        $this->service->update($category, $request->validated());
+        $this->service->update($category, $this->withIcon($request, $category));
 
         return redirect()->route('admin.categories.index')->with('success', __('تم تحديث الفئة بنجاح.'));
+    }
+
+    /**
+     * يدمج رفع الأيقونة في بيانات الفئة: يخزّن الملف على قرص public ويحذف القديم عند الاستبدال.
+     *
+     * @return array<string, mixed>
+     */
+    private function withIcon(Request $request, ?Category $category = null): array
+    {
+        $data = collect($request->validated())->except('icon')->toArray();
+
+        if ($request->hasFile('icon')) {
+            if ($category?->image) {
+                Storage::disk('public')->delete($category->image);
+            }
+            $data['image'] = $request->file('icon')->store('categories', 'public');
+        }
+
+        return $data;
     }
 
     public function destroy(Category $category): RedirectResponse

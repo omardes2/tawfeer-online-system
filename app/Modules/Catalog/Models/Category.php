@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * الفئة — تصنيف شجري للمنتجات (PHASE_2_DESIGN §11).
@@ -42,6 +43,12 @@ class Category extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    /** رابط أيقونة الفئة (مخزّنة على قرص public) أو null. */
+    public function iconUrl(): ?string
+    {
+        return $this->image ? Storage::disk('public')->url($this->image) : null;
     }
 
     /** إبطال كاش تنقّل المتجر عند أي تغيير فئة (Production Readiness). */
