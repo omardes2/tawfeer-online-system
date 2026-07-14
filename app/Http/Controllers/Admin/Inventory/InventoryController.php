@@ -101,6 +101,15 @@ class InventoryController extends Controller
 
         $this->products->update($product, $data);
 
+        // مزامنة أسعار المتغيّر الافتراضي — لأن صفحات الطلب/المنتجات تقرأ سعر المتغيّر.
+        if ($variant = $product->defaultVariant()->first()) {
+            $variant->update([
+                'cost_price' => $data['cost_price'] ?? $variant->cost_price,
+                'retail_price' => $data['retail_price'] ?? $variant->retail_price,
+                'wholesale_price' => $data['wholesale_price'] ?? $variant->wholesale_price,
+            ]);
+        }
+
         return redirect()->route('admin.inventory.stocks')->with('success', __('حُدّث الصنف.'));
     }
 

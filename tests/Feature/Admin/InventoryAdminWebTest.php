@@ -74,6 +74,10 @@ class InventoryAdminWebTest extends TestCase
         $this->assertEquals(55, (float) $product->retail_price);
         $this->assertEquals(45, (float) $product->wholesale_price);
         $this->assertEquals(30, (float) $product->cost_price);
+
+        // السعر يُزامَن للمتغيّر الافتراضي (مصدر السعر في صفحات الطلب/المنتجات).
+        $this->assertEquals(55, (float) $product->defaultVariant->retail_price);
+        $this->assertEquals(45, (float) $product->defaultVariant->wholesale_price);
     }
 
     public function test_admin_can_receive_via_web(): void

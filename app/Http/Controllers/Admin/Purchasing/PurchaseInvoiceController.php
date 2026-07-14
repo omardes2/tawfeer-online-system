@@ -94,7 +94,14 @@ class PurchaseInvoiceController extends Controller
             'cost_price' => $item['unit_cost'],
         ]);
 
-        return $product->defaultVariant()->firstOrFail();
+        $variant = $product->defaultVariant()->firstOrFail();
+        // مزامنة أسعار المتغيّر — صفحات الطلب/المنتجات تقرأ سعر المتغيّر لا المنتج.
+        $variant->update([
+            'retail_price' => $item['sell_price'] ?? $item['unit_cost'],
+            'cost_price' => $item['unit_cost'],
+        ]);
+
+        return $variant;
     }
 
     private function uniqueSku(): string
