@@ -173,6 +173,16 @@
                                 @endcan
                             @endif
                             <a href="{{ route('admin.sales.orders.show', $o) }}" class="text-emerald-600 hover:underline text-sm">{{ __('عرض') }}</a>
+                            {{-- مبيعات مباشرة غير مسدَّدة: زر «دفع» لتسديد المبلغ نقدًا --}}
+                            @if ($o->channel === 'pos' && $o->payment_status !== 'paid' && $o->status !== 'cancelled')
+                                @can('update', $o)
+                                    <form method="POST" action="{{ route('admin.sales.orders.settle', $o) }}"
+                                          onsubmit="return confirm('{{ __('تأكيد تسديد مبلغ الطلب نقدًا؟') }}')">
+                                        @csrf
+                                        <button type="submit" class="btn-primary btn-sm">{{ __('دفع') }}</button>
+                                    </form>
+                                @endcan
+                            @endif
                             {{-- إلغاء طلب ما زال «بانتظار الاستلام» لدى أوبتيموس — يُلغي الشحنة من الشركة أيضًا --}}
                             @if (in_array($o->latestShipment?->provider_status, ['submitted', 'submit', 'pending'], true) && $o->status !== 'cancelled')
                                 @can('cancel', $o)

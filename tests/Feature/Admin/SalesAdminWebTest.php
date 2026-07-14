@@ -322,6 +322,58 @@ class SalesAdminWebTest extends TestCase
             ->assertOk()->assertSee('زبون عادي فريد')->assertDontSee('زبون مباشر فريد');
     }
 
+    public function test_settle_marks_direct_sale_paid(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 10, 5);
+
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.direct.store'), [
+            'customer_name' => 'زبون نقدي', 'items' => [['variant' => $variant->uuid, 'qty' => 2, 'unit_price' => 30]],
+        ])->assertRedirect();
+
+        $order = Order::where('channel', 'pos')->latest('id')->firstOrFail();
+        $this->assertNotSame('paid', $order->payment_status);
+
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.settle', $order))
+            ->assertRedirect()->assertSessionHas('success');
+
+        $order->refresh();
+        $this->assertSame('paid', $order->payment_status);
+        $this->assertEqualsWithDelta((float) $order->total, (float) $order->amount_paid, 0.01);
+        $this->assertSame(1, $order->payments()->where('status', 'paid')->count());
+    }
+
+    public function test_settle_rejected_for_normal_sale(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $order = app(OrderService::class)->create([
+            'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id,
+            'customer_name' => 'عادي', 'customer_phone' => '0599000000',
+        ], [], 2026); // channel افتراضي ليس pos
+
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.settle', $order))
+            ->assertRedirect()->assertSessionHas('error');
+
+        $this->assertNotSame('paid', $order->fresh()->payment_status);
+    }
+
+    public function test_direct_sale_shows_pay_button_normal_sale_does_not(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 10, 5);
+
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.direct.store'), [
+            'customer_name' => 'زبون زر الدفع', 'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 15]],
+        ])->assertRedirect();
+        $order = Order::where('channel', 'pos')->latest('id')->firstOrFail();
+
+        $this->actingAs($this->admin())->get('/admin/sales/orders')
+            ->assertOk()
+            ->assertSee(route('admin.sales.orders.settle', $order), false);
+    }
+
     public function test_confirm_without_live_provider_just_confirms(): void
     {
         // بلا مزوّد مُفعّل (config الافتراضي 'null') ⇒ تأكيد فقط دون إرسال ولا مهمة.

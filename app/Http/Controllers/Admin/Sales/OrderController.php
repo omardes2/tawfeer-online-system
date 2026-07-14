@@ -12,8 +12,10 @@ use App\Modules\Crm\Models\Customer;
 use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\City;
 use App\Modules\Foundation\Models\DeliveryCityRate;
+use App\Modules\Foundation\Models\PaymentMethod;
 use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Inventory\Services\InventoryService;
+use App\Modules\Payment\Services\PaymentService;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
 use App\Modules\Shipping\Jobs\CancelOrderShipment;
@@ -307,6 +309,48 @@ class OrderController extends Controller
         });
 
         return back()->with('success', __('تم تأكيد استلام المرتجع وإرجاع الكميات إلى المخزون.'));
+    }
+
+    /**
+     * تسديد مبلغ الطلب نقدًا — متاح للمبيعات المباشرة (pos) غير المسدَّدة فقط.
+     * يسجّل دفعة أوفلاين بكامل المبلغ المتبقّي ويحصّلها فتصبح حالة الدفع «مدفوع».
+     */
+    public function settle(Order $order, PaymentService $payments): RedirectResponse
+    {
+        $this->authorize('update', $order);
+
+        if ($order->channel !== 'pos') {
+            return back()->with('error', __('التسديد المباشر متاح للمبيعات المباشرة فقط.'));
+        }
+        if ($order->status === 'cancelled') {
+            return back()->with('error', __('لا يمكن تسديد طلب ملغى.'));
+        }
+        if ($order->payment_status === 'paid') {
+            return back()->with('error', __('الطلب مسدَّد بالفعل.'));
+        }
+
+        $outstanding = round((float) $order->total - (float) $order->amount_paid, 2);
+        if ($outstanding <= 0) {
+            return back()->with('error', __('لا يوجد مبلغ مستحق للتسديد.'));
+        }
+
+        $method = PaymentMethod::where('code', 'cod')->where('is_active', true)->first()
+            ?? PaymentMethod::where('type', 'offline')->where('is_active', true)->first();
+
+        if (! $method) {
+            return back()->with('error', __('لا توجد طريقة دفع نقدي مُفعّلة.'));
+        }
+
+        try {
+            $payment = $payments->initiate($order, $method, $outstanding, (int) now()->year, [
+                'notes' => __('تسديد مبيعات مباشرة'),
+            ]);
+            $payments->capture($payment);
+        } catch (ValidationException $e) {
+            return back()->with('error', collect($e->errors())->flatten()->first());
+        }
+
+        return back()->with('success', __('تم تسديد مبلغ الطلب.'));
     }
 
     /** حذف الطلب — مسموح فقط إذا كانت حالته «ملغى» وحالة توصيله «ملغاة». */
