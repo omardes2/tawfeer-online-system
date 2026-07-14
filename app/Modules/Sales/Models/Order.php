@@ -38,7 +38,7 @@ class Order extends Model
         'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'total', 'amount_paid',
         'notes', 'cancel_reason',
         'confirmed_at', 'reserved_at', 'shipped_at', 'delivered_at', 'cancelled_at', 'settled_at',
-        'return_received_at', 'created_by',
+        'return_received_at', 'revenue_entry_id', 'cogs_entry_id', 'created_by',
     ];
 
     protected $casts = [

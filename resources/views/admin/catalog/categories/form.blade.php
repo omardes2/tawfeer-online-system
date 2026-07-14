@@ -49,6 +49,24 @@
                     <textarea name="description" rows="3" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">{{ old('description', $category->description) }}</textarea>
                 </x-admin.field>
 
+                {{-- حسابات محاسبية اختيارية للفئة (تجاوز إعدادات الترحيل الافتراضية) --}}
+                <div class="border-t border-gray-100 pt-4 mt-2">
+                    <p class="text-sm font-semibold text-gray-700 mb-1">{{ __('الحسابات المحاسبية (اختياري)') }}</p>
+                    <p class="text-xs text-gray-400 mb-3">{{ __('اترُكها فارغة لاستخدام الإعدادات الافتراضية. تُطبَّق على منتجات هذه الفئة.') }}</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        @foreach (['revenue_account_id' => __('حساب الإيراد'), 'inventory_account_id' => __('حساب المخزون'), 'cogs_account_id' => __('حساب تكلفة البضاعة')] as $field => $lbl)
+                            <x-admin.field :label="$lbl" :name="$field">
+                                <select name="{{ $field }}" class="w-full rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                    <option value="">{{ __('— الافتراضي —') }}</option>
+                                    @foreach ($accounts as $acc)
+                                        <option value="{{ $acc->id }}" @selected(old($field, $category->{$field}) == $acc->id)>{{ $acc->code }} — {{ $acc->name }}</option>
+                                    @endforeach
+                                </select>
+                            </x-admin.field>
+                        @endforeach
+                    </div>
+                </div>
+
                 <label class="flex items-center gap-2 text-sm">
                     <input type="hidden" name="is_active" value="0" />
                     <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $category->is_active ?? true)) class="rounded border-gray-300 text-emerald-600" />

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Catalog;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Catalog\StoreCategoryRequest;
 use App\Http\Requests\Catalog\UpdateCategoryRequest;
+use App\Modules\Accounting\Models\Account;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Services\CategoryService;
 use Illuminate\Contracts\View\View;
@@ -35,6 +36,7 @@ class CategoryController extends Controller
         return view('admin.catalog.categories.form', [
             'category' => new Category,
             'parents' => Category::orderBy('name')->get(),
+            'accounts' => Account::where('is_postable', true)->orderBy('code')->get(['id', 'code', 'name']),
         ]);
     }
 
@@ -53,6 +55,7 @@ class CategoryController extends Controller
         return view('admin.catalog.categories.form', [
             'category' => $category,
             'parents' => Category::whereKeyNot($category->id)->orderBy('name')->get(),
+            'accounts' => Account::where('is_postable', true)->orderBy('code')->get(['id', 'code', 'name']),
         ]);
     }
 

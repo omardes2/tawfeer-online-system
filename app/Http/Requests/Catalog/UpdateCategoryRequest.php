@@ -25,6 +25,9 @@ class UpdateCategoryRequest extends FormRequest
             'icon' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp,svg', 'max:1024'], // أيقونة الفئة (≤1MB)
             'sort_order' => ['integer', 'min:0'],
             'is_active' => ['boolean'],
+            'revenue_account_id' => ['nullable', 'integer', 'exists:accounts,id'],
+            'inventory_account_id' => ['nullable', 'integer', 'exists:accounts,id'],
+            'cogs_account_id' => ['nullable', 'integer', 'exists:accounts,id'],
         ];
     }
 }

@@ -23,6 +23,7 @@ class Category extends Model
 
     protected $fillable = [
         'parent_id', 'name', 'slug', 'description', 'image', 'sort_order', 'is_active',
+        'revenue_account_id', 'inventory_account_id', 'cogs_account_id',
     ];
 
     protected $casts = [

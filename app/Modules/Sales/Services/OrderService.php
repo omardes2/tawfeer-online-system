@@ -22,6 +22,7 @@ class OrderService
     public function __construct(
         private readonly ReservationService $reservations,
         private readonly InventoryService $inventory,
+        private readonly SalesPostingService $posting,
     ) {}
 
     /**
@@ -98,6 +99,9 @@ class OrderService
     public function confirm(Order $order): Order
     {
         $this->transition($order, ['draft', 'new'], 'confirmed', fn () => $order->update(['confirmed_at' => now()]));
+
+        // ترحيل محاسبي تلقائي عند التأكيد: قيدا الإيراد والتكلفة (Posting Setup).
+        $this->posting->post($order);
 
         return $order;
     }

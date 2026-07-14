@@ -63,6 +63,7 @@
         ]],
         ['المالية والمحاسبة', 'wallet', [
             ['admin.accounting.accounts.index', 'دليل الحسابات', 'accounting.journal.view', 'admin.accounting.accounts.*'],
+            ['admin.accounting.posting_setup.index', 'إعدادات الترحيل', 'accounting.accounts.manage', 'admin.accounting.posting_setup.*'],
             ['admin.accounting.journal.index', 'القيود اليومية', 'accounting.journal.view', 'admin.accounting.journal.*'],
             ['admin.accounting.cashboxes.index', 'الخزائن النقدية', 'accounting.cashboxes.view', 'admin.accounting.cashboxes.*'],
             ['admin.accounting.banks.index', 'الحسابات البنكية', 'accounting.banks.view', 'admin.accounting.banks.*'],

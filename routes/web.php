@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\Accounting\AccountingController as AdminAccountingController;
+use App\Http\Controllers\Admin\Accounting\AccountMappingController;
 use App\Http\Controllers\Admin\Accounting\BankController as AdminBankController;
 use App\Http\Controllers\Admin\Accounting\CashboxController as AdminCashboxController;
 use App\Http\Controllers\Admin\Accounting\FinanceReportController as AdminFinanceReportController;
@@ -422,6 +423,9 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     // المحاسبة (Phase 2.9)
     Route::prefix('accounting')->name('accounting.')->group(function () {
         Route::get('accounts', [AdminAccountingController::class, 'accounts'])->name('accounts.index');
+        // إعدادات الترحيل المحاسبي (Posting Setup)
+        Route::get('posting-setup', [AccountMappingController::class, 'index'])->name('posting_setup.index')->middleware('can:accounting.accounts.manage');
+        Route::put('posting-setup', [AccountMappingController::class, 'update'])->name('posting_setup.update')->middleware('can:accounting.accounts.manage');
         Route::get('reports/trial-balance', [AdminAccountingController::class, 'trialBalance'])->name('reports.trial_balance');
         Route::resource('journal', AdminJournalEntryController::class)->only(['index', 'create', 'store', 'show'])->parameters(['journal' => 'journalEntry']);
         Route::post('journal/{journalEntry}/post', [AdminJournalEntryController::class, 'post'])->name('journal.post');

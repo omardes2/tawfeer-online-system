@@ -43,6 +43,7 @@ class DatabaseSeeder extends Seeder
             PaymentPermissionSeeder::class,
             // Phase 2.9 — المحاسبة
             ChartOfAccountsSeeder::class,
+            AccountMappingSeeder::class,
             AccountingPermissionSeeder::class,
             // Phase 7.1 — المحاسبة التشغيلية (خزائن/بنوك/سندات)
             AccountingOperationsPermissionSeeder::class,

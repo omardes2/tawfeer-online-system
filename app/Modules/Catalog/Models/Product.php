@@ -37,6 +37,7 @@ class Product extends Model
         'weight', 'reorder_level', 'track_inventory',
         'status', 'visibility', 'is_featured', 'sort_order', 'is_active',
         'meta_title', 'meta_description', 'meta_keywords', 'search_keywords',
+        'revenue_account_id', 'inventory_account_id', 'cogs_account_id',
     ];
 
     protected $casts = [
