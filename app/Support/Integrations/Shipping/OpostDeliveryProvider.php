@@ -202,13 +202,48 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
         return $provided !== '' && hash_equals($expected, $provided);
     }
 
+    /**
+     * تطبيع حمولة webhook من Opost. الشكل الفعلي: كائن الشحنة كاملًا، ومعرّفها في
+     * consignee.shipment_id (أو id العلوي)، والحالة في أحدث عنصر من status_history
+     * (أو last_status.status). event_id = معرّف آخر تغيير حالة (فريد لكل حدث).
+     */
     public function parseWebhookEvent(array $payload): array
     {
+        $shipmentId = $payload['id']
+            ?? $payload['shipment_id']
+            ?? ($payload['consignee']['shipment_id'] ?? null);
+
+        $status = $payload['last_status']['status'] ?? $payload['status'] ?? null;
+        $eventId = $payload['last_status']['id'] ?? $payload['event_id'] ?? null;
+
+        // الحالة الحديثة من سجلّ الحالات (Opost يضعها في status_history).
+        if (! empty($payload['status_history']) && is_array($payload['status_history'])) {
+            $latest = $this->latestHistory($payload['status_history']);
+            $status ??= $latest['status'] ?? null;
+            $eventId ??= $latest['id'] ?? null;
+            $shipmentId ??= $latest['shipment_id'] ?? null;
+        }
+
         return [
-            'event_id' => $payload['event_id'] ?? $payload['id'] ?? null,
-            'external_id' => $payload['tracking_number'] ?? $payload['external_id'] ?? $payload['id'] ?? null,
-            'provider_status' => $payload['status'] ?? $payload['last_status']['status'] ?? $payload['state'] ?? null,
+            'event_id' => $eventId !== null ? (string) $eventId : null,
+            'external_id' => $shipmentId !== null ? (string) $shipmentId : null,
+            'provider_status' => $status,
         ];
+    }
+
+    /** أحدث عنصر في status_history (بأكبر id). */
+    private function latestHistory(array $history): array
+    {
+        $latest = [];
+        $maxId = -1;
+        foreach ($history as $h) {
+            if (is_array($h) && (int) ($h['id'] ?? 0) > $maxId) {
+                $maxId = (int) ($h['id'] ?? 0);
+                $latest = $h;
+            }
+        }
+
+        return $latest;
     }
 
     public function name(): string

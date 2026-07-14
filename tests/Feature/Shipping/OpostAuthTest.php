@@ -47,6 +47,24 @@ class OpostAuthTest extends TestCase
         $this->assertSame('STATIC-TKN', app(OpostTokenProvider::class)->token());
     }
 
+    public function test_parse_webhook_reads_opost_real_shape(): void
+    {
+        // شكل Opost الفعلي: معرّف الشحنة في consignee.shipment_id، والحالة في status_history.
+        $payload = [
+            'consignee' => ['shipment_id' => 7296046, 'name' => 'super apple'],
+            'status_history' => [
+                ['id' => 67108086, 'shipment_id' => 7296046, 'status' => 'submitted'],
+                ['id' => 67200000, 'shipment_id' => 7296046, 'status' => 'cancelled'],
+            ],
+        ];
+
+        $parsed = (new OpostDeliveryProvider)->parseWebhookEvent($payload);
+
+        $this->assertSame('7296046', $parsed['external_id']);
+        $this->assertSame('cancelled', $parsed['provider_status']); // أحدث حالة
+        $this->assertSame('67200000', $parsed['event_id']);         // معرّف الحدث الأحدث
+    }
+
     public function test_cancel_posts_to_actions_cancel_endpoint(): void
     {
         Http::fake([
