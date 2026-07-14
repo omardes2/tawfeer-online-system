@@ -59,7 +59,7 @@ class OpostGeographySyncProvider implements GeographySyncProviderInterface
     public function pullCities(string $governorateExternalId = ''): iterable
     {
         try {
-            $res = $this->client()->get('/cities');
+            $res = $this->client()->get('/resources/cities');
             if (! $res->successful()) {
                 Log::warning('Opost cities sync failed', ['status' => $res->status()]);
 
@@ -97,7 +97,7 @@ class OpostGeographySyncProvider implements GeographySyncProviderInterface
     public function pullAreas(string $cityExternalId): iterable
     {
         try {
-            $res = $this->client()->get('/areas', ['city_id' => $cityExternalId]);
+            $res = $this->client()->get('/resources/areas', ['city' => $cityExternalId]);
             if (! $res->successful()) {
                 return [];
             }
