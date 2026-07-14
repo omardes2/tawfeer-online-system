@@ -26,9 +26,13 @@ cd "${APP_PATH}"
 export COMPOSER_ALLOW_SUPERUSER=1
 log() { echo -e "\n\033[1;34m==> $*\033[0m"; }
 
-log "Maintenance mode ON"
-php artisan down --retry=15 || true
-trap 'php artisan up || true' EXIT   # always lift maintenance, even on failure
+# تحديث بلا وضع صيانة (بلا صفحة 503) — الترحيلات إضافية وآمنة أثناء الخدمة.
+# لتفعيل الصيانة أثناء التحديث، صدّر MAINTENANCE=1 قبل تشغيل السكربت.
+if [[ "${MAINTENANCE:-0}" == "1" ]]; then
+    log "Maintenance mode ON"
+    php artisan down --retry=15 || true
+    trap 'php artisan up || true' EXIT
+fi
 
 log "git pull"
 git fetch --all --prune
@@ -56,8 +60,10 @@ log "Reload opcache + restart workers"
 sudo systemctl reload "php${PHP_VERSION}-fpm" || true
 php artisan queue:restart || true
 
-log "Maintenance mode OFF"
-php artisan up
-trap - EXIT
+if [[ "${MAINTENANCE:-0}" == "1" ]]; then
+    log "Maintenance mode OFF"
+    php artisan up
+    trap - EXIT
+fi
 
 log "Update complete."
