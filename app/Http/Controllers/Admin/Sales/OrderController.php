@@ -163,6 +163,27 @@ class OrderController extends Controller
         return back()->with('success', __('تم تأكيد الطلب.'));
     }
 
+    /** حذف الطلب — مسموح فقط إذا كانت حالته «ملغى» وحالة توصيله «ملغاة». */
+    public function destroy(Order $order): RedirectResponse
+    {
+        $this->authorize('delete', $order);
+
+        if (! self::isDeletable($order)) {
+            return back()->with('error', __('لا يمكن حذف الطلب إلا إذا كانت حالته «ملغى» وحالة التوصيل «ملغاة».'));
+        }
+
+        $order->delete(); // حذف ناعم (soft delete).
+
+        return redirect()->route('admin.sales.orders.index')->with('success', __('تم حذف الطلب.'));
+    }
+
+    /** الطلب قابل للحذف فقط عند إلغائه وإلغاء شحنته لدى المزوّد. */
+    public static function isDeletable(Order $order): bool
+    {
+        return $order->status === 'cancelled'
+            && $order->latestShipment?->delivery_status === DeliveryStatus::CANCELLED;
+    }
+
     public function reserve(Order $order): RedirectResponse
     {
         $this->authorize('reserve', $order);

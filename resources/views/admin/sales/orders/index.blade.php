@@ -129,6 +129,15 @@
                                 @endcan
                             @endif
                             <a href="{{ route('admin.sales.orders.show', $o) }}" class="text-emerald-600 hover:underline text-sm">{{ __('عرض') }}</a>
+                            @if (\App\Http\Controllers\Admin\Sales\OrderController::isDeletable($o))
+                                @can('delete', $o)
+                                    <form method="POST" action="{{ route('admin.sales.orders.destroy', $o) }}"
+                                          onsubmit="return confirm('{{ __('حذف الطلب نهائيًا؟') }}')">
+                                        @csrf @method('DELETE')
+                                        <button type="submit" class="text-rose-600 hover:underline text-sm">{{ __('حذف') }}</button>
+                                    </form>
+                                @endcan
+                            @endif
                         </div>
                     </td>
                 </tr>

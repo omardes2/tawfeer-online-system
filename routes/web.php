@@ -237,6 +237,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('orders/{order}/ship', [AdminOrderController::class, 'ship'])->name('orders.ship');
         Route::post('orders/{order}/deliver', [AdminOrderController::class, 'deliver'])->name('orders.deliver');
         Route::post('orders/{order}/cancel', [AdminOrderController::class, 'cancel'])->name('orders.cancel');
+        Route::delete('orders/{order}', [AdminOrderController::class, 'destroy'])->name('orders.destroy');
     });
 
     // الشحن والجغرافيا (Phase 2.7)

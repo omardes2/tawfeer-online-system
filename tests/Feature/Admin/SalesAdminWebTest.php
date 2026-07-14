@@ -12,6 +12,8 @@ use App\Modules\Foundation\Models\Governorate;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Shipping\Jobs\CancelOrderShipment;
 use App\Modules\Shipping\Jobs\DispatchOrderShipment;
+use App\Modules\Shipping\Models\Shipment;
+use App\Modules\Shipping\Support\DeliveryStatus;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -165,5 +167,40 @@ class SalesAdminWebTest extends TestCase
 
         $this->assertSame('cancelled', $order->fresh()->status);
         Queue::assertPushed(CancelOrderShipment::class);
+    }
+
+    public function test_delete_blocked_unless_order_and_delivery_cancelled(): void
+    {
+        $variant = Product::factory()->create()->defaultVariant;
+        $this->actingAs($this->admin())->post('/admin/sales/orders', [
+            'customer_name' => 'نور', 'customer_phone' => '0599444444',
+            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 50]],
+        ])->assertRedirect();
+        $order = Order::latest('id')->first(); // draft — غير قابل للحذف
+
+        $this->actingAs($this->admin())->delete(route('admin.sales.orders.destroy', $order))->assertRedirect();
+
+        $this->assertNull($order->fresh()->deleted_at); // لم يُحذف
+    }
+
+    public function test_delete_allowed_when_order_and_delivery_both_cancelled(): void
+    {
+        $variant = Product::factory()->create()->defaultVariant;
+        $this->actingAs($this->admin())->post('/admin/sales/orders', [
+            'customer_name' => 'رامي', 'customer_phone' => '0599555555',
+            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 50]],
+        ])->assertRedirect();
+        $order = Order::latest('id')->first();
+        $order->update(['status' => 'cancelled']);
+        Shipment::create([
+            'number' => 'SHP-DEL-'.$order->id, 'order_id' => $order->id,
+            'branch_id' => $order->branch_id, 'warehouse_id' => $order->warehouse_id,
+            'status' => 'not_shipped', 'delivery_status' => DeliveryStatus::CANCELLED,
+            'recipient_name' => 'x', 'recipient_phone' => '0599555555', 'external_id' => '999',
+        ]);
+
+        $this->actingAs($this->admin())->delete(route('admin.sales.orders.destroy', $order))->assertRedirect();
+
+        $this->assertNotNull($order->fresh()->deleted_at); // حُذف (soft delete)
     }
 }

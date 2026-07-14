@@ -88,6 +88,18 @@ class DeliveryStatusEngineTest extends TestCase
         $this->assertEquals(DeliveryStatus::DRAFT, $this->shipment()->delivery_status);
     }
 
+    public function test_provider_cancel_auto_cancels_the_order(): void
+    {
+        // إلغاء المزوّد للشحنة (webhook/مزامنة) يُلغي الطلب تلقائيًا.
+        $provider = DeliveryProvider::create(['name' => 'Opost', 'code' => 'opost', 'driver' => 'opost']);
+        $shipment = $this->shipment(null, $provider->id);
+
+        $this->svc->applyProviderStatus($shipment, 'cancelled', ['event_id' => 'c1']);
+
+        $this->assertEquals(DeliveryStatus::CANCELLED, $shipment->fresh()->delivery_status);
+        $this->assertSame('cancelled', $shipment->order->fresh()->status);
+    }
+
     public function test_legal_manual_path_records_history_with_actor(): void
     {
         $actor = $this->actor('delivery_ops');

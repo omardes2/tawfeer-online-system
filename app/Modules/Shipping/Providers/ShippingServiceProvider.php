@@ -2,6 +2,8 @@
 
 namespace App\Modules\Shipping\Providers;
 
+use App\Modules\Shipping\Events\DeliveryStatusChanged;
+use App\Modules\Shipping\Listeners\SyncOrderOnDeliveryStatus;
 use App\Modules\Shipping\Models\Shipment;
 use App\Modules\Shipping\Policies\ShipmentPolicy;
 use App\Support\Contracts\Shipping\DeliveryProviderInterface;
@@ -11,6 +13,7 @@ use App\Support\Integrations\Shipping\DeliveryProviderManager;
 use App\Support\Integrations\Shipping\NullDeliveryProvider;
 use App\Support\Integrations\Shipping\NullGeographySyncProvider;
 use App\Support\Integrations\Shipping\NullShippingQuoteProvider;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -35,5 +38,8 @@ class ShippingServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(Shipment::class, ShipmentPolicy::class);
+
+        // إلغاء المزوّد للشحنة (webhook/مزامنة) ⇒ إلغاء الطلب تلقائيًا وتحرير المخزون.
+        Event::listen(DeliveryStatusChanged::class, SyncOrderOnDeliveryStatus::class);
     }
 }
