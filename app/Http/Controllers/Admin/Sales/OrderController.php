@@ -15,6 +15,7 @@ use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
 use App\Modules\Shipping\Jobs\CancelOrderShipment;
 use App\Modules\Shipping\Jobs\DispatchOrderShipment;
+use App\Modules\Shipping\Support\DeliveryStatus;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,15 +35,32 @@ class OrderController extends Controller
         $status = $request->query('status');
         $status = in_array($status, self::STATUSES, true) ? $status : null;
 
+        $deliveryStatus = $request->query('delivery_status');
+        $deliveryStatus = in_array($deliveryStatus, DeliveryStatus::all(), true) ? $deliveryStatus : null;
+
+        $paymentStatus = $request->query('payment_status');
+        $paymentStatus = in_array($paymentStatus, ['paid', 'unpaid', 'partial'], true) ? $paymentStatus : null;
+
         $query = Order::with(['assignee', 'creator', 'customer', 'latestShipment'])->latest('id');
         if ($status !== null) {
             $query->where('status', $status);
+        }
+        if ($deliveryStatus !== null) {
+            $query->whereHas('shipments', fn ($q) => $q->where('delivery_status', $deliveryStatus));
+        }
+        if ($paymentStatus !== null) {
+            $paymentStatus === 'unpaid'
+                ? $query->where(fn ($q) => $q->where('payment_status', 'unpaid')->orWhereNull('payment_status'))
+                : $query->where('payment_status', $paymentStatus);
         }
 
         return view('admin.sales.orders.index', [
             'orders' => $query->paginate(20)->withQueryString(),
             'statuses' => self::STATUSES,
             'activeStatus' => $status,
+            'activeDeliveryStatus' => $deliveryStatus,
+            'activePaymentStatus' => $paymentStatus,
+            'deliveryLabels' => DeliveryStatus::LABELS,
             'statusCounts' => Order::selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status'),
             'totalCount' => Order::count(),
         ]);

@@ -10,35 +10,53 @@
 
     <x-admin.flash />
 
-    {{-- فلتر الحالات --}}
+    {{-- فلاتر (قوائم منسدلة): الحالة + حالة التوصيل + حالة الدفع --}}
     @php
-        $labels = [
+        $statusLabels = [
             'draft' => 'مسودّة', 'confirmed' => 'مؤكّد', 'processing' => 'قيد المعالجة',
             'shipped' => 'مُشحَن', 'delivered' => 'مُسلَّم', 'cancelled' => 'مُلغى',
         ];
-        $tab = fn ($key, $label, $count, $active) => compact('key', 'label', 'count', 'active');
-        $tabs = [$tab(null, __('الكل'), $totalCount, ($activeStatus ?? null) === null)];
-        foreach ($statuses as $s) {
-            $tabs[] = $tab($s, __($labels[$s] ?? $s), (int) ($statusCounts[$s] ?? 0), ($activeStatus ?? null) === $s);
-        }
+        $selectCls = 'rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500 min-w-[10rem]';
+        $hasFilter = ($activeStatus ?? null) || ($activeDeliveryStatus ?? null) || ($activePaymentStatus ?? null);
     @endphp
-    <div class="flex items-center gap-2 flex-wrap mb-4">
-        @foreach ($tabs as $t)
-            <a href="{{ $t['key'] ? route('admin.sales.orders.index', ['status' => $t['key']]) : route('admin.sales.orders.index') }}"
-               @class([
-                   'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition border',
-                   'bg-emerald-600 text-white border-emerald-600' => $t['active'],
-                   'bg-white text-gray-600 border-gray-200 hover:bg-gray-50' => !$t['active'],
-               ])>
-                <span>{{ $t['label'] }}</span>
-                <span @class([
-                    'text-xs rounded-full px-1.5 min-w-[1.25rem] text-center',
-                    'bg-white/20 text-white' => $t['active'],
-                    'bg-gray-100 text-gray-500' => !$t['active'],
-                ])>{{ $t['count'] }}</span>
-            </a>
-        @endforeach
-    </div>
+    <form method="GET" action="{{ route('admin.sales.orders.index') }}" class="flex flex-wrap items-end gap-3 mb-5">
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">{{ __('الحالة') }}</label>
+            <select name="status" onchange="this.form.submit()" class="{{ $selectCls }}">
+                <option value="">{{ __('كل الحالات') }} ({{ $totalCount }})</option>
+                @foreach ($statuses as $s)
+                    <option value="{{ $s }}" @selected(($activeStatus ?? null) === $s)>
+                        {{ __($statusLabels[$s] ?? $s) }} ({{ (int) ($statusCounts[$s] ?? 0) }})
+                    </option>
+                @endforeach
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">{{ __('حالة التوصيل') }}</label>
+            <select name="delivery_status" onchange="this.form.submit()" class="{{ $selectCls }}">
+                <option value="">{{ __('كل حالات التوصيل') }}</option>
+                @foreach ($deliveryLabels as $key => $label)
+                    <option value="{{ $key }}" @selected(($activeDeliveryStatus ?? null) === $key)>{{ $label }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">{{ __('حالة الدفع') }}</label>
+            <select name="payment_status" onchange="this.form.submit()" class="{{ $selectCls }}">
+                <option value="">{{ __('كل حالات الدفع') }}</option>
+                <option value="paid" @selected(($activePaymentStatus ?? null) === 'paid')>{{ __('مدفوع') }}</option>
+                <option value="unpaid" @selected(($activePaymentStatus ?? null) === 'unpaid')>{{ __('غير مدفوع') }}</option>
+                <option value="partial" @selected(($activePaymentStatus ?? null) === 'partial')>{{ __('مدفوع جزئيًا') }}</option>
+            </select>
+        </div>
+
+        <noscript><button type="submit" class="btn-secondary btn-sm">{{ __('فلترة') }}</button></noscript>
+        @if ($hasFilter)
+            <a href="{{ route('admin.sales.orders.index') }}" class="btn-secondary btn-sm">{{ __('مسح الفلاتر') }}</a>
+        @endif
+    </form>
 
     <x-admin.table>
         <thead>
