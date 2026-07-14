@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin;
 
 use App\Models\User;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Crm\Models\Customer;
 use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\City;
@@ -263,6 +264,27 @@ class SalesAdminWebTest extends TestCase
         $onHand = (float) InventoryStock::where('variant_id', $variant->id)
             ->where('warehouse_id', $warehouse->id)->value('on_hand');
         $this->assertEqualsWithDelta(7, $onHand, 0.001);       // 10 − 3
+    }
+
+    public function test_direct_sale_with_registered_customer_links_customer(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 5, 5);
+
+        $customer = Customer::create([
+            'branch_id' => Branch::default()->id, 'name' => 'عميل مسجّل', 'primary_phone' => '0599777888',
+        ]);
+
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.direct.store'), [
+            'customer' => $customer->uuid,
+            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 20]],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $order = Order::latest('id')->first();
+        $this->assertSame($customer->id, $order->customer_id);
+        $this->assertSame('عميل مسجّل', $order->customer_name);
+        $this->assertSame('0599777888', $order->customer_phone);
     }
 
     public function test_confirm_without_live_provider_just_confirms(): void

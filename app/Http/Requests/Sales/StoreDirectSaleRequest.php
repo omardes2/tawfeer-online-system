@@ -18,7 +18,9 @@ class StoreDirectSaleRequest extends FormRequest
     {
         return [
             'warehouse' => ['nullable', 'string', 'exists:warehouses,uuid'],
-            'customer_name' => ['required', 'string', 'max:180'],
+            // إمّا عميل مسجّل (uuid) أو كتابة اسم عميل جديد.
+            'customer' => ['nullable', 'string', 'exists:customers,uuid'],
+            'customer_name' => ['required_without:customer', 'nullable', 'string', 'max:180'],
             'customer_phone' => ['nullable', 'string', 'max:40'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'items' => ['required', 'array', 'min:1'],
@@ -29,10 +31,18 @@ class StoreDirectSaleRequest extends FormRequest
         ];
     }
 
+    protected function prepareForValidation(): void
+    {
+        // الحقل المخفي «customer» قد يصل كسلسلة فارغة في وضع «عميل جديد» — نُطبّعها إلى null.
+        if ($this->input('customer') === '') {
+            $this->merge(['customer' => null]);
+        }
+    }
+
     public function messages(): array
     {
         return [
-            'customer_name.required' => __('اسم العميل مطلوب.'),
+            'customer_name.required_without' => __('اكتب اسم العميل أو اختر عميلًا مسجّلًا.'),
             'items.required' => __('أضف صنفًا واحدًا على الأقل.'),
             'items.min' => __('أضف صنفًا واحدًا على الأقل.'),
             'items.*.variant.required' => __('اختر الصنف.'),

@@ -9,22 +9,71 @@
     <x-admin.flash />
 
     <form method="POST" action="{{ route('admin.sales.orders.direct.store') }}"
-          x-data="directSale(@js($products))"
+          x-data="directSale(@js($products), @js($customers))"
           @submit="if (rows.length === 0) { $event.preventDefault(); alert('{{ __('أضف صنفًا واحدًا على الأقل.') }}'); }"
           class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         @csrf
 
         {{-- العمود الأيمن: العميل + الأصناف --}}
         <div class="lg:col-span-2 space-y-6">
-            <x-admin.form-section :title="__('بيانات العميل')" :cols="2">
-                <x-admin.field :label="__('اسم العميل')" name="customer_name" :required="true">
-                    <input type="text" name="customer_name" value="{{ old('customer_name') }}" required
-                           class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
-                </x-admin.field>
-                <x-admin.field :label="__('رقم الهاتف (اختياري)')" name="customer_phone">
-                    <input type="text" name="customer_phone" value="{{ old('customer_phone') }}" inputmode="tel"
-                           class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
-                </x-admin.field>
+            <x-admin.form-section :title="__('بيانات العميل')">
+                {{-- تبديل: كتابة اسم جديد أو اختيار عميل مسجّل --}}
+                <div class="inline-flex rounded-lg border border-gray-200 p-0.5 mb-4 text-sm">
+                    <button type="button" @click="custMode = 'new'; clearCustomer()"
+                            :class="custMode === 'new' ? 'bg-emerald-600 text-white' : 'text-gray-600'"
+                            class="px-3 py-1.5 rounded-md">{{ __('عميل جديد') }}</button>
+                    <button type="button" @click="custMode = 'existing'"
+                            :class="custMode === 'existing' ? 'bg-emerald-600 text-white' : 'text-gray-600'"
+                            class="px-3 py-1.5 rounded-md">{{ __('عميل مسجّل') }}</button>
+                </div>
+
+                {{-- وضع: عميل جديد (كتابة) --}}
+                <div x-show="custMode === 'new'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <x-admin.field :label="__('اسم العميل')" name="customer_name" :required="true">
+                        <input type="text" name="customer_name" x-model="customerName"
+                               class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                    </x-admin.field>
+                    <x-admin.field :label="__('رقم الهاتف (اختياري)')" name="customer_phone">
+                        <input type="text" name="customer_phone" x-model="customerPhone" inputmode="tel"
+                               class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                    </x-admin.field>
+                </div>
+
+                {{-- وضع: عميل مسجّل (اختيار من القائمة) --}}
+                <div x-show="custMode === 'existing'" x-cloak>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('اختر عميلًا') }}</label>
+                    <template x-if="!selectedCustomer">
+                        <div class="relative">
+                            <input type="text" x-model="custQuery" @focus="showCustResults = true" @click.outside="showCustResults = false"
+                                   placeholder="{{ __('ابحث بالاسم أو الهاتف...') }}"
+                                   class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                            <div x-show="showCustResults && filteredCustomers.length" x-cloak
+                                 class="absolute z-20 mt-1 w-full max-h-56 overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                                <template x-for="c in filteredCustomers" :key="c.uuid">
+                                    <button type="button" @click="pickCustomer(c)"
+                                            class="w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-emerald-50 text-start">
+                                        <span class="text-sm text-gray-800 truncate" x-text="c.name"></span>
+                                        <span class="text-xs text-gray-400" x-text="c.phone" dir="ltr"></span>
+                                    </button>
+                                </template>
+                            </div>
+                            <template x-if="custQuery.trim() && filteredCustomers.length === 0">
+                                <p class="mt-1 text-xs text-gray-400">{{ __('لا عميل مطابق. جرّب «عميل جديد».') }}</p>
+                            </template>
+                        </div>
+                    </template>
+                    <template x-if="selectedCustomer">
+                        <div class="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2">
+                            <div>
+                                <span class="text-sm font-medium text-gray-800" x-text="selectedCustomer.name"></span>
+                                <span class="block text-xs text-gray-500" dir="ltr" x-text="selectedCustomer.phone"></span>
+                            </div>
+                            <button type="button" @click="clearCustomer()" class="text-rose-500 hover:text-rose-700 text-sm">{{ __('تغيير') }}</button>
+                        </div>
+                    </template>
+                    <input type="hidden" name="customer" :value="selectedCustomer?.uuid || ''" />
+                </div>
+                @error('customer_name')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
             </x-admin.form-section>
 
             <x-admin.form-section :title="__('الأصناف')">
@@ -123,10 +172,24 @@
 
     @push('scripts')
         <script>
-            function directSale(products) {
+            function directSale(products, customers) {
                 return {
                     products: products || [],
+                    customers: customers || [],
                     query: '', showResults: false, rows: [],
+                    // حالة العميل
+                    custMode: 'new',
+                    customerName: @js(old('customer_name') ?? ''),
+                    customerPhone: @js(old('customer_phone') ?? ''),
+                    custQuery: '', showCustResults: false, selectedCustomer: null,
+                    get filteredCustomers() {
+                        const q = this.custQuery.trim().toLowerCase();
+                        const list = q === '' ? this.customers
+                            : this.customers.filter(c => (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q));
+                        return list.slice(0, 30);
+                    },
+                    pickCustomer(c) { this.selectedCustomer = c; this.showCustResults = false; this.custQuery = ''; },
+                    clearCustomer() { this.selectedCustomer = null; this.custQuery = ''; },
                     get filteredProducts() {
                         const q = this.query.trim().toLowerCase();
                         const list = q === '' ? this.products

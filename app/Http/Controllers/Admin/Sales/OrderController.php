@@ -8,6 +8,7 @@ use App\Http\Requests\Sales\StoreDirectSaleRequest;
 use App\Http\Requests\Sales\StoreOrderRequest;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Crm\Models\Customer;
 use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\City;
 use App\Modules\Foundation\Models\DeliveryCityRate;
@@ -157,7 +158,13 @@ class OrderController extends Controller
                 'image' => $p->primaryImage?->url(),
             ])->values();
 
-        return view('admin.sales.orders.direct', ['products' => $products]);
+        return view('admin.sales.orders.direct', [
+            'products' => $products,
+            // قائمة العملاء المسجّلين للاختيار (بديل عن كتابة الاسم يدويًا).
+            'customers' => Customer::orderBy('name')
+                ->get(['uuid', 'name', 'primary_phone'])
+                ->map(fn ($c) => ['uuid' => $c->uuid, 'name' => $c->name, 'phone' => $c->primary_phone])->values(),
+        ]);
     }
 
     public function storeDirect(StoreDirectSaleRequest $request): RedirectResponse
@@ -177,11 +184,17 @@ class OrderController extends Controller
             'discount' => $i['discount'] ?? 0,
         ])->all();
 
+        // عميل مسجّل (اختيار) أو عميل جديد (كتابة الاسم).
+        $customer = $request->filled('customer')
+            ? Customer::where('uuid', $request->validated('customer'))->first()
+            : null;
+
         $order = $this->service->create([
             'warehouse_id' => $warehouse->id,
             'branch_id' => $warehouse->branch_id,
-            'customer_name' => $request->validated('customer_name'),
-            'customer_phone' => $request->validated('customer_phone') ?? '', // اختياري في البيع المباشر (العمود NOT NULL)
+            'customer_id' => $customer?->id,
+            'customer_name' => $customer?->name ?? $request->validated('customer_name'),
+            'customer_phone' => $customer?->primary_phone ?? ($request->validated('customer_phone') ?? ''),
             'channel' => 'pos', // علامة «مبيعات مباشرة»
             'notes' => $request->validated('notes'),
         ], $items, (int) now()->year);
