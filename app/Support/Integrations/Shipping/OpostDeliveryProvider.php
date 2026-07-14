@@ -85,7 +85,7 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
             'business_address' => config('services.opost.business_address_id'),
             'shipment_types[0][id]' => config('services.opost.shipment_type_id', 1),
             'consignee[name]' => $payload['consignee_name'] ?? null,
-            'consignee[phone]' => $payload['consignee_phone'] ?? null,
+            'consignee[phone]' => $this->normalizePhone($payload['consignee_phone'] ?? null),
             'consignee[city]' => $payload['city_external_id'] ?? null,
             'consignee[area]' => $payload['area_external_id'] ?? null,
             'consignee[address]' => $payload['address'] ?? null,
@@ -117,6 +117,31 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
             'raw' => $data,
             'driver' => $this->name(),
         ];
+    }
+
+    /**
+     * تطبيع رقم الهاتف لصيغة Opost (10 خانات محلّية): إزالة الرموز، تحويل مقدّمة الدولة
+     * الفلسطينية 970/00970 إلى صفر محلّي، وإضافة صفر بادئ لرقم من 9 خانات.
+     */
+    private function normalizePhone(?string $phone): ?string
+    {
+        if ($phone === null) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+
+        if (str_starts_with($digits, '00970')) {
+            $digits = '0'.substr($digits, 5);
+        } elseif (str_starts_with($digits, '970')) {
+            $digits = '0'.substr($digits, 3);
+        }
+
+        if (strlen($digits) === 9 && $digits[0] !== '0') {
+            $digits = '0'.$digits;
+        }
+
+        return $digits !== '' ? $digits : null;
     }
 
     public function track(string $trackingNumber): array

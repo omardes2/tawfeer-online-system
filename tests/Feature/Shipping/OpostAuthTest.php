@@ -79,6 +79,23 @@ class OpostAuthTest extends TestCase
             && $req['selected_ids'][0] === '12345');
     }
 
+    public function test_create_shipment_normalizes_phone_to_ten_digits(): void
+    {
+        Http::fake([
+            'opost.ps/oauth/token' => Http::response(['access_token' => 'T', 'expires_in' => 3600], 200),
+            'opost.ps/api/resources/shipments' => Http::response(['data' => ['id' => 9, 'barcode' => 'BC-9']], 200),
+        ]);
+
+        (new OpostDeliveryProvider)->createShipment([
+            'consignee_name' => 'عميل',
+            'consignee_phone' => '+970 59 943 2037', // مقدّمة دولة + فراغات
+            'city_external_id' => '1',
+        ]);
+
+        Http::assertSent(fn ($req) => str_contains($req->url(), '/resources/shipments')
+            && $req['consignee[phone]'] === '0599432037');
+    }
+
     public function test_geography_sync_reauthenticates_on_401(): void
     {
         $calls = 0;
