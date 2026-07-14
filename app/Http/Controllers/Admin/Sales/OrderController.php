@@ -16,6 +16,7 @@ use App\Modules\Sales\Services\OrderService;
 use App\Modules\Shipping\Jobs\CancelOrderShipment;
 use App\Modules\Shipping\Jobs\DispatchOrderShipment;
 use App\Modules\Shipping\Support\DeliveryStatus;
+use App\Modules\Shipping\Support\OpostStatus;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,8 +36,9 @@ class OrderController extends Controller
         $status = $request->query('status');
         $status = in_array($status, self::STATUSES, true) ? $status : null;
 
+        // فلترة بحالة أوبتيموس الخام (كما ترد من المزوّد).
         $deliveryStatus = $request->query('delivery_status');
-        $deliveryStatus = in_array($deliveryStatus, DeliveryStatus::all(), true) ? $deliveryStatus : null;
+        $deliveryStatus = array_key_exists((string) $deliveryStatus, OpostStatus::options()) ? $deliveryStatus : null;
 
         $paymentStatus = $request->query('payment_status');
         $paymentStatus = in_array($paymentStatus, ['paid', 'unpaid', 'partial'], true) ? $paymentStatus : null;
@@ -46,7 +48,7 @@ class OrderController extends Controller
             $query->where('status', $status);
         }
         if ($deliveryStatus !== null) {
-            $query->whereHas('shipments', fn ($q) => $q->where('delivery_status', $deliveryStatus));
+            $query->whereHas('shipments', fn ($q) => $q->where('provider_status', $deliveryStatus));
         }
         if ($paymentStatus !== null) {
             $paymentStatus === 'unpaid'
@@ -60,7 +62,7 @@ class OrderController extends Controller
             'activeStatus' => $status,
             'activeDeliveryStatus' => $deliveryStatus,
             'activePaymentStatus' => $paymentStatus,
-            'deliveryLabels' => DeliveryStatus::LABELS,
+            'deliveryLabels' => OpostStatus::options(),
             'statusCounts' => Order::selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status'),
             'totalCount' => Order::count(),
         ]);
@@ -180,11 +182,13 @@ class OrderController extends Controller
         return redirect()->route('admin.sales.orders.index')->with('success', __('تم حذف الطلب.'));
     }
 
-    /** الطلب قابل للحذف فقط عند إلغائه وإلغاء شحنته لدى المزوّد. */
+    /** الطلب قابل للحذف فقط عند إلغائه وإلغاء شحنته لدى المزوّد (أوبتيموس). */
     public static function isDeletable(Order $order): bool
     {
+        $s = $order->latestShipment;
+
         return $order->status === 'cancelled'
-            && $order->latestShipment?->delivery_status === DeliveryStatus::CANCELLED;
+            && ($s?->provider_status === 'cancelled' || $s?->delivery_status === DeliveryStatus::CANCELLED);
     }
 
     public function reserve(Order $order): RedirectResponse

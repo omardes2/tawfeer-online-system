@@ -101,9 +101,9 @@
                     </td>
                     <td><x-sales.status :status="$o->status" /></td>
                     <td class="whitespace-nowrap text-xs">
-                        @php $ds = $o->latestShipment?->delivery_status; @endphp
-                        @if ($ds)
-                            <span class="inline-flex items-center rounded-md bg-sky-50 text-sky-700 px-2 py-0.5">{{ \App\Modules\Shipping\Support\DeliveryStatus::label($ds) }}</span>
+                        @php $ps = $o->latestShipment?->provider_status; @endphp
+                        @if ($ps)
+                            <span class="inline-flex items-center rounded-md bg-sky-50 text-sky-700 px-2 py-0.5">{{ \App\Modules\Shipping\Support\OpostStatus::label($ps) }}</span>
                         @else
                             <span class="text-gray-300">—</span>
                         @endif
