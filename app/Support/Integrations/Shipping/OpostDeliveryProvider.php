@@ -236,6 +236,8 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
     {
         $shipmentId = $payload['id']
             ?? $payload['shipment_id']
+            ?? $payload['external_id']
+            ?? $payload['tracking_number']
             ?? ($payload['consignee']['shipment_id'] ?? null);
 
         $status = $payload['last_status']['status'] ?? $payload['status'] ?? null;
