@@ -82,10 +82,13 @@ class StoreOrderRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         // خانة التبديل ترسل "on"/"1"/غياب — نُطبّعها إلى boolean.
-        $this->merge([
-            'has_return' => $this->boolean('has_return'),
-            'customer_phone' => $this->normalizePhone($this->input('customer_phone')),
-        ]);
+        $this->merge(['has_return' => $this->boolean('has_return')]);
+
+        // نُطبّع الهاتف فقط عند وروده فعلًا — حتى لا نُقحم null على حقل غائب
+        // (يربط عميل CRM عبر الـAPI دون هاتف: تبقى اللقطة تُشتقّ من العميل).
+        if ($this->filled('customer_phone')) {
+            $this->merge(['customer_phone' => $this->normalizePhone($this->input('customer_phone'))]);
+        }
     }
 
     /** تطبيع الهاتف لصيغة 10 خانات محلّية (إزالة الرموز، تحويل 970/00970، إضافة صفر بادئ). */
