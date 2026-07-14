@@ -101,6 +101,42 @@ class OrderDeliveryDispatcher
         ];
     }
 
+    /**
+     * إلغاء شحنة الطلب لدى المزوّد (Opost) عند إلغاء الطلب. يستخدم المعرّف الخارجي المخزّن.
+     *
+     * @return array{status: string, message?: ?string}
+     */
+    public function cancelShipment(Order $order): array
+    {
+        $code = (string) config('shipping.provider', 'null');
+        $reference = $order->delivery_external_id ?: $order->tracking_number;
+
+        if ($code === 'null' || $code === '' || empty($reference)) {
+            return ['status' => 'skipped'];
+        }
+
+        try {
+            $ok = $this->manager->driver($code)->cancel((string) $reference);
+
+            if ($ok) {
+                // تحديث لقطة الشحنة المحلية (خارج آلة الحالات — مجرّد انعكاس).
+                $order->shipments()->whereNotNull('external_id')->update([
+                    'status' => 'cancelled',
+                    'delivery_status' => 'cancelled',
+                ]);
+                $order->update(['delivery_status' => 'cancelled']);
+
+                return ['status' => 'cancelled'];
+            }
+
+            return ['status' => 'failed', 'message' => __('رفض المزوّد الإلغاء.')];
+        } catch (\Throwable $e) {
+            Log::warning('Order delivery cancel failed: '.$e->getMessage(), ['order' => $order->id]);
+
+            return ['status' => 'failed', 'message' => $e->getMessage()];
+        }
+    }
+
     private function externalId(string $type, ?int $localId, int $providerId): ?string
     {
         if (! $localId) {

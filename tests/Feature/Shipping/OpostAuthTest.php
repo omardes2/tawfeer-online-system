@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Shipping;
 
+use App\Support\Integrations\Shipping\OpostDeliveryProvider;
 use App\Support\Integrations\Shipping\OpostGeographySyncProvider;
 use App\Support\Integrations\Shipping\OpostTokenProvider;
 use Illuminate\Support\Facades\Http;
@@ -44,6 +45,20 @@ class OpostAuthTest extends TestCase
         config()->set('services.opost.token', 'STATIC-TKN');
 
         $this->assertSame('STATIC-TKN', app(OpostTokenProvider::class)->token());
+    }
+
+    public function test_cancel_posts_to_actions_cancel_endpoint(): void
+    {
+        Http::fake([
+            'opost.ps/oauth/token' => Http::response(['access_token' => 'T', 'expires_in' => 3600], 200),
+            'opost.ps/api/resources/shipments/actions/cancel' => Http::response(['status' => 'ok'], 200),
+        ]);
+
+        $ok = (new OpostDeliveryProvider)->cancel('12345');
+
+        $this->assertTrue($ok);
+        Http::assertSent(fn ($req) => str_contains($req->url(), '/resources/shipments/actions/cancel')
+            && $req['selected_ids'][0] === '12345');
     }
 
     public function test_geography_sync_reauthenticates_on_401(): void

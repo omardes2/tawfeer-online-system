@@ -10,6 +10,7 @@ use App\Modules\Foundation\Models\City;
 use App\Modules\Foundation\Models\DeliveryCityRate;
 use App\Modules\Foundation\Models\Governorate;
 use App\Modules\Sales\Models\Order;
+use App\Modules\Shipping\Jobs\CancelOrderShipment;
 use App\Modules\Shipping\Jobs\DispatchOrderShipment;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -140,5 +141,29 @@ class SalesAdminWebTest extends TestCase
 
         $this->assertSame('confirmed', $order->fresh()->status);
         Queue::assertPushed(DispatchOrderShipment::class);
+    }
+
+    public function test_cancel_queues_provider_cancel_when_order_was_sent(): void
+    {
+        // طلب أُرسل لـOpost (له معرّف خارجي) ⇒ إلغاؤه يضع مهمة إلغاء لدى المزوّد.
+        config()->set('shipping.provider', 'opost');
+        Queue::fake();
+
+        $variant = Product::factory()->create()->defaultVariant;
+        $this->actingAs($this->admin())->post('/admin/sales/orders', [
+            'customer_name' => 'ليان',
+            'customer_phone' => '0599333333',
+            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 50]],
+        ])->assertRedirect();
+
+        $order = Order::latest('id')->first();
+        $order->update(['delivery_external_id' => '9999', 'tracking_number' => '9999']);
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.sales.orders.cancel', $order), ['reason' => 'اختبار الإلغاء'])
+            ->assertRedirect();
+
+        $this->assertSame('cancelled', $order->fresh()->status);
+        Queue::assertPushed(CancelOrderShipment::class);
     }
 }

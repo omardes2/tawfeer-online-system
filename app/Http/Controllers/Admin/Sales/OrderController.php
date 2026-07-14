@@ -13,6 +13,7 @@ use App\Modules\Foundation\Models\DeliveryCityRate;
 use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
+use App\Modules\Shipping\Jobs\CancelOrderShipment;
 use App\Modules\Shipping\Jobs\DispatchOrderShipment;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -183,7 +184,23 @@ class OrderController extends Controller
     {
         $this->authorize('cancel', $order);
 
-        return $this->guard($order, fn () => $this->service->cancel($order, $request->validated('reason')), __('أُلغي الطلب وحُرّر الحجز.'));
+        // المعرّف الخارجي قبل الإلغاء (للإلغاء لدى المزوّد لاحقًا).
+        $sentToProvider = ! empty($order->delivery_external_id) || ! empty($order->tracking_number);
+
+        try {
+            $this->service->cancel($order, $request->validated('reason'));
+        } catch (ValidationException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        // إلغاء الشحنة من شركة التوصيل (Opost) في الخلفية إن كان الطلب قد أُرسل.
+        if ($sentToProvider && config('shipping.provider', 'null') !== 'null') {
+            CancelOrderShipment::dispatch($order->id);
+
+            return back()->with('success', __('أُلغي الطلب وحُرّر الحجز، ويجري إلغاء الشحنة من شركة التوصيل.'));
+        }
+
+        return back()->with('success', __('أُلغي الطلب وحُرّر الحجز.'));
     }
 
     /** المستودع الافتراضي (النظام أحادي المستودع حاليًا). */

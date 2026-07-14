@@ -161,7 +161,17 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
     public function cancel(string $reference): bool
     {
         try {
-            return $this->send(fn (PendingRequest $c) => $c->delete('/resources/shipments/'.rawurlencode($reference)))->successful();
+            // Opost يلغي عبر إجراء جماعي: POST /resources/shipments/actions/cancel بـ selected_ids[].
+            $res = $this->send(fn (PendingRequest $c) => $c->asForm()->post('/resources/shipments/actions/cancel', [
+                'selected_ids' => [$reference],
+                'notes' => __('أُلغي من النظام'),
+            ]));
+
+            if (! $res->successful()) {
+                Log::warning('Opost cancel failed', ['status' => $res->status(), 'body' => $res->body(), 'ref' => $reference]);
+            }
+
+            return $res->successful();
         } catch (\Throwable $e) {
             Log::warning('Opost cancel error: '.$e->getMessage());
 
