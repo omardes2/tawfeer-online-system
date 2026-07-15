@@ -139,10 +139,10 @@ class TreasuryService
             : config('accounting.treasury.cash_account', '1010');
         $parent = Account::where('code', $parentCode)->first()
             ?? Account::where('code', config('accounting.treasury.assets_parent', '1000'))->first();
-        $code = 'T-'.$data['code'];
 
         return Account::create([
-            'code' => $code,
+            // كود فرعي متسلسل تحت الأب (مثل 1010-0001) ليظهر مباشرةً تحته في الدليل.
+            'code' => $this->nextChildCode($parent),
             'name' => $data['name'],
             'name_en' => $data['name_en'] ?? null,
             'type' => 'asset',
@@ -151,6 +151,20 @@ class TreasuryService
             'currency' => $data['currency'] ?? 'SAR',
             'is_active' => true,
         ]);
+    }
+
+    /** كود فرعي فريد تحت الأب بنمط «1010-0001». */
+    private function nextChildCode(Account $parent): string
+    {
+        $seq = (int) Account::where('parent_id', $parent->id)
+            ->where('code', 'like', $parent->code.'-%')->count() + 1;
+
+        do {
+            $code = $parent->code.'-'.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+            $seq++;
+        } while (Account::where('code', $code)->exists());
+
+        return $code;
     }
 
     /** رمز مقترح للخزينة الجديدة. */

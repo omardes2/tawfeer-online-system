@@ -33,7 +33,8 @@ class TreasuryLedgerAccountTest extends TestCase
         $cashId = Account::where('code', '1010')->value('id');
         $account = $treasury->glAccount;
 
-        $this->assertSame('T-CB-2026-001', $account->code);
+        // كود فرعي بنمط الأب ليظهر مباشرةً تحت «الصندوق 1010».
+        $this->assertStringStartsWith('1010-', $account->code);
         $this->assertSame($cashId, $account->parent_id);
         $this->assertSame('asset', $account->type);
         $this->assertTrue($account->is_postable);
