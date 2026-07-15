@@ -139,13 +139,17 @@
                         </td>
                     @endcan
                     <td class="font-mono text-xs">
-                        @if ($o->channel === 'pos')
-                            <span class="inline-flex items-center rounded-md bg-violet-50 text-violet-700 text-[11px] px-1.5 py-0.5">{{ __('مبيعات مباشرة') }}</span>
-                        @elseif ($o->tracking_number)
-                            <span class="font-semibold text-gray-900">{{ $o->tracking_number }}</span>
-                        @else
-                            <span class="text-amber-500">{{ __('بانتظار التتبّع') }}</span>
-                        @endif
+                        {{-- رقم التتبّع/الطلب رابطٌ لصفحة التفاصيل (بديلًا عن زر «عرض») --}}
+                        <a href="{{ route('admin.sales.orders.show', $o) }}" class="group inline-flex flex-col hover:underline">
+                            @if ($o->channel === 'pos')
+                                <span class="inline-flex items-center rounded-md bg-violet-50 text-violet-700 text-[11px] px-1.5 py-0.5">{{ __('مبيعات مباشرة') }}</span>
+                            @elseif ($o->tracking_number)
+                                <span class="font-semibold text-emerald-700 group-hover:text-emerald-800">{{ $o->tracking_number }}</span>
+                            @else
+                                <span class="text-amber-500">{{ __('بانتظار التتبّع') }}</span>
+                            @endif
+                            <span class="text-[10px] text-gray-400 font-sans">{{ $o->number }}</span>
+                        </a>
                     </td>
                     <td class="whitespace-nowrap text-gray-600">
                         <div>{{ \Illuminate\Support\Carbon::parse($o->created_at)->format('Y-m-d') }}</div>
@@ -191,8 +195,12 @@
                         @endif
                     </td>
                     <td class="text-start font-medium tabular-nums whitespace-nowrap">{{ number_format($o->total, 2) }} {{ \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪') }}</td>
-                    <td class="text-end whitespace-nowrap">
-                        <div class="inline-flex items-center gap-3">
+                    <td class="text-end">
+                        @php
+                            $isEditable = \App\Http\Controllers\Admin\Sales\OrderController::isEditable($o);
+                            $isCancellable = ! in_array($o->status, ['cancelled', 'delivered', 'returned'], true);
+                        @endphp
+                        <div class="flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5">
                             @if ($o->status === 'draft')
                                 @can('confirm', $o)
                                     <form method="POST" action="{{ route('admin.sales.orders.confirm', $o) }}">
@@ -211,7 +219,12 @@
                                     </form>
                                 @endcan
                             @endif
-                            <a href="{{ route('admin.sales.orders.show', $o) }}" class="text-emerald-600 hover:underline text-sm">{{ __('عرض') }}</a>
+                            {{-- تعديل بيانات التواصل/التوصيل (تصحيح بيانات خاطئة) قبل الإرسال لشركة التوصيل --}}
+                            @if ($isEditable)
+                                @can('update', $o)
+                                    <a href="{{ route('admin.sales.orders.edit', $o) }}" class="text-emerald-600 hover:underline text-sm">{{ __('تعديل') }}</a>
+                                @endcan
+                            @endif
                             {{-- مبيعات مباشرة غير مسدَّدة: زر «دفع» يفتح نافذة تحصيل (مبلغ + خزينة) --}}
                             @if ($o->channel === 'pos' && $o->payment_status !== 'paid' && $o->status !== 'cancelled')
                                 @can('update', $o)
@@ -224,13 +237,13 @@
                                             class="btn-primary btn-sm">{{ __('دفع') }}</button>
                                 @endcan
                             @endif
-                            {{-- إلغاء طلب ما زال «بانتظار الاستلام» لدى أوبتيموس — يُلغي الشحنة من الشركة أيضًا --}}
-                            @if (in_array($o->latestShipment?->provider_status, ['submitted', 'submit', 'pending'], true) && $o->status !== 'cancelled')
+                            {{-- إلغاء الطلب: للطلبات غير المُنتهية (يعكس الأثر المحاسبي/المخزوني ويُلغي الشحنة إن أُرسلت). المبيعات المباشرة تُلغى بالحذف النهائي. --}}
+                            @if ($isCancellable && $o->channel !== 'pos')
                                 @can('cancel', $o)
                                     <form method="POST" action="{{ route('admin.sales.orders.cancel', $o) }}"
-                                          onsubmit="return confirm('{{ __('إلغاء الطلب وإلغاء الشحنة من شركة التوصيل؟') }}')">
+                                          onsubmit="return confirm('{{ __('إلغاء الطلب؟ سيُعكَس أثره المحاسبي والمخزوني وتُلغى الشحنة من شركة التوصيل إن وُجدت.') }}')">
                                         @csrf
-                                        <input type="hidden" name="reason" value="{{ __('إلغاء قبل الاستلام') }}" />
+                                        <input type="hidden" name="reason" value="{{ __('إلغاء الطلب') }}" />
                                         <button type="submit" class="text-rose-600 hover:underline text-sm">{{ __('إلغاء الطلب') }}</button>
                                     </form>
                                 @endcan

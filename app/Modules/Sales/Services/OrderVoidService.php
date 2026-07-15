@@ -40,16 +40,31 @@ class OrderVoidService
 
     public function void(Order $order, ?User $actor = null): void
     {
+        $this->reverseEffects($order, $actor, __('حذف إداري (عكس الأثر المحاسبي)'), delete: true);
+    }
+
+    /**
+     * إلغاء طلب مع عكس كامل لأثره المحاسبي والمخزوني، مع الإبقاء عليه ظاهرًا بحالة «ملغى»
+     * (لا حذف). يُستخدم لإلغاء طلب سبق ترحيله/شحنه داخليًا (خُصم مخزونيًا ومحاسبيًا عند التقديم)
+     * ولم يُسلَّم بعد — فيعيد الكميات للمخزون ويعكس القيود ويلغي الشحنة لدى المزوّد إن وُجدت.
+     */
+    public function cancelWithReversal(Order $order, ?User $actor = null, ?string $reason = null): void
+    {
+        $this->reverseEffects($order, $actor, $reason ?: __('إلغاء الطلب (عكس الأثر المحاسبي)'), delete: false);
+    }
+
+    private function reverseEffects(Order $order, ?User $actor, string $reason, bool $delete): void
+    {
         // 1) إلغاء الشحنة لدى المزوّد — خارج المعاملة (اتصال شبكي)، أفضل جهد.
         if (! empty($order->tracking_number) || ! empty($order->delivery_external_id)) {
             try {
                 $this->dispatcher->cancelShipment($order);
             } catch (\Throwable) {
-                // فشل الإلغاء لدى المزوّد لا يمنع الحذف المحاسبي.
+                // فشل الإلغاء لدى المزوّد لا يمنع العكس المحاسبي.
             }
         }
 
-        DB::transaction(function () use ($order, $actor) {
+        DB::transaction(function () use ($order, $actor, $reason, $delete) {
             $order->loadMissing('items');
 
             // 2) عكس سندات القبض المُرحّلة المرتبطة بالطلب (المرجع = رقم الطلب).
@@ -103,15 +118,18 @@ class OrderVoidService
             $this->commissions->reverseForOrder($order, $actor);
             $this->commissions->cancelForOrder($order, $actor);
 
-            // 6) تصفير حالة الطلب ثم حذفه (حذف ناعم).
+            // 6) تصفير حالة الطلب (وحذفه ناعمًا عند الحذف الإداري فقط).
             $order->update([
                 'status' => 'cancelled',
                 'payment_status' => 'unpaid',
                 'amount_paid' => 0,
-                'cancel_reason' => __('حذف إداري (عكس الأثر المحاسبي)'),
+                'cancel_reason' => $reason,
                 'cancelled_at' => now(),
             ]);
-            $order->delete();
+
+            if ($delete) {
+                $order->delete();
+            }
         });
     }
 }

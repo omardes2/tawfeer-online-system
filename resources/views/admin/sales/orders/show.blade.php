@@ -66,6 +66,12 @@
                         <form method="POST" action="{{ route('admin.sales.orders.confirm', $order) }}">@csrf<button class="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700">{{ __('تأكيد') }}</button></form>
                     @endcan
                 @endif
+                {{-- تعديل بيانات التواصل/التوصيل (تصحيح بيانات خاطئة) قبل الإرسال لشركة التوصيل --}}
+                @if (\App\Http\Controllers\Admin\Sales\OrderController::isEditable($order))
+                    @can('update', $order)
+                        <a href="{{ route('admin.sales.orders.edit', $order) }}" class="px-4 py-2 bg-amber-100 text-amber-800 text-sm rounded-md hover:bg-amber-200">{{ __('تعديل الطلب') }}</a>
+                    @endcan
+                @endif
                 @if ($order->status === 'confirmed')
                     @can('reserve', $order)
                         <form method="POST" action="{{ route('admin.sales.orders.reserve', $order) }}">@csrf<button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('حجز المخزون') }}</button></form>
@@ -98,7 +104,7 @@
                         <form method="POST" action="{{ route('admin.sales.orders.deliver', $order) }}">@csrf<button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('تسليم') }}</button></form>
                     @endcan
                 @endif
-                @if (in_array($order->status, ['draft', 'new', 'confirmed', 'stock_reserved', 'preparing', 'ready_to_ship']))
+                @if (! in_array($order->status, ['cancelled', 'delivered', 'returned']) && $order->channel !== 'pos')
                     @can('cancel', $order)
                         <button type="button" @click="cancelling = true" x-show="!cancelling" class="px-4 py-2 bg-rose-100 text-rose-700 text-sm rounded-md hover:bg-rose-200">{{ __('إلغاء الطلب') }}</button>
                         <form method="POST" action="{{ route('admin.sales.orders.cancel', $order) }}" x-show="cancelling" x-cloak class="flex gap-2 items-center">@csrf

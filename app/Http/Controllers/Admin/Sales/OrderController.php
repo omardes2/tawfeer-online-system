@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Sales\CancelOrderRequest;
 use App\Http\Requests\Sales\StoreDirectSaleRequest;
 use App\Http\Requests\Sales\StoreOrderRequest;
+use App\Http\Requests\Sales\UpdateOrderContactRequest;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
@@ -273,6 +274,52 @@ class OrderController extends Controller
         ]);
     }
 
+    /**
+     * تعديل بيانات التواصل/التوصيل لطلب قائم (تصحيح بيانات خاطئة: الاسم/الهاتف/البريد/العنوان/الملاحظات).
+     * لا يمسّ الأصناف ولا القيود المحاسبية ولا المخزون. متاح ما لم يُرسَل الطلب لشركة التوصيل بعد.
+     */
+    public function edit(Order $order): View
+    {
+        $this->authorize('update', $order);
+
+        abort_unless(self::isEditable($order), 403, __('لا يمكن تعديل هذا الطلب بعد إرساله لشركة التوصيل أو إلغائه/تسليمه.'));
+
+        return view('admin.sales.orders.edit', ['order' => $order]);
+    }
+
+    public function update(UpdateOrderContactRequest $request, Order $order): RedirectResponse
+    {
+        $this->authorize('update', $order);
+
+        if (! self::isEditable($order)) {
+            return redirect()->route('admin.sales.orders.show', $order)
+                ->with('error', __('لا يمكن تعديل هذا الطلب بعد إرساله لشركة التوصيل أو إلغائه/تسليمه.'));
+        }
+
+        // تحديث بيانات التواصل/التوصيل فقط — دون أي أثر مخزوني أو محاسبي.
+        $order->update([
+            'customer_name' => $request->validated('customer_name'),
+            'customer_phone' => $request->validated('customer_phone'),
+            'customer_email' => $request->validated('customer_email'),
+            'shipping_address' => $request->validated('shipping_address'),
+            'notes' => $request->validated('notes'),
+        ]);
+
+        return redirect()->route('admin.sales.orders.show', $order)
+            ->with('success', __('تم تحديث بيانات الطلب.'));
+    }
+
+    /**
+     * الطلب قابل للتعديل (بيانات التواصل/التوصيل) ما لم يُرسَل لشركة التوصيل بعد
+     * (لا رقم تتبّع ولا معرّف خارجي) ولم يُلغَ ولم يُسلَّم — فبعد الإرسال لن تتزامن التعديلات مع أوبتيموس.
+     */
+    public static function isEditable(Order $order): bool
+    {
+        return ! in_array($order->status, ['cancelled', 'delivered', 'returned'], true)
+            && empty($order->tracking_number)
+            && empty($order->delivery_external_id);
+    }
+
     public function confirm(Order $order, OrderDeliveryDispatcher $dispatcher): RedirectResponse
     {
         $this->authorize('confirm', $order);
@@ -512,15 +559,36 @@ class OrderController extends Controller
         return $this->guard($order, fn () => $this->service->deliver($order), __('تم تسليم الطلب.'));
     }
 
-    public function cancel(CancelOrderRequest $request, Order $order, OrderDeliveryDispatcher $dispatcher): RedirectResponse
+    public function cancel(CancelOrderRequest $request, Order $order, OrderDeliveryDispatcher $dispatcher, OrderVoidService $void): RedirectResponse
     {
         $this->authorize('cancel', $order);
+
+        $reason = $request->validated('reason');
+
+        // حالات ما قبل الشحن تُلغى بتحرير الحجز فقط (لا أثر مخزوني/محاسبي بعد).
+        $preShip = ['draft', 'new', 'confirmed', 'stock_reserved', 'preparing', 'ready_to_ship'];
+
+        // طلب سبق ترحيله وخصمه من المخزون عند التقديم (حالة «مشحون» داخليًا) ولم يُسلَّم/يُلغَ:
+        // الإلغاء يعكس الأثر المحاسبي والمخزوني كاملًا ويُلغي الشحنة لدى المزوّد إن وُجدت.
+        if (! in_array($order->status, $preShip, true)) {
+            if (in_array($order->status, ['cancelled', 'delivered', 'returned'], true)) {
+                return back()->with('error', __('لا يمكن إلغاء هذا الطلب في حالته الحالية.'));
+            }
+
+            try {
+                $void->cancelWithReversal($order, $request->user(), $reason);
+            } catch (\Throwable $e) {
+                return back()->with('error', __('تعذّر إلغاء الطلب: :m', ['m' => $e->getMessage()]));
+            }
+
+            return back()->with('success', __('أُلغي الطلب وعُكس أثره المحاسبي والمخزوني، وأُلغيت الشحنة من شركة التوصيل إن وُجدت.'));
+        }
 
         // هل أُرسل الطلب لشركة التوصيل؟ (له معرّف خارجي أو رقم تتبّع).
         $sentToProvider = ! empty($order->delivery_external_id) || ! empty($order->tracking_number);
 
         try {
-            $this->service->cancel($order, $request->validated('reason'));
+            $this->service->cancel($order, $reason);
         } catch (ValidationException $e) {
             return back()->with('error', $e->getMessage());
         }

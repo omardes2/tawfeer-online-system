@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Http\Controllers\Admin\Sales\OrderController;
 use App\Models\User;
 use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Accounting\Models\Treasury;
@@ -563,5 +564,91 @@ class SalesAdminWebTest extends TestCase
         $this->actingAs($this->admin())->delete(route('admin.sales.orders.destroy', $order))->assertRedirect();
 
         $this->assertNotNull($order->fresh()->deleted_at); // حُذف (soft delete)
+    }
+
+    /** طلب مُقدَّم (مشحون داخليًا) بلا رقم تتبّع: يُتاح تعديل بيانات التواصل/التوصيل ويُطبَّع الهاتف. */
+    public function test_edit_updates_contact_fields_and_normalizes_phone(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 10, 50);
+
+        $this->actingAs($this->admin())->post('/admin/sales/orders', [
+            'customer_name' => 'اسم خاطئ', 'customer_phone' => '0599000000', ...$this->geo(),
+            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 100]],
+        ])->assertRedirect();
+
+        $order = Order::latest('id')->first();
+        $this->assertTrue(OrderController::isEditable($order));
+
+        // صفحة التعديل تُفتح.
+        $this->actingAs($this->admin())->get(route('admin.sales.orders.edit', $order))
+            ->assertOk()->assertSee('تعديل الطلب');
+
+        // حفظ التعديلات (تصحيح الاسم/الهاتف/العنوان) — الهاتف الدولي يُطبَّع لعشر خانات.
+        $this->actingAs($this->admin())->put(route('admin.sales.orders.update', $order), [
+            'customer_name' => 'الاسم الصحيح',
+            'customer_phone' => '+970 599 111222',
+            'shipping_address' => 'العنوان الصحيح',
+            'notes' => 'ملاحظة محدَّثة',
+        ])->assertRedirect(route('admin.sales.orders.show', $order));
+
+        $fresh = $order->fresh();
+        $this->assertSame('الاسم الصحيح', $fresh->customer_name);
+        $this->assertSame('0599111222', $fresh->customer_phone);
+        $this->assertSame('العنوان الصحيح', $fresh->shipping_address);
+    }
+
+    /** بعد إرسال الطلب لشركة التوصيل (له رقم تتبّع) لا يُتاح التعديل. */
+    public function test_edit_blocked_after_dispatch(): void
+    {
+        $order = app(OrderService::class)->create([
+            'branch_id' => Branch::default()->id,
+            'warehouse_id' => Warehouse::where('code', 'WH-MAIN')->firstOrFail()->id,
+            'customer_name' => 'س', 'customer_phone' => '0599000000',
+        ], [], 2026);
+        $order->update(['status' => 'shipped', 'tracking_number' => 'TRK-9', 'delivery_external_id' => 'TRK-9']);
+
+        $this->assertFalse(OrderController::isEditable($order->fresh()));
+
+        $this->actingAs($this->admin())->get(route('admin.sales.orders.edit', $order))->assertForbidden();
+
+        // محاولة التحديث تُرفض وتُعيد التوجيه دون تغيير الاسم.
+        $this->actingAs($this->admin())->put(route('admin.sales.orders.update', $order), [
+            'customer_name' => 'محاولة', 'customer_phone' => '0599111222', 'shipping_address' => 'عنوان',
+        ])->assertRedirect(route('admin.sales.orders.show', $order));
+
+        $this->assertSame('س', $order->fresh()->customer_name);
+    }
+
+    /** إلغاء طلب مُقدَّم (خُصم مخزونيًا ومحاسبيًا) يعكس الأثر: تُعاد الكميات ويُعكس القيد. */
+    public function test_cancel_submitted_order_reverses_stock_and_accounting(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 10, 50);
+
+        $this->actingAs($this->admin())->post('/admin/sales/orders', [
+            'customer_name' => 'زبون', 'customer_phone' => '0599000000', ...$this->geo(),
+            'items' => [['variant' => $variant->uuid, 'qty' => 3, 'unit_price' => 100]],
+        ])->assertRedirect();
+
+        $order = Order::latest('id')->first();
+        // بعد التقديم: خُصمت 3 (10−3=7) ورُحّل محاسبيًا.
+        $this->assertEqualsWithDelta(7.0, (float) InventoryStock::where('variant_id', $variant->id)
+            ->where('warehouse_id', $warehouse->id)->value('on_hand'), 0.001);
+        $this->assertNotNull($order->revenue_entry_id);
+
+        // إلغاء الطلب ⇒ عكس الأثر: تُعاد الكميات (7+3=10) ويُعكس القيد ويبقى الطلب ظاهرًا «ملغى».
+        $this->actingAs($this->admin())
+            ->post(route('admin.sales.orders.cancel', $order), ['reason' => 'اختبار العكس'])
+            ->assertRedirect();
+
+        $fresh = $order->fresh();
+        $this->assertSame('cancelled', $fresh->status);
+        $this->assertNull($fresh->deleted_at); // لم يُحذف — ظاهر بحالة ملغى.
+        $this->assertNull($fresh->revenue_entry_id); // عُكس القيد.
+        $this->assertEqualsWithDelta(10.0, (float) InventoryStock::where('variant_id', $variant->id)
+            ->where('warehouse_id', $warehouse->id)->value('on_hand'), 0.001);
     }
 }
