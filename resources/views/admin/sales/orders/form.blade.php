@@ -60,13 +60,32 @@
                 </x-admin.field>
 
                 <x-admin.field :label="__('المنطقة')" name="area_id" :required="true">
-                    <select name="area_id" x-model.number="areaId" required
-                            class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
-                        <option value="">{{ __('— اختر المنطقة —') }}</option>
-                        <template x-for="a in areasForCity" :key="a.id">
-                            <option :value="a.id" x-text="a.name"></option>
-                        </template>
-                    </select>
+                    {{-- قائمة مناطق قابلة للبحث (تُصفّى حسب المدينة المختارة) --}}
+                    <div class="relative" @click.outside="areaOpen = false">
+                        <div class="relative">
+                            <span class="absolute inset-y-0 start-0 ps-3 flex items-center text-gray-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
+                            </span>
+                            <input type="text" x-model="areaSearch" @focus="cityId && (areaOpen = true)" @input="areaOpen = true"
+                                   autocomplete="off" :disabled="!cityId"
+                                   placeholder="{{ __('ابحث واختر المنطقة…') }}"
+                                   class="w-full ps-9 pe-3 rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500 disabled:bg-gray-50 disabled:text-gray-400" />
+                        </div>
+                        <input type="hidden" name="area_id" :value="areaId" />
+                        <div x-show="areaOpen" x-transition x-cloak
+                             class="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                            <template x-for="a in filteredAreas" :key="a.id">
+                                <button type="button" @click="selectArea(a)"
+                                        class="w-full flex items-center gap-2 px-3 py-2 text-sm text-start hover:bg-emerald-50"
+                                        :class="Number(a.id) === Number(areaId) ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-700'">
+                                    <span x-text="a.name"></span>
+                                </button>
+                            </template>
+                            <template x-if="filteredAreas.length === 0">
+                                <p class="px-3 py-2 text-sm text-gray-400">{{ __('لا نتائج مطابقة') }}</p>
+                            </template>
+                        </div>
+                    </div>
                     <template x-if="cityId && areasForCity.length === 0">
                         <p class="mt-1 text-xs text-gray-400">{{ __('لا مناطق مسجّلة لهذه المدينة.') }}</p>
                     </template>
@@ -284,11 +303,15 @@
                     areaId: @js(old('area_id') ? (int) old('area_id') : ''),
                     citySearch: '',
                     cityOpen: false,
+                    areaSearch: '',
+                    areaOpen: false,
 
-                    // تهيئة نص البحث باسم المدينة المختارة سابقًا (عند وجود خطأ تحقّق).
+                    // تهيئة نصوص البحث بأسماء المدينة/المنطقة المختارة سابقًا (عند خطأ تحقّق).
                     init() {
-                        const sel = this.cities.find(c => Number(c.id) === Number(this.cityId));
-                        if (sel) this.citySearch = sel.name;
+                        const sc = this.cities.find(c => Number(c.id) === Number(this.cityId));
+                        if (sc) this.citySearch = sc.name;
+                        const sa = this.areas.find(a => Number(a.id) === Number(this.areaId));
+                        if (sa) this.areaSearch = sa.name;
                     },
 
                     get filteredCities() {
@@ -303,7 +326,22 @@
                         this.cityId = Number(c.id);
                         this.citySearch = c.name;
                         this.areaId = '';
+                        this.areaSearch = '';
                         this.cityOpen = false;
+                    },
+
+                    get filteredAreas() {
+                        const list = this.areasForCity;
+                        const q = (this.areaSearch || '').trim().toLowerCase();
+                        const sel = list.find(a => Number(a.id) === Number(this.areaId));
+                        if (q === '' || (sel && q === sel.name.toLowerCase())) return list;
+                        return list.filter(a => (a.name || '').toLowerCase().includes(q));
+                    },
+
+                    selectArea(a) {
+                        this.areaId = Number(a.id);
+                        this.areaSearch = a.name;
+                        this.areaOpen = false;
                     },
                     hasReturn: @js((bool) old('has_return')),
                     rows: [],
