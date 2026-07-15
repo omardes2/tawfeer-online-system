@@ -49,13 +49,17 @@ class SalesPostingService
     }
 
     /**
-     * حساب الطرف المدين: الصندوق للبيع المباشر (pos)، وإلا ذمم العميل — حساب العميل
-     * الفرعي إن وُجد (يُنشأ كسولًا للعملاء القدامى)، وإلا الحساب العام «ذمم العملاء».
+     * حساب الطرف المدين حسب مصدر البيع:
+     *  - طلبات شركة التوصيل (من «انشاء اوردر»، channel ≠ pos): الذمم على شركة التوصيل
+     *    «ذمم شركة التوصيل 1050» — حساب واحد بلا حساب عميل لكل طلب (تُسوّى بالتحصيل).
+     *  - المبيعات المباشرة (pos): ذمم العميل — حسابه الفرعي تحت «ذمم العملاء 1100»
+     *    إن كان عميلًا مسجّلًا، وإلا الحساب العام 1100.
      */
     private function debitCode(Order $order): ?string
     {
-        if ($order->channel === 'pos') {
-            return $this->resolver->code('cash', null, self::DOC);
+        if ($order->channel !== 'pos') {
+            return $this->resolver->code('cod_receivable', null, self::DOC)
+                ?? config('accounting.sales.cod_receivable', '1050');
         }
 
         if ($order->customer_id && ($customer = $order->customer)) {

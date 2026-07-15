@@ -55,8 +55,9 @@ class SalesPostingTest extends TestCase
         $this->assertNotNull($order->revenue_entry_id);
         $this->assertNotNull($order->cogs_entry_id);
 
-        // الإيراد: مدين ذمم العملاء 200 / دائن إيراد المبيعات 200.
-        $this->assertEqualsWithDelta(200, $this->balance('1100'), 0.01); // receivable (asset debit)
+        // طلب توصيل (channel=manual): مدين ذمم شركة التوصيل 1050 / دائن إيراد المبيعات.
+        $this->assertEqualsWithDelta(200, $this->balance('1050'), 0.01); // COD receivable (asset debit)
+        $this->assertEqualsWithDelta(0, $this->balance('1100'), 0.01);   // لا ذمم عملاء لطلبات التوصيل
         $this->assertEqualsWithDelta(200, $this->balance('4010'), 0.01); // revenue (credit)
         // التكلفة: مدين COGS 120 / دائن المخزون 120.
         $this->assertEqualsWithDelta(120, $this->balance('6000'), 0.01); // COGS (cost_of_goods debit)

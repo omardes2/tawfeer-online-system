@@ -14,7 +14,8 @@ class AccountMappingSeeder extends Seeder
     /** document_type => [function => account_code] */
     private array $defaults = [
         'sales_invoice' => [
-            'receivable' => '1100',        // ذمم العملاء (طلبات التوصيل)
+            'receivable' => '1100',        // ذمم العملاء (مبيعات مباشرة/عميل)
+            'cod_receivable' => '1050',    // ذمم شركة التوصيل (طلبات انشاء اوردر — COD)
             'cash' => '1010',              // الصندوق (المبيعات المباشرة)
             'revenue' => '4010',           // إيراد المبيعات
             'shipping_revenue' => '4020',  // إيراد الشحن

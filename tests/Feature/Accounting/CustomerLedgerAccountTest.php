@@ -59,7 +59,7 @@ class CustomerLedgerAccountTest extends TestCase
         $this->assertNotSame($c1->glAccount->code, $c2->glAccount->code);
     }
 
-    public function test_sales_posts_receivable_to_customer_sub_account(): void
+    public function test_direct_sale_posts_receivable_to_customer_sub_account(): void
     {
         $accounting = app(AccountingService::class);
         $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
@@ -70,22 +70,44 @@ class CustomerLedgerAccountTest extends TestCase
             'branch_id' => Branch::default()->id, 'name' => 'عميل الذمم', 'primary_phone' => '0599777000',
         ]);
 
+        // بيع مباشر (channel=pos) لعميل مسجّل ⇒ ذمم العميل على حسابه الفرعي تحت 1100.
         $order = app(OrderService::class)->create([
-            'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id,
+            'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id, 'channel' => 'pos',
             'customer_id' => $customer->id, 'customer_name' => $customer->name, 'customer_phone' => $customer->primary_phone,
         ], [['variant_id' => $variant->id, 'qty' => 2, 'unit_price' => 100]], 2026);
 
         app(OrderService::class)->confirm($order);
 
         $sub = $customer->fresh()->glAccount;
-
-        // الطرف المدين (ذمم) على حساب العميل الفرعي = 200، وليس على الحساب العام مباشرة.
         $line = JournalLine::where('account_id', $sub->id)->first();
         $this->assertNotNull($line);
         $this->assertEqualsWithDelta(200, (float) $line->debit, 0.01);
-
-        // رصيد الفرعي = 200، ورصيد الأب (مراقبة) يشمله = 200.
         $this->assertEqualsWithDelta(200, $accounting->accountBalance($sub), 0.01);
         $this->assertEqualsWithDelta(200, $accounting->accountBalance($this->arParent()), 0.01);
+    }
+
+    public function test_delivery_order_posts_to_cod_receivable_1050_without_customer_account(): void
+    {
+        $accounting = app(AccountingService::class);
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 10, 60);
+
+        $customer = app(CustomerService::class)->create([
+            'branch_id' => Branch::default()->id, 'name' => 'مستلم التوصيل', 'primary_phone' => '0599111222',
+        ]);
+
+        // طلب عبر شركة التوصيل (channel=manual من «انشاء اوردر»).
+        $order = app(OrderService::class)->create([
+            'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id, 'channel' => 'manual',
+            'customer_id' => $customer->id, 'customer_name' => $customer->name, 'customer_phone' => $customer->primary_phone,
+        ], [['variant_id' => $variant->id, 'qty' => 2, 'unit_price' => 100]], 2026);
+
+        app(OrderService::class)->confirm($order);
+
+        // الذمم على شركة التوصيل 1050، ولا شيء على حساب العميل الفرعي.
+        $this->assertEqualsWithDelta(200, $accounting->accountBalance(Account::where('code', '1050')->firstOrFail()), 0.01);
+        $sub = $customer->fresh()->glAccount;
+        $this->assertSame(0, JournalLine::where('account_id', $sub->id)->count());
     }
 }
