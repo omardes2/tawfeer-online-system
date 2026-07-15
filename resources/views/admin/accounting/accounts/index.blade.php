@@ -14,9 +14,10 @@
                     <tbody class="divide-y">
                         @php $types = ['asset' => 'أصول', 'liability' => 'خصوم', 'equity' => 'حقوق ملكية', 'revenue' => 'إيرادات', 'expense' => 'مصروفات', 'cost_of_goods' => 'تكلفة بضاعة']; @endphp
                         @foreach ($accounts as $a)
+                            @php $depth = $a->depth ?? 0; @endphp
                             <tr>
-                                <td class="py-2 px-3 text-gray-800 {{ $a->is_postable ? 'pr-8' : 'font-semibold' }}">{{ $a->code }}</td>
-                                <td class="py-2 px-3 {{ $a->is_postable ? 'text-gray-600' : 'font-semibold text-gray-800' }}">{{ $a->name }}</td>
+                                <td class="py-2 px-3 text-gray-800 {{ $depth === 0 ? 'font-semibold' : '' }}" style="padding-inline-start: {{ 0.75 + $depth * 1.5 }}rem">{{ $a->code }}</td>
+                                <td class="py-2 px-3 {{ $depth === 0 ? 'font-semibold text-gray-800' : 'text-gray-600' }}">{{ $a->name }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ __($types[$a->type] ?? $a->type) }}</td>
                                 <td class="py-2 px-3">{{ $a->is_postable ? '✓' : '—' }}</td>
                             </tr>
