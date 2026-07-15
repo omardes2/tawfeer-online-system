@@ -29,13 +29,16 @@
 
     {{-- البحث + الفلاتر في صفٍّ واحد (البحث بجانب الفلاتر) --}}
     <form method="GET" action="{{ route('admin.sales.orders.index') }}" class="flex flex-wrap items-end gap-3 mb-5">
-        <div class="relative w-full sm:w-72">
-            <span class="absolute inset-y-0 start-0 ps-3 flex items-center text-gray-400">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
-            </span>
-            <input type="text" name="search" value="{{ $activeSearch }}"
-                   placeholder="{{ __('بحث برقم التتبّع أو اسم المستلم...') }}"
-                   class="w-full ps-9 pe-3 rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+        <div class="flex items-stretch gap-2">
+            <div class="relative w-full sm:w-72">
+                <span class="absolute inset-y-0 start-0 ps-3 flex items-center text-gray-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
+                </span>
+                <input type="text" name="search" value="{{ $activeSearch }}"
+                       placeholder="{{ __('بحث برقم التتبّع أو اسم المستلم...') }}"
+                       class="w-full h-full ps-9 pe-3 rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+            </div>
+            <button type="submit" class="btn-secondary btn-sm shrink-0">{{ __('بحث') }}</button>
         </div>
 
         <div>
@@ -74,7 +77,6 @@
             </select>
         </div>
 
-        <button type="submit" class="btn-secondary btn-sm">{{ __('بحث') }}</button>
         @if ($hasFilter)
             <a href="{{ route('admin.sales.orders.index') }}" class="btn-secondary btn-sm">{{ __('مسح الفلاتر') }}</a>
         @endif
