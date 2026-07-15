@@ -281,10 +281,10 @@
                 </dl>
 
                 <div class="flex flex-col gap-2 pt-2">
-                    <button type="submit" class="btn-primary w-full justify-center">{{ __('حفظ كمسودّة') }}</button>
+                    <button type="submit" class="btn-primary w-full justify-center">{{ __('تقديم الطلب') }}</button>
                     <a href="{{ route('admin.sales.orders.index') }}" class="btn-secondary w-full justify-center">{{ __('إلغاء') }}</a>
                 </div>
-                <p class="text-xs text-gray-400 text-center">{{ __('يُرسَل الطلب لشركة التوصيل عند تأكيده.') }}</p>
+                <p class="text-xs text-gray-400 text-center">{{ __('يُحتسب بيعًا كاملًا وتُخصم الكميات من المخزون، ويبقى المبلغ مستحقًّا على العميل حتى الدفع.') }}</p>
             </x-admin.form-section>
         </div>
     </form>

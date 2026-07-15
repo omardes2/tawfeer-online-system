@@ -181,11 +181,20 @@ class OrderController extends Controller
             'has_return' => $request->boolean('has_return'),
             'return_notes' => $request->validated('return_notes'),
             'shipping_total' => $this->deliveryFeeFor($cityId),
-            'channel' => $request->validated('channel', 'manual'),
+            'channel' => 'pos', // بيع مباشر آجل — الذمّة على العميل، بلا شركة توصيل.
             'notes' => $request->validated('notes'),
         ], $items, (int) now()->year);
 
-        return redirect()->route('admin.sales.orders.show', $order)->with('success', __('أُنشئ الطلب.'));
+        // «تقديم الطلب» = بيع كامل فوري: ترحيل محاسبي + خصم الكميات من المخزون، ويبقى المبلغ
+        // ذمّة على العميل حتى الدفع (زر «دفع»). لا إرسال لشركة توصيل.
+        try {
+            $this->service->fulfillDirect($order);
+        } catch (ValidationException $e) {
+            return back()->withInput()->with('error', collect($e->errors())->flatten()->first());
+        }
+
+        return redirect()->route('admin.sales.orders.show', $order)
+            ->with('success', __('تم تقديم الطلب واحتسابه بيعًا كاملًا وخصم الكميات من المخزون. المبلغ مستحق على العميل حتى الدفع.'));
     }
 
     /** نموذج «مبيعات مباشرة» — بيع من المستودع بلا توصيل خارجي. */

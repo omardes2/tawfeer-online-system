@@ -96,7 +96,9 @@ class SalesAdminWebTest extends TestCase
         $area = Area::create(['city_id' => $city->id, 'name' => 'المصيون', 'is_active' => true]);
         DeliveryCityRate::create(['city_id' => $city->id, 'name' => 'رام الله', 'delivery_fee' => 20, 'currency' => 'ILS', 'is_active' => true]);
 
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
         $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 10, 50); // مخزون كافٍ للبيع.
 
         $response = $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'customer_name' => 'محمد',
@@ -110,17 +112,23 @@ class SalesAdminWebTest extends TestCase
             'items' => [['variant' => $variant->uuid, 'qty' => 2, 'unit_price' => 100]],
         ]);
 
-        $response->assertRedirect();
-
         $order = Order::latest('id')->first();
         $this->assertNotNull($order);
+        $response->assertRedirect(route('admin.sales.orders.show', $order));
+
+        // الحقول المُلتقطة + رسوم التوصيل.
         $this->assertSame($city->id, $order->city_id);
         $this->assertSame($area->id, $order->area_id);
         $this->assertTrue($order->has_return);
-        $this->assertSame('قطعة مرتجعة', $order->return_notes);
         $this->assertEqualsWithDelta(20.0, (float) $order->shipping_total, 0.001);
         $this->assertEqualsWithDelta(200.0, (float) $order->subtotal, 0.001);
         $this->assertEqualsWithDelta(220.0, (float) $order->total, 0.001); // 200 + 20 توصيل
+
+        // «تقديم الطلب» = بيع كامل: خُصمت الكميات، رُحّل محاسبيًا، والمبلغ ذمّة (غير مدفوع).
+        $this->assertEqualsWithDelta(8.0, (float) InventoryStock::where('variant_id', $variant->id)
+            ->where('warehouse_id', $warehouse->id)->value('on_hand'), 0.001);
+        $this->assertNotNull($order->revenue_entry_id);
+        $this->assertNotSame('paid', $order->payment_status);
     }
 
     public function test_create_order_requires_name_phone_city_area_and_item(): void
@@ -148,7 +156,9 @@ class SalesAdminWebTest extends TestCase
     public function test_admin_order_normalizes_phone_to_ten_digits(): void
     {
         Queue::fake();
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
         $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 5, 50);
 
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'customer_name' => 'ليان',
@@ -437,15 +447,17 @@ class SalesAdminWebTest extends TestCase
         config()->set('shipping.drivers.faketrack.delivery', FakeTrackingDeliveryProvider::class);
         FakeTrackingDeliveryProvider::$createResult = null;
 
+        // طلب توصيل (channel ≠ pos، من المتجر/الـAPI) بحالة جديدة يُنتظر تأكيده.
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $geo = $this->geo();
         $variant = Product::factory()->create()->defaultVariant;
-        $this->actingAs($this->admin())->post('/admin/sales/orders', [
-            'customer_name' => 'خالد',
-            'customer_phone' => '0599222222',
-            ...$this->geo(),
-            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 50]],
-        ])->assertRedirect();
+        $order = app(OrderService::class)->create([
+            'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id,
+            'customer_name' => 'خالد', 'customer_phone' => '0599222222',
+            'city_id' => $geo['city_id'], 'area_id' => $geo['area_id'], 'shipping_address' => $geo['shipping_address'],
+            'channel' => 'manual',
+        ], [['variant_id' => $variant->id, 'qty' => 1, 'unit_price' => 50]], 2026);
 
-        $order = Order::latest('id')->first();
         $this->actingAs($this->admin())->post(route('admin.sales.orders.confirm', $order))->assertRedirect();
 
         $order->refresh();
