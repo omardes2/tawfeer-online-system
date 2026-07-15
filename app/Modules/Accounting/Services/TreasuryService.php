@@ -132,8 +132,13 @@ class TreasuryService
             return $account;
         }
 
-        // إنشاء حساب أصل فرعي مخصّص (قابل للترحيل) تحت مجموعة الأصول.
-        $parent = Account::where('code', config('accounting.treasury.assets_parent', '1000'))->first();
+        // حساب فرعي مخصّص (قابل للترحيل) تحت الحساب الرئيس المناسب:
+        // الخزائن النقدية تحت «الصندوق 1010»، والبنوك تحت «البنك 1020» (وإلا مجموعة الأصول).
+        $parentCode = ($data['type'] ?? 'cash') === 'bank'
+            ? config('accounting.treasury.bank_account', '1020')
+            : config('accounting.treasury.cash_account', '1010');
+        $parent = Account::where('code', $parentCode)->first()
+            ?? Account::where('code', config('accounting.treasury.assets_parent', '1000'))->first();
         $code = 'T-'.$data['code'];
 
         return Account::create([
