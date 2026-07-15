@@ -7,11 +7,13 @@ use App\Http\Requests\Crm\BlockCustomerRequest;
 use App\Http\Requests\Crm\StoreCustomerRequest;
 use App\Http\Requests\Crm\StoreNoteRequest;
 use App\Http\Requests\Crm\UpdateCustomerRequest;
+use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Crm\Models\Customer;
 use App\Modules\Crm\Services\CustomerService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class CustomerController extends Controller
 {
@@ -81,9 +83,61 @@ class CustomerController extends Controller
     {
         $this->authorize('view', $customer);
 
-        return view('admin.crm.customers.show', [
-            'customer' => $customer->load(['phones', 'addresses', 'contacts', 'customerNotes.author', 'orders']),
-        ]);
+        $customer->load(['phones', 'addresses', 'contacts', 'customerNotes.author', 'glAccount']);
+
+        $orders = $customer->orders()->latest('id')->paginate(15);
+
+        $receipts = FinancialVoucher::where('customer_id', $customer->id)
+            ->where('kind', 'receipt')
+            ->with('treasury:id,name')
+            ->latest('voucher_date')->latest('id')->paginate(15, ['*'], 'receipts_page');
+
+        $statement = $this->buildStatement($customer);
+        // الرصيد/الإجماليات من كشف الحساب نفسه ليتطابق آخر رصيد مع البطاقة.
+        $sales = round($statement->sum('debit'), 2);
+        $received = round($statement->sum('credit'), 2);
+        $balance = round($sales - $received, 2);
+
+        return view('admin.crm.customers.show', compact(
+            'customer', 'orders', 'receipts', 'statement', 'sales', 'received', 'balance',
+        ));
+    }
+
+    /**
+     * كشف حساب العميل: حركات حسابه الفرعي في «ذمم العملاء» (القيود المُرحّلة) برصيد متحرّك.
+     * المبيعات على الحساب مدينة (تزيد المستحق)، والمقبوضات دائنة (تُنقصه). الحساب أصل مدين الطبيعة.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function buildStatement(Customer $customer): Collection
+    {
+        $account = $customer->glAccount;
+        if (! $account) {
+            return collect();
+        }
+
+        $running = 0.0;
+
+        return $account->lines()
+            ->whereHas('entry', fn ($q) => $q->where('status', 'posted'))
+            ->with('entry:id,number,entry_date,description')
+            ->get()
+            ->sortBy(fn ($l) => [optional($l->entry)->entry_date?->format('Y-m-d'), $l->id])
+            ->values()
+            ->map(function ($line) use (&$running) {
+                $debit = (float) $line->debit;
+                $credit = (float) $line->credit;
+                $running += $debit - $credit;
+
+                return [
+                    'date' => $line->entry?->entry_date,
+                    'ref' => $line->entry?->number,
+                    'desc' => $line->entry?->description,
+                    'debit' => $debit,
+                    'credit' => $credit,
+                    'balance' => round($running, 2),
+                ];
+            });
     }
 
     public function addNote(StoreNoteRequest $request, Customer $customer): RedirectResponse
