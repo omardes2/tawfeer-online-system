@@ -30,9 +30,36 @@ class ChartOfAccountsSeeder extends Seeder
             )->id;
         }
 
+        // النقدية والبنوك: حساب مراقبة رئيسي (1010) يتفرّع إلى «حساب النقدية 1011» (الخزائن
+        // النقدية) و«الحسابات البنكية 1020» (البنوك). الحسابات الثلاثة مراقبة (غير قابلة للترحيل)؛
+        // كل خزينة/بنك يُنشأ حسابًا طرفيًا فرعيًا تحتها (انظر TreasurySeeder).
+        $cashBanks = Account::query()->firstOrCreate(
+            ['code' => '1010'],
+            ['name' => 'النقدية والبنوك', 'type' => 'asset', 'parent_id' => $parents['1000'], 'is_postable' => false],
+        );
+        $cashGroup = Account::query()->firstOrCreate(
+            ['code' => '1011'],
+            ['name' => 'حساب النقدية', 'type' => 'asset', 'parent_id' => $cashBanks->id, 'is_postable' => false],
+        );
+        $bankGroup = Account::query()->firstOrCreate(
+            ['code' => '1020'],
+            ['name' => 'الحسابات البنكية', 'type' => 'asset', 'parent_id' => $cashBanks->id, 'is_postable' => false],
+        );
+
+        // الحسابان الطرفيان الافتراضيان (الصندوق/البنك الرئيسيان) — قابلان للترحيل. تُربَط بهما
+        // الخزينة/البنك الرئيسيان في TreasurySeeder، ويشير إليهما إعداد الترحيل «cash».
+        Account::query()->firstOrCreate(
+            ['code' => '1011-0001'],
+            ['name' => 'الصندوق الرئيسي', 'name_en' => 'Main Cashbox', 'type' => 'asset',
+                'parent_id' => $cashGroup->id, 'is_postable' => true, 'currency' => 'SAR'],
+        );
+        Account::query()->firstOrCreate(
+            ['code' => '1020-0001'],
+            ['name' => 'البنك الرئيسي', 'name_en' => 'Main Bank', 'type' => 'asset',
+                'parent_id' => $bankGroup->id, 'is_postable' => true, 'currency' => 'SAR'],
+        );
+
         $leaves = [
-            ['1010', 'الصندوق', 'asset', '1000'],
-            ['1020', 'البنك', 'asset', '1000'],
             ['1050', 'ذمم شركات التوصيل (COD قيد التحصيل)', 'asset', '1000'], // Phase 4.6 — COD clearing
             ['1100', 'ذمم العملاء', 'asset', '1000'],
             ['1200', 'المخزون', 'asset', '1000'],

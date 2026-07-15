@@ -7,17 +7,23 @@ use App\Modules\Accounting\Models\Treasury;
 use Illuminate\Database\Seeder;
 
 /**
- * الخزينة والبنك الرئيسيان (Phase 7.1) — مرتبطان بحسابي GL القائمين (1010/1020).
- * الرصيد الافتتاحي 0 (يُضبط لاحقًا من اللوحة). الأرصدة تُشتقّ من القيود المُرحّلة.
+ * الخزينة والبنك الرئيسيان (Phase 7.1). كل خزينة/بنك مرتبط بحساب GL **طرفي قابل للترحيل**
+ * فرعي تحت حساب المراقبة المناسب: الصندوق الرئيسي (1011-0001) تحت «حساب النقدية 1011»،
+ * والبنك الرئيسي (1020-0001) تحت «الحسابات البنكية 1020». الرصيد الافتتاحي 0.
  */
 class TreasurySeeder extends Seeder
 {
     public function run(): void
     {
-        $cashGl = Account::where('code', config('accounting.treasury.cash_account', '1010'))->first();
-        $bankGl = Account::where('code', config('accounting.treasury.bank_account', '1020'))->first();
+        $cashParent = Account::where('code', config('accounting.treasury.cash_account', '1011'))->first();
+        $bankParent = Account::where('code', config('accounting.treasury.bank_account', '1020'))->first();
 
-        if ($cashGl) {
+        if ($cashParent) {
+            $cashGl = Account::query()->firstOrCreate(
+                ['code' => config('accounting.treasury.cash_posting', '1011-0001')],
+                ['name' => 'الصندوق الرئيسي', 'name_en' => 'Main Cashbox', 'type' => 'asset',
+                    'parent_id' => $cashParent->id, 'is_postable' => true, 'currency' => 'SAR', 'is_active' => true],
+            );
             Treasury::query()->firstOrCreate(
                 ['code' => 'CB-MAIN'],
                 ['name' => 'الصندوق الرئيسي', 'name_en' => 'Main Cashbox', 'type' => 'cash',
@@ -25,7 +31,12 @@ class TreasurySeeder extends Seeder
             );
         }
 
-        if ($bankGl) {
+        if ($bankParent) {
+            $bankGl = Account::query()->firstOrCreate(
+                ['code' => '1020-0001'],
+                ['name' => 'البنك الرئيسي', 'name_en' => 'Main Bank', 'type' => 'asset',
+                    'parent_id' => $bankParent->id, 'is_postable' => true, 'currency' => 'SAR', 'is_active' => true],
+            );
             Treasury::query()->firstOrCreate(
                 ['code' => 'BNK-MAIN'],
                 ['name' => 'البنك الرئيسي', 'name_en' => 'Main Bank', 'type' => 'bank',

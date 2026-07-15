@@ -27,7 +27,7 @@ class AccountingEngineTest extends TestCase
     private function postEntry(float $amount): JournalEntry
     {
         return $this->accounting->postEntry(['entry_date' => '2026-07-12'], [
-            ['account_code' => '1010', 'debit' => $amount, 'credit' => 0],
+            ['account_code' => '1011-0001', 'debit' => $amount, 'credit' => 0],
             ['account_code' => '4010', 'debit' => 0, 'credit' => $amount],
         ]);
     }

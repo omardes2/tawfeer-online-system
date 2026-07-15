@@ -40,7 +40,7 @@ class JournalEntryApiTest extends TestCase
             'description' => 'قيد اختبار',
             'post' => $post,
             'lines' => [
-                ['account_code' => '1010', 'debit' => $amount, 'credit' => 0],
+                ['account_code' => '1011-0001', 'debit' => $amount, 'credit' => 0],
                 ['account_code' => '1100', 'debit' => 0, 'credit' => $amount],
             ],
         ];
@@ -74,7 +74,7 @@ class JournalEntryApiTest extends TestCase
 
         $this->postJson('/api/v1/accounting/journal-entries', [
             'lines' => [
-                ['account_code' => '1010', 'debit' => 100],
+                ['account_code' => '1011-0001', 'debit' => 100],
                 ['account_code' => '1100', 'credit' => 50],
             ],
         ])->assertUnprocessable();
@@ -86,7 +86,7 @@ class JournalEntryApiTest extends TestCase
 
         $this->postJson('/api/v1/accounting/journal-entries', [
             'lines' => [
-                ['account_code' => '1010', 'debit' => 100, 'credit' => 100],
+                ['account_code' => '1011-0001', 'debit' => 100, 'credit' => 100],
                 ['account_code' => '1100', 'credit' => 100],
             ],
         ])->assertUnprocessable();
@@ -125,7 +125,7 @@ class JournalEntryApiTest extends TestCase
         // القيد العاكس يقلب المدين/الدائن.
         $lines = collect($rev->json('data.lines'));
         $this->assertEquals(300, (float) $lines->firstWhere('account_code', '1100')['debit']);
-        $this->assertEquals(300, (float) $lines->firstWhere('account_code', '1010')['credit']);
+        $this->assertEquals(300, (float) $lines->firstWhere('account_code', '1011-0001')['credit']);
 
         // لا يمكن عكس نفس القيد مرّتين.
         $this->postJson("/api/v1/accounting/journal-entries/{$id}/reverse")->assertUnprocessable();

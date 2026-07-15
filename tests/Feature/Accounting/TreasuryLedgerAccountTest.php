@@ -24,17 +24,17 @@ class TreasuryLedgerAccountTest extends TestCase
         $this->actingAs($admin);
     }
 
-    public function test_new_cashbox_gl_account_nests_under_cash_1010(): void
+    public function test_new_cashbox_gl_account_nests_under_cash_1011(): void
     {
         $treasury = app(TreasuryService::class)->create([
             'code' => 'CB-2026-001', 'name' => 'صندوق طه', 'type' => 'cash', 'opening_balance' => 0,
         ]);
 
-        $cashId = Account::where('code', '1010')->value('id');
+        $cashId = Account::where('code', '1011')->value('id');
         $account = $treasury->glAccount;
 
-        // كود فرعي بنمط الأب ليظهر مباشرةً تحت «الصندوق 1010».
-        $this->assertStringStartsWith('1010-', $account->code);
+        // كود فرعي بنمط الأب ليظهر مباشرةً تحت «حساب النقدية 1011».
+        $this->assertStringStartsWith('1011-', $account->code);
         $this->assertSame($cashId, $account->parent_id);
         $this->assertSame('asset', $account->type);
         $this->assertTrue($account->is_postable);

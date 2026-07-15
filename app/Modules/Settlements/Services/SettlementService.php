@@ -26,8 +26,6 @@ use Illuminate\Validation\ValidationException;
 class SettlementService
 {
     // رموز الحسابات (ChartOfAccounts).
-    private const ACC_CASH = '1010';
-
     private const ACC_COD_CLEARING = '1050'; // ذمم شركات التوصيل
 
     private const ACC_DELIVERY_EXPENSE = '5020';
@@ -194,9 +192,11 @@ class SettlementService
         $deductions = (float) $settlement->computed_deductions_total;
         $cod = (float) $settlement->computed_cod_total;
 
+        $cashCode = config('accounting.treasury.cash_posting', '1011-0001');
+
         $lines = [];
         if ($net > 0) {
-            $lines[] = ['account_code' => self::ACC_CASH, 'debit' => $net, 'credit' => 0, 'description' => __('صافي محصّل من المزوّد')];
+            $lines[] = ['account_code' => $cashCode, 'debit' => $net, 'credit' => 0, 'description' => __('صافي محصّل من المزوّد')];
         }
         if ($fees > 0) {
             $lines[] = ['account_code' => self::ACC_DELIVERY_EXPENSE, 'debit' => $fees, 'credit' => 0, 'description' => __('رسوم التوصيل')];

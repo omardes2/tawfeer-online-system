@@ -17,7 +17,8 @@ class AccountMappingController extends Controller
     /** الوظائف المعروضة لكل نوع مستند. */
     private const FUNCTIONS = [
         'sales_invoice' => [
-            'receivable' => 'ذمم العملاء (طلبات التوصيل)',
+            'cod_receivable' => 'ذمم العملاء (طلبات التوصيل)',
+            'receivable' => 'ذمم العملاء (مبيعات مباشرة)',
             'cash' => 'الصندوق (المبيعات المباشرة)',
             'revenue' => 'إيراد المبيعات',
             'shipping_revenue' => 'إيراد الشحن',

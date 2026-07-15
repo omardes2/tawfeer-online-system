@@ -132,16 +132,16 @@ class TreasuryService
             return $account;
         }
 
-        // حساب فرعي مخصّص (قابل للترحيل) تحت الحساب الرئيس المناسب:
-        // الخزائن النقدية تحت «الصندوق 1010»، والبنوك تحت «البنك 1020» (وإلا مجموعة الأصول).
+        // حساب فرعي مخصّص (قابل للترحيل) تحت حساب المراقبة المناسب:
+        // الخزائن النقدية تحت «حساب النقدية 1011»، والبنوك تحت «الحسابات البنكية 1020».
         $parentCode = ($data['type'] ?? 'cash') === 'bank'
             ? config('accounting.treasury.bank_account', '1020')
-            : config('accounting.treasury.cash_account', '1010');
+            : config('accounting.treasury.cash_account', '1011');
         $parent = Account::where('code', $parentCode)->first()
             ?? Account::where('code', config('accounting.treasury.assets_parent', '1000'))->first();
 
         return Account::create([
-            // كود فرعي متسلسل تحت الأب (مثل 1010-0001) ليظهر مباشرةً تحته في الدليل.
+            // كود فرعي متسلسل تحت الأب (مثل 1011-0001) ليظهر مباشرةً تحته في الدليل.
             'code' => $this->nextChildCode($parent),
             'name' => $data['name'],
             'name_en' => $data['name_en'] ?? null,
@@ -153,7 +153,7 @@ class TreasuryService
         ]);
     }
 
-    /** كود فرعي فريد تحت الأب بنمط «1010-0001». */
+    /** كود فرعي فريد تحت الأب بنمط «1011-0001». */
     private function nextChildCode(Account $parent): string
     {
         $seq = (int) Account::where('parent_id', $parent->id)

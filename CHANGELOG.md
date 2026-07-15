@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Cash & banks chart hierarchy + direct-sales receivable mapping
+- Restructured the "cash" area of the chart of accounts into a control-account
+  tree: **1010 «النقدية والبنوك»** (control) branches into **1011 «حساب النقدية»**
+  (holds cash treasuries as `1011-000N` leaves) and **1020 «الحسابات البنكية»**
+  (holds bank accounts as `1020-000N` leaves). The three group accounts are
+  non-postable; the default **الصندوق الرئيسي (1011-0001)** / **البنك الرئيسي
+  (1020-0001)** are the postable leaves. A migration moves existing posted
+  journal lines, treasury GL links, and posting mappings off the old postable
+  1010/1020 onto the new leaves (idempotent, balances preserved via control
+  roll-up). General cash postings (financial events, delivery settlements) now
+  target `treasury.cash_posting` (1011-0001).
+- Posting setup now exposes two distinct receivable functions for sales:
+  **ذمم العملاء (طلبات التوصيل)** → 1050 (COD via delivery company) and
+  **ذمم العملاء (مبيعات مباشرة)** → 1100 (direct sales / per-customer sub-accounts).
+
 ### Added — Purchase invoices / supplier payables (REQUIREMENTS §2.5)
 - New **purchase invoice** module built on the double-entry engine: supplier
   invoice with items, lifecycle draft → approved → posted, posting **Dr Inventory
