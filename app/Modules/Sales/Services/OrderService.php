@@ -165,6 +165,24 @@ class OrderService
         });
     }
 
+    /**
+     * معالجة الطلب حتى «الشحن» فقط: ترحيل محاسبي (عند التأكيد) وخصم الكميات من المخزون
+     * (عند الشحن)، دون «تسليم» ودون إرسال لشركة التوصيل — يبقى إرسال التوصيل خطوة لاحقة
+     * (تأكيد الأدمن). يُستخدم عند «تقديم الطلب» ليُحتسب البيع مخزونيًا ومحاسبيًا فورًا.
+     */
+    public function fulfillToShipped(Order $order): Order
+    {
+        return DB::transaction(function () use ($order) {
+            $this->confirm($order);
+            $this->reserveStock($order);
+            $this->startPreparing($order);
+            $this->markReady($order);
+            $this->ship($order);
+
+            return $order->fresh();
+        });
+    }
+
     /** التأكيد → الحجز: يحجز كل بند عبر ReservationService (ADR-009، BR-ORD-06). */
     public function reserveStock(Order $order): Order
     {

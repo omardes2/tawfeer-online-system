@@ -96,7 +96,9 @@ class SalesAdminWebTest extends TestCase
         $area = Area::create(['city_id' => $city->id, 'name' => 'المصيون', 'is_active' => true]);
         DeliveryCityRate::create(['city_id' => $city->id, 'name' => 'رام الله', 'delivery_fee' => 20, 'currency' => 'ILS', 'is_active' => true]);
 
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
         $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 10, 50); // مخزون كافٍ.
 
         $response = $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'customer_name' => 'محمد',
@@ -114,15 +116,20 @@ class SalesAdminWebTest extends TestCase
         $this->assertNotNull($order);
         $response->assertRedirect(route('admin.sales.orders.show', $order));
 
-        // «تقديم الطلب» = إدخال طلب توصيل بانتظار التأكيد (غير مؤكّد، غير مُرحّل بعد).
-        $this->assertContains($order->status, ['draft', 'new']);
+        // الحقول المُلتقطة + رسوم التوصيل.
         $this->assertSame($city->id, $order->city_id);
         $this->assertSame($area->id, $order->area_id);
         $this->assertTrue($order->has_return);
         $this->assertEqualsWithDelta(20.0, (float) $order->shipping_total, 0.001);
         $this->assertEqualsWithDelta(200.0, (float) $order->subtotal, 0.001);
         $this->assertEqualsWithDelta(220.0, (float) $order->total, 0.001); // 200 + 20 توصيل
-        $this->assertNull($order->revenue_entry_id); // لا ترحيل قبل التأكيد.
+
+        // «تقديم الطلب» = احتساب فوري: خُصمت الكميات (10−2) ورُحّل محاسبيًا؛ لم يُرسَل للتوصيل بعد.
+        $this->assertNotContains($order->status, ['draft', 'new']);
+        $this->assertEqualsWithDelta(8.0, (float) InventoryStock::where('variant_id', $variant->id)
+            ->where('warehouse_id', $warehouse->id)->value('on_hand'), 0.001);
+        $this->assertNotNull($order->revenue_entry_id);
+        $this->assertEmpty($order->tracking_number);
     }
 
     public function test_create_order_requires_name_phone_city_area_and_item(): void
@@ -150,7 +157,9 @@ class SalesAdminWebTest extends TestCase
     public function test_admin_order_normalizes_phone_to_ten_digits(): void
     {
         Queue::fake();
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
         $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 5, 50);
 
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'customer_name' => 'ليان',

@@ -181,14 +181,20 @@ class OrderController extends Controller
             'has_return' => $request->boolean('has_return'),
             'return_notes' => $request->validated('return_notes'),
             'shipping_total' => $this->deliveryFeeFor($cityId),
-            'channel' => 'manual', // طلب توصيل — يُدخَل بانتظار التأكيد ثم يُرسَل لشركة التوصيل.
+            'channel' => 'manual', // طلب توصيل — يُخصم مخزونيًا ومحاسبيًا فور التقديم، ثم يؤكّده الأدمن للتوصيل.
             'notes' => $request->validated('notes'),
         ], $items, (int) now()->year);
 
-        // «تقديم الطلب» = إدخاله في النظام بانتظار التأكيد. تأكيده (لمدير النظام/الأدمن فقط)
-        // هو ما يُرحّله محاسبيًا ويرسله لشركة التوصيل.
+        // «تقديم الطلب» = احتساب البيع فورًا: ترحيل محاسبي كامل + خصم الكميات من المخزون
+        // (حتى «الشحن»). إرسال الطلب لشركة التوصيل يبقى خطوة «تأكيد» لاحقة (للأدمن/المدير).
+        try {
+            $this->service->fulfillToShipped($order);
+        } catch (ValidationException $e) {
+            return back()->withInput()->with('error', collect($e->errors())->flatten()->first());
+        }
+
         return redirect()->route('admin.sales.orders.show', $order)
-            ->with('success', __('تم تقديم الطلب. بانتظار تأكيده لإرساله لشركة التوصيل.'));
+            ->with('success', __('تم تقديم الطلب: خُصمت الكميات من المخزون ورُحّل محاسبيًا. بانتظار تأكيده لإرساله لشركة التوصيل.'));
     }
 
     /** نموذج «مبيعات مباشرة» — بيع من المستودع بلا توصيل خارجي. */
