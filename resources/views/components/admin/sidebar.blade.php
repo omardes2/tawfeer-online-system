@@ -33,7 +33,6 @@
             ['admin.sales.orders.index', 'المبيعات', ['viewAny', $P('Sales\\Models\\Order')], 'admin.sales.orders.index'],
             ['admin.sales.orders.create', 'إنشاء اوردر', ['create', $P('Sales\\Models\\Order')], 'admin.sales.orders.create'],
             ['admin.sales.orders.direct.create', 'مبيعات مباشرة', ['create', $P('Sales\\Models\\Order')], 'admin.sales.orders.direct.*'],
-            ['admin.returns.index', 'المرتجعات والمرفوضة', 'returns.view', 'admin.returns.*'],
         ]],
         ['المنتجات', 'box', [
             ['admin.products.index', 'المنتجات', ['viewAny', $P('Catalog\\Models\\Product')], 'admin.products.*'],
@@ -58,7 +57,6 @@
             ['admin.shipping.delivery.index', 'محرّك التوصيل', 'shipping.delivery.view', 'admin.shipping.delivery.*'],
             ['admin.shipping.delivery_rates.index', 'المدن وأسعار التوصيل', 'settings.geography.view', 'admin.shipping.delivery_rates.*'],
             ['admin.shipping.areas.index', 'مناطق الشحن', 'settings.geography.view', 'admin.shipping.areas.*'],
-            ['admin.returns.index', 'المرتجعات', 'returns.view', 'admin.returns.*'],
         ]],
         ['المالية والمحاسبة', 'wallet', [
             ['admin.accounting.accounts.index', 'دليل الحسابات', 'accounting.journal.view', 'admin.accounting.accounts.*'],

@@ -109,6 +109,15 @@
                 </template>
 
                 <div class="divide-y divide-gray-100 mt-2" x-show="rows.length">
+                    {{-- ترويسة الأعمدة: اسم الصنف ثم السعر فالكمية فالإجمالي --}}
+                    <div class="flex items-center gap-3 pb-1 text-xs font-medium text-gray-400">
+                        <span class="w-11 shrink-0"></span>
+                        <div class="min-w-0 flex-1">{{ __('الصنف') }}</div>
+                        <div class="w-24">{{ __('السعر') }}</div>
+                        <div class="w-20">{{ __('الكمية') }}</div>
+                        <span class="w-24 text-start">{{ __('الإجمالي') }}</span>
+                        <span class="w-4"></span>
+                    </div>
                     <template x-for="(row, i) in rows" :key="row.variant">
                         <div class="flex items-center gap-3 py-3">
                             <span class="w-11 h-11 shrink-0 rounded-md bg-gray-100 overflow-hidden grid place-items-center">
