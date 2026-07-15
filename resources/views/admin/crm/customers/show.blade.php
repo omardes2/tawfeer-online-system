@@ -7,6 +7,7 @@
                 <span>{{ __('الهاتف') }}: <b>{{ $customer->primary_phone }}</b></span>
                 <span>{{ __('البريد') }}: {{ $customer->email ?: '—' }}</span>
                 <span>{{ __('التصنيف') }}: {{ $customer->category ?: '—' }}</span>
+                @if ($customer->glAccount)<span>{{ __('الحساب المحاسبي') }}: <b class="font-mono">{{ $customer->glAccount->code }}</b></span>@endif
                 @if ($customer->is_blocked)<span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-rose-100 text-rose-700">{{ __('محظور') }}: {{ $customer->blocked_reason }}</span>@endif
                 @can('update', $customer)
                     <a href="{{ route('admin.crm.customers.edit', $customer) }}" class="text-emerald-600 hover:underline">{{ __('تعديل') }}</a>

@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Models;
 
 use App\Models\User;
+use App\Modules\Accounting\Models\Account;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Store\Models\WishlistItem;
@@ -32,6 +33,7 @@ class Customer extends Model
         // Phase 3.4 — جاهزية تجربة/تسويق العميل (ADR-035)
         'birth_date', 'preferred_locale', 'preferred_branch_id',
         'communication_preferences', 'acquisition_source',
+        'gl_account_id',
     ];
 
     protected $casts = [
@@ -61,6 +63,12 @@ class Customer extends Model
     public function preferredBranch(): BelongsTo
     {
         return $this->belongsTo(Branch::class, 'preferred_branch_id');
+    }
+
+    /** الحساب الفرعي للعميل في دليل الحسابات (تحت «ذمم العملاء»). */
+    public function glAccount(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'gl_account_id');
     }
 
     /**

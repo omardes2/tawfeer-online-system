@@ -5,6 +5,7 @@ namespace App\Modules\Sales\Services;
 use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Accounting\Services\AccountingService;
 use App\Modules\Accounting\Services\PostingAccountResolver;
+use App\Modules\Crm\Services\CustomerService;
 use App\Modules\Sales\Models\Order;
 use Illuminate\Support\Facades\DB;
 
@@ -29,12 +30,12 @@ class SalesPostingService
             return; // مُرحّل سابقًا.
         }
 
-        $order->loadMissing('items.variant.product');
+        $order->loadMissing('items.variant.product', 'customer');
         if ($order->items->isEmpty()) {
             return;
         }
 
-        $debitCode = $this->resolver->code($order->channel === 'pos' ? 'cash' : 'receivable', null, self::DOC);
+        $debitCode = $this->debitCode($order);
         if ($debitCode === null) {
             return; // إعدادات الترحيل غير مكتملة — لا نكسر البيع؛ يُعاد الترحيل بعد الضبط.
         }
@@ -45,6 +46,27 @@ class SalesPostingService
                 'cogs_entry_id' => optional($this->postCogs($order))->id,
             ]);
         });
+    }
+
+    /**
+     * حساب الطرف المدين: الصندوق للبيع المباشر (pos)، وإلا ذمم العميل — حساب العميل
+     * الفرعي إن وُجد (يُنشأ كسولًا للعملاء القدامى)، وإلا الحساب العام «ذمم العملاء».
+     */
+    private function debitCode(Order $order): ?string
+    {
+        if ($order->channel === 'pos') {
+            return $this->resolver->code('cash', null, self::DOC);
+        }
+
+        if ($order->customer_id && ($customer = $order->customer)) {
+            $account = $customer->glAccount()->first()
+                ?: app(CustomerService::class)->ensureLedgerAccount($customer);
+            if ($account) {
+                return $account->code;
+            }
+        }
+
+        return $this->resolver->code('receivable', null, self::DOC);
     }
 
     /** قيد الإيراد: مدين (نقدي/ذمم) = الإجمالي / دائن الإيراد لكل حساب منتج [+ شحن + ضريبة]. */

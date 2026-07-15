@@ -2,6 +2,8 @@
 
 namespace App\Modules\Crm\Services;
 
+use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Services\PostingAccountResolver;
 use App\Modules\Crm\Models\Customer;
 use App\Modules\Crm\Models\CustomerAddress;
 use App\Modules\Sales\Models\Order;
@@ -26,6 +28,7 @@ class CustomerService
             $this->syncPhones($customer, $phones);
             $this->syncAddresses($customer, $addresses);
             $this->syncContacts($customer, $contacts);
+            $this->ensureLedgerAccount($customer);
 
             return $customer;
         });
@@ -39,6 +42,7 @@ class CustomerService
 
         return DB::transaction(function () use ($customer, $data, $phones, $addresses, $contacts) {
             $customer->update($data);
+            $this->ensureLedgerAccount($customer); // ينشئه إن غاب، ويزامن الاسم إن تغيّر
 
             if ($phones !== null) {
                 $customer->phones()->delete();
@@ -61,6 +65,61 @@ class CustomerService
     {
         // حذف ناعم فقط لكيان مهم (BR-CUST-13).
         $customer->delete();
+    }
+
+    /**
+     * يضمن وجود حساب فرعي للعميل تحت «ذمم العملاء» (الحساب المُعدّ للترحيل).
+     * idempotent: ينشئ الحساب مرّة واحدة ويربطه، ثم يزامن الاسم عند تغيّره.
+     */
+    public function ensureLedgerAccount(Customer $customer): ?Account
+    {
+        // الحساب الأب = حساب «ذمم العملاء» من إعدادات الترحيل (وإلا 1100 افتراضيًا).
+        $parentCode = app(PostingAccountResolver::class)->code('receivable', null, 'sales_invoice') ?? '1100';
+        $parent = Account::where('code', $parentCode)->first();
+        if (! $parent) {
+            return null; // دليل الحسابات غير مُهيّأ بعد — لا نُعطّل إنشاء العميل.
+        }
+
+        if ($customer->gl_account_id && ($account = $customer->glAccount()->first())) {
+            $name = $this->accountName($customer);
+            if ($account->name !== $name) {
+                $account->update(['name' => $name]);
+            }
+
+            return $account;
+        }
+
+        $account = Account::create([
+            'code' => $this->nextChildCode($parent),
+            'name' => $this->accountName($customer),
+            'type' => $parent->type,               // أصل (asset) مثل الأب
+            'parent_id' => $parent->id,
+            'is_postable' => true,                 // الترحيل يكون على الفرعي
+            'currency' => $parent->currency,
+            'is_active' => true,
+        ]);
+
+        $customer->forceFill(['gl_account_id' => $account->id])->save();
+
+        return $account;
+    }
+
+    private function accountName(Customer $customer): string
+    {
+        return __('ذمم العميل: :name', ['name' => $customer->name]);
+    }
+
+    /** كود فرعي فريد تحت الأب بنمط «1100-0001». */
+    private function nextChildCode(Account $parent): string
+    {
+        $seq = (int) Account::where('parent_id', $parent->id)->count() + 1;
+
+        do {
+            $code = $parent->code.'-'.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+            $seq++;
+        } while (Account::where('code', $code)->exists());
+
+        return $code;
     }
 
     /*
