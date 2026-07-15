@@ -50,5 +50,14 @@ class SalesPermissionSeeder extends Seeder
                 $role->givePermissionTo($abilities === ['*'] ? $this->permissions : $abilities);
             }
         }
+
+        // حصر أصحاب «العرض الخاص»: سحب العرض الكامل إن كان ممنوحًا سابقًا لهذه الأدوار
+        // (givePermissionTo يضيف فقط، فنسحب صراحةً حتى يُطبَّق التحديث على قاعدة بيانات قائمة).
+        foreach (['sales', 'affiliate'] as $roleName) {
+            $role = Role::where('name', $roleName)->first();
+            if ($role && $role->hasPermissionTo('sales.orders.view')) {
+                $role->revokePermissionTo('sales.orders.view');
+            }
+        }
     }
 }

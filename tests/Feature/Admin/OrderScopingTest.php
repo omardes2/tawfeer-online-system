@@ -7,6 +7,7 @@ use App\Modules\Foundation\Models\Branch;
 use App\Modules\Sales\Models\Order;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -39,6 +40,16 @@ class OrderScopingTest extends TestCase
     private function order(array $attrs = []): Order
     {
         return Order::factory()->create(array_merge(['channel' => 'manual'], $attrs));
+    }
+
+    public function test_sales_and_affiliate_have_view_own_not_full_view(): void
+    {
+        foreach (['sales', 'affiliate'] as $roleName) {
+            $role = Role::where('name', $roleName)->first();
+            $this->assertTrue($role->hasPermissionTo('sales.orders.view_own'), "$roleName يفتقد view_own");
+            $this->assertFalse($role->hasPermissionTo('sales.orders.view'), "$roleName ما زال يملك العرض الكامل");
+            $this->assertTrue($role->hasPermissionTo('sales.orders.create'), "$roleName يفتقد create");
+        }
     }
 
     public function test_sales_user_sees_only_own_orders_in_list(): void
