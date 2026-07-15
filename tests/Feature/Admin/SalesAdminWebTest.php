@@ -96,9 +96,7 @@ class SalesAdminWebTest extends TestCase
         $area = Area::create(['city_id' => $city->id, 'name' => 'المصيون', 'is_active' => true]);
         DeliveryCityRate::create(['city_id' => $city->id, 'name' => 'رام الله', 'delivery_fee' => 20, 'currency' => 'ILS', 'is_active' => true]);
 
-        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
         $variant = Product::factory()->create()->defaultVariant;
-        app(InventoryService::class)->receive($variant, $warehouse, 10, 50); // مخزون كافٍ للبيع.
 
         $response = $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'customer_name' => 'محمد',
@@ -116,19 +114,15 @@ class SalesAdminWebTest extends TestCase
         $this->assertNotNull($order);
         $response->assertRedirect(route('admin.sales.orders.show', $order));
 
-        // الحقول المُلتقطة + رسوم التوصيل.
+        // «تقديم الطلب» = إدخال طلب توصيل بانتظار التأكيد (غير مؤكّد، غير مُرحّل بعد).
+        $this->assertContains($order->status, ['draft', 'new']);
         $this->assertSame($city->id, $order->city_id);
         $this->assertSame($area->id, $order->area_id);
         $this->assertTrue($order->has_return);
         $this->assertEqualsWithDelta(20.0, (float) $order->shipping_total, 0.001);
         $this->assertEqualsWithDelta(200.0, (float) $order->subtotal, 0.001);
         $this->assertEqualsWithDelta(220.0, (float) $order->total, 0.001); // 200 + 20 توصيل
-
-        // «تقديم الطلب» = بيع كامل: خُصمت الكميات، رُحّل محاسبيًا، والمبلغ ذمّة (غير مدفوع).
-        $this->assertEqualsWithDelta(8.0, (float) InventoryStock::where('variant_id', $variant->id)
-            ->where('warehouse_id', $warehouse->id)->value('on_hand'), 0.001);
-        $this->assertNotNull($order->revenue_entry_id);
-        $this->assertNotSame('paid', $order->payment_status);
+        $this->assertNull($order->revenue_entry_id); // لا ترحيل قبل التأكيد.
     }
 
     public function test_create_order_requires_name_phone_city_area_and_item(): void
@@ -156,9 +150,7 @@ class SalesAdminWebTest extends TestCase
     public function test_admin_order_normalizes_phone_to_ten_digits(): void
     {
         Queue::fake();
-        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
         $variant = Product::factory()->create()->defaultVariant;
-        app(InventoryService::class)->receive($variant, $warehouse, 5, 50);
 
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'customer_name' => 'ليان',
@@ -463,6 +455,34 @@ class SalesAdminWebTest extends TestCase
         $order->refresh();
         $this->assertSame('confirmed', $order->status);
         $this->assertNotEmpty($order->tracking_number); // أُرسل مباشرةً لشركة التوصيل.
+    }
+
+    public function test_only_admin_and_manager_can_confirm_order(): void
+    {
+        // مزوّد غير مُفعّل: التأكيد يُرحّل ويؤكّد دون إرسال خارجي.
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $geo = $this->geo();
+        $mk = fn () => app(OrderService::class)->create([
+            'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id,
+            'customer_name' => 'س', 'customer_phone' => '0599000000',
+            'city_id' => $geo['city_id'], 'area_id' => $geo['area_id'], 'shipping_address' => $geo['shipping_address'],
+            'channel' => 'manual',
+        ], [['variant_id' => Product::factory()->create()->defaultVariant->id, 'qty' => 1, 'unit_price' => 50]], 2026);
+
+        // موظف المبيعات والمسوّق: ممنوعان من التأكيد.
+        foreach (['sales', 'affiliate'] as $role) {
+            $this->actingAs($this->withRole($role))
+                ->post(route('admin.sales.orders.confirm', $mk()))->assertForbidden();
+        }
+
+        // المدير والأدمن: مسموح، ويؤكَّد الطلب.
+        $mgrOrder = $mk();
+        $this->actingAs($this->withRole('manager'))->post(route('admin.sales.orders.confirm', $mgrOrder))->assertRedirect();
+        $this->assertSame('confirmed', $mgrOrder->fresh()->status);
+
+        $adminOrder = $mk();
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.confirm', $adminOrder))->assertRedirect();
+        $this->assertSame('confirmed', $adminOrder->fresh()->status);
     }
 
     public function test_cancel_cancels_provider_shipment_synchronously(): void

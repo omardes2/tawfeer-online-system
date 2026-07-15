@@ -18,14 +18,15 @@ class SalesPermissionSeeder extends Seeder
 
     private array $grants = [
         'manager' => ['*'],
-        // موظف المبيعات: ينشئ الطلبات ويرى/يدير طلباته هو فقط (view_own بدل view الكاملة).
+        // موظف المبيعات: ينشئ الطلبات ويرى/يدير طلباته فقط. لا يملك «تأكيد الطلب»
+        // (التأكيد الذي يُرحّل ويرسل لشركة التوصيل — لمدير النظام/الأدمن فقط).
         'sales' => [
             'sales.orders.view_own', 'sales.orders.create', 'sales.orders.update',
-            'sales.orders.confirm', 'sales.orders.reserve', 'sales.orders.cancel',
+            'sales.orders.reserve', 'sales.orders.cancel',
         ],
-        // المسوّق: ينشئ الطلبات ويرى طلباته هو فقط.
+        // المسوّق: ينشئ ويرى ويلغي طلباته هو فقط.
         'affiliate' => [
-            'sales.orders.view_own', 'sales.orders.create',
+            'sales.orders.view_own', 'sales.orders.create', 'sales.orders.cancel',
         ],
         'warehouse' => [
             'sales.orders.view', 'sales.orders.ship', 'sales.orders.deliver',
@@ -51,12 +52,17 @@ class SalesPermissionSeeder extends Seeder
             }
         }
 
-        // حصر أصحاب «العرض الخاص»: سحب العرض الكامل إن كان ممنوحًا سابقًا لهذه الأدوار
-        // (givePermissionTo يضيف فقط، فنسحب صراحةً حتى يُطبَّق التحديث على قاعدة بيانات قائمة).
+        // سحب صلاحيات ممنوحة سابقًا لهذه الأدوار (givePermissionTo يضيف فقط): العرض الكامل
+        // و«تأكيد الطلب» — فالتأكيد لمدير النظام/الأدمن فقط. يُطبَّق على قاعدة بيانات قائمة.
         foreach (['sales', 'affiliate'] as $roleName) {
             $role = Role::where('name', $roleName)->first();
-            if ($role && $role->hasPermissionTo('sales.orders.view')) {
-                $role->revokePermissionTo('sales.orders.view');
+            if (! $role) {
+                continue;
+            }
+            foreach (['sales.orders.view', 'sales.orders.confirm'] as $perm) {
+                if ($role->hasPermissionTo($perm)) {
+                    $role->revokePermissionTo($perm);
+                }
             }
         }
     }
