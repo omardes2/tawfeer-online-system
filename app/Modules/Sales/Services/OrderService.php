@@ -38,6 +38,9 @@ class OrderService
             }
         }
 
+        // يُمنع البيع بأقل من سعر الجملة لكل الأصناف ولجميع المستخدمين (كل قنوات البيع).
+        $this->assertPricesAboveWholesale($items);
+
         return DB::transaction(function () use ($data, $items, $year) {
             $order = Order::create([
                 'number' => NumberGenerator::next('orders', 'number', 'SO', $year),
@@ -80,6 +83,7 @@ class OrderService
             ])));
 
             if ($items !== null) {
+                $this->assertPricesAboveWholesale($items);
                 $order->items()->delete();
                 $this->syncItems($order, $items);
                 $this->recomputeTotals($order);
@@ -87,6 +91,43 @@ class OrderService
 
             return $order;
         });
+    }
+
+    /**
+     * يمنع البيع بأقل من سعر الجملة: صافي سعر الوحدة (بعد الخصم) يجب ألّا يقلّ عن
+     * wholesale_price للمتغيّر عندما يكون محدَّدًا (> 0). يُطبَّق على كل قنوات البيع ولكل المستخدمين.
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     */
+    private function assertPricesAboveWholesale(array $items): void
+    {
+        $variantIds = collect($items)->pluck('variant_id')->filter()->unique()->all();
+        if (empty($variantIds)) {
+            return;
+        }
+
+        $variants = ProductVariant::with('product:id,name')->whereIn('id', $variantIds)->get()->keyBy('id');
+
+        foreach ($items as $item) {
+            $variant = $variants->get($item['variant_id'] ?? null);
+            if (! $variant) {
+                continue;
+            }
+            $wholesale = (float) ($variant->wholesale_price ?? 0);
+            if ($wholesale <= 0) {
+                continue; // لا سعر جملة محدَّد ⇒ لا قيد.
+            }
+            $qty = max((float) ($item['qty'] ?? 1), 0.0001);
+            $netUnit = (float) ($item['unit_price'] ?? 0) - ((float) ($item['discount'] ?? 0) / $qty);
+            if ($netUnit + 0.001 < $wholesale) {
+                throw ValidationException::withMessages([
+                    'items' => __('لا يمكن بيع «:name» بأقل من سعر الجملة (:price).', [
+                        'name' => $variant->product?->name ?? $variant->sku ?? __('صنف'),
+                        'price' => number_format($wholesale, 2),
+                    ]),
+                ]);
+            }
+        }
     }
 
     public function delete(Order $order): void
