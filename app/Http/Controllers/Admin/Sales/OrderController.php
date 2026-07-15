@@ -19,6 +19,7 @@ use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderPaymentService;
 use App\Modules\Sales\Services\OrderService;
+use App\Modules\Sales\Services\OrderVoidService;
 use App\Modules\Shipping\Services\OrderDeliveryDispatcher;
 use App\Modules\Shipping\Support\DeliveryStatus;
 use App\Modules\Shipping\Support\OpostStatus;
@@ -405,6 +406,24 @@ class OrderController extends Controller
         $order->delete(); // حذف ناعم (soft delete).
 
         return redirect()->route('admin.sales.orders.index')->with('success', __('تم حذف الطلب.'));
+    }
+
+    /**
+     * حذف إداري نهائي لأي طلب (أيًّا كانت حالته/نوعه) مع عكس كامل لأثره المحاسبي والمخزوني.
+     * متاح لحساب الأدمن فقط (سياسة forceDelete).
+     */
+    public function forceDestroy(Order $order, OrderVoidService $void): RedirectResponse
+    {
+        $this->authorize('forceDelete', $order);
+
+        try {
+            $void->void($order, request()->user());
+        } catch (\Throwable $e) {
+            return back()->with('error', __('تعذّر حذف الطلب: :m', ['m' => $e->getMessage()]));
+        }
+
+        return redirect()->route('admin.sales.orders.index')
+            ->with('success', __('تم حذف الطلب نهائيًا وعُكس أثره المحاسبي والمخزوني.'));
     }
 
     /**

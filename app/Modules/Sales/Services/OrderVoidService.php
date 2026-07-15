@@ -1,0 +1,117 @@
+<?php
+
+namespace App\Modules\Sales\Services;
+
+use App\Models\User;
+use App\Modules\Accounting\Models\FinancialVoucher;
+use App\Modules\Accounting\Models\JournalEntry;
+use App\Modules\Accounting\Services\AccountingService;
+use App\Modules\Accounting\Services\VoucherService;
+use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Commissions\Services\CommissionService;
+use App\Modules\Inventory\Models\StockReservation;
+use App\Modules\Inventory\Services\InventoryService;
+use App\Modules\Inventory\Services\ReservationService;
+use App\Modules\Sales\Models\Order;
+use App\Modules\Shipping\Services\OrderDeliveryDispatcher;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * حذف إداري لطلب بيع مع عكس كامل لأثره المحاسبي والمخزوني (أيًّا كانت حالته/نوعه):
+ *   1) إلغاء الشحنة لدى شركة التوصيل (إن أُرسلت).
+ *   2) عكس سندات القبض المرتبطة (تُعيد النقد وتلغي أثر التحصيل).
+ *   3) عكس قيدَي الإيراد والتكلفة (عكس محاسبي متوازن، لا مسّ بالتاريخ).
+ *   4) إعادة الكميات المُصرَّفة إلى المخزون وتحرير الحجوزات النشطة.
+ *   5) عكس/إلغاء عمولات الطلب.
+ *   6) حذف الطلب (حذف ناعم) بعد تصفير أثره.
+ *
+ * كل الخطوات محروسة (idempotent) فتعمل بأمان مهما كانت مرحلة الطلب.
+ */
+class OrderVoidService
+{
+    public function __construct(
+        private readonly AccountingService $accounting,
+        private readonly InventoryService $inventory,
+        private readonly ReservationService $reservations,
+        private readonly VoucherService $vouchers,
+        private readonly CommissionService $commissions,
+        private readonly OrderDeliveryDispatcher $dispatcher,
+    ) {}
+
+    public function void(Order $order, ?User $actor = null): void
+    {
+        // 1) إلغاء الشحنة لدى المزوّد — خارج المعاملة (اتصال شبكي)، أفضل جهد.
+        if (! empty($order->tracking_number) || ! empty($order->delivery_external_id)) {
+            try {
+                $this->dispatcher->cancelShipment($order);
+            } catch (\Throwable) {
+                // فشل الإلغاء لدى المزوّد لا يمنع الحذف المحاسبي.
+            }
+        }
+
+        DB::transaction(function () use ($order, $actor) {
+            $order->loadMissing('items');
+
+            // 2) عكس سندات القبض المُرحّلة المرتبطة بالطلب (المرجع = رقم الطلب).
+            FinancialVoucher::where('kind', 'receipt')
+                ->where('reference', $order->number)
+                ->where('status', 'posted')
+                ->get()
+                ->each(fn (FinancialVoucher $v) => $this->vouchers->reverse($v, __('حذف الطلب :n', ['n' => $order->number])));
+
+            // 3) عكس قيدَي الإيراد والتكلفة (إن كانا مُرحّلين وغير معكوسين).
+            foreach ([$order->revenue_entry_id, $order->cogs_entry_id] as $entryId) {
+                if ($entryId === null) {
+                    continue;
+                }
+                $entry = JournalEntry::find($entryId);
+                if ($entry && $entry->isPosted() && ! $entry->isReversed()) {
+                    $this->accounting->reverse($entry, ['description' => __('عكس مبيعة محذوفة :n', ['n' => $order->number])]);
+                }
+            }
+            $order->update(['revenue_entry_id' => null, 'cogs_entry_id' => null]);
+
+            // 4) إعادة الكميات المُصرَّفة للمخزون + تحرير الحجوزات النشطة.
+            $warehouse = $order->warehouse;
+            if ($warehouse) {
+                foreach ($order->items as $item) {
+                    $shipped = (float) $item->qty_shipped;
+                    if ($shipped <= 0) {
+                        continue;
+                    }
+                    $variant = ProductVariant::find($item->variant_id);
+                    if (! $variant) {
+                        continue;
+                    }
+                    $unitCost = $item->wholesale_cost_snapshot !== null
+                        ? (float) $item->wholesale_cost_snapshot
+                        : ($variant->average_cost !== null ? (float) $variant->average_cost : null);
+
+                    $this->inventory->returnToStock($variant, $warehouse, $shipped, $unitCost, [
+                        'reference_type' => Order::class,
+                        'reference_id' => $order->id,
+                        'reason' => 'void:'.$order->number,
+                    ]);
+                    $item->update(['qty_shipped' => 0]);
+                }
+            }
+
+            StockReservation::where('order_id', $order->id)->where('status', 'active')->get()
+                ->each(fn (StockReservation $r) => $this->reservations->release($r));
+
+            // 5) عكس/إلغاء العمولات (المستحقّة تُعكس، وغير المستحقّة تُلغى).
+            $this->commissions->reverseForOrder($order, $actor);
+            $this->commissions->cancelForOrder($order, $actor);
+
+            // 6) تصفير حالة الطلب ثم حذفه (حذف ناعم).
+            $order->update([
+                'status' => 'cancelled',
+                'payment_status' => 'unpaid',
+                'amount_paid' => 0,
+                'cancel_reason' => __('حذف إداري (عكس الأثر المحاسبي)'),
+                'cancelled_at' => now(),
+            ]);
+            $order->delete();
+        });
+    }
+}

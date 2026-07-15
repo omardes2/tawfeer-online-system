@@ -244,6 +244,16 @@
                                     </form>
                                 @endcan
                             @endif
+                            {{-- حذف إداري نهائي لأي طلب مع عكس الأثر المحاسبي — للأدمن فقط --}}
+                            @can('forceDelete', $o)
+                                @unless ($o->trashed())
+                                    <form method="POST" action="{{ route('admin.sales.orders.force_destroy', $o) }}"
+                                          onsubmit="return confirm('{{ __('حذف نهائي للطلب مع عكس كل أثره المحاسبي والمخزوني (القيود + المخزون + الدفعات + العمولات)؟ لا يمكن التراجع.') }}')">
+                                        @csrf @method('DELETE')
+                                        <button type="submit" class="text-rose-700 hover:underline text-sm font-medium">{{ __('حذف نهائي') }}</button>
+                                    </form>
+                                @endunless
+                            @endcan
                         </div>
                     </td>
                 </tr>

@@ -49,6 +49,12 @@ class OrderPolicy
         return $user->can('sales.orders.delete');
     }
 
+    /** حذف إداري نهائي (مع عكس الأثر المحاسبي) لأي طلب — لحساب الأدمن فقط. */
+    public function forceDelete(User $user, Order $m): bool
+    {
+        return $user->hasRole('admin');
+    }
+
     public function confirm(User $user, Order $m): bool
     {
         return $user->can('sales.orders.confirm');
