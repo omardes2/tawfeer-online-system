@@ -3,6 +3,8 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\User;
+use App\Modules\Accounting\Models\FinancialVoucher;
+use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Crm\Models\Customer;
 use App\Modules\Foundation\Models\Area;
@@ -335,13 +337,44 @@ class SalesAdminWebTest extends TestCase
         $order = Order::where('channel', 'pos')->latest('id')->firstOrFail();
         $this->assertNotSame('paid', $order->payment_status);
 
-        $this->actingAs($this->admin())->post(route('admin.sales.orders.settle', $order))
-            ->assertRedirect()->assertSessionHas('success');
+        $treasury = Treasury::where('code', 'CB-MAIN')->firstOrFail();
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.settle', $order), [
+            'amount' => (float) $order->total,
+            'treasury_id' => $treasury->id,
+        ])->assertRedirect()->assertSessionHas('success');
 
         $order->refresh();
         $this->assertSame('paid', $order->payment_status);
         $this->assertEqualsWithDelta((float) $order->total, (float) $order->amount_paid, 0.01);
-        $this->assertSame(1, $order->payments()->where('status', 'paid')->count());
+        // سند قبض مُرحّل على الخزينة مرتبط بالطلب.
+        $this->assertSame(1, FinancialVoucher::where('kind', 'receipt')
+            ->where('reference', $order->number)->where('status', 'posted')->count());
+    }
+
+    public function test_settle_partial_then_full_marks_paid(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 10, 5);
+
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.direct.store'), [
+            'customer_name' => 'زبون جزئي', 'items' => [['variant' => $variant->uuid, 'qty' => 2, 'unit_price' => 30]],
+        ])->assertRedirect();
+
+        $order = Order::where('channel', 'pos')->latest('id')->firstOrFail();
+        $treasury = Treasury::where('code', 'CB-MAIN')->firstOrFail();
+
+        // دفعة جزئية (نصف المبلغ) → partially_paid
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.settle', $order), [
+            'amount' => 30, 'treasury_id' => $treasury->id,
+        ])->assertRedirect()->assertSessionHas('success');
+        $this->assertSame('partially_paid', $order->fresh()->payment_status);
+
+        // بقية المبلغ → paid
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.settle', $order), [
+            'amount' => 30, 'treasury_id' => $treasury->id,
+        ])->assertRedirect()->assertSessionHas('success');
+        $this->assertSame('paid', $order->fresh()->payment_status);
     }
 
     public function test_settle_rejected_for_normal_sale(): void

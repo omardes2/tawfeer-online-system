@@ -57,6 +57,16 @@ class SalesPostingService
      */
     private function debitCode(Order $order): ?string
     {
+        return $this->receivableAccountCode($order);
+    }
+
+    /**
+     * رمز حساب المديونية الذي يُقيَّد عليه الطلب (نفسه يُستخدم عند التحصيل لإقفاله):
+     * طلبات التوصيل → ذمم شركة التوصيل (1050)؛ المبيعات المباشرة → حساب العميل الفرعي
+     * تحت «ذمم العملاء 1100» (أو الحساب العام 1100 لعميل غير مسجّل).
+     */
+    public function receivableAccountCode(Order $order): ?string
+    {
         if ($order->channel !== 'pos') {
             return $this->resolver->code('cod_receivable', null, self::DOC)
                 ?? config('accounting.sales.cod_receivable', '1050');

@@ -173,14 +173,16 @@
                                 @endcan
                             @endif
                             <a href="{{ route('admin.sales.orders.show', $o) }}" class="text-emerald-600 hover:underline text-sm">{{ __('عرض') }}</a>
-                            {{-- مبيعات مباشرة غير مسدَّدة: زر «دفع» لتسديد المبلغ نقدًا --}}
+                            {{-- مبيعات مباشرة غير مسدَّدة: زر «دفع» يفتح نافذة تحصيل (مبلغ + خزينة) --}}
                             @if ($o->channel === 'pos' && $o->payment_status !== 'paid' && $o->status !== 'cancelled')
                                 @can('update', $o)
-                                    <form method="POST" action="{{ route('admin.sales.orders.settle', $o) }}"
-                                          onsubmit="return confirm('{{ __('تأكيد تسديد مبلغ الطلب نقدًا؟') }}')">
-                                        @csrf
-                                        <button type="submit" class="btn-primary btn-sm">{{ __('دفع') }}</button>
-                                    </form>
+                                    @php($outstanding = round((float) $o->total - (float) $o->amount_paid, 2))
+                                    <button type="button" x-data
+                                            data-action="{{ route('admin.sales.orders.settle', $o) }}"
+                                            data-number="{{ $o->number }}"
+                                            data-outstanding="{{ $outstanding }}"
+                                            @click="$dispatch('open-pay', { number: $el.dataset.number, outstanding: Number($el.dataset.outstanding), action: $el.dataset.action })"
+                                            class="btn-primary btn-sm">{{ __('دفع') }}</button>
                                 @endcan
                             @endif
                             {{-- إلغاء طلب ما زال «بانتظار الاستلام» لدى أوبتيموس — يُلغي الشحنة من الشركة أيضًا --}}
@@ -218,4 +220,52 @@
     </x-admin.table>
 
     <div class="mt-4">{{ $orders->links() }}</div>
+
+    {{-- نافذة تحصيل دفعة (كامل/جزئي) إلى خزينة نقدية أو حساب بنكي --}}
+    <div x-data="{ show: false, number: '', outstanding: 0, action: '' }"
+         x-on:open-pay.window="show = true; number = $event.detail.number; outstanding = $event.detail.outstanding; action = $event.detail.action; $nextTick(() => $refs.amount && ($refs.amount.value = $event.detail.outstanding))"
+         x-show="show" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+         style="display:none" @click.self="show = false" @keydown.escape.window="show = false">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-gray-800">{{ __('تحصيل دفعة') }} <span class="text-sm text-gray-400 font-mono" x-text="number"></span></h3>
+                <button type="button" @click="show = false" class="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+            <form :action="action" method="POST" class="space-y-4">
+                @csrf
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">
+                        {{ __('المبلغ') }}
+                        <span class="text-gray-400 text-xs">({{ __('المتبقّي') }}: <span x-text="Number(outstanding).toFixed(2)"></span>)</span>
+                    </label>
+                    <input type="number" name="amount" x-ref="amount" step="0.01" min="0.01" :max="outstanding" required
+                           class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+                    <button type="button" @click="$refs.amount.value = outstanding" class="mt-1 text-xs text-emerald-600 hover:underline">{{ __('المبلغ كامل') }}</button>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">{{ __('إيداع في') }}</label>
+                    <select name="treasury_id" required class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <option value="">{{ __('— اختر الخزينة/الحساب —') }}</option>
+                        @php($cashBoxes = $treasuries->where('type', 'cash'))
+                        @php($bankAccounts = $treasuries->where('type', 'bank'))
+                        @if ($cashBoxes->isNotEmpty())
+                            <optgroup label="{{ __('الخزائن النقدية') }}">
+                                @foreach ($cashBoxes as $t)<option value="{{ $t->id }}">{{ $t->name }}</option>@endforeach
+                            </optgroup>
+                        @endif
+                        @if ($bankAccounts->isNotEmpty())
+                            <optgroup label="{{ __('الحسابات البنكية') }}">
+                                @foreach ($bankAccounts as $t)<option value="{{ $t->id }}">{{ $t->name }}</option>@endforeach
+                            </optgroup>
+                        @endif
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" @click="show = false" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg">{{ __('إلغاء') }}</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700">{{ __('تحصيل') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </x-app-layout>
