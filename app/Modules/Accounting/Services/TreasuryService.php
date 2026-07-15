@@ -34,7 +34,7 @@ class TreasuryService
                 'name_en' => $data['name_en'] ?? null,
                 'type' => $data['type'] ?? 'cash',
                 'gl_account_id' => $account->id,
-                'currency' => $data['currency'] ?? 'SAR',
+                'currency' => $data['currency'] ?? 'ILS',
                 'opening_balance' => round((float) ($data['opening_balance'] ?? 0), 2),
                 'is_active' => $data['is_active'] ?? true,
                 'is_default' => $data['is_default'] ?? false,
@@ -148,7 +148,7 @@ class TreasuryService
             'type' => 'asset',
             'parent_id' => $parent?->id,
             'is_postable' => true,
-            'currency' => $data['currency'] ?? 'SAR',
+            'currency' => $data['currency'] ?? 'ILS',
             'is_active' => true,
         ]);
     }

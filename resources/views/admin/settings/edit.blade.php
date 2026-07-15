@@ -90,7 +90,7 @@
                                 @foreach ($timezones as $tz)<option value="{{ $tz }}" @selected(old('system_timezone', $values['system_timezone'] ?: config('app.timezone')) === $tz)>{{ $tz }}</option>@endforeach
                             </select>
                         </x-admin.field>
-                        <x-admin.field :label="__('settings.currency')" name="system_currency"><input type="text" name="system_currency" value="{{ old('system_currency', $values['system_currency'] ?: 'SAR') }}" maxlength="3" class="w-full rounded-md border-gray-300 uppercase" /></x-admin.field>
+                        <x-admin.field :label="__('settings.currency')" name="system_currency"><input type="text" name="system_currency" value="{{ old('system_currency', $values['system_currency'] ?: 'ILS') }}" maxlength="3" class="w-full rounded-md border-gray-300 uppercase" /></x-admin.field>
                         <x-admin.field :label="__('settings.language')" name="system_locale">
                             <select name="system_locale" class="w-full rounded-md border-gray-300">
                                 <option value="ar" @selected(old('system_locale', $values['system_locale'] ?: 'ar') === 'ar')>{{ __('عربي') }}</option>

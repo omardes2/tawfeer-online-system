@@ -51,7 +51,7 @@ class PaymentService
             $provider = $this->providers->for($method);
             $result = $provider->charge(new PaymentChargeRequest(
                 amountMinor: (int) round($amount * 100),
-                currency: $opts['currency'] ?? 'SAR',
+                currency: $opts['currency'] ?? 'ILS',
                 orderNumber: $order->number,
                 methodCode: $method->code,
             ));
