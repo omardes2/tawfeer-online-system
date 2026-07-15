@@ -149,7 +149,10 @@ class SupplierController extends Controller
     {
         $this->authorize('create', Supplier::class);
 
-        return view('admin.purchasing.suppliers.form', ['supplier' => new Supplier]);
+        return view('admin.purchasing.suppliers.form', [
+            'supplier' => new Supplier,
+            'suggestedCode' => $this->service->nextCode(),
+        ]);
     }
 
     public function store(StoreSupplierRequest $request): RedirectResponse

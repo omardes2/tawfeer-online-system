@@ -15,6 +15,10 @@ class SupplierService
     public function create(array $data, array $contacts = []): Supplier
     {
         return DB::transaction(function () use ($data, $contacts) {
+            // رمز تسلسلي تلقائي يبدأ من 1000 عند عدم تمريره (نموذج الإضافة لا يرسله).
+            if (empty($data['code'])) {
+                $data['code'] = $this->nextCode();
+            }
             $supplier = Supplier::create($data);
             $this->syncContacts($supplier, $contacts);
             $this->ensureLedgerAccount($supplier);
@@ -24,6 +28,22 @@ class SupplierService
 
             return $supplier;
         });
+    }
+
+    /** الرمز التسلسلي التالي للمورد: أكبر رمز رقمي + 1، بدءًا من 1000. */
+    public function nextCode(): string
+    {
+        $max = Supplier::query()->pluck('code')
+            ->filter(fn ($c) => ctype_digit((string) $c))
+            ->map(fn ($c) => (int) $c)
+            ->max();
+
+        $next = max(1000, ($max ?? 999) + 1);
+        while (Supplier::where('code', (string) $next)->exists()) {
+            $next++;
+        }
+
+        return (string) $next;
     }
 
     public function update(Supplier $supplier, array $data, ?array $contacts = null): Supplier

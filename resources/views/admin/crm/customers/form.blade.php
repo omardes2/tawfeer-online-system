@@ -19,14 +19,8 @@
                     <x-admin.field :label="__('الهاتف الأساسي')" name="primary_phone">
                         <input type="text" name="primary_phone" value="{{ old('primary_phone', $customer->primary_phone) }}" required class="w-full rounded-md border-gray-300 text-sm" />
                     </x-admin.field>
-                    <x-admin.field :label="__('البريد')" name="email">
-                        <input type="email" name="email" value="{{ old('email', $customer->email) }}" class="w-full rounded-md border-gray-300 text-sm" />
-                    </x-admin.field>
                     <x-admin.field :label="__('التصنيف')" name="category">
                         <input type="text" name="category" value="{{ old('category', $customer->category) }}" placeholder="{{ __('تجزئة/جملة/VIP') }}" class="w-full rounded-md border-gray-300 text-sm" />
-                    </x-admin.field>
-                    <x-admin.field :label="__('حدّ الائتمان')" name="credit_limit">
-                        <input type="number" step="0.01" min="0" name="credit_limit" value="{{ old('credit_limit', $customer->credit_limit) }}" class="w-full rounded-md border-gray-300 text-sm" />
                     </x-admin.field>
                 </div>
 

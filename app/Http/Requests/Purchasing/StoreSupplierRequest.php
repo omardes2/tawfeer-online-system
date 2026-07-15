@@ -15,7 +15,8 @@ class StoreSupplierRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:180'],
-            'code' => ['required', 'string', 'max:50', 'unique:suppliers,code'],
+            // الرمز يُولّد تلقائيًا (تسلسلي من 1000) في الخدمة — اختياري في الطلب.
+            'code' => ['nullable', 'string', 'max:50'],
             'legal_name' => ['nullable', 'string', 'max:200'],
             'tax_number' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:180'],

@@ -31,13 +31,22 @@
                     </div>
                     <template x-for="(row, i) in rows" :key="i">
                         <div class="flex flex-wrap gap-2 mb-2 items-end">
-                            <select :name="`items[${i}][variant]`" x-model="row.variant" required class="rounded-md border-gray-300 text-sm">
-                                <option value="">—</option>
-                                @foreach ($variants as $p)<option value="{{ $p->defaultVariant->uuid }}">{{ $p->name }} ({{ $p->sku }})</option>@endforeach
-                            </select>
-                            <input type="number" step="0.001" min="0.001" :name="`items[${i}][qty]`" x-model="row.qty" placeholder="{{ __('الكمية') }}" required class="rounded-md border-gray-300 text-sm w-28" />
-                            <input type="number" step="0.0001" min="0" :name="`items[${i}][unit_cost]`" x-model="row.cost" placeholder="{{ __('تكلفة') }}" class="rounded-md border-gray-300 text-sm w-28" />
-                            <button type="button" @click="rows.splice(i, 1)" x-show="rows.length > 1" class="text-rose-500 text-sm">&times;</button>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-0.5">{{ __('الصنف') }}</label>
+                                <select :name="`items[${i}][variant]`" x-model="row.variant" required class="rounded-md border-gray-300 text-sm">
+                                    <option value="">—</option>
+                                    @foreach ($variants as $p)<option value="{{ $p->defaultVariant->uuid }}">{{ $p->name }} ({{ $p->sku }})</option>@endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-0.5">{{ __('الكمية') }}</label>
+                                <input type="number" step="0.001" min="0.001" :name="`items[${i}][qty]`" x-model="row.qty" placeholder="{{ __('الكمية') }}" required class="rounded-md border-gray-300 text-sm w-28" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-0.5">{{ __('التكلفة') }}</label>
+                                <input type="number" step="0.0001" min="0" :name="`items[${i}][unit_cost]`" x-model="row.cost" placeholder="{{ __('التكلفة') }}" class="rounded-md border-gray-300 text-sm w-28" />
+                            </div>
+                            <button type="button" @click="rows.splice(i, 1)" x-show="rows.length > 1" class="text-rose-500 text-sm pb-1.5">&times;</button>
                         </div>
                     </template>
                 </div>

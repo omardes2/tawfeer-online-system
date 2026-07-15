@@ -15,28 +15,18 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <x-admin.field :label="__('الرمز')" name="code">
-                        <input type="text" name="code" value="{{ old('code', $supplier->code) }}" required class="w-full rounded-md border-gray-300 text-sm" />
+                        {{-- رمز تسلسلي تلقائي يبدأ من 1000 — للعرض فقط (يُولّد عند الحفظ). --}}
+                        <input type="text" value="{{ old('code', $supplier->code ?: ($suggestedCode ?? '')) }}" readonly
+                               class="w-full rounded-md border-gray-200 bg-gray-50 text-gray-500 text-sm" />
+                        @unless ($supplier->exists)
+                            <p class="mt-1 text-xs text-gray-400">{{ __('يُنشأ تلقائيًا بالتسلسل عند الحفظ.') }}</p>
+                        @endunless
                     </x-admin.field>
                     <x-admin.field :label="__('الاسم')" name="name">
                         <input type="text" name="name" value="{{ old('name', $supplier->name) }}" required class="w-full rounded-md border-gray-300 text-sm" />
                     </x-admin.field>
-                    <x-admin.field :label="__('الاسم القانوني')" name="legal_name">
-                        <input type="text" name="legal_name" value="{{ old('legal_name', $supplier->legal_name) }}" class="w-full rounded-md border-gray-300 text-sm" />
-                    </x-admin.field>
-                    <x-admin.field :label="__('الرقم الضريبي')" name="tax_number">
-                        <input type="text" name="tax_number" value="{{ old('tax_number', $supplier->tax_number) }}" class="w-full rounded-md border-gray-300 text-sm" />
-                    </x-admin.field>
-                    <x-admin.field :label="__('البريد')" name="email">
-                        <input type="email" name="email" value="{{ old('email', $supplier->email) }}" class="w-full rounded-md border-gray-300 text-sm" />
-                    </x-admin.field>
                     <x-admin.field :label="__('الهاتف')" name="phone">
                         <input type="text" name="phone" value="{{ old('phone', $supplier->phone) }}" class="w-full rounded-md border-gray-300 text-sm" />
-                    </x-admin.field>
-                    <x-admin.field :label="__('مهلة السداد (أيام)')" name="payment_terms_days">
-                        <input type="number" min="0" name="payment_terms_days" value="{{ old('payment_terms_days', $supplier->payment_terms_days) }}" class="w-full rounded-md border-gray-300 text-sm" />
-                    </x-admin.field>
-                    <x-admin.field :label="__('حدّ الائتمان')" name="credit_limit">
-                        <input type="number" step="0.01" min="0" name="credit_limit" value="{{ old('credit_limit', $supplier->credit_limit) }}" class="w-full rounded-md border-gray-300 text-sm" />
                     </x-admin.field>
                 </div>
 
