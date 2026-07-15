@@ -24,7 +24,7 @@
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm text-right">
                     <thead class="text-gray-500 border-b"><tr>
-                        <th class="py-2 px-3 font-medium">SKU</th>
+                        <th class="py-2 px-3 font-medium">{{ __('الصنف') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('الكمية') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('السعر') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('الخصم') }}</th>
@@ -35,7 +35,12 @@
                     <tbody class="divide-y">
                         @foreach ($order->items as $item)
                             <tr>
-                                <td class="py-2 px-3 text-gray-500">{{ $item->variant?->sku }}</td>
+                                <td class="py-2 px-3 text-gray-800">
+                                    {{ $item->variant?->product?->name ?? $item->variant?->name ?? $item->variant?->sku ?? __('صنف محذوف') }}
+                                    @if ($item->variant?->sku)
+                                        <span class="block text-xs text-gray-400 font-mono">{{ $item->variant->sku }}</span>
+                                    @endif
+                                </td>
                                 <td class="py-2 px-3">{{ rtrim(rtrim($item->qty, '0'), '.') }}</td>
                                 <td class="py-2 px-3">{{ $item->unit_price }}</td>
                                 <td class="py-2 px-3">{{ $item->discount }}</td>

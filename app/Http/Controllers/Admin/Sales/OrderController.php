@@ -243,7 +243,7 @@ class OrderController extends Controller
         $this->authorize('view', $order);
 
         return view('admin.sales.orders.show', [
-            'order' => $order->load(['warehouse', 'city', 'area', 'items.variant', 'statusHistory.changedBy']),
+            'order' => $order->load(['warehouse', 'city', 'area', 'items.variant.product', 'statusHistory.changedBy']),
         ]);
     }
 
