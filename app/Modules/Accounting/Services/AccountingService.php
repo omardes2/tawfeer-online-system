@@ -6,6 +6,7 @@ use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Models\AccountingPeriod;
 use App\Modules\Accounting\Models\FiscalYear;
 use App\Modules\Accounting\Models\JournalEntry;
+use App\Modules\Accounting\Models\JournalLine;
 use App\Support\NumberGenerator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -143,17 +144,34 @@ class AccountingService
     /** رصيد حساب مشتقّ من الدفتر (POSTED فقط) — بطبيعته الطبيعية (المتطلّب 4). */
     public function accountBalance(Account $account, array $filters = []): float
     {
-        $query = $account->lines()->whereHas('entry', function ($q) use ($filters) {
-            $q->where('status', 'posted');
-            if (! empty($filters['fiscal_year_id'])) {
-                $q->where('fiscal_year_id', $filters['fiscal_year_id']);
-            }
-        });
+        // رصيد الحساب يشمل حساباته الفرعية (حساب مراقبة): مثلًا «ذمم الموردين» =
+        // مجموع أرصدة حسابات الموردين الفرعية. الحساب الطرفي لا فروع له فلا فرق.
+        $accountIds = $this->accountWithDescendantIds($account);
+
+        $query = JournalLine::query()->whereIn('account_id', $accountIds)
+            ->whereHas('entry', function ($q) use ($filters) {
+                $q->where('status', 'posted');
+                if (! empty($filters['fiscal_year_id'])) {
+                    $q->where('fiscal_year_id', $filters['fiscal_year_id']);
+                }
+            });
 
         $debit = (float) (clone $query)->sum('debit');
         $credit = (float) (clone $query)->sum('credit');
 
         return $account->isDebitNormal() ? $debit - $credit : $credit - $debit;
+    }
+
+    /** معرّف الحساب مع كل فروعه (تفكيك تكراري) — لتجميع رصيد حساب المراقبة. */
+    private function accountWithDescendantIds(Account $account): array
+    {
+        $ids = [$account->id];
+
+        foreach (Account::where('parent_id', $account->id)->get(['id', 'parent_id']) as $child) {
+            $ids = array_merge($ids, $this->accountWithDescendantIds($child));
+        }
+
+        return $ids;
     }
 
     /** ميزان المراجعة: لكل حساب قابل للترحيل مدينه ودائنه — مجموع المدين = مجموع الدائن. */

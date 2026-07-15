@@ -25,7 +25,25 @@ class PurchaseInvoiceService
         private readonly AccountingService $accounting,
         private readonly VoucherService $vouchers,
         private readonly InventoryService $inventory,
+        private readonly SupplierService $suppliers,
     ) {}
+
+    /**
+     * حساب ذمم المورد المستخدَم في الترحيل: الحساب الفرعي للمورد إن وُجد،
+     * وإلا الحساب العام «ذمم الموردين» (توافق رجعي). ينشئ الفرعي كسولًا إن غاب.
+     */
+    private function payableAccountCode(PurchaseInvoice $invoice): string
+    {
+        $supplier = $invoice->supplier;
+        if ($supplier) {
+            $account = $supplier->glAccount()->first() ?: $this->suppliers->ensureLedgerAccount($supplier);
+            if ($account) {
+                return $account->code;
+            }
+        }
+
+        return config('accounting.purchasing.payable_account');
+    }
 
     /**
      * إنشاء فاتورة (مسودّة) ببنودها. يحسب الإجماليات من البنود.
@@ -117,7 +135,7 @@ class PurchaseInvoiceService
             if ((float) $invoice->tax_amount > 0) {
                 $lines[] = ['account_code' => $cfg['tax_account'], 'debit' => (float) $invoice->tax_amount, 'credit' => 0];
             }
-            $lines[] = ['account_code' => $cfg['payable_account'], 'debit' => 0, 'credit' => (float) $invoice->total];
+            $lines[] = ['account_code' => $this->payableAccountCode($invoice), 'debit' => 0, 'credit' => (float) $invoice->total];
 
             $entry = $this->accounting->postEntry([
                 'entry_date' => $invoice->invoice_date->toDateString(),
@@ -174,7 +192,8 @@ class PurchaseInvoiceService
             throw ValidationException::withMessages(['amount' => __('المبلغ يجب أن يكون بين 0 والمتبقّي (:due).', ['due' => number_format($due, 2)])]);
         }
 
-        $payable = Account::where('code', config('accounting.purchasing.payable_account'))->firstOrFail();
+        // نُخصم من حساب المورد الفرعي نفسه المستخدَم في الترحيل (يبقى رصيده صحيحًا).
+        $payable = Account::where('code', $this->payableAccountCode($invoice))->firstOrFail();
 
         return DB::transaction(function () use ($invoice, $treasuryId, $amount, $date, $payable) {
             $voucher = $this->vouchers->create('payment', [

@@ -36,6 +36,7 @@
                         <div class="text-sm text-gray-500 mt-0.5 space-y-0.5">
                             <div>{{ __('الرمز') }}: <span class="text-gray-700">{{ $supplier->code }}</span></div>
                             @if ($supplier->tax_number)<div>{{ __('الرقم الضريبي') }}: <span class="text-gray-700">{{ $supplier->tax_number }}</span></div>@endif
+                            @if ($supplier->glAccount)<div>{{ __('الحساب المحاسبي') }}: <span class="text-gray-700 font-mono">{{ $supplier->glAccount->code }}</span> <span class="text-gray-400">— {{ $supplier->glAccount->name }}</span></div>@endif
                         </div>
                     </div>
                 </div>

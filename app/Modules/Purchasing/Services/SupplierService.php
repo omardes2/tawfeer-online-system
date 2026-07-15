@@ -2,11 +2,13 @@
 
 namespace App\Modules\Purchasing\Services;
 
+use App\Modules\Accounting\Models\Account;
 use App\Modules\Purchasing\Models\Supplier;
 use Illuminate\Support\Facades\DB;
 
 /**
- * منطق أعمال الموردين: جهة اتصال أساسية واحدة كحدّ أقصى (§10).
+ * منطق أعمال الموردين: جهة اتصال أساسية واحدة كحدّ أقصى (§10)، وحساب فرعي محاسبي
+ * لكل مورد تحت «ذمم الموردين» — تُرحَّل عليه قيود فواتير/مدفوعات المورد.
  */
 class SupplierService
 {
@@ -15,6 +17,7 @@ class SupplierService
         return DB::transaction(function () use ($data, $contacts) {
             $supplier = Supplier::create($data);
             $this->syncContacts($supplier, $contacts);
+            $this->ensureLedgerAccount($supplier);
 
             // مزامنة القيم الافتراضية من قاعدة البيانات (مثل is_active) للاستجابة.
             $supplier->refresh();
@@ -27,6 +30,7 @@ class SupplierService
     {
         return DB::transaction(function () use ($supplier, $data, $contacts) {
             $supplier->update($data);
+            $this->ensureLedgerAccount($supplier); // ينشئه إن غاب، ويزامن الاسم إن تغيّر
 
             if ($contacts !== null) {
                 $supplier->contacts()->delete();
@@ -40,6 +44,60 @@ class SupplierService
     public function delete(Supplier $supplier): void
     {
         $supplier->delete();
+    }
+
+    /**
+     * يضمن وجود حساب فرعي للمورد تحت «ذمم الموردين» (الحساب الأب من الإعدادات).
+     * idempotent: ينشئ الحساب مرّة واحدة ويربطه، ثم يزامن الاسم عند تغيّره.
+     */
+    public function ensureLedgerAccount(Supplier $supplier): ?Account
+    {
+        $parent = Account::where('code', config('accounting.purchasing.payable_account'))->first();
+        if (! $parent) {
+            return null; // دليل الحسابات غير مُهيّأ بعد — لا نُعطّل إنشاء المورد.
+        }
+
+        // موجود مسبقًا: نُزامن الاسم فقط إن تغيّر.
+        if ($supplier->gl_account_id && ($account = $supplier->glAccount()->first())) {
+            $name = $this->accountName($supplier);
+            if ($account->name !== $name) {
+                $account->update(['name' => $name]);
+            }
+
+            return $account;
+        }
+
+        $account = Account::create([
+            'code' => $this->nextChildCode($parent),
+            'name' => $this->accountName($supplier),
+            'type' => $parent->type,               // خصم (liability) مثل الأب
+            'parent_id' => $parent->id,
+            'is_postable' => true,                 // الترحيل يكون على الفرعي
+            'currency' => $parent->currency,
+            'is_active' => true,
+        ]);
+
+        $supplier->forceFill(['gl_account_id' => $account->id])->save();
+
+        return $account;
+    }
+
+    private function accountName(Supplier $supplier): string
+    {
+        return __('ذمم المورد: :name', ['name' => $supplier->name]);
+    }
+
+    /** كود فرعي فريد تحت الأب بنمط «2010-0001». */
+    private function nextChildCode(Account $parent): string
+    {
+        $seq = (int) Account::where('parent_id', $parent->id)->count() + 1;
+
+        do {
+            $code = $parent->code.'-'.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+            $seq++;
+        } while (Account::where('code', $code)->exists());
+
+        return $code;
     }
 
     private function syncContacts(Supplier $supplier, array $contacts): void

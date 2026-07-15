@@ -2,6 +2,7 @@
 
 namespace App\Modules\Purchasing\Models;
 
+use App\Modules\Accounting\Models\Account;
 use App\Modules\Foundation\Models\Branch;
 use App\Support\Concerns\Auditable;
 use App\Support\Concerns\HasUuid;
@@ -22,7 +23,7 @@ class Supplier extends Model
 
     protected $fillable = [
         'branch_id', 'name', 'code', 'legal_name', 'tax_number', 'email', 'phone',
-        'address', 'governorate_id', 'city_id', 'currency_id',
+        'address', 'governorate_id', 'city_id', 'currency_id', 'gl_account_id',
         'payment_terms_days', 'credit_limit', 'opening_balance', 'notes', 'is_active',
     ];
 
@@ -36,6 +37,12 @@ class Supplier extends Model
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    /** الحساب الفرعي للمورد في دليل الحسابات (تحت «ذمم الموردين»). */
+    public function glAccount(): BelongsTo
+    {
+        return $this->belongsTo(Account::class, 'gl_account_id');
     }
 
     public function contacts(): HasMany
