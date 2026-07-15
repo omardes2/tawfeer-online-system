@@ -10,6 +10,7 @@ use App\Modules\Sales\Models\Order;
 use App\Modules\Shipping\Models\Shipment;
 use App\Support\Integrations\Shipping\DeliveryProviderManager;
 use App\Support\NumberGenerator;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -41,7 +42,19 @@ class OrderDeliveryDispatcher
             return ['status' => 'skipped'];
         }
 
+        // قفل ذرّي لكل طلب: يمنع الإرسال المزدوج عند التزامن (تأكيد فوري + مكنسة + زر يدوي).
+        $lock = Cache::lock('ship-dispatch-'.$order->id, 30);
+        if (! $lock->get()) {
+            return ['status' => 'skipped']; // إرسال آخر لنفس الطلب جارٍ الآن.
+        }
+
         try {
+            // إعادة تحميل داخل القفل: قد يكون طلب متزامن آخر أضاف رقم التتبّع للتوّ.
+            $order->refresh();
+            if (! empty($order->tracking_number)) {
+                return ['status' => 'skipped'];
+            }
+
             $driver = $this->manager->driver($code);
             $provider = DeliveryProvider::where('code', $code)->first();
 
@@ -63,6 +76,8 @@ class OrderDeliveryDispatcher
             Log::warning('Order delivery dispatch failed: '.$e->getMessage(), ['order' => $order->id]);
 
             return ['status' => 'failed', 'message' => $e->getMessage()];
+        } finally {
+            $lock->release();
         }
     }
 

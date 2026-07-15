@@ -19,12 +19,12 @@ use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
 use App\Modules\Shipping\Jobs\CancelOrderShipment;
-use App\Modules\Shipping\Jobs\DispatchOrderShipment;
 use App\Modules\Shipping\Models\Shipment;
 use App\Modules\Shipping\Support\DeliveryStatus;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Tests\Support\FakeTrackingDeliveryProvider;
 use Tests\TestCase;
 
 class SalesAdminWebTest extends TestCase
@@ -429,11 +429,13 @@ class SalesAdminWebTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    public function test_confirm_queues_delivery_dispatch_when_provider_configured(): void
+    public function test_confirm_dispatches_delivery_synchronously_when_provider_configured(): void
     {
-        // مزوّد مُفعّل ⇒ التأكيد يضع مهمة إرسال في الطابور (لا اتصال متزامن).
-        config()->set('shipping.provider', 'opost');
-        Queue::fake();
+        // الترحيل الجذري: مزوّد مُفعّل ⇒ التأكيد يُرسل الطلب لشركة التوصيل مباشرةً (متزامن)
+        // فيظهر رقم التتبّع فورًا — لا اعتماد على طابور.
+        config()->set('shipping.provider', 'faketrack');
+        config()->set('shipping.drivers.faketrack.delivery', FakeTrackingDeliveryProvider::class);
+        FakeTrackingDeliveryProvider::$createResult = null;
 
         $variant = Product::factory()->create()->defaultVariant;
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
@@ -446,8 +448,9 @@ class SalesAdminWebTest extends TestCase
         $order = Order::latest('id')->first();
         $this->actingAs($this->admin())->post(route('admin.sales.orders.confirm', $order))->assertRedirect();
 
-        $this->assertSame('confirmed', $order->fresh()->status);
-        Queue::assertPushed(DispatchOrderShipment::class);
+        $order->refresh();
+        $this->assertSame('confirmed', $order->status);
+        $this->assertNotEmpty($order->tracking_number); // أُرسل مباشرةً لشركة التوصيل.
     }
 
     public function test_cancel_queues_provider_cancel_when_order_was_sent(): void

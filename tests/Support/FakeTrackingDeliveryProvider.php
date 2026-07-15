@@ -15,6 +15,20 @@ class FakeTrackingDeliveryProvider extends OpostDeliveryProvider
     /** محاكاة فشل التتبّع (لاختبار إعادة المحاولة). */
     public static bool $throw = false;
 
+    /** نتيجة createShipment القابلة للضبط (لمحاكاة نجاح/فشل الإرسال لشركة التوصيل). */
+    public static ?array $createResult = null;
+
+    public function createShipment(array $payload): array
+    {
+        return self::$createResult ?? [
+            'status' => 'created',
+            'tracking_number' => 'FT-'.($payload['reference'] ?? 'X'),
+            'external_id' => 'EXT-'.($payload['reference'] ?? 'X'),
+            'provider_status' => 'submitted',
+            'raw' => [],
+        ];
+    }
+
     public function track(string $trackingNumber): array
     {
         if (self::$throw) {

@@ -242,6 +242,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('orders/direct', [AdminOrderController::class, 'storeDirect'])->name('orders.direct.store');
         Route::resource('orders', AdminOrderController::class)->only(['index', 'create', 'store', 'show']);
         Route::post('orders/{order}/confirm', [AdminOrderController::class, 'confirm'])->name('orders.confirm');
+        Route::post('orders/{order}/resend-shipment', [AdminOrderController::class, 'resendShipment'])->name('orders.resend_shipment');
         Route::post('orders/{order}/reserve', [AdminOrderController::class, 'reserve'])->name('orders.reserve');
         Route::post('orders/{order}/prepare', [AdminOrderController::class, 'prepare'])->name('orders.prepare');
         Route::post('orders/{order}/ready', [AdminOrderController::class, 'ready'])->name('orders.ready');

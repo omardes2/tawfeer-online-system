@@ -141,6 +141,30 @@ new settlement line), never by editing history.
 - Worker: `supervisorctl status tawfeer-worker:*` → RUNNING; `queue:failed` empty.
 - Failed job retry: `php artisan queue:retry all`.
 - Scheduler: `php artisan schedule:list` shows birthdays (daily 09:00), abandoned-carts
-  (hourly), and delivery sync/escalation (when enabled).
+  (hourly), delivery sync/escalation (when enabled), and `shipping:dispatch-pending`
+  (every minute).
 - Queued marketing sends are idempotent (`SendCampaignMessageJob` skips already-sent
   messages; message rows carry a unique `idempotency_key`).
+
+## 7.1 Guaranteed delivery dispatch (الترحيل المضمون لشركة التوصيل)
+
+Sending a confirmed order to the shipping provider (Opost) does **not** depend on a
+persistent queue worker:
+
+- **Primary — synchronous:** confirming an order (`OrderController::confirm`) sends it to
+  the provider inline via `OrderDeliveryDispatcher`, so the tracking number appears
+  immediately. The call is defensive: provider failure never breaks confirmation.
+- **Guarantee — scheduled sweep:** `shipping:dispatch-pending` runs **every minute** and
+  re-dispatches any deliverable order (has `city_id`, non-`pos` channel, no
+  `tracking_number` yet). So even if the provider was momentarily down at confirm time,
+  the order is sent within a minute — no worker to babysit. Requires only the standard
+  scheduler cron (`* * * * * php artisan schedule:run`).
+- **Idempotency:** `OrderDeliveryDispatcher::dispatch` guards on `tracking_number` and
+  takes a per-order cache lock (`ship-dispatch-<id>`), so synchronous + sweep + the manual
+  “إرسال لشركة التوصيل” button can never create duplicate shipments.
+- **Dashboard indicator:** the sales-orders page shows a chip via `SystemHealth::delivery()`
+  — green when the provider is enabled and no order is stuck, amber with a count when
+  deliverable orders remain without a tracking number past a 3-minute grace (the signal
+  that the scheduler cron is not running).
+- **Health check:** `php artisan schedule:list | grep dispatch-pending` and confirm the
+  cron line exists (`crontab -l`). To force a sweep now: `php artisan shipping:dispatch-pending`.

@@ -19,7 +19,7 @@ use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderPaymentService;
 use App\Modules\Sales\Services\OrderService;
 use App\Modules\Shipping\Jobs\CancelOrderShipment;
-use App\Modules\Shipping\Jobs\DispatchOrderShipment;
+use App\Modules\Shipping\Services\OrderDeliveryDispatcher;
 use App\Modules\Shipping\Support\DeliveryStatus;
 use App\Modules\Shipping\Support\OpostStatus;
 use Illuminate\Contracts\View\View;
@@ -252,7 +252,7 @@ class OrderController extends Controller
         ]);
     }
 
-    public function confirm(Order $order): RedirectResponse
+    public function confirm(Order $order, OrderDeliveryDispatcher $dispatcher): RedirectResponse
     {
         $this->authorize('confirm', $order);
 
@@ -262,15 +262,52 @@ class OrderController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        // عند التأكيد: إرسال الطلب لشركة التوصيل (Opost) في الخلفية عبر الطابور —
-        // لا اتصال متزامن داخل طلب الويب (يتفادى مهلة الانتظار). رقم التتبّع يظهر بعد تنفيذ المهمة.
-        if (empty($order->tracking_number) && config('shipping.provider', 'null') !== 'null') {
-            DispatchOrderShipment::dispatch($order->id);
+        // الترحيل الجذري: إرسال الطلب لشركة التوصيل مباشرةً لحظة التأكيد (متزامن) — لا اعتماد
+        // على طابور خلفية. إن تعذّر الإرسال الآن (Opost متوقّف لحظيًا) تلتقطه المكنسة المجدولة
+        // (shipping:dispatch-pending) خلال دقيقة فتُعيد المحاولة حتى ينجح ⇒ وصول مضمون.
+        if ($this->needsDelivery($order)) {
+            $result = $dispatcher->dispatch($order);
 
-            return back()->with('success', __('تم تأكيد الطلب، ويجري إرساله لشركة التوصيل (يظهر رقم التتبّع خلال لحظات).'));
+            if (($result['status'] ?? null) === 'created') {
+                return back()->with('success', __('تم تأكيد الطلب وإرساله لشركة التوصيل. رقم التتبّع: :n', ['n' => $result['tracking_number']]));
+            }
+
+            if (($result['status'] ?? null) === 'failed') {
+                return back()->with('warning', __('تم تأكيد الطلب، وسيُعاد إرساله لشركة التوصيل تلقائيًا خلال دقيقة (تعذّر الإرسال الآن: :msg).', ['msg' => $result['message'] ?? '']));
+            }
         }
 
         return back()->with('success', __('تم تأكيد الطلب.'));
+    }
+
+    /**
+     * إعادة إرسال الطلب لشركة التوصيل يدويًا — للطلبات التي لم يظهر لها رقم تتبّع بعد.
+     * idempotent (الحارس داخل الـDispatcher يمنع التكرار)، ومتاح فقط لطلبات التوصيل.
+     */
+    public function resendShipment(Order $order, OrderDeliveryDispatcher $dispatcher): RedirectResponse
+    {
+        $this->authorize('confirm', $order);
+
+        if (! $this->needsDelivery($order)) {
+            return back()->with('error', __('لا حاجة لإعادة الإرسال: الطلب مُرسَل مسبقًا أو ليس طلب توصيل.'));
+        }
+
+        $result = $dispatcher->dispatch($order);
+
+        return match ($result['status'] ?? null) {
+            'created' => back()->with('success', __('تم إرسال الطلب لشركة التوصيل. رقم التتبّع: :n', ['n' => $result['tracking_number']])),
+            'skipped' => back()->with('warning', __('الطلب مُرسَل مسبقًا لشركة التوصيل.')),
+            default => back()->with('error', __('تعذّر إرسال الطلب لشركة التوصيل: :msg', ['msg' => $result['message'] ?? ''])),
+        };
+    }
+
+    /** طلب توصيل (له وجهة مدينة، وليس مبيعة مباشرة POS) لم يُرسَل بعد، ومزوّد التوصيل مُفعّل. */
+    private function needsDelivery(Order $order): bool
+    {
+        return empty($order->tracking_number)
+            && $order->channel !== 'pos'
+            && $order->city_id !== null
+            && config('shipping.provider', 'null') !== 'null';
     }
 
     /**

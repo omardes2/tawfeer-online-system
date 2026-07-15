@@ -9,6 +9,13 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 /*
+| الترحيل الجذري المضمون: مكنسة كل دقيقة تلتقط أي طلب توصيل مؤكّد بلا رقم تتبّع فتعيد
+| إرساله لشركة التوصيل حتى ينجح — ضمان الوصول دون اعتماد على عامل طابور دائم. آمنة
+| ومتوقّفة ذاتيًا حين لا مزوّد توصيل مُفعّل (no-op)، و idempotent (لا تكرار للشحنات).
+*/
+Schedule::command('shipping:dispatch-pending')->everyMinute()->withoutOverlapping();
+
+/*
 | جدولة عمليات التوصيل (Phase 4.3 / ADR-039) — مفعّلة بالإعداد فقط (config/delivery.php).
 */
 if (config('delivery.sync.enabled')) {

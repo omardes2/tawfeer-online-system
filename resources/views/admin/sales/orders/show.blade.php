@@ -71,6 +71,13 @@
                         <form method="POST" action="{{ route('admin.sales.orders.reserve', $order) }}">@csrf<button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('حجز المخزون') }}</button></form>
                     @endcan
                 @endif
+                {{-- إعادة إرسال لشركة التوصيل يدويًا: تظهر فقط لطلب توصيل مؤكّد لم يظهر له رقم تتبّع بعد. --}}
+                @if (empty($order->tracking_number) && $order->channel !== 'pos' && $order->city_id && config('shipping.provider', 'null') !== 'null'
+                    && ! in_array($order->status, ['draft', 'new', 'cancelled', 'delivered', 'returned']))
+                    @can('confirm', $order)
+                        <form method="POST" action="{{ route('admin.sales.orders.resend_shipment', $order) }}">@csrf<button class="px-4 py-2 bg-amber-500 text-white text-sm rounded-md hover:bg-amber-600">{{ __('إرسال لشركة التوصيل') }}</button></form>
+                    @endcan
+                @endif
                 @if ($order->status === 'stock_reserved')
                     @can('ship', $order)
                         <form method="POST" action="{{ route('admin.sales.orders.prepare', $order) }}">@csrf<button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('بدء التجهيز') }}</button></form>

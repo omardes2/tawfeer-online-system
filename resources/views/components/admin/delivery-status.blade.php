@@ -1,4 +1,4 @@
-{{-- مؤشّر حالة إرسال الطلبات لشركة التوصيل: مزوّد التوصيل + عامل الطابور. --}}
+{{-- مؤشّر ضمان وصول الطلبات لشركة التوصيل: مزوّد التوصيل + طلبات لم تُرسَل بعد. --}}
 @php($h = \App\Support\SystemHealth::delivery())
 
 <div class="mb-4 flex flex-wrap items-center gap-2 text-sm">
@@ -15,26 +15,19 @@
         </span>
     @endif
 
-    {{-- عامل الطابور --}}
-    @if (! $h['queue_healthy'])
-        <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 text-amber-700 px-3 py-1">
-            <span class="h-2 w-2 rounded-full bg-amber-500"></span>
-            {{ __('الطابور متوقّف؟') }} — {{ __(':n مهمة معلّقة', ['n' => $h['pending']]) }}
-            @if ($h['oldest_age'] !== null) ({{ __('منذ :m دقيقة', ['m' => intdiv((int) $h['oldest_age'], 60)]) }}) @endif
-        </span>
-    @elseif ($h['enabled'])
-        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-emerald-700 px-3 py-1">
-            <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-            {{ __('الطابور يعمل') }}
-        </span>
-    @endif
-
-    {{-- مهام فاشلة --}}
-    @if ($h['failed'] > 0)
-        <span class="inline-flex items-center gap-1.5 rounded-full bg-rose-50 text-rose-700 px-3 py-1">
-            <span class="h-2 w-2 rounded-full bg-rose-500"></span>
-            {{ __(':n مهمة فاشلة', ['n' => $h['failed']]) }}
-        </span>
+    {{-- حالة وصول الطلبات لشركة التوصيل --}}
+    @if ($h['enabled'])
+        @if ($h['stuck'] === 0)
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-emerald-700 px-3 py-1">
+                <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                {{ __('كل الطلبات مُرسَلة لشركة التوصيل') }}
+            </span>
+        @else
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 text-amber-700 px-3 py-1">
+                <span class="h-2 w-2 rounded-full bg-amber-500"></span>
+                {{ __(':n طلب لم يُرسَل لشركة التوصيل بعد', ['n' => $h['stuck']]) }}
+            </span>
+        @endif
     @endif
 
     {{-- تلميح عند وجود مشكلة --}}
@@ -43,7 +36,7 @@
             @if (! $h['enabled'])
                 {{ __('اضبط SHIPPING_PROVIDER=opost في .env ثم config:cache.') }}
             @else
-                {{ __('تأكّد أن عامل الطابور يعمل (supervisor / queue:work).') }}
+                {{ __('تُعاد المحاولة تلقائيًا كل دقيقة — تأكّد أن المجدول يعمل (cron: schedule:run).') }}
             @endif
         </span>
     @endunless
