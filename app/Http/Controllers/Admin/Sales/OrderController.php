@@ -23,6 +23,7 @@ use App\Modules\Shipping\Services\OrderDeliveryDispatcher;
 use App\Modules\Shipping\Support\DeliveryStatus;
 use App\Modules\Shipping\Support\OpostStatus;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -55,7 +56,7 @@ class OrderController extends Controller
         $saleType = $request->query('sale_type');
         $saleType = in_array($saleType, ['direct', 'normal'], true) ? $saleType : null;
 
-        $query = Order::with(['assignee', 'creator', 'customer', 'latestShipment'])->latest('id');
+        $query = $this->visibleOrders($request)->with(['assignee', 'creator', 'customer', 'latestShipment'])->latest('id');
 
         match ($saleType) {
             'direct' => $query->where('channel', 'pos'),
@@ -96,8 +97,8 @@ class OrderController extends Controller
             'activeSearch' => $search,
             'activeSaleType' => $saleType,
             'deliveryLabels' => OpostStatus::options(),
-            'statusCounts' => Order::selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status'),
-            'totalCount' => Order::count(),
+            'statusCounts' => $this->visibleOrders($request)->selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status'),
+            'totalCount' => $this->visibleOrders($request)->count(),
             // خزائن التحصيل (نقدية/بنكية) لنافذة الدفع — مربوطة بحساب GL فقط.
             'treasuries' => Treasury::query()
                 ->where('is_active', true)->whereNotNull('gl_account_id')
@@ -189,7 +190,7 @@ class OrderController extends Controller
     /** نموذج «مبيعات مباشرة» — بيع من المستودع بلا توصيل خارجي. */
     public function createDirect(): View
     {
-        $this->authorize('create', Order::class);
+        $this->authorize('createDirect', Order::class);
 
         $products = Product::query()->active()
             ->with(['defaultVariant', 'primaryImage'])
@@ -213,7 +214,7 @@ class OrderController extends Controller
 
     public function storeDirect(StoreDirectSaleRequest $request): RedirectResponse
     {
-        $this->authorize('create', Order::class);
+        $this->authorize('createDirect', Order::class);
 
         $warehouse = $request->filled('warehouse')
             ? Warehouse::where('uuid', $request->validated('warehouse'))->firstOrFail()
@@ -515,6 +516,26 @@ class OrderController extends Controller
     private function defaultWarehouse(): ?Warehouse
     {
         return Warehouse::where('is_default', true)->first() ?? Warehouse::orderBy('id')->first();
+    }
+
+    /**
+     * أساس استعلام الطلبات المرئية للمستخدم: من يملك «العرض الكامل» يرى الجميع، وإلا فأصحاب
+     * «عرض الخاص» (موظف مبيعات/مسوّق) يرون طلباتهم فقط (أنشأوها أو أُسنِدت إليهم أو مسوّقهم).
+     */
+    private function visibleOrders(Request $request): Builder
+    {
+        $query = Order::query();
+        $user = $request->user();
+
+        if ($user !== null && ! $user->can('sales.orders.view')) {
+            $query->where(function ($w) use ($user) {
+                $w->where('created_by', $user->id)
+                    ->orWhere('assigned_to', $user->id)
+                    ->orWhere('affiliate_id', $user->id);
+            });
+        }
+
+        return $query;
     }
 
     /** سعر توصيل المدينة من جدول أسعار المزوّد (نمط Opost) — 0 إن لم يُضبط. */

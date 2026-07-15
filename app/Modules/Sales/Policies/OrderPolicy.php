@@ -9,17 +9,34 @@ class OrderPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('sales.orders.view');
+        // عرض كامل، أو عرض «الخاص» (طلباته هو فقط) — كلاهما يُتيح فتح قائمة الطلبات.
+        return $user->can('sales.orders.view') || $user->can('sales.orders.view_own');
     }
 
     public function view(User $user, Order $m): bool
     {
-        return $user->can('sales.orders.view');
+        return $user->can('sales.orders.view')
+            || ($user->can('sales.orders.view_own') && $this->owns($user, $m));
     }
 
     public function create(User $user): bool
     {
         return $user->can('sales.orders.create');
+    }
+
+    /**
+     * إنشاء مبيعة مباشرة (نقطة بيع): متاح فقط لأصحاب العرض الكامل (لا لأصحاب «الخاص»)،
+     * فلا يظهر بند «مبيعات مباشرة» لموظف المبيعات/المسوّق.
+     */
+    public function createDirect(User $user): bool
+    {
+        return $user->can('sales.orders.create') && $user->can('sales.orders.view');
+    }
+
+    /** الطلب من إنشاء المستخدم أو مُسنَد إليه أو مسوّقه — لتحديد نطاق «عرض الخاص». */
+    private function owns(User $user, Order $order): bool
+    {
+        return in_array($user->id, [$order->created_by, $order->assigned_to, $order->affiliate_id], true);
     }
 
     public function update(User $user, Order $m): bool

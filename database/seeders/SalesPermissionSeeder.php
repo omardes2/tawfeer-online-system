@@ -12,15 +12,20 @@ use Spatie\Permission\Models\Role;
 class SalesPermissionSeeder extends Seeder
 {
     private array $permissions = [
-        'sales.orders.view', 'sales.orders.create', 'sales.orders.update', 'sales.orders.delete',
+        'sales.orders.view', 'sales.orders.view_own', 'sales.orders.create', 'sales.orders.update', 'sales.orders.delete',
         'sales.orders.confirm', 'sales.orders.reserve', 'sales.orders.ship', 'sales.orders.deliver', 'sales.orders.cancel',
     ];
 
     private array $grants = [
         'manager' => ['*'],
+        // موظف المبيعات: ينشئ الطلبات ويرى/يدير طلباته هو فقط (view_own بدل view الكاملة).
         'sales' => [
-            'sales.orders.view', 'sales.orders.create', 'sales.orders.update',
+            'sales.orders.view_own', 'sales.orders.create', 'sales.orders.update',
             'sales.orders.confirm', 'sales.orders.reserve', 'sales.orders.cancel',
+        ],
+        // المسوّق: ينشئ الطلبات ويرى طلباته هو فقط.
+        'affiliate' => [
+            'sales.orders.view_own', 'sales.orders.create',
         ],
         'warehouse' => [
             'sales.orders.view', 'sales.orders.ship', 'sales.orders.deliver',

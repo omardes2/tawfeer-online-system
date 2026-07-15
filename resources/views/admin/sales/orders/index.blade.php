@@ -2,16 +2,18 @@
     <x-admin.header
         :title="__('طلبات البيع')"
         :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('المبيعات') => null, __('الطلبات') => null]">
-        @can('create', \App\Modules\Sales\Models\Order::class)
+        @can('createDirect', \App\Modules\Sales\Models\Order::class)
             <a href="{{ route('admin.sales.orders.direct.create') }}" class="btn-secondary btn-sm">{{ __('مبيعات مباشرة') }}</a>
+        @endcan
+        @can('create', \App\Modules\Sales\Models\Order::class)
             <a href="{{ route('admin.sales.orders.create') }}" class="btn-primary btn-sm">{{ __('انشاء اوردر') }}</a>
         @endcan
     </x-admin.header>
 
     <x-admin.flash />
 
-    {{-- مؤشّر حالة إرسال الطلبات لشركة التوصيل (المزوّد + عامل الطابور) --}}
-    @can('create', \App\Modules\Sales\Models\Order::class)
+    {{-- مؤشّر حالة إرسال الطلبات لشركة التوصيل — لأصحاب العرض الكامل فقط (مؤشّر تشغيلي) --}}
+    @can('sales.orders.view')
         <x-admin.delivery-status />
     @endcan
 

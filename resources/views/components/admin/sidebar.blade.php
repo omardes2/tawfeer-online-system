@@ -32,7 +32,7 @@
         ['المبيعات', 'cart', [
             ['admin.sales.orders.index', 'المبيعات', ['viewAny', $P('Sales\\Models\\Order')], 'admin.sales.orders.index'],
             ['admin.sales.orders.create', 'إنشاء اوردر', ['create', $P('Sales\\Models\\Order')], 'admin.sales.orders.create'],
-            ['admin.sales.orders.direct.create', 'مبيعات مباشرة', ['create', $P('Sales\\Models\\Order')], 'admin.sales.orders.direct.*'],
+            ['admin.sales.orders.direct.create', 'مبيعات مباشرة', ['createDirect', $P('Sales\\Models\\Order')], 'admin.sales.orders.direct.*'],
         ]],
         ['المنتجات', 'box', [
             ['admin.products.index', 'المنتجات', ['viewAny', $P('Catalog\\Models\\Product')], 'admin.products.*'],
