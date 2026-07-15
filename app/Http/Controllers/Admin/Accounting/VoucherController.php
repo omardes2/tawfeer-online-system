@@ -78,6 +78,39 @@ class VoucherController extends Controller
         ]);
     }
 
+    public function edit(string $kind, FinancialVoucher $voucher): View
+    {
+        $this->auth($kind, 'create');
+        abort_unless($voucher->kind === $kind, 404);
+        abort_if(in_array($voucher->status, ['reversed', 'cancelled', 'rejected'], true), 403, __('لا يمكن تعديل سند بهذه الحالة.'));
+
+        return view('admin.accounting.vouchers.form', $this->formData($kind, $voucher));
+    }
+
+    public function update(StoreVoucherRequest $request, string $kind, FinancialVoucher $voucher): RedirectResponse
+    {
+        $this->auth($kind, 'create');
+        abort_unless($voucher->kind === $kind, 404);
+        abort_if(in_array($voucher->status, ['reversed', 'cancelled', 'rejected'], true), 403, __('لا يمكن تعديل سند بهذه الحالة.'));
+
+        $data = $request->validated();
+        $newAttachments = $this->storeAttachments($request);
+        if ($newAttachments) {
+            $data['attachments'] = array_merge($voucher->attachments ?? [], $newAttachments);
+        }
+
+        // المُرحّل: عكس + قيد مُصحّح (يتطلّب صلاحية الترحيل). غير المُرحّل: تعديل مباشر.
+        if ($voucher->status === 'posted') {
+            $this->auth($kind, 'post');
+            $this->service->repost($voucher, $data);
+        } else {
+            $this->service->update($voucher, $data);
+        }
+
+        return redirect()->route('admin.accounting.vouchers.show', [$kind, $voucher])
+            ->with('success', __('حُدّث السند وانعكس محاسبيًا.'));
+    }
+
     public function approve(string $kind, FinancialVoucher $voucher): RedirectResponse
     {
         $this->auth($kind, 'approve');

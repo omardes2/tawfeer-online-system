@@ -13,6 +13,11 @@
             <div class="flex items-center justify-between mb-4">
                 <x-accounting.status :status="$voucher->status" />
                 <div class="flex flex-wrap gap-2">
+                    @can('accounting.'.$res.'.create')
+                        @unless (in_array($voucher->status, ['reversed', 'cancelled', 'rejected']))
+                            <a href="{{ route('admin.accounting.vouchers.edit', [$kind, $voucher]) }}" class="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 text-sm rounded-md hover:bg-gray-50">{{ __('تعديل') }}</a>
+                        @endunless
+                    @endcan
                     @if ($voucher->status === 'draft')
                         @can('accounting.'.$res.'.approve')<form method="POST" action="{{ route('admin.accounting.vouchers.approve', [$kind, $voucher]) }}">@csrf<button class="px-3 py-1.5 bg-emerald-600 text-white text-sm rounded-md">{{ __('اعتماد') }}</button></form>
                         <form method="POST" action="{{ route('admin.accounting.vouchers.reject', [$kind, $voucher]) }}">@csrf<button class="px-3 py-1.5 bg-rose-600 text-white text-sm rounded-md">{{ __('رفض') }}</button></form>@endcan

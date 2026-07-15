@@ -38,7 +38,7 @@ class VoucherService
             'kind' => $kind,
             'status' => 'draft',
             'voucher_date' => $date,
-            'currency' => 'SAR',
+            'currency' => 'ILS',
             'tax_amount' => 0,
             'created_by' => auth()->id(),
         ], collect($data)->only([
@@ -52,8 +52,9 @@ class VoucherService
     /** @param array<string, mixed> $data */
     public function update(FinancialVoucher $voucher, array $data): FinancialVoucher
     {
-        if ($voucher->status !== 'draft') {
-            throw ValidationException::withMessages(['status' => __('لا يمكن تعديل سند غير مسودّة.')]);
+        // المسودّة/المعتمد لم يُرحَّل بعد (لا قيد) فيُعدَّل مباشرةً. المُرحّل يُعدَّل عبر repost.
+        if (! in_array($voucher->status, ['draft', 'approved'], true)) {
+            throw ValidationException::withMessages(['status' => __('السند المُرحّل يُعدَّل بإعادة الترحيل (عكس + قيد مُصحّح).')]);
         }
         $voucher->update(collect($data)->only([
             'voucher_date', 'treasury_id', 'counter_treasury_id', 'counter_account_id',
@@ -63,6 +64,53 @@ class VoucherService
         ])->all());
 
         return $voucher;
+    }
+
+    /**
+     * تعديل سند مُرحّل بطريقة محاسبية سليمة (ADR-016): يعكس القيد الأصلي بقيد عاكس، ثم يطبّق
+     * القيم الجديدة ويُرحّل قيدًا مُصحّحًا. الأثر الصافي = القيم الجديدة فقط، دون تعديل قيد مُرحّل.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function repost(FinancialVoucher $voucher, array $data, ?User $actor = null): FinancialVoucher
+    {
+        if ($voucher->status !== 'posted') {
+            throw ValidationException::withMessages(['status' => __('إعادة الترحيل للسند المُرحّل فقط.')]);
+        }
+
+        return DB::transaction(function () use ($voucher, $data, $actor) {
+            // 1) عكس القيد الأصلي (تصحيح لا حذف).
+            if ($voucher->journalEntry && ! $voucher->journalEntry->isReversed()) {
+                $this->accounting->reverse($voucher->journalEntry, [
+                    'description' => __('عكس تعديل سند :n', ['n' => $voucher->number]),
+                ]);
+            }
+
+            // 2) تطبيق القيم الجديدة.
+            $voucher->update(collect($data)->only([
+                'voucher_date', 'treasury_id', 'counter_treasury_id', 'counter_account_id',
+                'customer_id', 'supplier_id', 'employee_id', 'party_name', 'amount', 'currency',
+                'payment_method', 'reference', 'category', 'tax_amount', 'description', 'notes', 'attachments',
+            ])->all());
+
+            // 3) ترحيل قيد مُصحّح بالقيم الجديدة وربطه بالسند.
+            $voucher->load(['treasury.glAccount', 'counterAccount', 'counterTreasury.glAccount']);
+            $entry = $this->accounting->postEntry([
+                'entry_date' => $voucher->voucher_date->toDateString(),
+                'description' => $voucher->description ?: $this->defaultDescription($voucher),
+                'source' => 'voucher',
+                'reference_type' => 'financial_voucher',
+                'reference_id' => $voucher->id,
+            ], $this->buildLines($voucher));
+
+            $voucher->update([
+                'journal_entry_id' => $entry->id,
+                'posted_by' => $actor?->id ?? auth()->id(),
+                'posted_at' => now(),
+            ]);
+
+            return $voucher;
+        });
     }
 
     public function approve(FinancialVoucher $voucher, ?User $actor = null): FinancialVoucher

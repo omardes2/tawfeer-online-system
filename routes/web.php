@@ -466,6 +466,8 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
             Route::post('/', [AdminVoucherController::class, 'store'])->name('store');
             Route::get('export', [AdminVoucherController::class, 'export'])->name('export');
             Route::get('{voucher}', [AdminVoucherController::class, 'show'])->name('show');
+            Route::get('{voucher}/edit', [AdminVoucherController::class, 'edit'])->name('edit');
+            Route::put('{voucher}', [AdminVoucherController::class, 'update'])->name('update');
             Route::get('{voucher}/print', [AdminVoucherController::class, 'print'])->name('print');
             Route::post('{voucher}/approve', [AdminVoucherController::class, 'approve'])->name('approve');
             Route::post('{voucher}/reject', [AdminVoucherController::class, 'reject'])->name('reject');
