@@ -87,8 +87,8 @@ class PurchaseInvoiceController extends Controller
         $product = $this->products->create([
             'name' => $item['new_name'],
             'sku' => $this->uniqueSku(),
-            'category_id' => Category::orderBy('id')->value('id'),
-            'unit_id' => Unit::orderBy('id')->value('id'),
+            'category_id' => $this->defaultCategoryId(),
+            'unit_id' => $this->defaultUnitId(),
             'status' => 'active',
             'retail_price' => $item['sell_price'] ?? $item['unit_cost'],
             'cost_price' => $item['unit_cost'],
@@ -111,6 +111,20 @@ class PurchaseInvoiceController extends Controller
         } while (Product::where('sku', $sku)->exists());
 
         return $sku;
+    }
+
+    /** فئة افتراضية للمنتجات المُنشأة من الفاتورة — تُنشأ إن لم توجد أي فئة (بعد تفريغ البيانات مثلًا). */
+    private function defaultCategoryId(): int
+    {
+        return Category::orderBy('id')->value('id')
+            ?? Category::firstOrCreate(['slug' => 'uncategorized'], ['name' => __('غير مصنّف'), 'is_active' => true])->id;
+    }
+
+    /** وحدة قياس افتراضية — تُنشأ إن لم توجد أي وحدة. */
+    private function defaultUnitId(): int
+    {
+        return Unit::orderBy('id')->value('id')
+            ?? Unit::firstOrCreate(['code' => 'PCS'], ['name' => __('قطعة'), 'is_active' => true])->id;
     }
 
     public function show(PurchaseInvoice $invoice): View

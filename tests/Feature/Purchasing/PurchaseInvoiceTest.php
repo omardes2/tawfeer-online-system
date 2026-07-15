@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Accounting\Services\AccountingService;
+use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Foundation\Models\Branch;
@@ -16,6 +17,7 @@ use App\Modules\Purchasing\Models\Supplier;
 use App\Modules\Purchasing\Services\PurchaseInvoiceService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -122,6 +124,25 @@ class PurchaseInvoiceTest extends TestCase
         $onHand = (float) InventoryStock::where('variant_id', $variant->id)
             ->where('warehouse_id', $warehouse->id)->value('on_hand');
         $this->assertEqualsWithDelta(5, $onHand, 0.001);
+    }
+
+    /** بعد تفريغ البيانات (لا فئات) — تعريف صنف جديد من الفاتورة يجب أن ينجح (فئة افتراضية). */
+    public function test_new_product_from_invoice_works_when_no_categories_exist(): void
+    {
+        Artisan::call('demo:clear', ['--force' => true]);
+        $this->assertSame(0, Category::count());
+
+        $supplier = Supplier::factory()->create();
+        $admin = User::where('email', 'admin@tawfeer.online')->first();
+
+        $this->actingAs($admin)->post(route('admin.purchasing.invoices.store'), [
+            'supplier_id' => $supplier->id,
+            'invoice_date' => now()->toDateString(),
+            'items' => [['new_name' => 'خشب', 'qty' => 10, 'unit_cost' => 20, 'tax_rate' => 0]],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('products', ['name' => 'خشب']);
+        $this->assertGreaterThan(0, Category::count());
     }
 
     public function test_post_is_idempotent(): void
