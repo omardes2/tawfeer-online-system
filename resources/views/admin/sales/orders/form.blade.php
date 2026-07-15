@@ -8,7 +8,7 @@
     @php $sym = \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪'); @endphp
 
     <form method="POST" action="{{ route('admin.sales.orders.store') }}"
-          x-data="orderForm(@js($products), @js($areas), @js($cityRates))"
+          x-data="orderForm(@js($products), @js($areas), @js($cityRates), @js($cities))"
           @submit="if (rows.length === 0) { $event.preventDefault(); alert('{{ __('أضف صنفًا واحدًا على الأقل.') }}'); }"
           class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         @csrf
@@ -32,13 +32,31 @@
                 </x-admin.field>
 
                 <x-admin.field :label="__('المدينة')" name="city_id" :required="true">
-                    <select name="city_id" x-model.number="cityId" @change="areaId = ''" required
-                            class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
-                        <option value="">{{ __('— اختر المدينة —') }}</option>
-                        @foreach ($cities as $c)
-                            <option value="{{ $c->id }}" @selected(old('city_id') == $c->id)>{{ $c->name }}</option>
-                        @endforeach
-                    </select>
+                    {{-- قائمة مدن قابلة للبحث (combobox): مربّع بحث يُصفّي المدن ويختار --}}
+                    <div class="relative" @click.outside="cityOpen = false">
+                        <div class="relative">
+                            <span class="absolute inset-y-0 start-0 ps-3 flex items-center text-gray-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
+                            </span>
+                            <input type="text" x-model="citySearch" @focus="cityOpen = true" @input="cityOpen = true"
+                                   autocomplete="off" placeholder="{{ __('ابحث واختر المدينة…') }}"
+                                   class="w-full ps-9 pe-3 rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                        </div>
+                        <input type="hidden" name="city_id" :value="cityId" />
+                        <div x-show="cityOpen" x-transition x-cloak
+                             class="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                            <template x-for="c in filteredCities" :key="c.id">
+                                <button type="button" @click="selectCity(c)"
+                                        class="w-full flex items-center gap-2 px-3 py-2 text-sm text-start hover:bg-emerald-50"
+                                        :class="Number(c.id) === Number(cityId) ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-gray-700'">
+                                    <span x-text="c.name"></span>
+                                </button>
+                            </template>
+                            <template x-if="filteredCities.length === 0">
+                                <p class="px-3 py-2 text-sm text-gray-400">{{ __('لا نتائج مطابقة') }}</p>
+                            </template>
+                        </div>
+                    </div>
                 </x-admin.field>
 
                 <x-admin.field :label="__('المنطقة')" name="area_id" :required="true">
@@ -254,15 +272,39 @@
 
     @push('scripts')
         <script>
-            function orderForm(products, areas, cityRates) {
+            function orderForm(products, areas, cityRates, cities) {
                 return {
                     products: products || [],
                     areas: areas || [],
+                    cities: cities || [],
                     cityRates: cityRates || {},
                     query: '',
                     showResults: false,
                     cityId: @js(old('city_id') ? (int) old('city_id') : ''),
                     areaId: @js(old('area_id') ? (int) old('area_id') : ''),
+                    citySearch: '',
+                    cityOpen: false,
+
+                    // تهيئة نص البحث باسم المدينة المختارة سابقًا (عند وجود خطأ تحقّق).
+                    init() {
+                        const sel = this.cities.find(c => Number(c.id) === Number(this.cityId));
+                        if (sel) this.citySearch = sel.name;
+                    },
+
+                    get filteredCities() {
+                        const q = (this.citySearch || '').trim().toLowerCase();
+                        const sel = this.cities.find(c => Number(c.id) === Number(this.cityId));
+                        // إن كان النص مطابقًا لاسم المدينة المختارة، اعرض الكل (لتسهيل التغيير).
+                        if (q === '' || (sel && q === sel.name.toLowerCase())) return this.cities;
+                        return this.cities.filter(c => (c.name || '').toLowerCase().includes(q));
+                    },
+
+                    selectCity(c) {
+                        this.cityId = Number(c.id);
+                        this.citySearch = c.name;
+                        this.areaId = '';
+                        this.cityOpen = false;
+                    },
                     hasReturn: @js((bool) old('has_return')),
                     rows: [],
                     returnRows: [],
