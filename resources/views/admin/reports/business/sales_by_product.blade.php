@@ -1,8 +1,12 @@
 <x-app-layout :title="__('المبيعات حسب المنتج')">
     @php $sym = \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪'); @endphp
-    <x-admin.header
-        :title="__('المبيعات حسب المنتج')"
-        :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('التقارير') => null, __('المبيعات حسب المنتج') => null]" />
+    <div class="report-no-print">
+        <x-admin.header
+            :title="__('المبيعات حسب المنتج')"
+            :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('التقارير') => null, __('المبيعات حسب المنتج') => null]" />
+    </div>
+
+    @include('admin.reports.business._toolbar', ['title' => __('المبيعات حسب المنتج')])
 
     <x-admin.table>
         <thead>

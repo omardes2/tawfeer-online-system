@@ -85,4 +85,45 @@ class BusinessReportsTest extends TestCase
         $this->actingAs($this->admin())->get(route('admin.reports.sales.by_employee'))
             ->assertOk()->assertSee('موظف تجريبي')->assertSee('200.00');
     }
+
+    public function test_csv_export_streams_arabic(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $customer = Customer::factory()->create(['name' => 'زبون التصدير']);
+        $variant = Product::factory()->create()->defaultVariant;
+        $order = app(OrderService::class)->create([
+            'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id,
+            'customer_id' => $customer->id, 'customer_name' => $customer->name, 'customer_phone' => '0599000000',
+        ], [['variant_id' => $variant->id, 'qty' => 1, 'unit_price' => 60]], 2026);
+        $order->update(['status' => 'delivered']);
+
+        $res = $this->actingAs($this->admin())->get(route('admin.reports.sales.by_customer', ['export' => 'csv']));
+        $res->assertOk();
+        $this->assertStringContainsString('text/csv', (string) $res->headers->get('content-type'));
+        $this->assertStringContainsString('زبون التصدير', $res->streamedContent());
+    }
+
+    public function test_date_range_filters_sales(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $recent = Customer::factory()->create(['name' => 'زبون حالي']);
+        $old = Customer::factory()->create(['name' => 'زبون قديم']);
+
+        foreach ([[$recent, now()], [$old, now()->subYear()]] as [$cust, $when]) {
+            $o = app(OrderService::class)->create([
+                'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id,
+                'customer_id' => $cust->id, 'customer_name' => $cust->name, 'customer_phone' => '0599000000',
+            ], [['variant_id' => Product::factory()->create()->defaultVariant->id, 'qty' => 1, 'unit_price' => 50]], 2026);
+            $o->forceFill(['status' => 'delivered', 'created_at' => $when])->save();
+        }
+
+        // النطاق الافتراضي «هذا الشهر»: يظهر الحالي دون القديم.
+        $this->actingAs($this->admin())->get(route('admin.reports.sales.by_customer'))
+            ->assertOk()->assertSee('زبون حالي')->assertDontSee('زبون قديم');
+
+        // نطاق «هذا العام» يشمل القديم إن كان ضمن نفس السنة، أو مخصّص واسع يشمل كليهما.
+        $this->actingAs($this->admin())->get(route('admin.reports.sales.by_customer', [
+            'range' => 'custom', 'from' => now()->subYears(2)->toDateString(), 'to' => now()->toDateString(),
+        ]))->assertOk()->assertSee('زبون قديم');
+    }
 }

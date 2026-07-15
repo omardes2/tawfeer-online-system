@@ -1,10 +1,12 @@
 <x-app-layout :title="__('كشف حساب الموردين')">
     @php $sym = \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪'); @endphp
-    <x-admin.header
-        :title="__('كشف حساب الموردين')"
-        :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('التقارير') => null, __('كشف حساب الموردين') => null]" />
+    <div class="report-no-print">
+        <x-admin.header
+            :title="__('كشف حساب الموردين')"
+            :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('التقارير') => null, __('كشف حساب الموردين') => null]" />
+    </div>
 
-    <p class="mb-4 text-sm text-gray-500">{{ __('المبلغ المستحق لكل مورد (رصيد افتتاحي + فواتير مُرحّلة − مدفوعات).') }}</p>
+    @include('admin.reports.business._toolbar', ['title' => __('كشف حساب الموردين')])
 
     <x-admin.table>
         <thead>
