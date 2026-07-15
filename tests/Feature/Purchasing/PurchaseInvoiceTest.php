@@ -156,6 +156,15 @@ class PurchaseInvoiceTest extends TestCase
         $this->assertGreaterThan(0, Category::count());
     }
 
+    public function test_create_and_edit_pages_render_ok(): void
+    {
+        $admin = User::whereHas('roles', fn ($q) => $q->where('name', 'admin'))->first();
+        $this->actingAs($admin)->get(route('admin.purchasing.invoices.create'))->assertOk();
+
+        $inv = $this->makeInvoice(50, 2, 0);
+        $this->actingAs($admin)->get(route('admin.purchasing.invoices.edit', $inv))->assertOk();
+    }
+
     public function test_update_draft_invoice_replaces_items_and_recomputes_totals(): void
     {
         $admin = User::whereHas('roles', fn ($q) => $q->where('name', 'admin'))->first();

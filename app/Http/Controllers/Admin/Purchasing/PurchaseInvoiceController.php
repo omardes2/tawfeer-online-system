@@ -52,10 +52,40 @@ class PurchaseInvoiceController extends Controller
     {
         $this->authorize('purchasing.invoices.create');
 
-        return view('admin.purchasing.invoices.form', [
+        return view('admin.purchasing.invoices.form', $this->formViewData(null));
+    }
+
+    /**
+     * بيانات نموذج الإنشاء/التعديل — تُمرَّر كمتغيّرات عرض (لا @php علوية) حتى تتوفّر داخل
+     * نطاق مكوّنات التخطيط (slots).
+     *
+     * @return array<string, mixed>
+     */
+    private function formViewData(?PurchaseInvoice $invoice): array
+    {
+        $rows = $invoice
+            ? $invoice->items->map(fn ($it) => [
+                'is_new' => (bool) (! $it->variant_id && $it->new_product_name),
+                'variant_id' => (string) ($it->variant_id ?? ''),
+                'new_name' => $it->new_product_name ?? '',
+                'sell_price' => $it->new_product_sell_price !== null ? (float) $it->new_product_sell_price : 0,
+                'description' => $it->description ?? '',
+                'qty' => (float) $it->qty,
+                'unit_cost' => (float) $it->unit_cost,
+                'tax_rate' => (float) $it->tax_rate,
+            ])->values()->all()
+            : [];
+        if (empty($rows)) {
+            $rows = [['is_new' => false, 'variant_id' => '', 'new_name' => '', 'sell_price' => 0, 'description' => '', 'qty' => 1, 'unit_cost' => 0, 'tax_rate' => 0]];
+        }
+
+        return [
+            'invoice' => $invoice,
+            'editing' => (bool) $invoice,
+            'initialRows' => $rows,
             'suppliers' => Supplier::where('is_active', true)->orderBy('name')->get(),
             'variants' => ProductVariant::with('product:id,name')->orderBy('id')->get(),
-        ]);
+        ];
     }
 
     public function store(StorePurchaseInvoiceRequest $request): RedirectResponse
@@ -70,11 +100,7 @@ class PurchaseInvoiceController extends Controller
         $this->authorize('purchasing.invoices.create');
         abort_unless(in_array($invoice->status, ['draft', 'approved'], true), 403, __('لا يمكن تعديل فاتورة بهذه الحالة.'));
 
-        return view('admin.purchasing.invoices.form', [
-            'invoice' => $invoice->load('items.variant.product'),
-            'suppliers' => Supplier::where('is_active', true)->orderBy('name')->get(),
-            'variants' => ProductVariant::with('product:id,name')->orderBy('id')->get(),
-        ]);
+        return view('admin.purchasing.invoices.form', $this->formViewData($invoice->load('items.variant.product')));
     }
 
     public function update(StorePurchaseInvoiceRequest $request, PurchaseInvoice $invoice): RedirectResponse

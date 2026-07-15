@@ -102,9 +102,16 @@
                             @endcan
                         </td>
                         <td class="text-end">
-                            @can('update', $product)
-                                <a href="{{ route('admin.products.edit', $product) }}" class="btn-secondary btn-sm">{{ __('تعديل') }}</a>
-                            @endcan
+                            <div class="inline-flex items-center gap-1.5">
+                                @can('update', $product)
+                                    <a href="{{ route('admin.products.edit', $product) }}" class="btn-secondary btn-sm">{{ __('تعديل') }}</a>
+                                @endcan
+                                @can('delete', $product)
+                                    <x-admin.confirm :action="route('admin.products.destroy', $product)" method="DELETE"
+                                        :title="__('حذف المنتج')" :message="__('سيُحذف المنتج نهائيًا من الكتالوج.')"
+                                        :confirm="__('حذف')" tone="red" :trigger="__('حذف')" />
+                                @endcan
+                            </div>
                         </td>
                     </tr>
                 @empty

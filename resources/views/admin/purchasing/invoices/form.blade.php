@@ -1,22 +1,3 @@
-@php($editing = isset($invoice))
-@php
-    $initialRows = $editing
-        ? $invoice->items->map(fn ($it) => [
-            'is_new' => (bool) (! $it->variant_id && $it->new_product_name),
-            'variant_id' => (string) ($it->variant_id ?? ''),
-            'new_name' => $it->new_product_name ?? '',
-            'sell_price' => $it->new_product_sell_price !== null ? (float) $it->new_product_sell_price : 0,
-            'description' => $it->description ?? '',
-            'qty' => (float) $it->qty,
-            'unit_cost' => (float) $it->unit_cost,
-            'tax_rate' => (float) $it->tax_rate,
-        ])->values()->all()
-        : [];
-    if (empty($initialRows)) {
-        $initialRows = [['is_new' => false, 'variant_id' => '', 'new_name' => '', 'sell_price' => 0, 'description' => '', 'qty' => 1, 'unit_cost' => 0, 'tax_rate' => 0]];
-    }
-@endphp
-
 <x-app-layout :title="$editing ? __('تعديل فاتورة شراء') : __('فاتورة شراء جديدة')">
     <x-admin.header
         :title="$editing ? __('تعديل فاتورة شراء') : __('فاتورة شراء جديدة')"

@@ -57,11 +57,24 @@
                                 <td class="py-3 px-4 tabular-nums text-gray-600">{{ $num($p->wholesale_price) }} {{ $currency }}</td>
                                 <td class="py-3 px-4 tabular-nums text-gray-500">{{ $num($p->cost_price) }} {{ $currency }}</td>
                                 <td class="py-3 px-4 text-center">
-                                    @can('update', $p)
-                                        <a href="{{ route('admin.inventory.products.edit', $p) }}" class="inline-flex text-gray-400 hover:text-emerald-600" title="{{ __('تعديل الصنف') }}">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
-                                        </a>
-                                    @endcan
+                                    <div class="inline-flex items-center gap-2">
+                                        @can('update', $p)
+                                            <a href="{{ route('admin.inventory.products.edit', $p) }}" class="inline-flex text-gray-400 hover:text-emerald-600" title="{{ __('تعديل الصنف') }}">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
+                                            </a>
+                                        @endcan
+                                        @can('delete', $p)
+                                            <x-admin.confirm :action="route('admin.products.destroy', $p)" method="DELETE"
+                                                :title="__('حذف الصنف')" :message="__('سيُحذف المنتج نهائيًا من الكتالوج والمخزون.')"
+                                                :confirm="__('حذف')" tone="red">
+                                                <x-slot name="trigger">
+                                                    <span class="inline-flex text-gray-400 hover:text-rose-600" title="{{ __('حذف الصنف') }}">
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                    </span>
+                                                </x-slot>
+                                            </x-admin.confirm>
+                                        @endcan
+                                    </div>
                                 </td>
                             </tr>
                         @empty
