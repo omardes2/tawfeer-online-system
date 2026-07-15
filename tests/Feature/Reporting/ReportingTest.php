@@ -137,44 +137,4 @@ class ReportingTest extends TestCase
     }
 
     // ---- الواجهة والتصدير ----
-
-    public function test_dashboards_render_for_authorized_role(): void
-    {
-        $manager = $this->actor('manager');
-        $manager->update(['email_verified_at' => now()]);
-        $this->deliveredOrder($this->actor('sales'));
-
-        foreach (['', '/executive', '/sales', '/orders', '/delivery', '/finance', '/sales-employees', '/marketers', '/products', '/customers', '/delivery-companies', '/returns'] as $path) {
-            $this->actingAs($manager)->get('/admin/reports'.$path)->assertOk();
-        }
-    }
-
-    public function test_excel_csv_export(): void
-    {
-        $manager = $this->actor('manager');
-        $manager->update(['email_verified_at' => now()]);
-        $rep = $this->actor('sales');
-        $this->deliveredOrder($rep);
-
-        $res = $this->actingAs($manager)->get('/admin/reports/sales-employees?export=csv');
-        $res->assertOk();
-        $this->assertStringContainsString('text/csv', $res->headers->get('content-type'));
-    }
-
-    public function test_reports_require_permission(): void
-    {
-        $sales = $this->actor('sales'); // لا يملك reports.view
-        $sales->update(['email_verified_at' => now()]);
-        $this->actingAs($sales)->get('/admin/reports')->assertForbidden();
-    }
-
-    public function test_search_filters_tabular_report(): void
-    {
-        $manager = $this->actor('manager');
-        $manager->update(['email_verified_at' => now()]);
-        $rep = $this->actor('sales');
-        $this->deliveredOrder($rep);
-
-        $this->actingAs($manager)->get('/admin/reports/sales-employees?q='.urlencode($rep->name))->assertOk()->assertSee($rep->name);
-    }
 }

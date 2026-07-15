@@ -28,12 +28,6 @@
         :title="__('dashboard.title')"
         :description="__('نظرة عامة على أداء المتجر والعمليات اليومية')"
         :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('dashboard.title') => null]">
-        @can('reports.view')
-            <a href="{{ route('admin.reports.index') }}" class="btn-secondary btn-sm">{{ __('dashboard.view_reports') }}</a>
-        @endcan
-        @can('kpis.view')
-            <a href="{{ route('admin.kpis') }}" class="btn-primary btn-sm">{{ __('reports.kpis') }}</a>
-        @endcan
     </x-admin.header>
 
     {{-- Operations KPIs --}}

@@ -54,14 +54,8 @@
                     @can('settlements.view')
                         <x-nav-link :href="route('admin.settlements.index')" :active="request()->routeIs('admin.settlements.*')">{{ __('settlements.title') }}</x-nav-link>
                     @endcan
-                    @can('reports.view')
-                        <x-nav-link :href="route('admin.reports.index')" :active="request()->routeIs('admin.reports.*')">{{ __('reports.title') }}</x-nav-link>
-                    @endcan
                     @can('dashboard.view')
                         <x-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')">{{ __('dashboard.title') }}</x-nav-link>
-                    @endcan
-                    @can('kpis.view')
-                        <x-nav-link :href="route('admin.kpis')" :active="request()->routeIs('admin.kpis')">{{ __('reports.kpis') }}</x-nav-link>
                     @endcan
                     @can('marketing.campaigns.view')
                         <x-nav-link :href="route('admin.marketing.campaigns.index')" :active="request()->routeIs('admin.marketing.*')">{{ __('التسويق') }}</x-nav-link>
