@@ -31,6 +31,7 @@ use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController as AdminPurcha
 use App\Http\Controllers\Admin\Purchasing\SupplierController as AdminSupplierController;
 use App\Http\Controllers\Admin\Purchasing\SupplierReturnController as AdminSupplierReturnController;
 use App\Http\Controllers\Admin\Recommendations\RecommendationRuleController as AdminRecommendationRuleController;
+use App\Http\Controllers\Admin\Reports\AnalyticsController as AdminAnalyticsController;
 use App\Http\Controllers\Admin\Reports\KpiController as AdminKpiController;
 use App\Http\Controllers\Admin\Reports\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\Returns\ReturnController as AdminReturnController;
@@ -315,6 +316,23 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('customers', [AdminReportController::class, 'customers'])->name('customers');
         Route::get('delivery-companies', [AdminReportController::class, 'deliveryCompanies'])->name('delivery_companies');
         Route::get('returns', [AdminReportController::class, 'returns'])->name('returns');
+
+        // وحدة «التقارير والتحليلات» الموسّعة — 12 فئة، صلاحية دقيقة لكل فئة.
+        Route::prefix('analytics')->name('analytics.')->group(function () {
+            Route::get('/', [AdminAnalyticsController::class, 'index'])->name('index');
+            Route::get('dashboard', [AdminAnalyticsController::class, 'dashboard'])->name('dashboard')->middleware('can:reports.executive.view');
+            Route::get('sales', [AdminAnalyticsController::class, 'sales'])->name('sales')->middleware('can:reports.sales.view');
+            Route::get('customers', [AdminAnalyticsController::class, 'customers'])->name('customers')->middleware('can:reports.customers.view');
+            Route::get('products', [AdminAnalyticsController::class, 'products'])->name('products')->middleware('can:reports.products.view');
+            Route::get('inventory', [AdminAnalyticsController::class, 'inventory'])->name('inventory')->middleware('can:reports.inventory.view');
+            Route::get('shipping', [AdminAnalyticsController::class, 'shipping'])->name('shipping')->middleware('can:reports.shipping.view');
+            Route::get('financial', [AdminAnalyticsController::class, 'financial'])->name('financial')->middleware('can:reports.financial.view');
+            Route::get('employees', [AdminAnalyticsController::class, 'employees'])->name('employees')->middleware('can:reports.employees.view');
+            Route::get('marketers', [AdminAnalyticsController::class, 'marketers'])->name('marketers')->middleware('can:reports.marketers.view');
+            Route::get('marketing', [AdminAnalyticsController::class, 'marketing'])->name('marketing')->middleware('can:reports.marketing.view');
+            Route::get('support', [AdminAnalyticsController::class, 'support'])->name('support')->middleware('can:reports.support.view');
+            Route::get('audit', [AdminAnalyticsController::class, 'audit'])->name('audit')->middleware('can:reports.audit.view');
+        });
     });
 
     // لوحة التحكّم التنفيذية (Production) — للقراءة فقط

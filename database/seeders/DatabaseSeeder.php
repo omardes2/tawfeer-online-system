@@ -67,6 +67,8 @@ class DatabaseSeeder extends Seeder
             MarketingPermissionSeeder::class,
             // الإدارة — المستخدمون/الأدوار/الإعدادات/لوحة التحكّم (Production)
             AdministrationPermissionSeeder::class,
+            // وحدة التقارير والتحليلات الموسّعة — صلاحية لكل فئة
+            AnalyticsReportPermissionSeeder::class,
         ]);
     }
 }
