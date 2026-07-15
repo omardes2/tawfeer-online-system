@@ -92,7 +92,12 @@
                                     </template>
                                 </span>
                                 <span class="min-w-0 flex-1">
-                                    <span class="block text-sm font-medium text-gray-800 truncate" x-text="p.name"></span>
+                                    <span class="flex items-center gap-2">
+                                        <span class="text-sm font-medium text-gray-800 truncate" x-text="p.name"></span>
+                                        <span class="shrink-0 text-[11px] px-1.5 py-0.5 rounded-md tabular-nums"
+                                              :class="(Number(p.available) > 0) ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'"
+                                              x-text="'{{ __('المتوفر') }}: ' + Number(p.available ?? 0)"></span>
+                                    </span>
                                     <span class="block text-xs text-gray-400" x-text="p.sku"></span>
                                 </span>
                                 <span class="text-sm font-semibold text-emerald-600 tabular-nums" x-text="p.price.toFixed(2) + ' {{ $sym }}'"></span>

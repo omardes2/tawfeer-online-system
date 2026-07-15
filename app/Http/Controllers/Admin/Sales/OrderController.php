@@ -14,6 +14,7 @@ use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\City;
 use App\Modules\Foundation\Models\DeliveryCityRate;
 use App\Modules\Foundation\Models\Warehouse;
+use App\Modules\Inventory\Models\InventoryStock;
 use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderPaymentService;
@@ -110,7 +111,16 @@ class OrderController extends Controller
     {
         $this->authorize('create', Order::class);
 
-        // بطاقات المنتجات للبحث بالاسم مع صورة مصغّرة وسعر (نمط نقطة البيع).
+        $warehouse = $this->defaultWarehouse();
+
+        // الكمية المتوفرة (on_hand − reserved) لكل صنف في المستودع الافتراضي — لعرضها في نتائج البحث.
+        $availableByVariant = InventoryStock::query()
+            ->when($warehouse, fn ($q) => $q->where('warehouse_id', $warehouse->id))
+            ->selectRaw('variant_id, SUM(on_hand - reserved) as qty')
+            ->groupBy('variant_id')
+            ->pluck('qty', 'variant_id');
+
+        // بطاقات المنتجات للبحث بالاسم مع صورة مصغّرة وسعر والكمية المتوفرة (نمط نقطة البيع).
         $products = Product::query()->active()
             ->with(['defaultVariant', 'primaryImage'])
             ->orderBy('name')
@@ -122,11 +132,12 @@ class OrderController extends Controller
                 'variant' => $p->defaultVariant->uuid,
                 'price' => (float) $p->defaultVariant->retail_price,
                 'image' => $p->primaryImage?->url(),
+                'available' => (float) ($availableByVariant[$p->defaultVariant->id] ?? 0),
             ])->values();
 
         return view('admin.sales.orders.form', [
             // مستودع افتراضي واحد (مخفيّ في الواجهة) — يُحلّ تلقائيًا.
-            'warehouse' => $this->defaultWarehouse(),
+            'warehouse' => $warehouse,
             'products' => $products,
             // مدن أوبتيموس فقط (المزامَنة ولها سعر) — تضمن وجود ربط خارجي (تفادي رفض 422).
             'cities' => City::whereIn('id', DeliveryCityRate::where('is_active', true)->pluck('city_id')->filter())
@@ -394,6 +405,39 @@ class OrderController extends Controller
         $order->delete(); // حذف ناعم (soft delete).
 
         return redirect()->route('admin.sales.orders.index')->with('success', __('تم حذف الطلب.'));
+    }
+
+    /**
+     * حذف جماعي للطلبات المحدَّدة — يحذف فقط ما يُسمح حذفه (ملغى + شحنته ملغاة) ولمن يملك
+     * الصلاحية، ويتخطّى الباقي بصمت مع تقرير عدد المحذوف والمتخطّى.
+     */
+    public function bulkDestroy(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()?->can('sales.orders.delete'), 403);
+
+        $ids = collect($request->input('ids', []))->filter()->map(fn ($v) => (int) $v)->all();
+        if (empty($ids)) {
+            return back()->with('error', __('لم تُحدَّد أي طلبات للحذف.'));
+        }
+
+        $deleted = 0;
+        $skipped = 0;
+
+        Order::with('latestShipment')->whereIn('id', $ids)->get()->each(function (Order $order) use (&$deleted, &$skipped) {
+            if (self::isDeletable($order)) {
+                $order->delete();
+                $deleted++;
+            } else {
+                $skipped++;
+            }
+        });
+
+        $message = trans_choice('{0}لم يُحذف أي طلب.|{1}تم حذف طلب واحد.|[2,*]تم حذف :count طلبات.', $deleted, ['count' => $deleted]);
+        if ($skipped > 0) {
+            $message .= ' '.__('(تُخطّي :n لعدم استيفاء شرط الحذف)', ['n' => $skipped]);
+        }
+
+        return redirect()->route('admin.sales.orders.index')->with($deleted > 0 ? 'success' : 'warning', $message);
     }
 
     /** الطلب قابل للحذف فقط عند إلغائه وإلغاء شحنته لدى المزوّد (أوبتيموس). */

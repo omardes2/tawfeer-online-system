@@ -25,25 +25,16 @@
         $hasFilter = ($activeStatus ?? null) || ($activeDeliveryStatus ?? null) || ($activePaymentStatus ?? null) || ($activeSearch ?? null) || ($activeSaleType ?? null);
     @endphp
 
-    {{-- بحث برقم التتبّع أو اسم المستلم أو المستخدم (يحافظ على الفلاتر الحالية) --}}
-    <form method="GET" action="{{ route('admin.sales.orders.index') }}" class="mb-3">
-        <input type="hidden" name="status" value="{{ $activeStatus }}" />
-        <input type="hidden" name="delivery_status" value="{{ $activeDeliveryStatus }}" />
-        <input type="hidden" name="payment_status" value="{{ $activePaymentStatus }}" />
-        <input type="hidden" name="sale_type" value="{{ $activeSaleType }}" />
-        <div class="relative max-w-lg">
+    {{-- البحث + الفلاتر في صفٍّ واحد (البحث بجانب الفلاتر) --}}
+    <form method="GET" action="{{ route('admin.sales.orders.index') }}" class="flex flex-wrap items-end gap-3 mb-5">
+        <div class="relative w-full sm:w-72">
             <span class="absolute inset-y-0 start-0 ps-3 flex items-center text-gray-400">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg>
             </span>
             <input type="text" name="search" value="{{ $activeSearch }}"
-                   placeholder="{{ __('بحث برقم التتبّع أو اسم المستلم أو المستخدم...') }}"
-                   class="w-full ps-9 pe-24 rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
-            <button type="submit" class="absolute inset-y-0 end-0 px-4 text-sm text-emerald-700 hover:text-emerald-900">{{ __('بحث') }}</button>
+                   placeholder="{{ __('بحث برقم التتبّع أو اسم المستلم...') }}"
+                   class="w-full ps-9 pe-3 rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
         </div>
-    </form>
-
-    <form method="GET" action="{{ route('admin.sales.orders.index') }}" class="flex flex-wrap items-end gap-3 mb-5">
-        <input type="hidden" name="search" value="{{ $activeSearch }}" />
 
         <div>
             <select name="sale_type" onchange="this.form.submit()" class="{{ $selectCls }}">
@@ -81,15 +72,42 @@
             </select>
         </div>
 
-        <noscript><button type="submit" class="btn-secondary btn-sm">{{ __('فلترة') }}</button></noscript>
+        <button type="submit" class="btn-secondary btn-sm">{{ __('بحث') }}</button>
         @if ($hasFilter)
             <a href="{{ route('admin.sales.orders.index') }}" class="btn-secondary btn-sm">{{ __('مسح الفلاتر') }}</a>
         @endif
     </form>
 
+    {{-- نموذج الحذف الجماعي (فارغ؛ صناديق التحديد تنضمّ إليه عبر السمة form=) --}}
+    @can('sales.orders.delete')
+        <form id="orders-bulk-delete" method="POST" action="{{ route('admin.sales.orders.bulk_destroy') }}"
+              onsubmit="return confirm('{{ __('حذف الطلبات المحدَّدة نهائيًا؟') }}')">
+            @csrf @method('DELETE')
+        </form>
+    @endcan
+
+    <div x-data="{
+            count: 0,
+            recount() { this.count = document.querySelectorAll('input[data-row-check]:checked').length; },
+            toggleAll(e) { document.querySelectorAll('input[data-row-check]:not(:disabled)').forEach(c => c.checked = e.target.checked); this.recount(); }
+         }">
+        @can('sales.orders.delete')
+            <div class="flex items-center justify-end mb-3" x-show="count > 0" x-cloak>
+                <button type="submit" form="orders-bulk-delete" class="btn-danger btn-sm">
+                    {{ __('حذف المحدَّد') }} (<span x-text="count"></span>)
+                </button>
+            </div>
+        @endcan
+
     <x-admin.table>
         <thead>
             <tr>
+                @can('sales.orders.delete')
+                    <th class="w-8">
+                        <input type="checkbox" x-on:change="toggleAll($event)"
+                               class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                    </th>
+                @endcan
                 <th>{{ __('رقم التتبّع') }}</th>
                 <th>{{ __('التاريخ والوقت') }}</th>
                 <th>{{ __('اسم المستلم') }}</th>
@@ -104,6 +122,18 @@
         <tbody>
             @forelse ($orders as $o)
                 <tr>
+                    @can('sales.orders.delete')
+                        @php
+                            $deletable = \App\Http\Controllers\Admin\Sales\OrderController::isDeletable($o);
+                        @endphp
+                        <td class="w-8">
+                            <input type="checkbox" name="ids[]" value="{{ $o->id }}" form="orders-bulk-delete"
+                                   data-row-check x-on:change="recount()"
+                                   @disabled(! $deletable)
+                                   title="{{ $deletable ? '' : __('لا يمكن حذف هذا الطلب (يجب أن يكون ملغى وشحنته ملغاة)') }}"
+                                   class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed" />
+                        </td>
+                    @endcan
                     <td class="font-mono text-xs">
                         @if ($o->channel === 'pos')
                             <span class="inline-flex items-center rounded-md bg-violet-50 text-violet-700 text-[11px] px-1.5 py-0.5">{{ __('مبيعات مباشرة') }}</span>
@@ -214,7 +244,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="9" class="!p-0">
+                <tr><td colspan="{{ auth()->user()?->can('sales.orders.delete') ? 10 : 9 }}" class="!p-0">
                     <x-admin.empty-state
                         :title="__('لا توجد طلبات')"
                         :description="($activeStatus ?? null) ? __('لا توجد طلبات بهذه الحالة.') : __('ابدأ بإنشاء أول طلب بيع.')"
@@ -223,6 +253,7 @@
             @endforelse
         </tbody>
     </x-admin.table>
+    </div>
 
     <div class="mt-4">{{ $orders->links() }}</div>
 
