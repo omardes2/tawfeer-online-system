@@ -19,7 +19,6 @@ use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderPaymentService;
 use App\Modules\Sales\Services\OrderService;
-use App\Modules\Shipping\Jobs\CancelOrderShipment;
 use App\Modules\Shipping\Services\OrderDeliveryDispatcher;
 use App\Modules\Shipping\Support\DeliveryStatus;
 use App\Modules\Shipping\Support\OpostStatus;
@@ -484,11 +483,11 @@ class OrderController extends Controller
         return $this->guard($order, fn () => $this->service->deliver($order), __('تم تسليم الطلب.'));
     }
 
-    public function cancel(CancelOrderRequest $request, Order $order): RedirectResponse
+    public function cancel(CancelOrderRequest $request, Order $order, OrderDeliveryDispatcher $dispatcher): RedirectResponse
     {
         $this->authorize('cancel', $order);
 
-        // المعرّف الخارجي قبل الإلغاء (للإلغاء لدى المزوّد لاحقًا).
+        // هل أُرسل الطلب لشركة التوصيل؟ (له معرّف خارجي أو رقم تتبّع).
         $sentToProvider = ! empty($order->delivery_external_id) || ! empty($order->tracking_number);
 
         try {
@@ -497,11 +496,16 @@ class OrderController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        // إلغاء الشحنة من شركة التوصيل (Opost) في الخلفية إن كان الطلب قد أُرسل.
+        // إلغاء الشحنة من شركة التوصيل (Opost) مباشرةً (متزامن) — لا اعتماد على طابور خلفية،
+        // فالإلغاء ينعكس فورًا لدى المزوّد (يعالج مشكلة بقاء الشحنة نشطة بعد إلغاء الطلب).
         if ($sentToProvider && config('shipping.provider', 'null') !== 'null') {
-            CancelOrderShipment::dispatch($order->id);
+            $result = $dispatcher->cancelShipment($order);
 
-            return back()->with('success', __('أُلغي الطلب وحُرّر الحجز، ويجري إلغاء الشحنة من شركة التوصيل.'));
+            if (($result['status'] ?? null) === 'cancelled') {
+                return back()->with('success', __('أُلغي الطلب وحُرّر الحجز، وأُلغيت الشحنة من شركة التوصيل.'));
+            }
+
+            return back()->with('warning', __('أُلغي الطلب وحُرّر الحجز، لكن تعذّر إلغاء الشحنة من شركة التوصيل: :msg', ['msg' => $result['message'] ?? '']));
         }
 
         return back()->with('success', __('أُلغي الطلب وحُرّر الحجز.'));

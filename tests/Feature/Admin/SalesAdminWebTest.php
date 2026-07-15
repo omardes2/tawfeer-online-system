@@ -18,7 +18,6 @@ use App\Modules\Inventory\Models\InventoryStock;
 use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
-use App\Modules\Shipping\Jobs\CancelOrderShipment;
 use App\Modules\Shipping\Models\Shipment;
 use App\Modules\Shipping\Support\DeliveryStatus;
 use Database\Seeders\DatabaseSeeder;
@@ -213,10 +212,11 @@ class SalesAdminWebTest extends TestCase
         $this->assertNull($order->fresh()->return_received_at);
     }
 
-    public function test_cancel_awaiting_pickup_order_cancels_and_dispatches_provider_cancel(): void
+    public function test_cancel_awaiting_pickup_order_cancels_provider_shipment_synchronously(): void
     {
-        config()->set('shipping.provider', 'opost');
-        Queue::fake();
+        config()->set('shipping.provider', 'faketrack');
+        config()->set('shipping.drivers.faketrack.delivery', FakeTrackingDeliveryProvider::class);
+        FakeTrackingDeliveryProvider::$cancelResult = true;
         $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
 
         $order = app(OrderService::class)->create([
@@ -224,13 +224,13 @@ class SalesAdminWebTest extends TestCase
             'customer_name' => 'س', 'customer_phone' => '0599000000',
         ], [], 2026);
         // أُرسل للمزوّد (له رقم تتبّع) وحالته أوبتيموس «بانتظار الاستلام».
-        $order->update(['status' => 'confirmed', 'tracking_number' => 'TRK-1']);
-        $provider = DeliveryProvider::firstOrCreate(['code' => 'opost'], ['name' => 'Opost', 'driver' => 'opost']);
+        $order->update(['status' => 'confirmed', 'tracking_number' => 'TRK-1', 'delivery_external_id' => 'TRK-1']);
+        $provider = DeliveryProvider::firstOrCreate(['code' => 'faketrack'], ['name' => 'Fake', 'driver' => 'faketrack']);
         Shipment::create([
             'number' => 'SHPX-'.$order->id, 'order_id' => $order->id, 'branch_id' => $order->branch_id,
             'warehouse_id' => $order->warehouse_id, 'status' => 'not_shipped',
             'recipient_name' => 'س', 'recipient_phone' => '0599000000',
-            'delivery_provider_id' => $provider->id, 'provider_status' => 'submitted',
+            'delivery_provider_id' => $provider->id, 'external_id' => 'TRK-1', 'provider_status' => 'submitted',
         ]);
 
         $this->actingAs($this->admin())->post(route('admin.sales.orders.cancel', $order), [
@@ -238,7 +238,7 @@ class SalesAdminWebTest extends TestCase
         ])->assertRedirect();
 
         $this->assertSame('cancelled', $order->fresh()->status);
-        Queue::assertPushed(CancelOrderShipment::class);
+        $this->assertSame('cancelled', Shipment::where('order_id', $order->id)->value('delivery_status'));
     }
 
     public function test_direct_sale_form_renders(): void
@@ -453,11 +453,13 @@ class SalesAdminWebTest extends TestCase
         $this->assertNotEmpty($order->tracking_number); // أُرسل مباشرةً لشركة التوصيل.
     }
 
-    public function test_cancel_queues_provider_cancel_when_order_was_sent(): void
+    public function test_cancel_cancels_provider_shipment_synchronously(): void
     {
-        // طلب أُرسل لـOpost (له معرّف خارجي) ⇒ إلغاؤه يضع مهمة إلغاء لدى المزوّد.
-        config()->set('shipping.provider', 'opost');
-        Queue::fake();
+        // طلب أُرسل للمزوّد (له معرّف خارجي وشحنة نشطة) ⇒ إلغاؤه يُلغي الشحنة لدى المزوّد
+        // مباشرةً (متزامن) وينعكس محليًا — لا اعتماد على طابور.
+        config()->set('shipping.provider', 'faketrack');
+        config()->set('shipping.drivers.faketrack.delivery', FakeTrackingDeliveryProvider::class);
+        FakeTrackingDeliveryProvider::$cancelResult = true;
 
         $variant = Product::factory()->create()->defaultVariant;
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
@@ -469,13 +471,22 @@ class SalesAdminWebTest extends TestCase
 
         $order = Order::latest('id')->first();
         $order->update(['delivery_external_id' => '9999', 'tracking_number' => '9999']);
+        $provider = DeliveryProvider::firstOrCreate(['code' => 'faketrack'], ['name' => 'Fake', 'driver' => 'faketrack']);
+        Shipment::create([
+            'number' => 'SHP-'.$order->id, 'order_id' => $order->id, 'branch_id' => $order->branch_id,
+            'warehouse_id' => $order->warehouse_id, 'status' => 'not_shipped',
+            'recipient_name' => 'ليان', 'recipient_phone' => '0599333333',
+            'delivery_provider_id' => $provider->id, 'external_id' => '9999', 'provider_status' => 'submitted',
+        ]);
 
         $this->actingAs($this->admin())
             ->post(route('admin.sales.orders.cancel', $order), ['reason' => 'اختبار الإلغاء'])
             ->assertRedirect();
 
         $this->assertSame('cancelled', $order->fresh()->status);
-        Queue::assertPushed(CancelOrderShipment::class);
+        // أُلغيت الشحنة لدى المزوّد وانعكست محليًا (لم تبقَ نشطة).
+        $this->assertSame('cancelled', $order->fresh()->delivery_status);
+        $this->assertSame('cancelled', Shipment::where('order_id', $order->id)->value('delivery_status'));
     }
 
     public function test_delete_blocked_unless_order_and_delivery_cancelled(): void

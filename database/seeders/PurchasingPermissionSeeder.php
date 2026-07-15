@@ -14,8 +14,8 @@ class PurchasingPermissionSeeder extends Seeder
     private array $permissions = [
         'purchasing.suppliers.view', 'purchasing.suppliers.create', 'purchasing.suppliers.update', 'purchasing.suppliers.delete',
         'purchasing.orders.view', 'purchasing.orders.create', 'purchasing.orders.update', 'purchasing.orders.approve', 'purchasing.orders.cancel', 'purchasing.orders.close', 'purchasing.orders.delete',
-        'purchasing.receipts.view', 'purchasing.receipts.create', 'purchasing.receipts.post',
-        'purchasing.returns.view', 'purchasing.returns.create', 'purchasing.returns.approve', 'purchasing.returns.post',
+        'purchasing.receipts.view', 'purchasing.receipts.create', 'purchasing.receipts.update', 'purchasing.receipts.delete', 'purchasing.receipts.post',
+        'purchasing.returns.view', 'purchasing.returns.create', 'purchasing.returns.update', 'purchasing.returns.delete', 'purchasing.returns.approve', 'purchasing.returns.post',
     ];
 
     private array $grants = [
