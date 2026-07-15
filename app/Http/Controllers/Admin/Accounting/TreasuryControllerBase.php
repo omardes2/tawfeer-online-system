@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Admin\Accounting;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Accounting\StoreTreasuryRequest;
 use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Models\FinancialVoucher;
+use App\Modules\Accounting\Models\JournalLine;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Accounting\Services\TreasuryService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 /**
  * أساس متحكّم الخزائن/البنوك (Phase 7.1) — متحكّم رفيع فوق TreasuryService.
@@ -84,11 +87,38 @@ abstract class TreasuryControllerBase extends Controller
         $this->authorize2('view');
         abort_unless($treasury->type === $this->type(), 404);
 
+        $movements = $this->service->movements($treasury, 100);
+
         return view('admin.accounting.treasury.show', array_merge($this->ctx(), [
             'treasury' => $treasury->load('glAccount'),
             'balance' => $this->service->balance($treasury),
-            'movements' => $this->service->movements($treasury, 100),
+            'movements' => $movements,
+            'parties' => $this->resolveParties($movements),
         ]));
+    }
+
+    /**
+     * اسم الشخص/الجهة المستفيدة من كل حركة (المستفيد) — يُشتقّ من السند المالي المرتبط
+     * بالقيد (سند قبض/صرف أو دفعة فاتورة). المفتاح = معرّف القيد. غير الموجود لا اسم له.
+     *
+     * @param  Collection<int, JournalLine>  $movements
+     * @return array<int, string>
+     */
+    private function resolveParties(Collection $movements): array
+    {
+        $entryIds = $movements->map(fn ($m) => $m->entry?->id)->filter()->unique()->all();
+        if (empty($entryIds)) {
+            return [];
+        }
+
+        return FinancialVoucher::whereIn('journal_entry_id', $entryIds)
+            ->with(['supplier:id,name', 'customer:id,name', 'employee:id,name'])
+            ->get(['id', 'journal_entry_id', 'supplier_id', 'customer_id', 'employee_id', 'party_name'])
+            ->mapWithKeys(fn (FinancialVoucher $v) => [
+                $v->journal_entry_id => $v->supplier?->name ?? $v->customer?->name ?? $v->employee?->name ?? $v->party_name,
+            ])
+            ->filter()
+            ->all();
     }
 
     /** سياق العرض المشترك: بادئة المسار ونوع الخزينة. */

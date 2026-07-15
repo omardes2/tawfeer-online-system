@@ -22,7 +22,11 @@
                             <tr>
                                 <td class="py-2 px-3 font-mono text-xs">{{ $m->entry?->number }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ $m->entry?->entry_date?->format('Y-m-d') }}</td>
-                                <td class="py-2 px-3 text-gray-600">{{ $m->entry?->description }}</td>
+                                <td class="py-2 px-3 text-gray-600">
+                                    {{ $m->entry?->description }}
+                                    @php($party = $parties[$m->entry?->id] ?? null)
+                                    @if ($party)<span class="text-gray-400">— {{ $party }}</span>@endif
+                                </td>
                                 <td class="py-2 px-3 text-emerald-700">{{ $m->debit > 0 ? number_format($m->debit, 2) : '' }}</td>
                                 <td class="py-2 px-3 text-rose-600">{{ $m->credit > 0 ? number_format($m->credit, 2) : '' }}</td>
                             </tr>

@@ -76,13 +76,14 @@ class SupplierController extends Controller
         $invoices = PurchaseInvoice::where('supplier_id', $supplier->id)
             ->latest('id')->paginate(15);
 
-        $totals = PurchaseInvoice::where('supplier_id', $supplier->id)
-            ->where('status', 'posted')
-            ->selectRaw('COALESCE(SUM(total), 0) as invoiced, COALESCE(SUM(amount_paid), 0) as paid')
-            ->first();
+        // إجمالي المشتريات = الفواتير المُرحّلة. المدفوعات = سندات الدفع المُرحّلة للمورد
+        // (تشمل الدفعات المرتبطة بفاتورة والدفعات على الحساب معًا) — نفس مصدر كشف الحساب،
+        // حتى يتطابق «الرصيد المتبقّي» في البطاقة مع آخر رصيد في كشف الحساب.
+        $invoiced = (float) PurchaseInvoice::where('supplier_id', $supplier->id)
+            ->where('status', 'posted')->sum('total');
 
-        $invoiced = (float) ($totals->invoiced ?? 0);
-        $paid = (float) ($totals->paid ?? 0);
+        $paid = (float) FinancialVoucher::where('supplier_id', $supplier->id)
+            ->where('kind', 'payment')->where('status', 'posted')->sum('amount');
 
         $payments = FinancialVoucher::where('supplier_id', $supplier->id)
             ->where('kind', 'payment')
