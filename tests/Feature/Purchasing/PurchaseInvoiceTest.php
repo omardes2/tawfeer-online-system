@@ -98,7 +98,7 @@ class PurchaseInvoiceTest extends TestCase
         $this->assertEqualsWithDelta($before + 10, $after, 0.001);
     }
 
-    public function test_store_defines_new_product_from_invoice_line(): void
+    public function test_new_product_defined_and_stocked_only_on_posting(): void
     {
         $admin = User::whereHas('roles', fn ($q) => $q->where('name', 'admin'))->first();
         $this->actingAs($admin);
@@ -109,16 +109,21 @@ class PurchaseInvoiceTest extends TestCase
             'items' => [['new_name' => 'صنف جديد للاختبار', 'sell_price' => 120, 'qty' => 5, 'unit_cost' => 80, 'tax_rate' => 0]],
         ])->assertRedirect();
 
+        // مسودّة: لا يُنشأ منتج ولا يدخل مخزون بعد.
+        $this->assertNull(Product::where('name', 'صنف جديد للاختبار')->first());
+        $inv = PurchaseInvoice::latest('id')->first();
+        $item = $inv->items->first();
+        $this->assertNull($item->variant_id);
+        $this->assertSame('صنف جديد للاختبار', $item->new_product_name);
+
+        // بعد الترحيل: يُنشأ المنتج ويدخل المخزون.
+        $this->service->approve($inv);
+        $this->service->post($inv->fresh());
+
         $product = Product::where('name', 'صنف جديد للاختبار')->first();
         $this->assertNotNull($product);
         $this->assertEqualsWithDelta(120, (float) $product->retail_price, 0.01);
         $variant = $product->defaultVariant()->firstOrFail();
-
-        $inv = PurchaseInvoice::latest('id')->first();
-        $this->assertEquals($variant->id, $inv->items->first()->variant_id);
-
-        $this->service->approve($inv);
-        $this->service->post($inv->fresh());
 
         $warehouse = Warehouse::where('is_default', true)->firstOrFail();
         $onHand = (float) InventoryStock::where('variant_id', $variant->id)
@@ -126,7 +131,7 @@ class PurchaseInvoiceTest extends TestCase
         $this->assertEqualsWithDelta(5, $onHand, 0.001);
     }
 
-    /** بعد تفريغ البيانات (لا فئات) — تعريف صنف جديد من الفاتورة يجب أن ينجح (فئة افتراضية). */
+    /** بعد تفريغ البيانات (لا فئات) — تعريف صنف جديد من الفاتورة عند الترحيل ينجح (فئة افتراضية). */
     public function test_new_product_from_invoice_works_when_no_categories_exist(): void
     {
         Artisan::call('demo:clear', ['--force' => true]);
@@ -141,8 +146,50 @@ class PurchaseInvoiceTest extends TestCase
             'items' => [['new_name' => 'خشب', 'qty' => 10, 'unit_cost' => 20, 'tax_rate' => 0]],
         ])->assertRedirect()->assertSessionHasNoErrors();
 
+        // لا منتج في المسودّة؛ يُنشأ عند الترحيل.
+        $this->assertDatabaseMissing('products', ['name' => 'خشب']);
+        $inv = PurchaseInvoice::latest('id')->first();
+        $this->service->approve($inv);
+        $this->service->post($inv->fresh());
+
         $this->assertDatabaseHas('products', ['name' => 'خشب']);
         $this->assertGreaterThan(0, Category::count());
+    }
+
+    public function test_update_draft_invoice_replaces_items_and_recomputes_totals(): void
+    {
+        $admin = User::whereHas('roles', fn ($q) => $q->where('name', 'admin'))->first();
+        $this->actingAs($admin);
+
+        $inv = $this->makeInvoice(50, 10, 0); // إجمالي 500
+        $this->assertEqualsWithDelta(500, (float) $inv->total, 0.01);
+
+        $this->put(route('admin.purchasing.invoices.update', $inv), [
+            'supplier_id' => $this->supplier->id,
+            'invoice_date' => now()->toDateString(),
+            'items' => [['variant_id' => $this->variant->id, 'qty' => 3, 'unit_cost' => 100, 'tax_rate' => 0]],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $inv->refresh();
+        $this->assertEqualsWithDelta(300, (float) $inv->total, 0.01);
+        $this->assertCount(1, $inv->items);
+        $this->assertEqualsWithDelta(3, (float) $inv->items->first()->qty, 0.001);
+    }
+
+    public function test_cannot_update_posted_invoice(): void
+    {
+        $inv = $this->makeInvoice(50, 10, 0);
+        $this->service->approve($inv);
+        $this->service->post($inv);
+
+        $admin = User::whereHas('roles', fn ($q) => $q->where('name', 'admin'))->first();
+        $this->actingAs($admin)->put(route('admin.purchasing.invoices.update', $inv->fresh()), [
+            'supplier_id' => $this->supplier->id,
+            'invoice_date' => now()->toDateString(),
+            'items' => [['variant_id' => $this->variant->id, 'qty' => 99, 'unit_cost' => 1, 'tax_rate' => 0]],
+        ])->assertForbidden(); // فاتورة مُرحّلة لا تُعدَّل
+
+        $this->assertEqualsWithDelta(500, (float) $inv->fresh()->total, 0.01); // لم تتغيّر
     }
 
     public function test_post_is_idempotent(): void

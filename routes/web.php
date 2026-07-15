@@ -227,7 +227,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('returns/{return}/post', [AdminSupplierReturnController::class, 'post'])->name('returns.post');
 
         // فواتير الموردين/الشراء (REQUIREMENTS §2.5)
-        Route::resource('invoices', PurchaseInvoiceController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
+        Route::resource('invoices', PurchaseInvoiceController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
         Route::post('invoices/{invoice}/approve', [PurchaseInvoiceController::class, 'approve'])->name('invoices.approve');
         Route::post('invoices/{invoice}/cancel', [PurchaseInvoiceController::class, 'cancel'])->name('invoices.cancel');
         Route::post('invoices/{invoice}/post', [PurchaseInvoiceController::class, 'post'])->name('invoices.post');

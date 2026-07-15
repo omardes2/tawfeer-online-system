@@ -10,9 +10,19 @@
         :title="__('فاتورة شراء :n', ['n' => $invoice->number])"
         :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('فواتير الشراء') => route('admin.purchasing.invoices.index'), $invoice->number => null]">
         <div class="flex items-center gap-2 flex-wrap">
+            {{-- تعديل متاح للمسودّة والمعتمدة (قبل الترحيل) --}}
+            @if (in_array($invoice->status, ['draft', 'approved']))
+                @can('purchasing.invoices.create')
+                    <a href="{{ route('admin.purchasing.invoices.edit', $invoice) }}" class="btn-secondary btn-sm">{{ __('تعديل') }}</a>
+                @endcan
+            @endif
             @if ($invoice->status === 'draft')
                 @can('purchasing.invoices.approve')
                     <form method="POST" action="{{ route('admin.purchasing.invoices.approve', $invoice) }}">@csrf<button class="btn-primary btn-sm">{{ __('اعتماد') }}</button></form>
+                @endcan
+                @can('purchasing.invoices.delete')
+                    <x-admin.confirm :action="route('admin.purchasing.invoices.destroy', $invoice)" method="DELETE"
+                        :title="__('حذف الفاتورة')" :message="__('سيُحذف السجلّ نهائيًا (المسودّة فقط).')" :confirm="__('حذف')" tone="red" :trigger="__('حذف')" />
                 @endcan
             @elseif ($invoice->status === 'approved')
                 @can('purchasing.invoices.post')

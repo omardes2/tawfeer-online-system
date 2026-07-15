@@ -5,17 +5,12 @@ namespace App\Http\Controllers\Admin\Purchasing;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Purchasing\StorePurchaseInvoiceRequest;
 use App\Modules\Accounting\Models\Treasury;
-use App\Modules\Catalog\Models\Category;
-use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
-use App\Modules\Catalog\Models\Unit;
-use App\Modules\Catalog\Services\ProductService;
 use App\Modules\Purchasing\Models\PurchaseInvoice;
 use App\Modules\Purchasing\Models\Supplier;
 use App\Modules\Purchasing\Services\PurchaseInvoiceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -28,7 +23,6 @@ class PurchaseInvoiceController extends Controller
 
     public function __construct(
         private readonly PurchaseInvoiceService $service,
-        private readonly ProductService $products,
     ) {}
 
     public function index(Request $request): View
@@ -66,65 +60,55 @@ class PurchaseInvoiceController extends Controller
 
     public function store(StorePurchaseInvoiceRequest $request): RedirectResponse
     {
-        // تعريف الأصناف الجديدة من الفاتورة: إنشاء منتج + متغيّر ثم استخدام معرّفه في البند.
-        $items = collect($request->validated('items'))->map(function (array $it) {
+        $invoice = $this->service->create($request->safe()->except('items'), $this->mapItems($request->validated('items')));
+
+        return redirect()->route('admin.purchasing.invoices.show', $invoice)->with('success', __('أُنشئت فاتورة الشراء.'));
+    }
+
+    public function edit(PurchaseInvoice $invoice): View
+    {
+        $this->authorize('purchasing.invoices.create');
+        abort_unless(in_array($invoice->status, ['draft', 'approved'], true), 403, __('لا يمكن تعديل فاتورة بهذه الحالة.'));
+
+        return view('admin.purchasing.invoices.form', [
+            'invoice' => $invoice->load('items.variant.product'),
+            'suppliers' => Supplier::where('is_active', true)->orderBy('name')->get(),
+            'variants' => ProductVariant::with('product:id,name')->orderBy('id')->get(),
+        ]);
+    }
+
+    public function update(StorePurchaseInvoiceRequest $request, PurchaseInvoice $invoice): RedirectResponse
+    {
+        $this->authorize('purchasing.invoices.create');
+        abort_unless(in_array($invoice->status, ['draft', 'approved'], true), 403, __('لا يمكن تعديل فاتورة بهذه الحالة.'));
+
+        try {
+            $this->service->update($invoice, $request->safe()->except('items'), $this->mapItems($request->validated('items')));
+        } catch (ValidationException $e) {
+            return back()->withInput()->with('error', collect($e->errors())->flatten()->first());
+        }
+
+        return redirect()->route('admin.purchasing.invoices.show', $invoice)->with('success', __('حُدّثت الفاتورة.'));
+    }
+
+    /**
+     * يُحوّل بنود الطلب: الصنف الجديد يُمرَّر باسمه/سعره المقترح ليُنشأ المنتج **عند الترحيل**
+     * فقط (لا في المسودّة) — لا تُنشأ منتجات ولا يدخل مخزون قبل الترحيل.
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     * @return array<int, array<string, mixed>>
+     */
+    private function mapItems(array $items): array
+    {
+        return collect($items)->map(function (array $it) {
             if (empty($it['variant_id']) && ! empty($it['new_name'])) {
-                $it['variant_id'] = $this->createProductFrom($it)->id;
+                $it['new_product_name'] = $it['new_name'];
+                $it['new_product_sell_price'] = $it['sell_price'] ?? null;
             }
             unset($it['new_name'], $it['sell_price']);
 
             return $it;
         })->all();
-
-        $invoice = $this->service->create($request->safe()->except('items'), $items);
-
-        return redirect()->route('admin.purchasing.invoices.show', $invoice)->with('success', __('أُنشئت فاتورة الشراء.'));
-    }
-
-    /** ينشئ منتجًا جديدًا من بند فاتورة (اسم + سعر بيع + تكلفة) ويُعيد متغيّره الافتراضي. */
-    private function createProductFrom(array $item): ProductVariant
-    {
-        $product = $this->products->create([
-            'name' => $item['new_name'],
-            'sku' => $this->uniqueSku(),
-            'category_id' => $this->defaultCategoryId(),
-            'unit_id' => $this->defaultUnitId(),
-            'status' => 'active',
-            'retail_price' => $item['sell_price'] ?? $item['unit_cost'],
-            'cost_price' => $item['unit_cost'],
-        ]);
-
-        $variant = $product->defaultVariant()->firstOrFail();
-        // مزامنة أسعار المتغيّر — صفحات الطلب/المنتجات تقرأ سعر المتغيّر لا المنتج.
-        $variant->update([
-            'retail_price' => $item['sell_price'] ?? $item['unit_cost'],
-            'cost_price' => $item['unit_cost'],
-        ]);
-
-        return $variant;
-    }
-
-    private function uniqueSku(): string
-    {
-        do {
-            $sku = 'P-'.Str::upper(Str::random(8));
-        } while (Product::where('sku', $sku)->exists());
-
-        return $sku;
-    }
-
-    /** فئة افتراضية للمنتجات المُنشأة من الفاتورة — تُنشأ إن لم توجد أي فئة (بعد تفريغ البيانات مثلًا). */
-    private function defaultCategoryId(): int
-    {
-        return Category::orderBy('id')->value('id')
-            ?? Category::firstOrCreate(['slug' => 'uncategorized'], ['name' => __('غير مصنّف'), 'is_active' => true])->id;
-    }
-
-    /** وحدة قياس افتراضية — تُنشأ إن لم توجد أي وحدة. */
-    private function defaultUnitId(): int
-    {
-        return Unit::orderBy('id')->value('id')
-            ?? Unit::firstOrCreate(['code' => 'PCS'], ['name' => __('قطعة'), 'is_active' => true])->id;
     }
 
     public function show(PurchaseInvoice $invoice): View

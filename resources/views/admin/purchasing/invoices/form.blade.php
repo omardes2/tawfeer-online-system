@@ -1,31 +1,51 @@
-<x-app-layout :title="__('فاتورة شراء جديدة')">
+@php($editing = isset($invoice))
+@php
+    $initialRows = $editing
+        ? $invoice->items->map(fn ($it) => [
+            'is_new' => (bool) (! $it->variant_id && $it->new_product_name),
+            'variant_id' => (string) ($it->variant_id ?? ''),
+            'new_name' => $it->new_product_name ?? '',
+            'sell_price' => $it->new_product_sell_price !== null ? (float) $it->new_product_sell_price : 0,
+            'description' => $it->description ?? '',
+            'qty' => (float) $it->qty,
+            'unit_cost' => (float) $it->unit_cost,
+            'tax_rate' => (float) $it->tax_rate,
+        ])->values()->all()
+        : [];
+    if (empty($initialRows)) {
+        $initialRows = [['is_new' => false, 'variant_id' => '', 'new_name' => '', 'sell_price' => 0, 'description' => '', 'qty' => 1, 'unit_cost' => 0, 'tax_rate' => 0]];
+    }
+@endphp
+
+<x-app-layout :title="$editing ? __('تعديل فاتورة شراء') : __('فاتورة شراء جديدة')">
     <x-admin.header
-        :title="__('فاتورة شراء جديدة')"
-        :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('فواتير الشراء') => route('admin.purchasing.invoices.index'), __('جديدة') => null]" />
+        :title="$editing ? __('تعديل فاتورة شراء') : __('فاتورة شراء جديدة')"
+        :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('فواتير الشراء') => route('admin.purchasing.invoices.index'), ($editing ? __('تعديل') : __('جديدة')) => null]" />
 
     <x-admin.flash />
 
-    <form method="POST" action="{{ route('admin.purchasing.invoices.store') }}"
-          x-data="invoiceForm()" class="space-y-6">
+    <form method="POST" action="{{ $editing ? route('admin.purchasing.invoices.update', $invoice) : route('admin.purchasing.invoices.store') }}"
+          x-data="invoiceForm(@js($initialRows))" class="space-y-6">
         @csrf
+        @if ($editing) @method('PUT') @endif
 
         <x-admin.form-section :title="__('بيانات الفاتورة')" :cols="2">
             <x-admin.field :label="__('المورد')" name="supplier_id" required>
                 <select name="supplier_id" required class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
                     <option value="">{{ __('— اختر —') }}</option>
                     @foreach ($suppliers as $s)
-                        <option value="{{ $s->id }}" @selected(old('supplier_id') == $s->id)>{{ $s->name }}</option>
+                        <option value="{{ $s->id }}" @selected(old('supplier_id', $editing ? $invoice->supplier_id : null) == $s->id)>{{ $s->name }}</option>
                     @endforeach
                 </select>
             </x-admin.field>
             <x-admin.field :label="__('رقم فاتورة المورد')" name="supplier_reference">
-                <input type="text" name="supplier_reference" value="{{ old('supplier_reference') }}" class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                <input type="text" name="supplier_reference" value="{{ old('supplier_reference', $editing ? $invoice->supplier_reference : '') }}" class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
             </x-admin.field>
             <x-admin.field :label="__('تاريخ الفاتورة')" name="invoice_date" required>
-                <input type="date" name="invoice_date" value="{{ old('invoice_date', now()->toDateString()) }}" required class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                <input type="date" name="invoice_date" value="{{ old('invoice_date', $editing ? $invoice->invoice_date?->toDateString() : now()->toDateString()) }}" required class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
             </x-admin.field>
             <x-admin.field :label="__('تاريخ الاستحقاق')" name="due_date">
-                <input type="date" name="due_date" value="{{ old('due_date') }}" class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                <input type="date" name="due_date" value="{{ old('due_date', $editing ? $invoice->due_date?->toDateString() : '') }}" class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
             </x-admin.field>
         </x-admin.form-section>
 
@@ -95,20 +115,20 @@
         </x-admin.form-section>
 
         <x-admin.field :label="__('ملاحظات')" name="notes">
-            <textarea name="notes" rows="2" class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">{{ old('notes') }}</textarea>
+            <textarea name="notes" rows="2" class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">{{ old('notes', $editing ? $invoice->notes : '') }}</textarea>
         </x-admin.field>
 
         <div class="flex items-center justify-end gap-2">
-            <a href="{{ route('admin.purchasing.invoices.index') }}" class="btn-secondary">{{ __('إلغاء') }}</a>
-            <button type="submit" class="btn-primary">{{ __('حفظ كمسودّة') }}</button>
+            <a href="{{ $editing ? route('admin.purchasing.invoices.show', $invoice) : route('admin.purchasing.invoices.index') }}" class="btn-secondary">{{ __('إلغاء') }}</a>
+            <button type="submit" class="btn-primary">{{ $editing ? __('حفظ التعديل') : __('حفظ كمسودّة') }}</button>
         </div>
     </form>
 
     @push('scripts')
         <script>
-            function invoiceForm() {
+            function invoiceForm(initial) {
                 return {
-                    rows: [{ is_new: false, variant_id: '', new_name: '', sell_price: 0, description: '', qty: 1, unit_cost: 0, tax_rate: 0 }],
+                    rows: (initial && initial.length) ? initial : [{ is_new: false, variant_id: '', new_name: '', sell_price: 0, description: '', qty: 1, unit_cost: 0, tax_rate: 0 }],
                     lineTotal(r) { return (Number(r.qty) || 0) * (Number(r.unit_cost) || 0); },
                     lineTax(r) { return this.lineTotal(r) * (Number(r.tax_rate) || 0) / 100; },
                     subtotal() { return this.rows.reduce((s, r) => s + this.lineTotal(r), 0); },

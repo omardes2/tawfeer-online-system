@@ -10,6 +10,7 @@ class PurchaseInvoiceItem extends Model
 {
     protected $fillable = [
         'purchase_invoice_id', 'variant_id', 'description',
+        'new_product_name', 'new_product_sell_price',
         'qty', 'unit_cost', 'tax_rate', 'tax_amount', 'line_total',
     ];
 
@@ -19,6 +20,7 @@ class PurchaseInvoiceItem extends Model
         'tax_rate' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'line_total' => 'decimal:2',
+        'new_product_sell_price' => 'decimal:2',
     ];
 
     public function invoice(): BelongsTo
