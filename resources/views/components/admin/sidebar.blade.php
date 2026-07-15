@@ -83,6 +83,17 @@
             ['admin.marketing.templates.index', 'قوالب الرسائل', 'marketing.campaigns.view', 'admin.marketing.templates.*'],
             ['admin.recommendations.index', 'توصيات المنتجات', 'recommendations.manage', 'admin.recommendations.*'],
         ]],
+        ['التقارير', 'chart', [
+            ['__group', 'المبيعات', [
+                ['admin.reports.sales.by_customer', 'المبيعات حسب الزبون', 'reports.sales_summary.view', 'admin.reports.sales.by_customer'],
+                ['admin.reports.sales.by_product', 'المبيعات حسب المنتج', 'reports.sales_summary.view', 'admin.reports.sales.by_product'],
+                ['admin.reports.sales.by_employee', 'المبيعات حسب موظف المبيعات', 'reports.sales_summary.view', 'admin.reports.sales.by_employee'],
+            ]],
+            ['__group', 'الذمم المدينة', [
+                ['admin.reports.receivables.customers', 'كشف حساب العملاء', 'reports.statements.view', 'admin.reports.receivables.customers'],
+                ['admin.reports.receivables.suppliers', 'كشف حساب الموردين', 'reports.statements.view', 'admin.reports.receivables.suppliers'],
+            ]],
+        ]],
         ['الإعدادات', 'cog', [
             ['admin.settings.edit', 'إعدادات النظام', 'settings.system.view', 'admin.settings.*'],
         ]],
@@ -132,8 +143,18 @@
 
         @foreach ($groups as [$label, $ic, $items])
             @php
-                // Filter items to only accessible + existing routes.
-                $visible = array_values(array_filter($items, fn ($it) => $routeExists($it[0]) && $allows($it[2])));
+                // عنصر ورقة عادي أم مجموعة فرعية (['__group', label, [leaves]]).
+                $isLeaf = fn ($it) => ($it[0] ?? null) !== '__group';
+                // Filter to accessible + existing routes (يشمل المجموعات الفرعية).
+                $visible = [];
+                foreach ($items as $it) {
+                    if ($isLeaf($it)) {
+                        if ($routeExists($it[0]) && $allows($it[2])) $visible[] = $it;
+                    } else {
+                        $sub = array_values(array_filter($it[2], fn ($s) => $routeExists($s[0]) && $allows($s[2])));
+                        if (count($sub)) $visible[] = ['__group', $it[1], $sub];
+                    }
+                }
             @endphp
             @continue(count($visible) === 0)
             @php
@@ -146,7 +167,11 @@
                     }
                     return true;
                 };
-                $groupActive = collect($visible)->contains($isItemActive);
+                $groupActive = false;
+                foreach ($visible as $v) {
+                    if ($isLeaf($v)) { if ($isItemActive($v)) { $groupActive = true; break; } }
+                    else { foreach ($v[2] as $s) { if ($isItemActive($s)) { $groupActive = true; break 2; } } }
+                }
             @endphp
 
             <div x-data="{ open: {{ $groupActive ? 'true' : 'false' }} }" class="pt-1">
@@ -162,16 +187,42 @@
 
                 <div x-show="open && !collapsed" x-transition class="mt-1 space-y-0.5 pe-2 ps-3">
                     @foreach ($visible as $it)
-                        @php [$r, $l] = $it; $params = $it[4] ?? []; $isActive = $isItemActive($it); @endphp
-                        <a href="{{ route($r, $params) }}"
-                           @class([
-                               'flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] transition',
-                               'bg-emerald-500/15 text-white font-medium' => $isActive,
-                               'text-slate-400 hover:bg-white/5 hover:text-slate-100' => !$isActive,
-                           ])>
-                            <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ $isActive ? 'bg-emerald-400' : 'bg-slate-600' }}"></span>
-                            <span class="whitespace-nowrap">{{ $l }}</span>
-                        </a>
+                        @if ($isLeaf($it))
+                            @php [$r, $l] = $it; $params = $it[4] ?? []; $isActive = $isItemActive($it); @endphp
+                            <a href="{{ route($r, $params) }}"
+                               @class([
+                                   'flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] transition',
+                                   'bg-emerald-500/15 text-white font-medium' => $isActive,
+                                   'text-slate-400 hover:bg-white/5 hover:text-slate-100' => !$isActive,
+                               ])>
+                                <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ $isActive ? 'bg-emerald-400' : 'bg-slate-600' }}"></span>
+                                <span class="whitespace-nowrap">{{ $l }}</span>
+                            </a>
+                        @else
+                            {{-- مجموعة فرعية قابلة للطيّ (مستوى ثانٍ) --}}
+                            @php $subActive = collect($it[2])->contains($isItemActive); @endphp
+                            <div x-data="{ subopen: {{ $subActive ? 'true' : 'false' }} }">
+                                <button type="button" @click="subopen = !subopen"
+                                        class="w-full flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] text-slate-300 hover:bg-white/5 transition">
+                                    <span class="flex-1 text-right whitespace-nowrap font-medium">{{ $it[1] }}</span>
+                                    <svg class="w-3.5 h-3.5 shrink-0 transition-transform text-slate-500" :class="{'rotate-180': subopen}" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+                                </button>
+                                <div x-show="subopen" x-transition class="mt-0.5 space-y-0.5 pe-3">
+                                    @foreach ($it[2] as $sub)
+                                        @php [$r, $l] = $sub; $params = $sub[4] ?? []; $isActive = $isItemActive($sub); @endphp
+                                        <a href="{{ route($r, $params) }}"
+                                           @class([
+                                               'flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] transition',
+                                               'bg-emerald-500/15 text-white font-medium' => $isActive,
+                                               'text-slate-400 hover:bg-white/5 hover:text-slate-100' => !$isActive,
+                                           ])>
+                                            <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ $isActive ? 'bg-emerald-400' : 'bg-slate-600' }}"></span>
+                                            <span class="whitespace-nowrap">{{ $l }}</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     @endforeach
                 </div>
             </div>

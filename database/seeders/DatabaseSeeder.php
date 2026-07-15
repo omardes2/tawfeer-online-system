@@ -69,6 +69,8 @@ class DatabaseSeeder extends Seeder
             AdministrationPermissionSeeder::class,
             // وحدة التقارير والتحليلات الموسّعة — صلاحية لكل فئة
             AnalyticsReportPermissionSeeder::class,
+            // نظام التقارير الجديد (المبيعات + الذمم)
+            BusinessReportsPermissionSeeder::class,
         ]);
     }
 }

@@ -31,6 +31,7 @@ use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController as AdminPurcha
 use App\Http\Controllers\Admin\Purchasing\SupplierController as AdminSupplierController;
 use App\Http\Controllers\Admin\Purchasing\SupplierReturnController as AdminSupplierReturnController;
 use App\Http\Controllers\Admin\Recommendations\RecommendationRuleController as AdminRecommendationRuleController;
+use App\Http\Controllers\Admin\Reports\BusinessReportController;
 use App\Http\Controllers\Admin\Returns\ReturnController as AdminReturnController;
 use App\Http\Controllers\Admin\Roles\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
@@ -299,6 +300,15 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('rules', [AdminCommissionController::class, 'rules'])->name('rules')->middleware('can:commissions.rules.manage');
         Route::post('rules', [AdminCommissionController::class, 'storeRule'])->name('rules.store')->middleware('can:commissions.rules.manage');
         Route::delete('rules/{rule}', [AdminCommissionController::class, 'destroyRule'])->name('rules.destroy')->middleware('can:commissions.rules.manage');
+    });
+
+    // نظام التقارير (المبيعات + الذمم) — للقراءة فقط
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('sales/by-customer', [BusinessReportController::class, 'salesByCustomer'])->name('sales.by_customer')->middleware('can:reports.sales_summary.view');
+        Route::get('sales/by-product', [BusinessReportController::class, 'salesByProduct'])->name('sales.by_product')->middleware('can:reports.sales_summary.view');
+        Route::get('sales/by-employee', [BusinessReportController::class, 'salesByEmployee'])->name('sales.by_employee')->middleware('can:reports.sales_summary.view');
+        Route::get('receivables/customers', [BusinessReportController::class, 'receivablesCustomers'])->name('receivables.customers')->middleware('can:reports.statements.view');
+        Route::get('receivables/suppliers', [BusinessReportController::class, 'receivablesSuppliers'])->name('receivables.suppliers')->middleware('can:reports.statements.view');
     });
 
     // لوحة التحكّم التنفيذية (Production) — للقراءة فقط

@@ -1,0 +1,88 @@
+<?php
+
+namespace Tests\Feature\Admin;
+
+use App\Models\User;
+use App\Modules\Catalog\Models\Product;
+use App\Modules\Crm\Models\Customer;
+use App\Modules\Foundation\Models\Branch;
+use App\Modules\Foundation\Models\Warehouse;
+use App\Modules\Sales\Services\OrderService;
+use Database\Seeders\DatabaseSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class BusinessReportsTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(DatabaseSeeder::class);
+    }
+
+    private function admin(): User
+    {
+        return User::where('email', 'admin@tawfeer.online')->first();
+    }
+
+    private function withRole(string $role): User
+    {
+        $u = User::factory()->create(['branch_id' => Branch::default()->id]);
+        $u->assignRole($role);
+
+        return $u;
+    }
+
+    private array $routes = [
+        'admin.reports.sales.by_customer',
+        'admin.reports.sales.by_product',
+        'admin.reports.sales.by_employee',
+        'admin.reports.receivables.customers',
+        'admin.reports.receivables.suppliers',
+    ];
+
+    public function test_all_report_pages_render_for_admin(): void
+    {
+        foreach ($this->routes as $r) {
+            $this->actingAs($this->admin())->get(route($r))->assertOk();
+        }
+    }
+
+    public function test_reports_gated_by_permission(): void
+    {
+        // موظف المبيعات لا يملك صلاحيات التقارير المجمّعة.
+        $sales = $this->withRole('sales');
+        $this->actingAs($sales)->get(route('admin.reports.sales.by_customer'))->assertForbidden();
+        $this->actingAs($sales)->get(route('admin.reports.receivables.customers'))->assertForbidden();
+
+        // المحاسب يرى كشوف الحسابات لا تقارير المبيعات.
+        $accountant = $this->withRole('accountant');
+        $this->actingAs($accountant)->get(route('admin.reports.receivables.suppliers'))->assertOk();
+        $this->actingAs($accountant)->get(route('admin.reports.sales.by_product'))->assertForbidden();
+    }
+
+    public function test_sales_reports_show_aggregates(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $employee = User::factory()->create(['branch_id' => Branch::default()->id, 'name' => 'موظف تجريبي']);
+        $customer = Customer::factory()->create(['name' => 'زبون تجريبي']);
+        $variant = Product::factory()->create(['name' => 'منتج تجريبي'])->defaultVariant;
+
+        $order = app(OrderService::class)->create([
+            'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id,
+            'customer_id' => $customer->id, 'customer_name' => $customer->name, 'customer_phone' => '0599000000',
+        ], [['variant_id' => $variant->id, 'qty' => 2, 'unit_price' => 100]], 2026);
+        $order->update(['assigned_to' => $employee->id, 'status' => 'delivered']);
+
+        $this->actingAs($this->admin())->get(route('admin.reports.sales.by_customer'))
+            ->assertOk()->assertSee('زبون تجريبي')->assertSee('200.00');
+
+        $this->actingAs($this->admin())->get(route('admin.reports.sales.by_product'))
+            ->assertOk()->assertSee('منتج تجريبي');
+
+        $this->actingAs($this->admin())->get(route('admin.reports.sales.by_employee'))
+            ->assertOk()->assertSee('موظف تجريبي')->assertSee('200.00');
+    }
+}
