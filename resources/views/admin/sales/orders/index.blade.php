@@ -10,6 +10,11 @@
 
     <x-admin.flash />
 
+    {{-- مؤشّر حالة إرسال الطلبات لشركة التوصيل (المزوّد + عامل الطابور) --}}
+    @can('create', \App\Modules\Sales\Models\Order::class)
+        <x-admin.delivery-status />
+    @endcan
+
     {{-- فلاتر (قوائم منسدلة): الحالة + حالة التوصيل + حالة الدفع --}}
     @php
         $statusLabels = [
