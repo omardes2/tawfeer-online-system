@@ -43,7 +43,6 @@ class ChartOfAccountsSeeder extends Seeder
             ['3020', 'أرباح مُبقاة', 'equity', '3000'],
             ['4010', 'إيراد المبيعات', 'revenue', '4000'],
             ['4020', 'إيراد الشحن', 'revenue', '4000'],
-            ['5010', 'تكلفة البضاعة المباعة', 'expense', '5000'],
             ['5020', 'مصروف الشحن', 'expense', '5000'],
             ['5030', 'الخصومات', 'expense', '5000'],
             ['5040', 'عمولات المسوّقين', 'expense', '5000'],
@@ -54,6 +53,12 @@ class ChartOfAccountsSeeder extends Seeder
                 ['name' => $name, 'type' => $type, 'parent_id' => $parents[$parent], 'is_postable' => true],
             );
         }
+
+        // تكلفة البضاعة المباعة — حساب رئيسي مستقلّ (نوع «تكلفة بضاعة»)، قابل للترحيل.
+        Account::query()->firstOrCreate(
+            ['code' => '6000'],
+            ['name' => 'تكلفة البضاعة المباعة', 'type' => 'cost_of_goods', 'parent_id' => null, 'is_postable' => true],
+        );
 
         // سنة مالية جارية (2026) + فتراتها الشهرية.
         $year = FiscalYear::query()->firstOrCreate(

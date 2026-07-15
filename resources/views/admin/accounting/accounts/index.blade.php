@@ -12,7 +12,7 @@
                         <th class="py-2 px-3 font-medium">{{ __('قابل للترحيل') }}</th>
                     </tr></thead>
                     <tbody class="divide-y">
-                        @php $types = ['asset' => 'أصول', 'liability' => 'خصوم', 'equity' => 'حقوق ملكية', 'revenue' => 'إيرادات', 'expense' => 'مصروفات']; @endphp
+                        @php $types = ['asset' => 'أصول', 'liability' => 'خصوم', 'equity' => 'حقوق ملكية', 'revenue' => 'إيرادات', 'expense' => 'مصروفات', 'cost_of_goods' => 'تكلفة بضاعة']; @endphp
                         @foreach ($accounts as $a)
                             <tr>
                                 <td class="py-2 px-3 text-gray-800 {{ $a->is_postable ? 'pr-8' : 'font-semibold' }}">{{ $a->code }}</td>

@@ -16,8 +16,8 @@ class Account extends Model
 {
     use Auditable, HasUuid, SoftDeletes;
 
-    /** أنواع مدينة الطبيعة (asset/expense) مقابل دائنة (liability/equity/revenue). */
-    public const DEBIT_NORMAL = ['asset', 'expense'];
+    /** أنواع مدينة الطبيعة (أصول/مصروفات/تكلفة بضاعة) مقابل دائنة (خصوم/حقوق/إيراد). */
+    public const DEBIT_NORMAL = ['asset', 'expense', 'cost_of_goods'];
 
     protected $fillable = ['code', 'name', 'name_en', 'type', 'parent_id', 'is_postable', 'currency', 'is_active'];
 

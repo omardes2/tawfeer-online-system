@@ -97,18 +97,21 @@ class FinanceReportController extends Controller
         $range = DateRange::resolve($request->query('preset', 'month'), $request->query('from'), $request->query('to'));
         [$from, $to] = $range->bounds();
 
-        $agg = fn (string $type) => DB::table('journal_lines')
+        // التكاليف مدينة الطبيعة (مصروفات + تكلفة بضاعة)؛ الإيرادات دائنة الطبيعة.
+        $agg = fn (array $types, bool $debitNormal) => DB::table('journal_lines')
             ->join('journal_entries', 'journal_lines.journal_entry_id', '=', 'journal_entries.id')
             ->join('accounts', 'journal_lines.account_id', '=', 'accounts.id')
             ->where('journal_entries.status', 'posted')
             ->whereBetween('journal_entries.entry_date', [$from, $to])
-            ->where('accounts.type', $type)
+            ->whereIn('accounts.type', $types)
             ->selectRaw('accounts.code, accounts.name, '
-                .($type === 'expense' ? 'SUM(journal_lines.debit - journal_lines.credit)' : 'SUM(journal_lines.credit - journal_lines.debit)').' as total')
+                .($debitNormal ? 'SUM(journal_lines.debit - journal_lines.credit)' : 'SUM(journal_lines.credit - journal_lines.debit)').' as total')
             ->groupBy('accounts.code', 'accounts.name')->havingRaw('total <> 0')->orderByDesc('total')->get();
 
         return view('admin.accounting.reports.monthly_summary', [
-            'range' => $range, 'expenses' => $agg('expense'), 'income' => $agg('revenue'),
+            'range' => $range,
+            'expenses' => $agg(['expense', 'cost_of_goods'], true),
+            'income' => $agg(['revenue'], false),
         ]);
     }
 

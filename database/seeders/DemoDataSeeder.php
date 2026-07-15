@@ -289,7 +289,7 @@ class DemoDataSeeder extends Seeder
             }
             auth()->login($admin);
             $rev = Account::where('code', '4010')->first();
-            $exp = Account::where('code', '5010')->first();
+            $exp = Account::where('code', '6000')->first();
             $post = function (string $kind, float $amount, $treasury, ?int $counter, string $party) use ($svc) {
                 $v = $svc->create($kind, array_filter([
                     'treasury_id' => $treasury->id, 'amount' => $amount, 'party_name' => $party,

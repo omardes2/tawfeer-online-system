@@ -59,7 +59,7 @@ class SalesPostingTest extends TestCase
         $this->assertEqualsWithDelta(200, $this->balance('1100'), 0.01); // receivable (asset debit)
         $this->assertEqualsWithDelta(200, $this->balance('4010'), 0.01); // revenue (credit)
         // التكلفة: مدين COGS 120 / دائن المخزون 120.
-        $this->assertEqualsWithDelta(120, $this->balance('5010'), 0.01); // COGS (expense debit)
+        $this->assertEqualsWithDelta(120, $this->balance('6000'), 0.01); // COGS (cost_of_goods debit)
     }
 
     public function test_posting_is_idempotent(): void

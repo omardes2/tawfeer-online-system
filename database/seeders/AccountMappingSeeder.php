@@ -19,7 +19,7 @@ class AccountMappingSeeder extends Seeder
             'revenue' => '4010',           // إيراد المبيعات
             'shipping_revenue' => '4020',  // إيراد الشحن
             'tax' => '2100',               // ضريبة مستحقة
-            'cogs' => '5010',              // تكلفة البضاعة المباعة
+            'cogs' => '6000',              // تكلفة البضاعة المباعة (حساب رئيسي)
             'inventory' => '1200',         // المخزون
         ],
         'purchase_invoice' => [
