@@ -252,6 +252,21 @@ class OrderController extends Controller
         ]);
     }
 
+    /** فاتورة الطلب (عرض/طباعة) بتصميم رسمي — تُظهر المدفوع والمتبقّي وحالة الدفع. */
+    public function invoice(Order $order): View
+    {
+        $this->authorize('view', $order);
+
+        return view('admin.sales.orders.invoice', [
+            'order' => $order->load(['city', 'area', 'items.variant.product', 'customer', 'latestShipment']),
+            // خزائن التحصيل (نقدية/بنكية) لنافذة الدفع الجزئي/الكامل — مربوطة بحساب GL فقط.
+            'treasuries' => Treasury::query()
+                ->where('is_active', true)->whereNotNull('gl_account_id')
+                ->orderByDesc('is_default')->orderBy('type')->orderBy('name')
+                ->get(['id', 'name', 'type']),
+        ]);
+    }
+
     /**
      * تعديل بيانات التواصل/التوصيل لطلب قائم (تصحيح بيانات خاطئة: الاسم/الهاتف/البريد/العنوان/الملاحظات).
      * لا يمسّ الأصناف ولا القيود المحاسبية ولا المخزون. متاح ما لم يُرسَل الطلب لشركة التوصيل بعد.
@@ -422,8 +437,8 @@ class OrderController extends Controller
     {
         $this->authorize('update', $order);
 
-        if ($order->channel !== 'pos') {
-            return back()->with('error', __('التسديد المباشر متاح للمبيعات المباشرة فقط.'));
+        if ($order->status === 'cancelled') {
+            return back()->with('error', __('لا يمكن تحصيل دفعة على طلب ملغى.'));
         }
         if ($order->payment_status === 'paid') {
             return back()->with('error', __('الطلب مسدَّد بالفعل.'));

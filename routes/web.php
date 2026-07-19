@@ -239,6 +239,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('orders/direct/create', [AdminOrderController::class, 'createDirect'])->name('orders.direct.create');
         Route::post('orders/direct', [AdminOrderController::class, 'storeDirect'])->name('orders.direct.store');
         Route::resource('orders', AdminOrderController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+        Route::get('orders/{order}/invoice', [AdminOrderController::class, 'invoice'])->name('orders.invoice');
         Route::post('orders/{order}/confirm', [AdminOrderController::class, 'confirm'])->name('orders.confirm');
         Route::post('orders/{order}/resend-shipment', [AdminOrderController::class, 'resendShipment'])->name('orders.resend_shipment');
         Route::post('orders/{order}/reserve', [AdminOrderController::class, 'reserve'])->name('orders.reserve');

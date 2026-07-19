@@ -187,11 +187,11 @@
                             <span class="text-gray-300">—</span>
                         @endif
                     </td>
-                    <td>
-                        @if ($o->payment_status === 'paid')
-                            <x-admin.badge tone="green" :label="__('مدفوع')" />
-                        @else
-                            <x-admin.badge tone="amber" :label="__('غير مدفوع')" />
+                    <td class="whitespace-nowrap">
+                        <x-payment.status :status="$o->payment_status ?: 'unpaid'" />
+                        @if ($o->payment_status === 'partially_paid')
+                            @php $rem = max(0, round((float) $o->total - (float) $o->amount_paid, 2)); @endphp
+                            <span class="block text-[11px] text-gray-400 mt-0.5">{{ __('المتبقّي') }}: {{ number_format($rem, 2) }}</span>
                         @endif
                     </td>
                     <td class="text-start font-medium tabular-nums whitespace-nowrap">{{ number_format($o->total, 2) }} {{ \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪') }}</td>
@@ -219,6 +219,8 @@
                                     </form>
                                 @endcan
                             @endif
+                            {{-- فاتورة رسمية (عرض/طباعة) تُظهر المدفوع والمتبقّي --}}
+                            <a href="{{ route('admin.sales.orders.invoice', $o) }}" target="_blank" class="text-slate-600 hover:underline text-sm">{{ __('فاتورة') }}</a>
                             {{-- تعديل بيانات التواصل/التوصيل (تصحيح بيانات خاطئة) قبل الإرسال لشركة التوصيل --}}
                             @if ($isEditable)
                                 @can('update', $o)

@@ -390,18 +390,57 @@ class SalesAdminWebTest extends TestCase
         $this->assertSame('paid', $order->fresh()->payment_status);
     }
 
-    public function test_settle_rejected_for_normal_sale(): void
+    /** الدفعة الجزئية متاحة الآن لطلبات التوصيل العادية (لا مبيعات مباشرة فقط). */
+    public function test_partial_payment_allowed_on_normal_sale(): void
     {
         $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
-        $order = app(OrderService::class)->create([
-            'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id,
-            'customer_name' => 'عادي', 'customer_phone' => '0599000000',
-        ], [], 2026); // channel افتراضي ليس pos
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 10, 50);
 
-        $this->actingAs($this->admin())->post(route('admin.sales.orders.settle', $order))
-            ->assertRedirect()->assertSessionHas('error');
+        // طلب توصيل عادي مُقدَّم (channel manual) بإجمالي 100.
+        $this->actingAs($this->admin())->post('/admin/sales/orders', [
+            'customer_name' => 'زبون', 'customer_phone' => '0599000000', ...$this->geo(),
+            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 100]],
+        ])->assertRedirect();
+        $order = Order::latest('id')->first();
 
-        $this->assertNotSame('paid', $order->fresh()->payment_status);
+        $cashbox = Treasury::where('type', 'cash')->whereNotNull('gl_account_id')->firstOrFail();
+
+        // دفعة جزئية 40 من 100 ⇒ الحالة «مدفوع جزئيًا» والمتبقّي 60.
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.settle', $order), [
+            'amount' => 40, 'treasury_id' => $cashbox->id,
+        ])->assertRedirect()->assertSessionHas('success');
+
+        $fresh = $order->fresh();
+        $this->assertSame('partially_paid', $fresh->payment_status);
+        $this->assertEqualsWithDelta(40.0, (float) $fresh->amount_paid, 0.001);
+    }
+
+    /** فاتورة الطلب تُعرض بحالة الدفع وتُظهر المدفوع والمتبقّي. */
+    public function test_invoice_view_shows_partial_status_and_due(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 10, 50);
+
+        $this->actingAs($this->admin())->post('/admin/sales/orders', [
+            'customer_name' => 'زبون الفاتورة', 'customer_phone' => '0599000000', ...$this->geo(),
+            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 100]],
+        ])->assertRedirect();
+        $order = Order::latest('id')->first();
+
+        // دفعة جزئية 30 من 100.
+        $cashbox = Treasury::where('type', 'cash')->whereNotNull('gl_account_id')->firstOrFail();
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.settle', $order), [
+            'amount' => 30, 'treasury_id' => $cashbox->id,
+        ])->assertRedirect();
+
+        $this->actingAs($this->admin())->get(route('admin.sales.orders.invoice', $order))
+            ->assertOk()
+            ->assertSee('الفاتورة')
+            ->assertSee('دُفعت جزئياً')
+            ->assertSee('إجمالي المبلغ المستحق')
+            ->assertSee('زبون الفاتورة');
     }
 
     public function test_direct_sale_shows_pay_button_normal_sale_does_not(): void

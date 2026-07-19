@@ -15,6 +15,10 @@ class SettingsSeeder extends Seeder
         $defaults = [
             ['key' => 'store.name', 'value' => 'توفير أونلاين', 'group' => 'store'],
             ['key' => 'store.email', 'value' => 'hello@tawfeer.online', 'group' => 'store'],
+            // بيانات تظهر على الفواتير (تُحرَّر من الإعدادات).
+            ['key' => 'store.address', 'value' => '', 'group' => 'store'],
+            ['key' => 'store.phone', 'value' => '', 'group' => 'store'],
+            ['key' => 'store.tax_number', 'value' => '', 'group' => 'store'],
             ['key' => 'store.currency', 'value' => 'ILS', 'group' => 'store'],
             ['key' => 'store.currency_symbol', 'value' => '₪', 'group' => 'store'],
             ['key' => 'store.default_locale', 'value' => 'ar', 'group' => 'localization'],

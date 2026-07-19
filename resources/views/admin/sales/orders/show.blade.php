@@ -53,10 +53,17 @@
                 </table>
             </div>
 
-            <div class="flex justify-end gap-6 text-sm border-t pt-3">
+            @php
+                $paid = (float) $order->amount_paid;
+                $due = max(0, round((float) $order->total - $paid, 2));
+            @endphp
+            <div class="flex flex-wrap justify-end items-center gap-x-6 gap-y-2 text-sm border-t pt-3">
                 <span>{{ __('الإجمالي الفرعي') }}: <b>{{ $order->subtotal }}</b></span>
                 <span>{{ __('الخصم') }}: <b>{{ $order->discount_total }}</b></span>
                 <span>{{ __('الإجمالي') }}: <b>{{ $order->total }}</b></span>
+                <span>{{ __('المدفوع') }}: <b class="text-emerald-700">{{ number_format($paid, 2) }}</b></span>
+                <span>{{ __('المتبقّي') }}: <b class="text-rose-700">{{ number_format($due, 2) }}</b></span>
+                <x-payment.status :status="$order->payment_status ?: 'unpaid'" />
             </div>
 
             {{-- أزرار الانتقالات حسب الحالة --}}
@@ -113,6 +120,9 @@
                         </form>
                     @endcan
                 @endif
+                {{-- فاتورة رسمية (عرض/طباعة) تُظهر المدفوع والمتبقّي --}}
+                <a href="{{ route('admin.sales.orders.invoice', $order) }}" target="_blank"
+                   class="px-4 py-2 bg-slate-700 text-white text-sm rounded-md hover:bg-slate-800">{{ __('الفاتورة') }}</a>
                 <a href="{{ route('admin.sales.orders.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('رجوع') }}</a>
             </div>
 
