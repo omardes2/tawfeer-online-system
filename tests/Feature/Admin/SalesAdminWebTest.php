@@ -5,6 +5,7 @@ namespace Tests\Feature\Admin;
 use App\Http\Controllers\Admin\Sales\OrderController;
 use App\Models\User;
 use App\Modules\Accounting\Models\FinancialVoucher;
+use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Crm\Models\Customer;
@@ -585,12 +586,13 @@ class SalesAdminWebTest extends TestCase
         $this->actingAs($this->admin())->get(route('admin.sales.orders.edit', $order))
             ->assertOk()->assertSee('تعديل الطلب');
 
-        // حفظ التعديلات (تصحيح الاسم/الهاتف/العنوان) — الهاتف الدولي يُطبَّع لعشر خانات.
+        // حفظ التعديلات (تصحيح الاسم/الهاتف/العنوان مع إبقاء الأصناف) — الهاتف الدولي يُطبَّع لعشر خانات.
         $this->actingAs($this->admin())->put(route('admin.sales.orders.update', $order), [
             'customer_name' => 'الاسم الصحيح',
             'customer_phone' => '+970 599 111222',
             'shipping_address' => 'العنوان الصحيح',
             'notes' => 'ملاحظة محدَّثة',
+            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 100]],
         ])->assertRedirect(route('admin.sales.orders.show', $order));
 
         $fresh = $order->fresh();
@@ -602,20 +604,22 @@ class SalesAdminWebTest extends TestCase
     /** بعد إرسال الطلب لشركة التوصيل (له رقم تتبّع) لا يُتاح التعديل. */
     public function test_edit_blocked_after_dispatch(): void
     {
+        $variant = Product::factory()->create()->defaultVariant;
         $order = app(OrderService::class)->create([
             'branch_id' => Branch::default()->id,
             'warehouse_id' => Warehouse::where('code', 'WH-MAIN')->firstOrFail()->id,
             'customer_name' => 'س', 'customer_phone' => '0599000000',
-        ], [], 2026);
+        ], [['variant_id' => $variant->id, 'qty' => 1, 'unit_price' => 100]], 2026);
         $order->update(['status' => 'shipped', 'tracking_number' => 'TRK-9', 'delivery_external_id' => 'TRK-9']);
 
         $this->assertFalse(OrderController::isEditable($order->fresh()));
 
         $this->actingAs($this->admin())->get(route('admin.sales.orders.edit', $order))->assertForbidden();
 
-        // محاولة التحديث تُرفض وتُعيد التوجيه دون تغيير الاسم.
+        // محاولة التحديث تُرفض وتُعيد التوجيه لصفحة العرض دون تغيير الاسم.
         $this->actingAs($this->admin())->put(route('admin.sales.orders.update', $order), [
             'customer_name' => 'محاولة', 'customer_phone' => '0599111222', 'shipping_address' => 'عنوان',
+            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 100]],
         ])->assertRedirect(route('admin.sales.orders.show', $order));
 
         $this->assertSame('س', $order->fresh()->customer_name);
@@ -650,5 +654,52 @@ class SalesAdminWebTest extends TestCase
         $this->assertNull($fresh->revenue_entry_id); // عُكس القيد.
         $this->assertEqualsWithDelta(10.0, (float) InventoryStock::where('variant_id', $variant->id)
             ->where('warehouse_id', $warehouse->id)->value('on_hand'), 0.001);
+    }
+
+    /** تعديل مبالغ فاتورة مُقدَّمة: يُحدَّث القيد نفسه في مكانه (لا قيد جديد) وتُزامَن الكميات. */
+    public function test_edit_amounts_updates_existing_entry_in_place(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 10, 50);
+        $onHand = fn () => (float) InventoryStock::where('variant_id', $variant->id)
+            ->where('warehouse_id', $warehouse->id)->value('on_hand');
+
+        // تقديم طلب: كمية 2 بسعر 100 (لا رسوم توصيل — لا سعر مضبوط للمدينة).
+        $this->actingAs($this->admin())->post('/admin/sales/orders', [
+            'customer_name' => 'زبون', 'customer_phone' => '0599000000', ...$this->geo(),
+            'items' => [['variant' => $variant->uuid, 'qty' => 2, 'unit_price' => 100]],
+        ])->assertRedirect();
+
+        $order = Order::latest('id')->first();
+        $revenueId = $order->revenue_entry_id;
+        $this->assertNotNull($revenueId);
+        $this->assertEqualsWithDelta(8.0, $onHand(), 0.001); // 10−2
+
+        $entriesForOrder = fn () => JournalEntry::where('reference_type', 'order')
+            ->where('reference_id', $order->id)->where('source', 'sales_invoice')->count();
+        $this->assertSame(1, $entriesForOrder());
+
+        // تعديل الكمية إلى 5 بسعر 120 → إجمالي 600.
+        $this->actingAs($this->admin())->put(route('admin.sales.orders.update', $order), [
+            'customer_name' => 'زبون معدّل',
+            'customer_phone' => '0599000000',
+            'shipping_address' => 'عنوان معدّل',
+            'items' => [['variant' => $variant->uuid, 'qty' => 5, 'unit_price' => 120]],
+        ])->assertRedirect(route('admin.sales.orders.show', $order));
+
+        $fresh = $order->fresh();
+        // نفس القيد (لم يُنشأ قيد إيراد جديد للفاتورة).
+        $this->assertSame($revenueId, $fresh->revenue_entry_id);
+        $this->assertSame(1, $entriesForOrder());
+        // الإجمالي والمخزون تحدّثا: 5×120=600، والمخزون 10−5=5 (أُعيدت 2 وصُرفت 5).
+        $this->assertEqualsWithDelta(600.0, (float) $fresh->subtotal, 0.001);
+        $this->assertEqualsWithDelta(600.0, (float) $fresh->total, 0.001);
+        $this->assertEqualsWithDelta(5.0, $onHand(), 0.001);
+        $this->assertSame('زبون معدّل', $fresh->customer_name);
+
+        // سطور القيد المُحدَّث تعكس المبلغ الجديد: مجموع المدين = 600.
+        $entry = JournalEntry::with('lines')->find($revenueId);
+        $this->assertEqualsWithDelta(600.0, (float) $entry->lines->sum('debit'), 0.001);
     }
 }

@@ -5,8 +5,8 @@ namespace App\Http\Requests\Sales;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * تعديل بيانات التواصل/التوصيل لطلب قائم (تصحيح بيانات خاطئة) — لا يمسّ الأصناف
- * ولا القيود المحاسبية ولا المخزون. متاح ما لم يُرسَل الطلب لشركة التوصيل بعد.
+ * تعديل فاتورة/طلب قائم: بيانات التواصل/التوصيل + الأصناف/الكميات/الأسعار. عند الحفظ تُزامَن
+ * الحركة المخزونية ويُحدَّث القيد المحاسبي في مكانه. متاح ما لم يُرسَل الطلب لشركة التوصيل بعد.
  */
 class UpdateOrderContactRequest extends FormRequest
 {
@@ -24,6 +24,12 @@ class UpdateOrderContactRequest extends FormRequest
             'customer_email' => ['nullable', 'email', 'max:180'],
             'shipping_address' => ['required', 'string', 'max:1000'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            // الأصناف (تعديل الكميات/الأسعار) — صنف واحد على الأقل.
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.variant' => ['required', 'string', 'distinct', 'exists:product_variants,uuid'],
+            'items.*.qty' => ['required', 'numeric', 'gt:0'],
+            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'items.*.discount' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 
@@ -35,6 +41,11 @@ class UpdateOrderContactRequest extends FormRequest
             'customer_phone.required' => __('رقم الهاتف مطلوب.'),
             'customer_phone.regex' => __('رقم الهاتف يجب أن يكون 10 أرقام (مثال: 0599123456).'),
             'shipping_address.required' => __('العنوان مطلوب.'),
+            'items.required' => __('أضف صنفًا واحدًا على الأقل.'),
+            'items.min' => __('أضف صنفًا واحدًا على الأقل.'),
+            'items.*.variant.required' => __('اختر الصنف.'),
+            'items.*.qty.required' => __('الكمية مطلوبة.'),
+            'items.*.qty.gt' => __('الكمية يجب أن تكون أكبر من صفر.'),
         ];
     }
 

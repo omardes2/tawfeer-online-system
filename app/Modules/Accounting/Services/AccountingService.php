@@ -114,6 +114,56 @@ class AccountingService
     }
 
     /**
+     * تحديث سطور قيد قائم في مكانه (نفس القيد ورقمه) — يستبدل السطور بأخرى متوازنة جديدة.
+     * يُستخدم عند تعديل فاتورة مبيعات: يُحدَّث قيدها الموجود بدل إنشاء قيد جديد (قرار إداري).
+     * يبقى تاريخ القيد ورقمه كما هما؛ تتغيّر السطور والمبالغ فقط.
+     *
+     * @param  array<int, array{account_code:string, debit?:float, credit?:float, description?:string}>  $lines
+     */
+    public function replaceLines(JournalEntry $entry, array $lines): JournalEntry
+    {
+        $prepared = $this->prepareLines($lines);
+        $this->assertBalanced($prepared);
+
+        return DB::transaction(function () use ($entry, $prepared) {
+            // حذف السطور القديمة عبر مُنشئ الاستعلام (لا يُطلق أحداث الموديل append-only).
+            $entry->lines()->delete();
+
+            foreach ($prepared as $i => $line) {
+                $entry->lines()->create([
+                    'account_id' => $line['account_id'],
+                    'line_no' => $i + 1,
+                    'debit' => $line['debit'],
+                    'credit' => $line['credit'],
+                    'currency' => $line['currency'] ?? null,
+                    'description' => $line['description'] ?? null,
+                    'created_at' => now(),
+                ]);
+            }
+
+            return $entry->load('lines');
+        });
+    }
+
+    /**
+     * حذف قيد (وسطوره) نهائيًا — يُستخدم حصرًا عند حذف الوثيقة المرتبطة (فاتورة مبيعات)،
+     * فيُحذف قيدها المحاسبي تلقائيًا بدل عكسه (قرار إداري). عملية محكومة عبر علم مؤقّت.
+     */
+    public function deleteEntry(JournalEntry $entry): void
+    {
+        DB::transaction(function () use ($entry) {
+            $entry->lines()->delete(); // مُنشئ استعلام — لا أحداث موديل.
+
+            JournalEntry::$allowPostedDeletion = true;
+            try {
+                $entry->delete();
+            } finally {
+                JournalEntry::$allowPostedDeletion = false;
+            }
+        });
+    }
+
+    /**
      * توليد قيد من حدث مالي (الخطّاف — BR-ACC-01/11، ADR-016). خريطة الحساب من الإعداد.
      * إضافة نوع حدث = إدخال في config/accounting.php + حسابات مزروعة، دون تعديل الكود.
      */

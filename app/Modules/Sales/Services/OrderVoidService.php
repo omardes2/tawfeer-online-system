@@ -74,14 +74,14 @@ class OrderVoidService
                 ->get()
                 ->each(fn (FinancialVoucher $v) => $this->vouchers->reverse($v, __('حذف الطلب :n', ['n' => $order->number])));
 
-            // 3) عكس قيدَي الإيراد والتكلفة (إن كانا مُرحّلين وغير معكوسين).
+            // 3) حذف قيدَي الإيراد والتكلفة المرتبطين بالطلب (حذف لا عكس — قرار إداري).
             foreach ([$order->revenue_entry_id, $order->cogs_entry_id] as $entryId) {
                 if ($entryId === null) {
                     continue;
                 }
                 $entry = JournalEntry::find($entryId);
-                if ($entry && $entry->isPosted() && ! $entry->isReversed()) {
-                    $this->accounting->reverse($entry, ['description' => __('عكس مبيعة محذوفة :n', ['n' => $order->number])]);
+                if ($entry) {
+                    $this->accounting->deleteEntry($entry);
                 }
             }
             $order->update(['revenue_entry_id' => null, 'cogs_entry_id' => null]);

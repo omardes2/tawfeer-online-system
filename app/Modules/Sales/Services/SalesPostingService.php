@@ -49,6 +49,69 @@ class SalesPostingService
     }
 
     /**
+     * إعادة ترحيل طلب مُرحّل بعد تعديل أصنافه/مبالغه: يُحدَّث القيد الموجود في مكانه (نفس رقمه)
+     * بدل إنشاء قيد جديد. يُعاد بناء سطور الإيراد والتكلفة من الحالة الحالية للطلب. إن لم يكن
+     * الطلب مُرحّلًا بعد فيُرحَّل من جديد. idempotent.
+     */
+    public function repost(Order $order): void
+    {
+        if ($order->revenue_entry_id === null) {
+            $this->post($order);
+
+            return;
+        }
+
+        $order->loadMissing('items.variant.product', 'customer');
+
+        $debitCode = $this->debitCode($order);
+        if ($debitCode === null) {
+            return;
+        }
+
+        DB::transaction(function () use ($order, $debitCode) {
+            // 1) قيد الإيراد: يُحدَّث في مكانه بالسطور الجديدة.
+            $revenueEntry = JournalEntry::find($order->revenue_entry_id);
+            if ($revenueEntry) {
+                $this->accounting->replaceLines($revenueEntry, $this->revenueLines($order, $debitCode));
+            }
+
+            // 2) قيد التكلفة: يُحدَّث/يُنشأ/يُحذف حسب وجود تكلفة الآن.
+            $cogsLines = $this->cogsLines($order);
+            $cogsEntry = $order->cogs_entry_id ? JournalEntry::find($order->cogs_entry_id) : null;
+
+            if ($cogsLines === []) {
+                if ($cogsEntry) {
+                    $this->accounting->deleteEntry($cogsEntry);
+                    $order->update(['cogs_entry_id' => null]);
+                }
+            } elseif ($cogsEntry) {
+                $this->accounting->replaceLines($cogsEntry, $cogsLines);
+            } else {
+                $order->update(['cogs_entry_id' => $this->accounting->postEntry($this->cogsMeta($order), $cogsLines)->id]);
+            }
+        });
+    }
+
+    /**
+     * حذف القيد المحاسبي المرتبط بالطلب (الإيراد + التكلفة) نهائيًا وتصفير مراجعه — يُستخدم عند
+     * حذف الفاتورة، فيُحذف قيدها تلقائيًا بدل عكسه (قرار إداري). idempotent.
+     */
+    public function unpost(Order $order): void
+    {
+        foreach (['revenue_entry_id', 'cogs_entry_id'] as $column) {
+            if ($order->{$column} === null) {
+                continue;
+            }
+            $entry = JournalEntry::find($order->{$column});
+            if ($entry) {
+                $this->accounting->deleteEntry($entry);
+            }
+        }
+
+        $order->update(['revenue_entry_id' => null, 'cogs_entry_id' => null]);
+    }
+
+    /**
      * حساب الطرف المدين حسب مصدر البيع:
      *  - طلبات شركة التوصيل (من «انشاء اوردر»، channel ≠ pos): الذمم على شركة التوصيل
      *    «ذمم شركة التوصيل 1050» — حساب واحد بلا حساب عميل لكل طلب (تُسوّى بالتحصيل).
@@ -86,6 +149,18 @@ class SalesPostingService
     /** قيد الإيراد: مدين (نقدي/ذمم) = الإجمالي / دائن الإيراد لكل حساب منتج [+ شحن + ضريبة]. */
     private function postRevenue(Order $order, string $debitCode): JournalEntry
     {
+        return $this->accounting->postEntry([
+            'entry_date' => now()->toDateString(),
+            'description' => __('مبيعة :n', ['n' => $order->number]),
+            'source' => self::DOC,
+            'reference_type' => 'order',
+            'reference_id' => $order->id,
+        ], $this->revenueLines($order, $debitCode));
+    }
+
+    /** سطور قيد الإيراد: مدين (نقدي/ذمم) = الإجمالي / دائن الإيراد لكل حساب منتج [+ شحن + ضريبة]. */
+    private function revenueLines(Order $order, string $debitCode): array
+    {
         $revenueByAccount = [];
         foreach ($order->items as $item) {
             $net = round((float) $item->line_total - (float) $item->discount, 2);
@@ -111,17 +186,22 @@ class SalesPostingService
             $lines[] = ['account_code' => $this->resolver->code('tax', null, self::DOC), 'debit' => 0, 'credit' => $tax];
         }
 
-        return $this->accounting->postEntry([
-            'entry_date' => now()->toDateString(),
-            'description' => __('مبيعة :n', ['n' => $order->number]),
-            'source' => self::DOC,
-            'reference_type' => 'order',
-            'reference_id' => $order->id,
-        ], $lines);
+        return $lines;
     }
 
     /** قيد التكلفة: مدين COGS / دائن المخزون (بتكلفة WAC). null إن كانت التكلفة صفرًا. */
     private function postCogs(Order $order): ?JournalEntry
+    {
+        $lines = $this->cogsLines($order);
+        if ($lines === []) {
+            return null;
+        }
+
+        return $this->accounting->postEntry($this->cogsMeta($order), $lines);
+    }
+
+    /** سطور قيد التكلفة: مدين COGS / دائن المخزون (بتكلفة WAC). [] إن كانت التكلفة صفرًا. */
+    private function cogsLines(Order $order): array
     {
         $cogsByAccount = [];
         $inventoryByAccount = [];
@@ -139,7 +219,7 @@ class SalesPostingService
         }
 
         if (array_sum($cogsByAccount) <= 0) {
-            return null;
+            return [];
         }
 
         $lines = [];
@@ -150,12 +230,18 @@ class SalesPostingService
             $lines[] = ['account_code' => $code, 'debit' => 0, 'credit' => $amount];
         }
 
-        return $this->accounting->postEntry([
+        return $lines;
+    }
+
+    /** بيانات ترويسة قيد التكلفة (مرجع الطلب). */
+    private function cogsMeta(Order $order): array
+    {
+        return [
             'entry_date' => now()->toDateString(),
             'description' => __('تكلفة مبيعة :n', ['n' => $order->number]),
             'source' => 'sales_cogs',
             'reference_type' => 'order',
             'reference_id' => $order->id,
-        ], $lines);
+        ];
     }
 }

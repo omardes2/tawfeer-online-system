@@ -62,18 +62,21 @@ class OrderForceDeleteTest extends TestCase
         $receiptId = FinancialVoucher::where('kind', 'receipt')->where('reference', $order->number)->value('id');
         $this->assertNotNull($receiptId);
 
-        $reversalsBefore = JournalEntry::whereNotNull('reverses_entry_id')->count();
+        $revenueId = $order->fresh()->revenue_entry_id;
+        $cogsId = $order->fresh()->cogs_entry_id;
 
         // الحذف الإداري النهائي.
         $this->actingAs($this->admin())
             ->delete(route('admin.sales.orders.force_destroy', $order))
             ->assertRedirect(route('admin.sales.orders.index'));
 
-        // الطلب محذوف (ناعم)، والمخزون عاد، والقيود عُكست، وسند القبض عُكس.
+        // الطلب محذوف (ناعم)، والمخزون عاد، وقيدا الإيراد/التكلفة حُذفا (لا عُكسا)، وسند القبض عُكس.
         $this->assertSoftDeleted('orders', ['id' => $order->id]);
         $this->assertEqualsWithDelta(10, $onHand(), 0.001);
         $this->assertNull($order->fresh()->revenue_entry_id);
-        $this->assertGreaterThan($reversalsBefore, JournalEntry::whereNotNull('reverses_entry_id')->count());
+        $this->assertNull($order->fresh()->cogs_entry_id);
+        $this->assertNull(JournalEntry::find($revenueId), 'يُفترض حذف قيد الإيراد لا عكسه');
+        $this->assertNull(JournalEntry::find($cogsId), 'يُفترض حذف قيد التكلفة لا عكسه');
         $this->assertSame('reversed', FinancialVoucher::find($receiptId)->status);
     }
 

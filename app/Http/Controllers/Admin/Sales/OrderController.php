@@ -115,32 +115,10 @@ class OrderController extends Controller
 
         $warehouse = $this->defaultWarehouse();
 
-        // الكمية المتوفرة (on_hand − reserved) لكل صنف في المستودع الافتراضي — لعرضها في نتائج البحث.
-        $availableByVariant = InventoryStock::query()
-            ->when($warehouse, fn ($q) => $q->where('warehouse_id', $warehouse->id))
-            ->selectRaw('variant_id, SUM(on_hand - reserved) as qty')
-            ->groupBy('variant_id')
-            ->pluck('qty', 'variant_id');
-
-        // بطاقات المنتجات للبحث بالاسم مع صورة مصغّرة وسعر والكمية المتوفرة (نمط نقطة البيع).
-        $products = Product::query()->active()
-            ->with(['defaultVariant', 'primaryImage'])
-            ->orderBy('name')
-            ->get()
-            ->filter(fn ($p) => $p->defaultVariant)
-            ->map(fn ($p) => [
-                'name' => $p->name,
-                'sku' => $p->sku,
-                'variant' => $p->defaultVariant->uuid,
-                'price' => (float) $p->defaultVariant->retail_price,
-                'image' => $p->primaryImage?->url(),
-                'available' => (float) ($availableByVariant[$p->defaultVariant->id] ?? 0),
-            ])->values();
-
         return view('admin.sales.orders.form', [
             // مستودع افتراضي واحد (مخفيّ في الواجهة) — يُحلّ تلقائيًا.
             'warehouse' => $warehouse,
-            'products' => $products,
+            'products' => $this->productCards($warehouse),
             // مدن أوبتيموس فقط (المزامَنة ولها سعر) — تضمن وجود ربط خارجي (تفادي رفض 422).
             'cities' => City::whereIn('id', DeliveryCityRate::where('is_active', true)->pluck('city_id')->filter())
                 ->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
@@ -284,7 +262,10 @@ class OrderController extends Controller
 
         abort_unless(self::isEditable($order), 403, __('لا يمكن تعديل هذا الطلب بعد إرساله لشركة التوصيل أو إلغائه/تسليمه.'));
 
-        return view('admin.sales.orders.edit', ['order' => $order]);
+        return view('admin.sales.orders.edit', [
+            'order' => $order->load('items.variant.product'),
+            'products' => $this->productCards(),
+        ]);
     }
 
     public function update(UpdateOrderContactRequest $request, Order $order): RedirectResponse
@@ -296,17 +277,29 @@ class OrderController extends Controller
                 ->with('error', __('لا يمكن تعديل هذا الطلب بعد إرساله لشركة التوصيل أو إلغائه/تسليمه.'));
         }
 
-        // تحديث بيانات التواصل/التوصيل فقط — دون أي أثر مخزوني أو محاسبي.
-        $order->update([
-            'customer_name' => $request->validated('customer_name'),
-            'customer_phone' => $request->validated('customer_phone'),
-            'customer_email' => $request->validated('customer_email'),
-            'shipping_address' => $request->validated('shipping_address'),
-            'notes' => $request->validated('notes'),
-        ]);
+        $items = collect($request->validated('items'))->map(fn ($i) => [
+            'variant_id' => ProductVariant::where('uuid', $i['variant'])->value('id'),
+            'qty' => $i['qty'],
+            'unit_price' => $i['unit_price'],
+            'discount' => $i['discount'] ?? 0,
+        ])->all();
+
+        // تعديل بيانات التواصل + الأصناف: تُزامَن الحركة المخزونية ويُحدَّث القيد المحاسبي
+        // الموجود في مكانه (لا قيد جديد) للطلب المُرحّل.
+        try {
+            $this->service->editPostedOrder($order, [
+                'customer_name' => $request->validated('customer_name'),
+                'customer_phone' => $request->validated('customer_phone'),
+                'customer_email' => $request->validated('customer_email'),
+                'shipping_address' => $request->validated('shipping_address'),
+                'notes' => $request->validated('notes'),
+            ], $items);
+        } catch (ValidationException $e) {
+            return back()->withInput()->with('error', collect($e->errors())->flatten()->first());
+        }
 
         return redirect()->route('admin.sales.orders.show', $order)
-            ->with('success', __('تم تحديث بيانات الطلب.'));
+            ->with('success', __('تم تحديث الطلب وتحديث قيده المحاسبي وحركته المخزونية.'));
     }
 
     /**
@@ -612,6 +605,33 @@ class OrderController extends Controller
     private function defaultWarehouse(): ?Warehouse
     {
         return Warehouse::where('is_default', true)->first() ?? Warehouse::orderBy('id')->first();
+    }
+
+    /** بطاقات المنتجات للبحث بالاسم مع صورة مصغّرة وسعر والكمية المتوفرة (نمط نقطة البيع). */
+    private function productCards(?Warehouse $warehouse = null)
+    {
+        $warehouse ??= $this->defaultWarehouse();
+
+        // الكمية المتوفرة (on_hand − reserved) لكل صنف في المستودع الافتراضي — لعرضها في نتائج البحث.
+        $availableByVariant = InventoryStock::query()
+            ->when($warehouse, fn ($q) => $q->where('warehouse_id', $warehouse->id))
+            ->selectRaw('variant_id, SUM(on_hand - reserved) as qty')
+            ->groupBy('variant_id')
+            ->pluck('qty', 'variant_id');
+
+        return Product::query()->active()
+            ->with(['defaultVariant', 'primaryImage'])
+            ->orderBy('name')
+            ->get()
+            ->filter(fn ($p) => $p->defaultVariant)
+            ->map(fn ($p) => [
+                'name' => $p->name,
+                'sku' => $p->sku,
+                'variant' => $p->defaultVariant->uuid,
+                'price' => (float) $p->defaultVariant->retail_price,
+                'image' => $p->primaryImage?->url(),
+                'available' => (float) ($availableByVariant[$p->defaultVariant->id] ?? 0),
+            ])->values();
     }
 
     /**

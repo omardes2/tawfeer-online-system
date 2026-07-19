@@ -21,6 +21,13 @@ class JournalEntry extends Model
 {
     use Auditable, HasFactory, HasUuid;
 
+    /**
+     * سماح محكوم بحذف قيد مُرحّل ضمن عملية إدارية واحدة (حذف الفاتورة المرتبطة يحذف قيدها
+     * تلقائيًا — قرار إداري). يُفعَّل حصرًا داخل AccountingService::deleteEntry ثم يُعاد لـfalse،
+     * فلا يُضعِف الحماية في أي مسار آخر (التعديل/الحذف العابر لقيد مُرحّل يبقى ممنوعًا).
+     */
+    public static bool $allowPostedDeletion = false;
+
     protected $fillable = [
         'number', 'fiscal_year_id', 'period_id', 'entry_date', 'description',
         'source', 'status', 'reference_type', 'reference_id', 'reverses_entry_id',
@@ -31,14 +38,16 @@ class JournalEntry extends Model
 
     protected static function booted(): void
     {
-        // حماية عدم القابلية للتعديل: لا تعديل/حذف لقيد مُرحّل (المتطلّب 8، BR-ACC-09).
+        // حماية عدم القابلية للتعديل: لا تعديل لقيد مُرحّل (المتطلّب 8، BR-ACC-09).
         static::updating(function (self $entry) {
             if ($entry->getOriginal('status') === 'posted') {
                 throw new RuntimeException('Posted journal entries are immutable.');
             }
         });
+        // الحذف ممنوع لقيد مُرحّل إلا ضمن عملية إدارية محكومة (حذف الفاتورة المرتبطة).
         static::deleting(function (self $entry) {
-            if ($entry->getOriginal('status') === 'posted' || $entry->status === 'posted') {
+            if (! self::$allowPostedDeletion
+                && ($entry->getOriginal('status') === 'posted' || $entry->status === 'posted')) {
                 throw new RuntimeException('Posted journal entries cannot be deleted.');
             }
         });

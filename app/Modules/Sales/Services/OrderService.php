@@ -94,6 +94,80 @@ class OrderService
     }
 
     /**
+     * تعديل فاتورة/طلب قائم (بيانات التواصل + الأصناف/الكميات/الأسعار) مع مزامنة الأثر:
+     *  - إن كان الطلب قد رُحّل وخُصم مخزونيًا (revenue_entry_id مضبوط): تُعاد كميات البنود القديمة
+     *    للمخزون، تُستبدل البنود، تُصرَف كميات البنود الجديدة، ويُحدَّث القيد المحاسبي في مكانه
+     *    (لا قيد جديد) عبر SalesPostingService::repost.
+     *  - إن لم يُرحّل بعد (مسودّة): تُستبدل البنود ويُعاد احتساب الإجمالي فقط (لا مخزون/قيد).
+     *
+     * @param  array<int, array{variant_id:int, qty:float, unit_price:float, discount?:float}>  $items
+     */
+    public function editPostedOrder(Order $order, array $data, array $items): Order
+    {
+        $this->assertPricesAboveWholesale($items);
+
+        return DB::transaction(function () use ($order, $data, $items) {
+            $order->loadMissing('items');
+            $warehouse = $order->warehouse;
+            $wasFulfilled = $order->revenue_entry_id !== null;
+
+            // 1) إعادة كميات البنود القديمة المصروفة للمخزون (فقط إن كان الطلب مُرحّلًا/مشحونًا).
+            if ($wasFulfilled && $warehouse) {
+                foreach ($order->items as $item) {
+                    $shipped = (float) $item->qty_shipped;
+                    if ($shipped <= 0 || ! $item->variant_id) {
+                        continue;
+                    }
+                    $variant = ProductVariant::find($item->variant_id);
+                    if ($variant) {
+                        $this->inventory->returnToStock($variant, $warehouse, $shipped,
+                            $variant->average_cost !== null ? (float) $variant->average_cost : null, [
+                                'reference_type' => Order::class,
+                                'reference_id' => $order->id,
+                                'reason' => 'edit_return:'.$order->number,
+                            ]);
+                    }
+                }
+            }
+
+            // 2) استبدال البنود بالجديدة وإعادة احتساب الإجمالي.
+            $order->items()->delete();
+            $this->syncItems($order, $items);
+            $order->update(array_intersect_key($data, array_flip([
+                'customer_name', 'customer_phone', 'customer_email', 'shipping_address', 'notes',
+            ])));
+            $order->unsetRelation('items'); // تفريغ البنود القديمة المُحمَّلة حتى يُعاد الاحتساب على الجديدة.
+            $this->recomputeTotals($order);
+
+            // 3) صرف كميات البنود الجديدة من المخزون + تحديث القيد في مكانه (للطلب المُرحّل فقط).
+            if ($wasFulfilled) {
+                $order->loadMissing('items');
+                if ($warehouse) {
+                    foreach ($order->items as $item) {
+                        $qty = (float) $item->qty;
+                        if ($qty <= 0 || ! $item->variant_id) {
+                            continue;
+                        }
+                        $variant = ProductVariant::find($item->variant_id);
+                        if ($variant) {
+                            $this->inventory->issue($variant, $warehouse, $qty, [
+                                'reference_type' => Order::class,
+                                'reference_id' => $order->id,
+                                'reason' => 'edit_sale:'.$order->number,
+                            ]);
+                        }
+                        $item->update(['qty_reserved' => $qty, 'qty_shipped' => $qty]);
+                    }
+                }
+
+                $this->posting->repost($order->fresh(['items', 'warehouse', 'customer']));
+            }
+
+            return $order->fresh();
+        });
+    }
+
+    /**
      * يمنع البيع بأقل من سعر الجملة: صافي سعر الوحدة (بعد الخصم) يجب ألّا يقلّ عن
      * wholesale_price للمتغيّر عندما يكون محدَّدًا (> 0). يُطبَّق على كل قنوات البيع ولكل المستخدمين.
      *
