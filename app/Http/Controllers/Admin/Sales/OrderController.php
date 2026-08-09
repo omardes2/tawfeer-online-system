@@ -11,6 +11,7 @@ use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Crm\Models\Customer;
+use App\Modules\Crm\Services\CustomerService;
 use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\City;
 use App\Modules\Foundation\Models\DeliveryCityRate;
@@ -36,7 +37,10 @@ class OrderController extends Controller
     /** حالات الطلب القانونية للفلترة (بالترتيب المنطقي). */
     private const STATUSES = ['draft', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
 
-    public function __construct(private readonly OrderService $service) {}
+    public function __construct(
+        private readonly OrderService $service,
+        private readonly CustomerService $customerService,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -218,10 +222,14 @@ class OrderController extends Controller
             'discount' => $i['discount'] ?? 0,
         ])->all();
 
-        // عميل مسجّل (اختيار) أو عميل جديد (كتابة الاسم).
+        // عميل مسجّل (اختيار) أو عميل جديد: يُنشأ سجل عميل فعلي ويُضاف لقائمة العملاء.
         $customer = $request->filled('customer')
             ? Customer::where('uuid', $request->validated('customer'))->first()
-            : null;
+            : $this->resolveNewDirectCustomer(
+                $request->validated('customer_name'),
+                $request->validated('customer_phone'),
+                $warehouse->branch_id,
+            );
 
         $order = $this->service->create([
             'warehouse_id' => $warehouse->id,
@@ -241,6 +249,35 @@ class OrderController extends Controller
 
         return redirect()->route('admin.sales.orders.show', $order)
             ->with('success', __('تمت المبيعة المباشرة وخُصمت الكميات من المخزون.'));
+    }
+
+    /**
+     * عميل جديد من شاشة المبيعات المباشرة: يُنشئ سجل عميل فعلي (source=pos) ويُضيفه
+     * لقائمة العملاء مع حسابه المحاسبي. يُعيد استخدام عميل قائم بنفس رقم الهاتف بدل
+     * تكرار السجل. الاسم إلزامي عبر التحقق، فلا حاجة لفحص إضافي.
+     */
+    private function resolveNewDirectCustomer(?string $name, ?string $phone, ?int $branchId): ?Customer
+    {
+        $name = trim((string) $name);
+        if ($name === '') {
+            return null;
+        }
+
+        // منع التكرار: إن وُجد رقم هاتف مطابق لعميل قائم، استخدمه بدل إنشاء عميل جديد.
+        $normalizedPhone = filled($phone) ? $this->customerService->normalizePhone($phone) : null;
+        if ($normalizedPhone !== null) {
+            $existing = Customer::where('primary_phone', $normalizedPhone)->first();
+            if ($existing) {
+                return $existing;
+            }
+        }
+
+        return $this->customerService->create([
+            'name' => $name,
+            'primary_phone' => $phone,
+            'branch_id' => $branchId,
+            'source' => 'pos',
+        ]);
     }
 
     public function show(Order $order): View

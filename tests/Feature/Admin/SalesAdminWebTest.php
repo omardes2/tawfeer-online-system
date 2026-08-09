@@ -302,6 +302,50 @@ class SalesAdminWebTest extends TestCase
         $this->assertSame('0599777888', $order->customer_phone);
     }
 
+    public function test_direct_sale_creates_new_customer_and_adds_to_list(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 5, 5);
+
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.direct.store'), [
+            'customer_name' => 'عميل جديد مباشر',
+            'customer_phone' => '0599123456',
+            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 20]],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        // أُنشئ سجل عميل فعلي وأُضيف لقائمة العملاء (source=pos).
+        $customer = Customer::where('name', 'عميل جديد مباشر')->first();
+        $this->assertNotNull($customer);
+        $this->assertSame('pos', $customer->source);
+        $this->assertSame('0599123456', $customer->primary_phone);
+
+        // الطلب مربوط بالعميل الجديد.
+        $order = Order::latest('id')->first();
+        $this->assertSame($customer->id, $order->customer_id);
+    }
+
+    public function test_direct_sale_reuses_existing_customer_by_phone(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, $warehouse, 5, 5);
+
+        $existing = Customer::create([
+            'branch_id' => Branch::default()->id, 'name' => 'عميل قائم', 'primary_phone' => '0599555444',
+        ]);
+
+        $this->actingAs($this->admin())->post(route('admin.sales.orders.direct.store'), [
+            'customer_name' => 'اسم مختلف', 'customer_phone' => '0599555444',
+            'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 20]],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        // لا تكرار: يُعاد استخدام العميل القائم بنفس الرقم.
+        $this->assertSame(1, Customer::where('primary_phone', '0599555444')->count());
+        $order = Order::latest('id')->first();
+        $this->assertSame($existing->id, $order->customer_id);
+    }
+
     public function test_orders_search_by_recipient_and_tracking(): void
     {
         $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
