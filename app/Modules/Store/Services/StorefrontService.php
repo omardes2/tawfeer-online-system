@@ -79,7 +79,7 @@ class StorefrontService
     {
         return Product::query()->active()->visible()
             ->where('slug', $slug)
-            ->with(['images', 'variants', 'defaultVariant.inventoryStocks', 'brand', 'category', 'attributes.values', 'unit'])
+            ->with(['images', 'variants.attributeValues', 'variants.inventoryStocks', 'defaultVariant.inventoryStocks', 'brand', 'category', 'attributes.values', 'unit'])
             ->firstOrFail();
     }
 

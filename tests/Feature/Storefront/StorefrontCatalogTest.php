@@ -6,6 +6,9 @@ use App\Models\User;
 use App\Modules\Catalog\Models\Brand;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\ProductAttribute;
+use App\Modules\Catalog\Models\ProductAttributeValue;
+use App\Modules\Catalog\Services\VariantService;
 use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Inventory\Services\InventoryService;
 use Database\Seeders\DatabaseSeeder;
@@ -69,6 +72,25 @@ class StorefrontCatalogTest extends TestCase
         $res->assertSee('"@type":"Product"', false); // بيانات مهيكلة
         $res->assertSee('rel="canonical"', false);
         $res->assertSee('أفضل كوب قهوة'); // meta description
+    }
+
+    public function test_product_with_variants_shows_option_selectors(): void
+    {
+        $product = $this->product(['name' => 'قميص', 'name_en' => 'Shirt']);
+
+        $attribute = ProductAttribute::factory()->create(['name' => 'مقاسات']);
+        $product->attributes()->attach($attribute->id);
+        $ids = collect(['S', 'L'])->map(fn ($s) => ProductAttributeValue::create([
+            'attribute_id' => $attribute->id, 'value' => $s, 'label' => $s, 'is_active' => true,
+        ])->id)->all();
+        app(VariantService::class)->generate($product, $ids);
+
+        $variant = $product->variants()->optionVariants()->first();
+        app(InventoryService::class)->receive($variant, $this->warehouse, 5, 40);
+
+        $res = $this->get("/p/{$product->slug}")->assertOk();
+        $res->assertSee('variantPicker', false);   // مكوّن اختيار الخيارات مفعّل
+        $res->assertSee($variant->uuid);           // متغيّر الخيار ضمن بيانات الاختيار
     }
 
     public function test_hidden_or_inactive_product_returns_404(): void

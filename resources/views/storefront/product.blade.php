@@ -13,6 +13,46 @@
     $desc = $locale === 'en' && filled($product->description_en) ? $product->description_en : $product->description;
     $shortDesc = $locale === 'en' && filled($product->short_description_en) ? $product->short_description_en : $product->short_description;
     $metaDesc = $product->meta_description ?: $shortDesc ?: \Illuminate\Support\Str::limit(strip_tags((string) $desc), 155);
+
+    // نظام المتغيّرات الكاملة: متغيّرات الخيارات المفعّلة (مقاس/لون) — يختارها الزبون.
+    $cart = app(\App\Modules\Store\Services\CartService::class);
+    $optionVariants = $product->variants->filter(fn ($v) => $v->is_active && $v->attributeValues->isNotEmpty());
+    $hasOptions = $optionVariants->isNotEmpty();
+    $attrNames = $product->attributes->pluck('name', 'id');
+
+    // مجموعات الخيارات (سمة → قيمها المستخدمة فعليًا في المتغيّرات).
+    $optionGroups = [];
+    foreach ($optionVariants as $ov) {
+        foreach ($ov->attributeValues as $val) {
+            $aid = (int) $val->attribute_id;
+            $optionGroups[$aid]['id'] = $aid;
+            $optionGroups[$aid]['name'] = $attrNames[$aid] ?? '';
+            $optionGroups[$aid]['values'][$val->id] = [
+                'id' => (int) $val->id,
+                'label' => $val->label ?: $val->value,
+                'color' => $val->color_hex,
+            ];
+        }
+    }
+    $optionGroups = array_map(function ($g) {
+        $g['values'] = array_values($g['values']);
+        return $g;
+    }, array_values($optionGroups));
+
+    // بيانات المتغيّرات لـ JS: التركيبة + السعر + التوفّر.
+    $variantsJs = $optionVariants->map(function ($v) use ($cart) {
+        $sell = $cart->sellingPrice($v);
+        $regular = (float) $v->retail_price;
+        $avail = $cart->availableQty($v);
+        return [
+            'uuid' => $v->uuid,
+            'values' => $v->attributeValues->pluck('id')->map(fn ($i) => (int) $i)->values(),
+            'price' => round($sell, 2),
+            'regular' => round($regular, 2),
+            'onSale' => $sell < $regular - 1e-9,
+            'available' => $avail > 1e-9,
+        ];
+    })->values();
 @endphp
 
 <x-storefront.layout
@@ -67,55 +107,123 @@
                 <span>{{ __('storefront.sku') }}: {{ $product->sku }}</span>
             </div>
 
-            {{-- السعر --}}
-            <div class="mt-4 flex items-center gap-3">
-                <span class="text-3xl font-bold text-emerald-700">{{ number_format($price, 2) }} {{ __('storefront.currency') }}</span>
-                @if ($onSale)
-                    <span class="text-lg text-gray-400 line-through">{{ number_format($regular, 2) }} {{ __('storefront.currency') }}</span>
-                    <span class="bg-rose-100 text-rose-700 text-xs font-bold px-2 py-1 rounded">
-                        {{ (int) round((1 - $price / max($regular, 0.01)) * 100) }}% {{ __('storefront.off') }}
-                    </span>
-                @endif
-            </div>
-
-            {{-- التوفّر --}}
-            <div class="mt-3">
-                @if ($inStock)
-                    <span class="inline-flex items-center gap-1.5 text-sm text-emerald-700">
-                        <span class="h-2 w-2 rounded-full bg-emerald-500"></span>{{ __('storefront.in_stock') }}
-                    </span>
-                @else
-                    <span class="inline-flex items-center gap-1.5 text-sm text-gray-500">
-                        <span class="h-2 w-2 rounded-full bg-gray-400"></span>{{ __('storefront.out_of_stock') }}
-                    </span>
-                @endif
-            </div>
-
-            @if ($shortDesc)
-                <p class="mt-4 text-gray-600 leading-relaxed">{{ $shortDesc }}</p>
-            @endif
-
-            {{-- إضافة للسلة --}}
-            @if ($variant && $inStock)
-                <div class="mt-6 flex items-center gap-3" x-data="{ qty: 1, done: false }">
-                    <div class="inline-flex items-center rounded-lg border border-gray-300 overflow-hidden">
-                        <button type="button" @click="qty = Math.max(1, qty - 1)" class="px-3 py-2 text-gray-600 hover:bg-gray-50" aria-label="-">−</button>
-                        <input type="text" x-model="qty" readonly class="w-12 text-center border-0 focus:ring-0 p-0" aria-label="{{ __('storefront.qty') }}">
-                        <button type="button" @click="qty++" class="px-3 py-2 text-gray-600 hover:bg-gray-50" aria-label="+">+</button>
+            @if ($hasOptions)
+                {{-- منتج بخيارات (مقاسات/ألوان): السعر والتوفّر يتبعان المتغيّر المختار --}}
+                <div x-data="variantPicker(@js($optionGroups), @js($variantsJs), { price: {{ (float) $price }}, regular: {{ (float) $regular }} })">
+                    {{-- السعر --}}
+                    <div class="mt-4 flex items-center gap-3">
+                        <span class="text-3xl font-bold text-emerald-700"><span x-text="money(displayPrice)"></span> {{ __('storefront.currency') }}</span>
+                        <template x-if="displayOnSale">
+                            <span class="text-lg text-gray-400 line-through"><span x-text="money(displayRegular)"></span> {{ __('storefront.currency') }}</span>
+                        </template>
+                        <template x-if="displayOnSale">
+                            <span class="bg-rose-100 text-rose-700 text-xs font-bold px-2 py-1 rounded"><span x-text="discountPct"></span>% {{ __('storefront.off') }}</span>
+                        </template>
                     </div>
-                    <button type="button"
-                            @click="await $store.cart.add('{{ $variant->uuid }}', qty); done = true; setTimeout(() => done = false, 1500)"
-                            class="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1">
-                        <span x-show="!done">{{ __('storefront.add_to_cart') }}</span>
-                        <span x-show="done" x-cloak>✓ {{ __('storefront.added') }}</span>
-                    </button>
+
+                    @if ($shortDesc)
+                        <p class="mt-4 text-gray-600 leading-relaxed">{{ $shortDesc }}</p>
+                    @endif
+
+                    {{-- مُنتقيات الخيارات --}}
+                    <div class="mt-5 space-y-4">
+                        <template x-for="group in groups" :key="group.id">
+                            <div>
+                                <div class="text-sm font-medium text-gray-800 mb-1.5" x-text="group.name"></div>
+                                <div class="flex flex-wrap gap-2">
+                                    <template x-for="val in group.values" :key="val.id">
+                                        <button type="button" @click="pick(group.id, val.id)"
+                                                :class="selected[group.id] === val.id ? 'border-emerald-600 ring-1 ring-emerald-600 text-emerald-700 bg-emerald-50' : 'border-gray-300 text-gray-700'"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm hover:border-emerald-400">
+                                            <template x-if="val.color"><span class="inline-block w-3.5 h-3.5 rounded-full border border-gray-300" :style="`background:${val.color}`"></span></template>
+                                            <span x-text="val.label"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    {{-- التوفّر --}}
+                    <div class="mt-4 text-sm">
+                        <template x-if="!isComplete">
+                            <span class="text-gray-500">{{ __('storefront.select_options') }}</span>
+                        </template>
+                        <template x-if="isComplete && matched && matched.available">
+                            <span class="inline-flex items-center gap-1.5 text-emerald-700"><span class="h-2 w-2 rounded-full bg-emerald-500"></span>{{ __('storefront.in_stock') }}</span>
+                        </template>
+                        <template x-if="isComplete && (!matched || !matched.available)">
+                            <span class="inline-flex items-center gap-1.5 text-gray-500"><span class="h-2 w-2 rounded-full bg-gray-400"></span>{{ __('storefront.combination_unavailable') }}</span>
+                        </template>
+                    </div>
+
+                    {{-- الكمية + الإضافة للسلة --}}
+                    <div class="mt-6 flex items-center gap-3" x-data="{ qty: 1, done: false }">
+                        <div class="inline-flex items-center rounded-lg border border-gray-300 overflow-hidden">
+                            <button type="button" @click="qty = Math.max(1, qty - 1)" class="px-3 py-2 text-gray-600 hover:bg-gray-50" aria-label="-">−</button>
+                            <input type="text" x-model="qty" readonly class="w-12 text-center border-0 focus:ring-0 p-0" aria-label="{{ __('storefront.qty') }}">
+                            <button type="button" @click="qty++" class="px-3 py-2 text-gray-600 hover:bg-gray-50" aria-label="+">+</button>
+                        </div>
+                        <button type="button" :disabled="!canAdd"
+                                @click="if (canAdd) { await $store.cart.add(matched.uuid, qty); done = true; setTimeout(() => done = false, 1500) }"
+                                :class="canAdd ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'"
+                                class="flex-1 inline-flex items-center justify-center gap-2 rounded-lg font-semibold px-6 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1">
+                            <span x-show="!done">{{ __('storefront.add_to_cart') }}</span>
+                            <span x-show="done" x-cloak>✓ {{ __('storefront.added') }}</span>
+                        </button>
+                    </div>
                 </div>
             @else
-                <div class="mt-6">
-                    <button type="button" disabled class="w-full rounded-lg bg-gray-200 text-gray-400 font-semibold px-6 py-3 cursor-not-allowed">
-                        {{ __('storefront.out_of_stock') }}
-                    </button>
+                {{-- السعر --}}
+                <div class="mt-4 flex items-center gap-3">
+                    <span class="text-3xl font-bold text-emerald-700">{{ number_format($price, 2) }} {{ __('storefront.currency') }}</span>
+                    @if ($onSale)
+                        <span class="text-lg text-gray-400 line-through">{{ number_format($regular, 2) }} {{ __('storefront.currency') }}</span>
+                        <span class="bg-rose-100 text-rose-700 text-xs font-bold px-2 py-1 rounded">
+                            {{ (int) round((1 - $price / max($regular, 0.01)) * 100) }}% {{ __('storefront.off') }}
+                        </span>
+                    @endif
                 </div>
+
+                {{-- التوفّر --}}
+                <div class="mt-3">
+                    @if ($inStock)
+                        <span class="inline-flex items-center gap-1.5 text-sm text-emerald-700">
+                            <span class="h-2 w-2 rounded-full bg-emerald-500"></span>{{ __('storefront.in_stock') }}
+                        </span>
+                    @else
+                        <span class="inline-flex items-center gap-1.5 text-sm text-gray-500">
+                            <span class="h-2 w-2 rounded-full bg-gray-400"></span>{{ __('storefront.out_of_stock') }}
+                        </span>
+                    @endif
+                </div>
+
+                @if ($shortDesc)
+                    <p class="mt-4 text-gray-600 leading-relaxed">{{ $shortDesc }}</p>
+                @endif
+
+                {{-- إضافة للسلة --}}
+                @if ($variant && $inStock)
+                    <div class="mt-6 flex items-center gap-3" x-data="{ qty: 1, done: false }">
+                        <div class="inline-flex items-center rounded-lg border border-gray-300 overflow-hidden">
+                            <button type="button" @click="qty = Math.max(1, qty - 1)" class="px-3 py-2 text-gray-600 hover:bg-gray-50" aria-label="-">−</button>
+                            <input type="text" x-model="qty" readonly class="w-12 text-center border-0 focus:ring-0 p-0" aria-label="{{ __('storefront.qty') }}">
+                            <button type="button" @click="qty++" class="px-3 py-2 text-gray-600 hover:bg-gray-50" aria-label="+">+</button>
+                        </div>
+                        <button type="button"
+                                @click="await $store.cart.add('{{ $variant->uuid }}', qty); done = true; setTimeout(() => done = false, 1500)"
+                                class="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1">
+                            <span x-show="!done">{{ __('storefront.add_to_cart') }}</span>
+                            <span x-show="done" x-cloak>✓ {{ __('storefront.added') }}</span>
+                        </button>
+                    </div>
+                @else
+                    <div class="mt-6">
+                        <button type="button" disabled class="w-full rounded-lg bg-gray-200 text-gray-400 font-semibold px-6 py-3 cursor-not-allowed">
+                            {{ __('storefront.out_of_stock') }}
+                        </button>
+                    </div>
+                @endif
             @endif
 
             {{-- المفضّلة --}}
@@ -153,8 +261,8 @@
                 </button>
             </div>
 
-            {{-- المواصفات --}}
-            @if ($product->attributes->isNotEmpty())
+            {{-- المواصفات (تُخفى لمنتجات الخيارات لأن السمات تظهر كمُنتقيات) --}}
+            @if (! $hasOptions && $product->attributes->isNotEmpty())
                 <div class="mt-6 border-t border-gray-200 pt-4">
                     <h2 class="text-sm font-bold text-gray-900 mb-2">{{ __('storefront.attributes') }}</h2>
                     <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
@@ -184,6 +292,51 @@
     <x-storefront.section :title="__('storefront.cross_sell')" :items="$crossSell" recoType="cross_sell" placement="product" :source="$product->id" />
     <x-storefront.section :title="__('storefront.upsell')" :items="$upsell" recoType="upsell" placement="product" :source="$product->id" />
     <x-storefront.section :title="__('storefront.bundles')" :items="$bundles" recoType="complementary" placement="product" :source="$product->id" />
+
+    {{-- مُنتقي المتغيّرات (مقاسات/ألوان): يطابق الاختيار بمتغيّر ويحدّث السعر/التوفّر --}}
+    @if ($hasOptions)
+        <script>
+            function variantPicker(groups, variants, base) {
+                return {
+                    groups: groups,
+                    variants: variants,
+                    base: base,
+                    selected: groups.reduce((acc, g) => { acc[g.id] = null; return acc; }, {}),
+                    pick(attrId, valueId) {
+                        this.selected[attrId] = this.selected[attrId] === valueId ? null : valueId;
+                    },
+                    get isComplete() {
+                        return this.groups.every(g => this.selected[g.id]);
+                    },
+                    get matched() {
+                        if (!this.isComplete) return null;
+                        const sel = this.groups.map(g => Number(this.selected[g.id])).sort((a, b) => a - b).join('-');
+                        return this.variants.find(v => v.values.map(Number).sort((a, b) => a - b).join('-') === sel) || null;
+                    },
+                    get canAdd() {
+                        return !!(this.matched && this.matched.available);
+                    },
+                    get displayPrice() {
+                        return this.matched ? this.matched.price : this.base.price;
+                    },
+                    get displayRegular() {
+                        return this.matched ? this.matched.regular : this.base.regular;
+                    },
+                    get displayOnSale() {
+                        return this.matched ? this.matched.onSale : (this.base.price < this.base.regular - 1e-9);
+                    },
+                    get discountPct() {
+                        const r = this.displayRegular, p = this.displayPrice;
+                        return r > 0 ? Math.round((1 - p / r) * 100) : 0;
+                    },
+                    money(v) {
+                        return Number(v).toFixed(2);
+                    },
+                };
+            }
+            document.addEventListener('alpine:init', () => window.Alpine.data('variantPicker', variantPicker));
+        </script>
+    @endif
 
     {{-- بيانات مهيكلة: منتج --}}
     @push('structured-data')

@@ -46,6 +46,8 @@ return [
     'sale' => 'Sale',
     'off' => 'off',
     'sku' => 'SKU',
+    'select_options' => 'Select available options',
+    'combination_unavailable' => 'This selection is unavailable',
     'availability' => 'Availability',
     'description' => 'Description',
     'attributes' => 'Specifications',

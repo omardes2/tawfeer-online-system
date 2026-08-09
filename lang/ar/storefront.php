@@ -46,6 +46,8 @@ return [
     'sale' => 'عرض',
     'off' => 'خصم',
     'sku' => 'رمز المنتج',
+    'select_options' => 'اختر الخيارات المتاحة',
+    'combination_unavailable' => 'هذا الاختيار غير متوفّر',
     'availability' => 'التوفّر',
     'description' => 'الوصف',
     'attributes' => 'المواصفات',
