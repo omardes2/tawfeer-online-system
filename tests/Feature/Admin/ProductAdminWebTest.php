@@ -194,4 +194,36 @@ class ProductAdminWebTest extends TestCase
         // أول صورة تصبح أساسية تلقائيًا؛ الباقي ألبوم.
         $this->assertSame(1, $product->images()->where('is_primary', true)->count());
     }
+
+    public function test_create_without_sku_autogenerates_and_activates(): void
+    {
+        // أُزيل حقل SKU/الحالة من النموذج: يُولَّد SKU تلقائيًا والمنتج مفعّل افتراضيًا.
+        $fields = $this->fields();
+        unset($fields['sku'], $fields['status']);
+        $fields['name'] = 'منتج بلا كود';
+
+        $this->actingAs($this->admin())->post('/admin/products', $fields)->assertRedirect();
+
+        $product = Product::where('name', 'منتج بلا كود')->first();
+        $this->assertNotNull($product);
+        $this->assertStringStartsWith('P-', $product->sku);
+        $this->assertSame('active', $product->status);
+        $this->assertTrue((bool) $product->is_active);
+    }
+
+    public function test_uploaded_image_is_converted_to_webp(): void
+    {
+        Storage::fake('public');
+        $product = Product::factory()->create();
+
+        $this->actingAs($this->admin())
+            ->from(route('admin.products.edit', $product))
+            ->post(route('admin.products.images.store', $product), [
+                'image' => UploadedFile::fake()->image('p.jpg', 1200, 900),
+            ])->assertRedirect();
+
+        $image = $product->images()->first();
+        $this->assertStringEndsWith('.webp', $image->path);
+        Storage::disk('public')->assertExists($image->path);
+    }
 }

@@ -5,6 +5,7 @@ namespace App\Modules\Catalog\Services;
 use App\Modules\Catalog\Models\Product;
 use App\Support\SlugGenerator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * منطق أعمال المنتجات (خارج المتحكمات): توليد slug، اشتقاق is_active من status،
@@ -18,6 +19,12 @@ class ProductService
             [$tagIds, $attributeIds, $attributes] = $this->extractRelations($data);
 
             $attributes['slug'] = $this->resolveSlug($attributes);
+            // SKU اختياري في النموذج — يُولَّد تلقائيًا عند غيابه.
+            if (blank($attributes['sku'] ?? null)) {
+                $attributes['sku'] = $this->generateSku();
+            }
+            // أُزيل التحكم بالحالة من النموذج: المنتج الجديد مفعّل وظاهر افتراضيًا.
+            $attributes['status'] = $attributes['status'] ?? 'active';
             $attributes['is_active'] = ($attributes['status'] ?? 'draft') === 'active';
             $attributes = $this->normalizePrices($attributes);
 
@@ -127,6 +134,16 @@ class ProductService
         unset($data['tag_ids'], $data['attribute_ids']);
 
         return [$tagIds, $attributeIds, $data];
+    }
+
+    /** يولّد رمز SKU فريدًا بنمط «P-XXXXXXXX» عند عدم إدخاله يدويًا. */
+    private function generateSku(): string
+    {
+        do {
+            $sku = 'P-'.Str::upper(Str::random(8));
+        } while (Product::withTrashed()->where('sku', $sku)->exists());
+
+        return $sku;
     }
 
     private function resolveSlug(array $data, ?Product $product = null): string

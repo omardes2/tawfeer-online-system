@@ -11,13 +11,7 @@
                     <x-admin.field :label="__('الاسم (عربي)')" name="name"><input type="text" name="name" value="{{ old('name', $product->name) }}" required class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" /></x-admin.field>
                     <x-admin.field :label="__('الاسم (إنجليزي)')" name="name_en"><input type="text" name="name_en" value="{{ old('name_en', $product->name_en) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" /></x-admin.field>
                     <x-admin.field :label="__('الرابط (slug) — اختياري')" name="slug"><input type="text" name="slug" value="{{ old('slug', $product->slug) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" /></x-admin.field>
-                    <x-admin.field label="SKU" name="sku"><input type="text" name="sku" value="{{ old('sku', $product->sku) }}" required class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" /></x-admin.field>
                     <x-admin.field :label="__('الباركود')" name="barcode"><input type="text" name="barcode" value="{{ old('barcode', $product->barcode) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" /></x-admin.field>
-                    <x-admin.field :label="__('النوع')" name="type">
-                        <select name="type" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
-                            @foreach (['simple' => 'بسيط', 'variable' => 'متغيّرات'] as $v => $l)<option value="{{ $v }}" @selected(old('type', $product->type ?? 'simple') === $v)>{{ __($l) }}</option>@endforeach
-                        </select>
-                    </x-admin.field>
                 </div>
 
                 {{-- التصنيف --}}
@@ -48,22 +42,6 @@
                     <x-admin.field :label="__('وصف مختصر (إنجليزي)')" name="short_description_en"><input type="text" name="short_description_en" value="{{ old('short_description_en', $product->short_description_en) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" /></x-admin.field>
                     <x-admin.field :label="__('الوصف (عربي)')" name="description"><textarea name="description" rows="3" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">{{ old('description', $product->description) }}</textarea></x-admin.field>
                     <x-admin.field :label="__('الوصف (إنجليزي)')" name="description_en"><textarea name="description_en" rows="3" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">{{ old('description_en', $product->description_en) }}</textarea></x-admin.field>
-                </div>
-
-                {{-- الحالة والظهور --}}
-                <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
-                    <x-admin.field :label="__('الحالة')" name="status">
-                        <select name="status" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
-                            @foreach (['draft' => 'مسودّة', 'active' => 'مفعّل', 'archived' => 'مؤرشف'] as $v => $l)<option value="{{ $v }}" @selected(old('status', $product->status ?? 'draft') === $v)>{{ __($l) }}</option>@endforeach
-                        </select>
-                    </x-admin.field>
-                    <x-admin.field :label="__('الظهور')" name="visibility">
-                        <select name="visibility" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
-                            @foreach (['visible' => 'ظاهر', 'hidden' => 'مخفي'] as $v => $l)<option value="{{ $v }}" @selected(old('visibility', $product->visibility ?? 'visible') === $v)>{{ __($l) }}</option>@endforeach
-                        </select>
-                    </x-admin.field>
-                    <x-admin.field :label="__('الترتيب')" name="sort_order"><input type="number" min="0" name="sort_order" value="{{ old('sort_order', $product->sort_order ?? 0) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" /></x-admin.field>
-                    <label class="flex items-center gap-2 text-sm pb-2"><input type="hidden" name="is_featured" value="0" /><input type="checkbox" name="is_featured" value="1" @checked(old('is_featured', $product->is_featured)) class="rounded border-gray-300 text-emerald-600" />{{ __('مميّز') }}</label>
                 </div>
 
                 {{-- الأسعار (تُزامَن مع المتغيّر الافتراضي وتظهر في الموقع والمخزن) --}}

@@ -23,7 +23,8 @@ class StoreProductRequest extends FormRequest
             'name' => ['required', 'string', 'max:200'],
             'name_en' => ['nullable', 'string', 'max:200'],
             'slug' => ['nullable', 'string', 'max:220', 'unique:products,slug'],
-            'sku' => ['required', 'string', 'max:60', 'unique:products,sku'],
+            // اختياري: يُولَّد تلقائيًا (P-XXXXXXXX) عند غيابه — أُزيل حقل SKU من النموذج.
+            'sku' => ['nullable', 'string', 'max:60', 'unique:products,sku'],
             'barcode' => ['nullable', 'string', 'max:60'],
             'type' => ['sometimes', Rule::in(['simple', 'variable'])],
 
