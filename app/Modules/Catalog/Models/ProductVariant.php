@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -50,6 +51,35 @@ class ProductVariant extends Model
     public function inventoryStocks(): HasMany
     {
         return $this->hasMany(InventoryStock::class, 'variant_id');
+    }
+
+    /** قيم السمات التي يمثّلها هذا المتغيّر (مقاس + لون ...) — نظام المتغيّرات الكاملة. */
+    public function attributeValues(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            ProductAttributeValue::class,
+            'product_variant_attribute_values',
+            'variant_id',
+            'attribute_value_id',
+        )->withTimestamps();
+    }
+
+    /** متغيّر خيارات (مرتبط بقيم سمات) لا المتغيّر الافتراضي المجرّد. */
+    public function scopeOptionVariants($query)
+    {
+        return $query->whereHas('attributeValues');
+    }
+
+    /** وصف المتغيّر من قيم سماته، مثل «L / أسود». يعود لاسمه أو SKU عند غياب القيم. */
+    public function optionLabel(): string
+    {
+        $values = $this->relationLoaded('attributeValues') ? $this->attributeValues : $this->attributeValues()->get();
+
+        if ($values->isEmpty()) {
+            return (string) ($this->name ?: $this->sku);
+        }
+
+        return $values->map(fn ($v) => $v->label ?: $v->value)->implode(' / ');
     }
 
     protected static function newFactory(): Factory
