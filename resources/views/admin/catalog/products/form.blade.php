@@ -145,6 +145,79 @@
         {{-- مساعد المحتوى بالذكاء الاصطناعي (Phase 6 / ADR-044) — اقتراح فقط --}}
         <x-admin.ai-panel :product="$product->exists ? $product : null" />
 
+        {{-- الخيارات والمتغيّرات (مقاسات/ألوان) — كل تركيبة متغيّر بمخزون وسعر خاص --}}
+        @if ($product->exists)
+            <div class="bg-white shadow-sm sm:rounded-lg p-6">
+                <h3 class="font-semibold text-gray-800 mb-1">{{ __('الخيارات والمتغيّرات') }}</h3>
+                <p class="text-xs text-gray-400 mb-5">{{ __('اختر قيم كل سمة مطبّقة ثم «توليد المتغيّرات». كل تركيبة (مثل: L / أسود) تصبح متغيّرًا له مخزونه وسعره، ويختاره الزبون في الموقع.') }}</p>
+
+                {{-- توليد التركيبات من قيم السمات المطبّقة --}}
+                @if ($product->attributes->isNotEmpty())
+                    <form method="POST" action="{{ route('admin.products.variants.generate', $product) }}" class="space-y-4 border border-gray-200 rounded-lg p-4 mb-6">
+                        @csrf
+                        @foreach ($product->attributes as $attribute)
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">{{ $attribute->name }}</label>
+                                <div class="flex flex-wrap gap-2">
+                                    @forelse ($attribute->values as $value)
+                                        <label class="inline-flex items-center gap-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md px-2.5 py-1 cursor-pointer">
+                                            <input type="checkbox" name="value_ids[]" value="{{ $value->id }}" class="rounded border-gray-300 text-emerald-600" />
+                                            @if ($value->color_hex)<span class="inline-block w-3 h-3 rounded-full border" style="background: {{ $value->color_hex }}"></span>@endif
+                                            {{ $value->label ?: $value->value }}
+                                        </label>
+                                    @empty
+                                        <span class="text-xs text-gray-400">{{ __('لا قيم لهذه السمة — أضِفها من «الخيارات والمتغيّرات» في القائمة الجانبية.') }}</span>
+                                    @endforelse
+                                </div>
+                            </div>
+                        @endforeach
+                        @error('value_ids')<p class="text-xs text-rose-600">{{ $message }}</p>@enderror
+                        <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('توليد المتغيّرات') }}</button>
+                    </form>
+                @else
+                    <div class="rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 mb-6">
+                        {{ __('طبّق سمة واحدة على الأقل (من «السمات المطبّقة» أعلاه) واحفظ المنتج، ثم عُد هنا لتوليد المتغيّرات.') }}
+                    </div>
+                @endif
+
+                {{-- جدول المتغيّرات المُولّدة: تعديل السعر/المخزون/التفعيل + الحذف --}}
+                @if ($optionVariants->isNotEmpty())
+                    <div class="space-y-2">
+                        <div class="hidden sm:grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 px-2">
+                            <span class="col-span-3">{{ __('الخيار') }}</span>
+                            <span class="col-span-2">{{ __('السعر') }}</span>
+                            <span class="col-span-2">{{ __('سعر الخصم') }}</span>
+                            <span class="col-span-2">{{ __('المخزون') }}</span>
+                            <span class="col-span-1">{{ __('مفعّل') }}</span>
+                            <span class="col-span-2"></span>
+                        </div>
+                        @foreach ($optionVariants as $v)
+                            <div class="grid grid-cols-2 sm:grid-cols-12 gap-2 items-center border border-gray-100 rounded-lg p-2">
+                                <div class="col-span-2 sm:col-span-3">
+                                    <div class="text-sm font-medium text-gray-800">{{ $v->optionLabel() }}</div>
+                                    <div class="text-[11px] text-gray-400">{{ $v->sku }}</div>
+                                </div>
+                                <form method="POST" action="{{ route('admin.products.variants.update', [$product, $v]) }}" class="contents">
+                                    @csrf @method('PUT')
+                                    <div class="sm:col-span-2"><input type="number" step="0.01" min="0" name="retail_price" value="{{ $v->retail_price }}" class="w-full rounded-md border-gray-300 text-sm" placeholder="{{ __('السعر') }}" /></div>
+                                    <div class="sm:col-span-2"><input type="number" step="0.01" min="0" name="promo_price" value="{{ $v->promo_price }}" class="w-full rounded-md border-gray-300 text-sm" placeholder="{{ __('خصم') }}" /></div>
+                                    <div class="sm:col-span-2"><input type="number" step="1" min="0" name="stock" value="{{ (int) ($variantStock[$v->id] ?? 0) }}" class="w-full rounded-md border-gray-300 text-sm" placeholder="{{ __('المخزون') }}" /></div>
+                                    <div class="sm:col-span-1 flex items-center"><input type="hidden" name="is_active" value="0" /><input type="checkbox" name="is_active" value="1" @checked($v->is_active) class="rounded border-gray-300 text-emerald-600" /></div>
+                                    <div class="sm:col-span-1"><button class="w-full px-2 py-1.5 bg-gray-800 text-white text-xs rounded-md hover:bg-gray-900">{{ __('حفظ') }}</button></div>
+                                </form>
+                                <div class="sm:col-span-1">
+                                    <form method="POST" action="{{ route('admin.products.variants.destroy', [$product, $v]) }}" onsubmit="return confirm('{{ __('حذف هذا المتغيّر؟') }}')">
+                                        @csrf @method('DELETE')
+                                        <button class="w-full px-2 py-1.5 bg-rose-50 text-rose-600 text-xs rounded-md hover:bg-rose-100">{{ __('حذف') }}</button>
+                                    </form>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        @endif
+
         {{-- الملفات والوسائط (بعد الإنشاء) — على نمط Files & Media --}}
         @if ($product->exists)
             @php

@@ -15,6 +15,8 @@ use App\Modules\Catalog\Models\ProductTag;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Catalog\Services\ProductImageService;
 use App\Modules\Catalog\Services\ProductService;
+use App\Modules\Foundation\Models\Warehouse;
+use App\Modules\Inventory\Models\InventoryStock;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -75,7 +77,9 @@ class ProductController extends Controller
     {
         $this->authorize('update', $product);
 
-        return view('admin.catalog.products.form', $this->formData($product->load(['tags', 'attributes', 'images'])));
+        return view('admin.catalog.products.form', $this->formData(
+            $product->load(['tags', 'attributes.values', 'images', 'variants.attributeValues']),
+        ));
     }
 
     public function update(UpdateProductRequest $request, Product $product): RedirectResponse
@@ -156,13 +160,31 @@ class ProductController extends Controller
 
     private function formData(Product $product): array
     {
-        return [
+        $data = [
             'product' => $product,
             'categories' => Category::orderBy('name')->get(),
             'brands' => Brand::orderBy('name')->get(),
             'units' => Unit::orderBy('name')->get(),
             'tags' => ProductTag::orderBy('name')->get(),
             'attributes' => ProductAttribute::orderBy('name')->get(),
+            'optionVariants' => collect(),
+            'variantStock' => [],
         ];
+
+        // متغيّرات الخيارات ورصيدها في المستودع الافتراضي (للعرض/التعديل).
+        if ($product->exists) {
+            $product->loadMissing('variants.attributeValues', 'attributes.values');
+            $data['optionVariants'] = $product->variants
+                ->filter(fn ($v) => $v->attributeValues->isNotEmpty())->values();
+
+            $warehouse = Warehouse::where('is_default', true)->first() ?? Warehouse::orderBy('id')->first();
+            if ($warehouse) {
+                $data['variantStock'] = InventoryStock::where('warehouse_id', $warehouse->id)
+                    ->whereIn('variant_id', $data['optionVariants']->pluck('id'))
+                    ->pluck('on_hand', 'variant_id')->all();
+            }
+        }
+
+        return $data;
     }
 }
