@@ -3,8 +3,7 @@
 namespace App\Http\Controllers\Admin\Catalog;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Catalog\GenerateVariantsRequest;
-use App\Http\Requests\Catalog\UpdateVariantRequest;
+use App\Http\Requests\Catalog\SyncVariantsRequest;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Catalog\Services\VariantService;
@@ -14,8 +13,8 @@ use App\Modules\Inventory\Services\InventoryService;
 use Illuminate\Http\RedirectResponse;
 
 /**
- * إدارة متغيّرات المنتج (مقاسات/ألوان): توليد التركيبات، تعديل السعر/المخزون/التفعيل، الحذف.
- * كل عمليات المخزون تمرّ عبر InventoryService (ADR-024) لضمان الحركة والتكلفة.
+ * مزامنة مصفوفة متغيّرات المنتج (مقاسات/ألوان) من الواجهة الحيّة: إنشاء/تحديث/حذف
+ * التركيبات دفعة واحدة، وضبط السعر والكمية لكل متغيّر. المخزون عبر InventoryService (ADR-024).
  */
 class ProductVariantController extends Controller
 {
@@ -24,46 +23,18 @@ class ProductVariantController extends Controller
         private readonly InventoryService $inventory,
     ) {}
 
-    public function generate(GenerateVariantsRequest $request, Product $product): RedirectResponse
+    public function sync(SyncVariantsRequest $request, Product $product): RedirectResponse
     {
         $this->authorize('update', $product);
 
-        $count = $this->service->generate($product, $request->validated('value_ids'));
+        $rows = $this->service->sync($product, $request->validated('combos', []));
 
-        return redirect()->route('admin.products.edit', $product)->with(
-            'success',
-            $count > 0
-                ? __('تم توليد :n متغيّرًا.', ['n' => $count])
-                : __('لا متغيّرات جديدة — كل التركيبات المختارة موجودة مسبقًا.'),
-        );
-    }
-
-    public function update(UpdateVariantRequest $request, Product $product, ProductVariant $variant): RedirectResponse
-    {
-        $this->authorize('update', $product);
-        abort_unless($variant->product_id === $product->id, 404);
-
-        $variant->update([
-            'retail_price' => $request->validated('retail_price') ?? 0,
-            'promo_price' => $request->validated('promo_price'),
-            'is_active' => $request->boolean('is_active'),
-        ]);
-
-        if ($request->filled('stock')) {
-            $this->setStock($variant, (float) $request->validated('stock'));
+        foreach ($rows as $row) {
+            $this->setStock($row['variant'], $row['stock']);
         }
 
-        return redirect()->route('admin.products.edit', $product)->with('success', __('تم تحديث المتغيّر.'));
-    }
-
-    public function destroy(Product $product, ProductVariant $variant): RedirectResponse
-    {
-        $this->authorize('update', $product);
-        abort_unless($variant->product_id === $product->id, 404);
-
-        $this->service->delete($variant);
-
-        return redirect()->route('admin.products.edit', $product)->with('success', __('تم حذف المتغيّر.'));
+        return redirect()->route('admin.products.edit', $product)
+            ->with('success', __('تم حفظ المتغيّرات (:n).', ['n' => $rows->count()]));
     }
 
     /** يضبط رصيد المتغيّر في المستودع الافتراضي إلى القيمة المطلوبة عبر تسوية (فرق الكمية). */

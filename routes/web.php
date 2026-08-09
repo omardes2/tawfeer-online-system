@@ -174,10 +174,8 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::post('products/{product}/images/{image}/primary', [ProductController::class, 'setPrimaryImage'])->name('products.images.primary');
     Route::delete('products/{product}/images/{image}', [ProductController::class, 'destroyImage'])->name('products.images.destroy');
 
-    // متغيّرات المنتج (مقاسات/ألوان) — نظام المتغيّرات الكاملة
-    Route::post('products/{product}/variants/generate', [ProductVariantController::class, 'generate'])->name('products.variants.generate');
-    Route::put('products/{product}/variants/{variant}', [ProductVariantController::class, 'update'])->name('products.variants.update');
-    Route::delete('products/{product}/variants/{variant}', [ProductVariantController::class, 'destroy'])->name('products.variants.destroy');
+    // متغيّرات المنتج (مقاسات/ألوان) — مزامنة حيّة لمصفوفة الخيارات (سعر/كمية لكل تركيبة)
+    Route::post('products/{product}/variants/sync', [ProductVariantController::class, 'sync'])->name('products.variants.sync');
 
     // المخزون (Phase 2.4)
     Route::prefix('inventory')->name('inventory.')->group(function () {

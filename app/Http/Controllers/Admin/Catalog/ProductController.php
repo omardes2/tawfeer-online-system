@@ -167,22 +167,46 @@ class ProductController extends Controller
             'units' => Unit::orderBy('name')->get(),
             'tags' => ProductTag::orderBy('name')->get(),
             'attributes' => ProductAttribute::orderBy('name')->get(),
-            'optionVariants' => collect(),
-            'variantStock' => [],
+            'variantMatrix' => ['attributes' => [], 'existing' => [], 'defaultPrice' => 0],
         ];
 
-        // متغيّرات الخيارات ورصيدها في المستودع الافتراضي (للعرض/التعديل).
+        // إعداد مصفوفة المتغيّرات الحيّة: السمات وقيمها + التركيبات الموجودة (سعر/كمية).
         if ($product->exists) {
-            $product->loadMissing('variants.attributeValues', 'attributes.values');
-            $data['optionVariants'] = $product->variants
+            $product->loadMissing('variants.attributeValues');
+
+            $optionVariants = $product->variants
                 ->filter(fn ($v) => $v->attributeValues->isNotEmpty())->values();
 
             $warehouse = Warehouse::where('is_default', true)->first() ?? Warehouse::orderBy('id')->first();
-            if ($warehouse) {
-                $data['variantStock'] = InventoryStock::where('warehouse_id', $warehouse->id)
-                    ->whereIn('variant_id', $data['optionVariants']->pluck('id'))
-                    ->pluck('on_hand', 'variant_id')->all();
-            }
+            $stock = $warehouse
+                ? InventoryStock::where('warehouse_id', $warehouse->id)
+                    ->whereIn('variant_id', $optionVariants->pluck('id'))
+                    ->pluck('on_hand', 'variant_id')->all()
+                : [];
+
+            $attributes = ProductAttribute::where('is_active', true)
+                ->with(['values' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order')->orderBy('id')])
+                ->orderBy('name')->get()
+                ->filter(fn ($a) => $a->values->isNotEmpty())
+                ->map(fn ($a) => [
+                    'id' => (int) $a->id,
+                    'name' => $a->name,
+                    'values' => $a->values->map(fn ($v) => [
+                        'id' => (int) $v->id,
+                        'label' => $v->label ?: $v->value,
+                        'color' => $v->color_hex,
+                    ])->values(),
+                ])->values();
+
+            $data['variantMatrix'] = [
+                'attributes' => $attributes,
+                'existing' => $optionVariants->map(fn ($v) => [
+                    'values' => $v->attributeValues->pluck('id')->map(fn ($i) => (int) $i)->values(),
+                    'price' => (float) $v->retail_price,
+                    'stock' => (float) ($stock[$v->id] ?? 0),
+                ])->values(),
+                'defaultPrice' => (float) ($product->defaultVariant?->retail_price ?? $product->retail_price ?? 0),
+            ];
         }
 
         return $data;

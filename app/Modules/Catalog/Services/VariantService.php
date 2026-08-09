@@ -5,6 +5,7 @@ namespace App\Modules\Catalog\Services;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductAttributeValue;
 use App\Modules\Catalog\Models\ProductVariant;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -68,6 +69,75 @@ class VariantService
         });
 
         return $created;
+    }
+
+    /**
+     * مزامنة مصفوفة المتغيّرات من الواجهة الحيّة: ينشئ التركيبات الجديدة، ويحدّث سعر
+     * الموجودة، ويحذف (ناعمًا) ما غاب. يعيد قائمة [variant => stock] لضبط المخزون خارجيًا.
+     * يزامن أيضًا السمات المستخدمة مع «السمات المطبّقة» ليبقى المتجر متسقًا.
+     *
+     * @param  array<array{values: array<int>, price?: mixed, stock?: mixed}>  $combos
+     * @return Collection<int, array{variant: ProductVariant, stock: float}>
+     */
+    public function sync(Product $product, array $combos): Collection
+    {
+        return DB::transaction(function () use ($product, $combos) {
+            $existing = $product->variants()->with('attributeValues:id')->get()
+                ->filter(fn ($v) => $v->attributeValues->isNotEmpty())
+                ->keyBy(fn ($v) => $this->signature($v->attributeValues->pluck('id')->all()));
+
+            $kept = [];
+            $usedAttributeIds = [];
+            $result = collect();
+
+            foreach ($combos as $combo) {
+                $ids = array_values(array_unique(array_map('intval', $combo['values'] ?? [])));
+                $signature = $this->signature($ids);
+                if ($signature === '' || isset($kept[$signature])) {
+                    continue;
+                }
+
+                $price = isset($combo['price']) && $combo['price'] !== '' ? (float) $combo['price'] : null;
+
+                $variant = $existing->get($signature);
+                if ($variant) {
+                    $variant->update([
+                        'retail_price' => $price ?? $variant->retail_price,
+                        'is_active' => true,
+                    ]);
+                } else {
+                    // array_merge حتى تَغلِب القيم الصريحة (السعر) على الموروثة من المتغيّر الافتراضي.
+                    $variant = $product->variants()->create(array_merge($this->priceDefaults($product), [
+                        'sku' => $this->generateSku(),
+                        'name' => $this->labelFor($ids),
+                        'retail_price' => $price ?? 0,
+                        'is_default' => false,
+                        'is_active' => true,
+                    ]));
+                    $variant->attributeValues()->sync($ids);
+                }
+
+                $kept[$signature] = true;
+                $result->push(['variant' => $variant, 'stock' => (float) ($combo['stock'] ?? 0)]);
+
+                foreach (ProductAttributeValue::whereIn('id', $ids)->pluck('attribute_id') as $attrId) {
+                    $usedAttributeIds[(int) $attrId] = true;
+                }
+            }
+
+            // حذف التركيبات التي أُزيلت من المصفوفة.
+            foreach ($existing as $signature => $variant) {
+                if (! isset($kept[$signature])) {
+                    $variant->delete();
+                }
+            }
+
+            if ($usedAttributeIds !== []) {
+                $product->attributes()->syncWithoutDetaching(array_keys($usedAttributeIds));
+            }
+
+            return $result;
+        });
     }
 
     /** حذف متغيّر خيارات (حذف ناعم). لا يُسمح بحذف المتغيّر الافتراضي. */

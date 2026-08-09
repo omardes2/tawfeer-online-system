@@ -27,17 +27,20 @@ class ProductVariantAdminTest extends TestCase
         return User::where('email', 'admin@tawfeer.online')->first();
     }
 
+    /** @return array{0: Product, 1: array<string,int>} منتج + خريطة تسمية→معرّف القيمة */
     private function productWithSizes(array $sizes = ['S', 'M']): array
     {
         $product = Product::factory()->create();
         $attribute = ProductAttribute::factory()->create(['name' => 'مقاسات']);
-        $product->attributes()->attach($attribute->id);
 
-        $valueIds = collect($sizes)->map(fn ($s) => ProductAttributeValue::create([
-            'attribute_id' => $attribute->id, 'value' => $s, 'label' => $s, 'is_active' => true,
-        ])->id)->all();
+        $values = [];
+        foreach ($sizes as $s) {
+            $values[$s] = ProductAttributeValue::create([
+                'attribute_id' => $attribute->id, 'value' => $s, 'label' => $s, 'is_active' => true,
+            ])->id;
+        }
 
-        return [$product, $valueIds];
+        return [$product, $values];
     }
 
     private function warehouse(): Warehouse
@@ -45,59 +48,81 @@ class ProductVariantAdminTest extends TestCase
         return Warehouse::where('is_default', true)->first() ?? Warehouse::orderBy('id')->first();
     }
 
-    public function test_admin_generates_variants_from_values(): void
+    private function onHand(int $variantId): float
     {
-        [$product, $valueIds] = $this->productWithSizes(['S', 'M', 'L']);
-
-        $this->actingAs($this->admin())
-            ->post(route('admin.products.variants.generate', $product), ['value_ids' => $valueIds])
-            ->assertRedirect()->assertSessionHasNoErrors();
-
-        $this->assertSame(3, $product->variants()->optionVariants()->count());
+        return (float) InventoryStock::where('variant_id', $variantId)
+            ->where('warehouse_id', $this->warehouse()->id)->value('on_hand');
     }
 
-    public function test_generate_requires_at_least_one_value(): void
+    public function test_sync_creates_variants_with_price_and_stock(): void
+    {
+        [$product, $v] = $this->productWithSizes(['S', 'M']);
+
+        $this->actingAs($this->admin())->post(route('admin.products.variants.sync', $product), [
+            'combos' => [
+                ['values' => [$v['S']], 'price' => 40, 'stock' => 5],
+                ['values' => [$v['M']], 'price' => 45, 'stock' => 3],
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame(2, $product->variants()->optionVariants()->count());
+
+        $small = $product->variants()->optionVariants()->get()
+            ->first(fn ($x) => $x->attributeValues->pluck('id')->contains($v['S']));
+        $this->assertEquals(40, $small->retail_price);
+        $this->assertEqualsWithDelta(5, $this->onHand($small->id), 0.001);
+    }
+
+    public function test_sync_updates_existing_variant_in_place(): void
+    {
+        [$product, $v] = $this->productWithSizes(['S']);
+
+        $this->actingAs($this->admin())->post(route('admin.products.variants.sync', $product), [
+            'combos' => [['values' => [$v['S']], 'price' => 40, 'stock' => 5]],
+        ])->assertRedirect();
+
+        $variant = $product->variants()->optionVariants()->first();
+
+        // إعادة المزامنة بنفس التركيبة بسعر/كمية مختلفين → تحديث في المكان (لا نسخة جديدة).
+        $this->actingAs($this->admin())->post(route('admin.products.variants.sync', $product), [
+            'combos' => [['values' => [$v['S']], 'price' => 60, 'stock' => 9]],
+        ])->assertRedirect();
+
+        $this->assertSame(1, $product->variants()->optionVariants()->count());
+        $variant->refresh();
+        $this->assertEquals(60, $variant->retail_price);
+        $this->assertEqualsWithDelta(9, $this->onHand($variant->id), 0.001);
+    }
+
+    public function test_sync_removes_dropped_combinations(): void
+    {
+        [$product, $v] = $this->productWithSizes(['S', 'M']);
+
+        $this->actingAs($this->admin())->post(route('admin.products.variants.sync', $product), [
+            'combos' => [
+                ['values' => [$v['S']], 'price' => 40, 'stock' => 5],
+                ['values' => [$v['M']], 'price' => 45, 'stock' => 3],
+            ],
+        ])->assertRedirect();
+
+        $removed = $product->variants()->optionVariants()->get()
+            ->first(fn ($x) => $x->attributeValues->pluck('id')->contains($v['M']));
+
+        // مزامنة بتركيبة واحدة فقط → تُحذف الأخرى.
+        $this->actingAs($this->admin())->post(route('admin.products.variants.sync', $product), [
+            'combos' => [['values' => [$v['S']], 'price' => 40, 'stock' => 5]],
+        ])->assertRedirect();
+
+        $this->assertSame(1, $product->variants()->optionVariants()->count());
+        $this->assertSoftDeleted('product_variants', ['id' => $removed->id]);
+    }
+
+    public function test_sync_requires_values_per_combo(): void
     {
         [$product] = $this->productWithSizes();
 
-        $this->actingAs($this->admin())
-            ->post(route('admin.products.variants.generate', $product), ['value_ids' => []])
-            ->assertSessionHasErrors('value_ids');
-    }
-
-    public function test_admin_updates_variant_price_and_stock(): void
-    {
-        [$product, $valueIds] = $this->productWithSizes(['S']);
-        $this->actingAs($this->admin())
-            ->post(route('admin.products.variants.generate', $product), ['value_ids' => $valueIds])->assertRedirect();
-
-        $variant = $product->variants()->optionVariants()->first();
-
-        $this->actingAs($this->admin())
-            ->put(route('admin.products.variants.update', [$product, $variant]), [
-                'retail_price' => 55, 'stock' => 7, 'is_active' => 1,
-            ])->assertRedirect()->assertSessionHasNoErrors();
-
-        $variant->refresh();
-        $this->assertEquals(55, $variant->retail_price);
-
-        $onHand = (float) InventoryStock::where('variant_id', $variant->id)
-            ->where('warehouse_id', $this->warehouse()->id)->value('on_hand');
-        $this->assertEqualsWithDelta(7, $onHand, 0.001);
-    }
-
-    public function test_admin_deletes_variant(): void
-    {
-        [$product, $valueIds] = $this->productWithSizes(['S']);
-        $this->actingAs($this->admin())
-            ->post(route('admin.products.variants.generate', $product), ['value_ids' => $valueIds])->assertRedirect();
-
-        $variant = $product->variants()->optionVariants()->first();
-
-        $this->actingAs($this->admin())
-            ->delete(route('admin.products.variants.destroy', [$product, $variant]))
-            ->assertRedirect();
-
-        $this->assertSoftDeleted('product_variants', ['id' => $variant->id]);
+        $this->actingAs($this->admin())->post(route('admin.products.variants.sync', $product), [
+            'combos' => [['values' => [], 'price' => 10, 'stock' => 1]],
+        ])->assertSessionHasErrors('combos.0.values');
     }
 }

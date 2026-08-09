@@ -145,75 +145,75 @@
         {{-- مساعد المحتوى بالذكاء الاصطناعي (Phase 6 / ADR-044) — اقتراح فقط --}}
         <x-admin.ai-panel :product="$product->exists ? $product : null" />
 
-        {{-- الخيارات والمتغيّرات (مقاسات/ألوان) — كل تركيبة متغيّر بمخزون وسعر خاص --}}
+        {{-- الخيارات والمتغيّرات (مقاسات/ألوان) — مصفوفة حيّة: اختر القيم فتظهر السعر والكمية فورًا --}}
         @if ($product->exists)
-            <div class="bg-white shadow-sm sm:rounded-lg p-6">
+            <div class="bg-white shadow-sm sm:rounded-lg p-6" x-data="variantMatrix(@js($variantMatrix))">
                 <h3 class="font-semibold text-gray-800 mb-1">{{ __('الخيارات والمتغيّرات') }}</h3>
-                <p class="text-xs text-gray-400 mb-5">{{ __('اختر قيم كل سمة مطبّقة ثم «توليد المتغيّرات». كل تركيبة (مثل: L / أسود) تصبح متغيّرًا له مخزونه وسعره، ويختاره الزبون في الموقع.') }}</p>
+                <p class="text-xs text-gray-400 mb-5">{{ __('اختر القيم (مقاس/لون) فتظهر التركيبات فورًا. عدّل السعر والكمية لكل تركيبة ثم اضغط «حفظ المتغيّرات».') }}</p>
 
-                {{-- توليد التركيبات من قيم السمات المطبّقة --}}
-                @if ($product->attributes->isNotEmpty())
-                    <form method="POST" action="{{ route('admin.products.variants.generate', $product) }}" class="space-y-4 border border-gray-200 rounded-lg p-4 mb-6">
-                        @csrf
-                        @foreach ($product->attributes as $attribute)
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">{{ $attribute->name }}</label>
-                                <div class="flex flex-wrap gap-2">
-                                    @forelse ($attribute->values as $value)
-                                        <label class="inline-flex items-center gap-1.5 text-sm bg-gray-50 border border-gray-200 rounded-md px-2.5 py-1 cursor-pointer">
-                                            <input type="checkbox" name="value_ids[]" value="{{ $value->id }}" class="rounded border-gray-300 text-emerald-600" />
-                                            @if ($value->color_hex)<span class="inline-block w-3 h-3 rounded-full border" style="background: {{ $value->color_hex }}"></span>@endif
-                                            {{ $value->label ?: $value->value }}
-                                        </label>
-                                    @empty
-                                        <span class="text-xs text-gray-400">{{ __('لا قيم لهذه السمة — أضِفها من «الخيارات والمتغيّرات» في القائمة الجانبية.') }}</span>
-                                    @endforelse
-                                </div>
-                            </div>
-                        @endforeach
-                        @error('value_ids')<p class="text-xs text-rose-600">{{ $message }}</p>@enderror
-                        <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('توليد المتغيّرات') }}</button>
-                    </form>
+                @if (empty($variantMatrix['attributes']))
+                    <div class="rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3">
+                        {{ __('لا توجد سمات بقيم بعد. أضِف سمة (مثل «مقاسات») وقيمها من «الخيارات والمتغيّرات» في القائمة الجانبية، ثم عُد هنا.') }}
+                    </div>
                 @else
-                    <div class="rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 mb-6">
-                        {{ __('طبّق سمة واحدة على الأقل (من «السمات المطبّقة» أعلاه) واحفظ المنتج، ثم عُد هنا لتوليد المتغيّرات.') }}
-                    </div>
-                @endif
+                    <form method="POST" action="{{ route('admin.products.variants.sync', $product) }}">
+                        @csrf
 
-                {{-- جدول المتغيّرات المُولّدة: تعديل السعر/المخزون/التفعيل + الحذف --}}
-                @if ($optionVariants->isNotEmpty())
-                    <div class="space-y-2">
-                        <div class="hidden sm:grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 px-2">
-                            <span class="col-span-3">{{ __('الخيار') }}</span>
-                            <span class="col-span-2">{{ __('السعر') }}</span>
-                            <span class="col-span-2">{{ __('سعر الخصم') }}</span>
-                            <span class="col-span-2">{{ __('المخزون') }}</span>
-                            <span class="col-span-1">{{ __('مفعّل') }}</span>
-                            <span class="col-span-2"></span>
-                        </div>
-                        @foreach ($optionVariants as $v)
-                            <div class="grid grid-cols-2 sm:grid-cols-12 gap-2 items-center border border-gray-100 rounded-lg p-2">
-                                <div class="col-span-2 sm:col-span-3">
-                                    <div class="text-sm font-medium text-gray-800">{{ $v->optionLabel() }}</div>
-                                    <div class="text-[11px] text-gray-400">{{ $v->sku }}</div>
+                        {{-- اختيار القيم لكل سمة (حيّ، بلا حفظ مسبق) --}}
+                        <div class="space-y-4 border border-gray-200 rounded-lg p-4 mb-5">
+                            <template x-for="attr in attributes" :key="attr.id">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2" x-text="attr.name"></label>
+                                    <div class="flex flex-wrap gap-2">
+                                        <template x-for="val in attr.values" :key="val.id">
+                                            <button type="button" @click="toggle(attr.id, val.id)"
+                                                    :class="isSel(attr.id, val.id) ? 'border-emerald-600 ring-1 ring-emerald-600 text-emerald-700 bg-emerald-50' : 'border-gray-300 text-gray-700 bg-gray-50'"
+                                                    class="inline-flex items-center gap-1.5 text-sm border rounded-md px-2.5 py-1 hover:border-emerald-400">
+                                                <template x-if="val.color"><span class="inline-block w-3 h-3 rounded-full border border-gray-300" :style="`background:${val.color}`"></span></template>
+                                                <span x-text="val.label"></span>
+                                            </button>
+                                        </template>
+                                    </div>
                                 </div>
-                                <form method="POST" action="{{ route('admin.products.variants.update', [$product, $v]) }}" class="contents">
-                                    @csrf @method('PUT')
-                                    <div class="sm:col-span-2"><input type="number" step="0.01" min="0" name="retail_price" value="{{ $v->retail_price }}" class="w-full rounded-md border-gray-300 text-sm" placeholder="{{ __('السعر') }}" /></div>
-                                    <div class="sm:col-span-2"><input type="number" step="0.01" min="0" name="promo_price" value="{{ $v->promo_price }}" class="w-full rounded-md border-gray-300 text-sm" placeholder="{{ __('خصم') }}" /></div>
-                                    <div class="sm:col-span-2"><input type="number" step="1" min="0" name="stock" value="{{ (int) ($variantStock[$v->id] ?? 0) }}" class="w-full rounded-md border-gray-300 text-sm" placeholder="{{ __('المخزون') }}" /></div>
-                                    <div class="sm:col-span-1 flex items-center"><input type="hidden" name="is_active" value="0" /><input type="checkbox" name="is_active" value="1" @checked($v->is_active) class="rounded border-gray-300 text-emerald-600" /></div>
-                                    <div class="sm:col-span-1"><button class="w-full px-2 py-1.5 bg-gray-800 text-white text-xs rounded-md hover:bg-gray-900">{{ __('حفظ') }}</button></div>
-                                </form>
-                                <div class="sm:col-span-1">
-                                    <form method="POST" action="{{ route('admin.products.variants.destroy', [$product, $v]) }}" onsubmit="return confirm('{{ __('حذف هذا المتغيّر؟') }}')">
-                                        @csrf @method('DELETE')
-                                        <button class="w-full px-2 py-1.5 bg-rose-50 text-rose-600 text-xs rounded-md hover:bg-rose-100">{{ __('حذف') }}</button>
-                                    </form>
+                            </template>
+                        </div>
+
+                        {{-- جدول التركيبات الحيّة: سعر + كمية لكل متغيّر --}}
+                        <template x-if="rows.length > 0">
+                            <div class="space-y-2">
+                                <div class="hidden sm:grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 px-2">
+                                    <span class="col-span-6">{{ __('الخيار') }}</span>
+                                    <span class="col-span-3">{{ __('السعر') }}</span>
+                                    <span class="col-span-3">{{ __('الكمية') }}</span>
+                                </div>
+                                <template x-for="(row, i) in rows" :key="row.key">
+                                    <div class="grid grid-cols-2 sm:grid-cols-12 gap-2 items-center border border-gray-100 rounded-lg p-2">
+                                        <div class="col-span-2 sm:col-span-6 text-sm font-medium text-gray-800" x-text="row.label"></div>
+                                        <template x-for="vid in row.values" :key="vid">
+                                            <input type="hidden" :name="`combos[${i}][values][]`" :value="vid" />
+                                        </template>
+                                        <div class="sm:col-span-3">
+                                            <input type="number" step="0.01" min="0" :name="`combos[${i}][price]`" x-model.number="cells[row.key].price"
+                                                   class="w-full rounded-md border-gray-300 text-sm" placeholder="{{ __('السعر') }}" />
+                                        </div>
+                                        <div class="sm:col-span-3">
+                                            <input type="number" step="1" min="0" :name="`combos[${i}][stock]`" x-model.number="cells[row.key].stock"
+                                                   class="w-full rounded-md border-gray-300 text-sm" placeholder="{{ __('الكمية') }}" />
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <div class="pt-3">
+                                    <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('حفظ المتغيّرات') }}</button>
+                                    <span class="text-xs text-gray-400 ms-2"><span x-text="rows.length"></span> {{ __('تركيبة') }}</span>
                                 </div>
                             </div>
-                        @endforeach
-                    </div>
+                        </template>
+
+                        <template x-if="rows.length === 0">
+                            <p class="text-sm text-gray-400">{{ __('اختر قيمة واحدة على الأقل لإظهار المتغيّرات.') }}</p>
+                        </template>
+                    </form>
                 @endif
             </div>
         @endif
@@ -290,4 +290,67 @@
             </div>
         @endif
     </div>
+
+    {{-- مصفوفة المتغيّرات الحيّة: تبني التركيبات من القيم المختارة وتحفظ السعر/الكمية --}}
+    <script>
+        function variantMatrix(config) {
+            return {
+                attributes: config.attributes || [],
+                defaultPrice: config.defaultPrice || 0,
+                selected: {},
+                cells: {},
+                rows: [],
+                init() {
+                    this.attributes.forEach(a => { this.selected[a.id] = []; });
+                    (config.existing || []).forEach(ex => {
+                        const key = this.sig(ex.values);
+                        this.cells[key] = { price: ex.price, stock: ex.stock };
+                        ex.values.forEach(vid => {
+                            const attr = this.attributes.find(a => a.values.some(v => v.id === vid));
+                            if (attr && !this.selected[attr.id].includes(vid)) this.selected[attr.id].push(vid);
+                        });
+                    });
+                    this.build();
+                },
+                toggle(attrId, valueId) {
+                    const arr = this.selected[attrId];
+                    const i = arr.indexOf(valueId);
+                    if (i >= 0) arr.splice(i, 1); else arr.push(valueId);
+                    this.build();
+                },
+                isSel(attrId, valueId) {
+                    return (this.selected[attrId] || []).includes(valueId);
+                },
+                build() {
+                    const groups = this.attributes
+                        .map(a => ({ id: a.id, values: this.selected[a.id] || [] }))
+                        .filter(g => g.values.length > 0);
+                    let combos = groups.length ? [[]] : [];
+                    groups.forEach(g => {
+                        const next = [];
+                        combos.forEach(c => g.values.forEach(vid => next.push([...c, vid])));
+                        combos = next;
+                    });
+                    this.rows = combos.map(vals => {
+                        const key = this.sig(vals);
+                        if (!this.cells[key]) this.cells[key] = { price: this.defaultPrice, stock: 0 };
+                        return { key: key, values: vals, label: this.labelOf(vals) };
+                    });
+                },
+                labelOf(vals) {
+                    return vals.map(vid => {
+                        for (const a of this.attributes) {
+                            const v = a.values.find(x => x.id === vid);
+                            if (v) return v.label;
+                        }
+                        return '';
+                    }).join(' / ');
+                },
+                sig(vals) {
+                    return vals.map(Number).sort((a, b) => a - b).join('-');
+                },
+            };
+        }
+        document.addEventListener('alpine:init', () => window.Alpine.data('variantMatrix', variantMatrix));
+    </script>
 </x-app-layout>
