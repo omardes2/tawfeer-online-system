@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Modules\Foundation\Models\Branch;
+use App\Modules\Foundation\Models\DeliveryBusiness;
 use App\Modules\Store\Models\SocialIdentity;
 use App\Support\Concerns\Auditable;
 use App\Support\Concerns\HasUuid;
@@ -19,7 +20,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'phone', 'department', 'job_title', 'password', 'branch_id', 'is_active', 'last_login_at', 'terms_accepted_at'])]
+#[Fillable(['name', 'email', 'phone', 'department', 'job_title', 'password', 'branch_id', 'delivery_business_id', 'is_active', 'last_login_at', 'terms_accepted_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -48,6 +49,12 @@ class User extends Authenticatable
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    /** حساب البزنس لدى شركة التوصيل — تُدخَل طرود طلبات هذا المستخدم تحته. */
+    public function deliveryBusiness(): BelongsTo
+    {
+        return $this->belongsTo(DeliveryBusiness::class);
     }
 
     /** هويّات تسجيل الدخول الاجتماعي المربوطة (Phase 3.5). */

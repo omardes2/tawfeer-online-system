@@ -17,6 +17,14 @@ interface DeliveryProviderInterface
     public function createShipment(array $payload): array;
 
     /**
+     * جلب حسابات «البزنس» لدى المزوّد (الحساب قد يملك عدّة بزنس).
+     * كل عنصر مُطبَّع: ['external_id', 'name', 'address_external_id', 'phone', 'raw'].
+     *
+     * @return iterable<array<string, mixed>>
+     */
+    public function pullBusinesses(): iterable;
+
+    /**
      * تتبّع شحنة عبر رقم التتبّع.
      *
      * @return array<string, mixed>

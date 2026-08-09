@@ -14,6 +14,11 @@ class NullDeliveryProvider implements DeliveryProviderInterface
         return ['status' => 'unavailable', 'reference' => null, 'driver' => $this->name()];
     }
 
+    public function pullBusinesses(): iterable
+    {
+        return []; // لا مزوّد ⇒ لا حسابات بزنس.
+    }
+
     public function track(string $trackingNumber): array
     {
         return ['status' => 'unavailable', 'driver' => $this->name()];

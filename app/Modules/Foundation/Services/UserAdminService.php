@@ -24,6 +24,7 @@ class UserAdminService
                 'department' => $data['department'] ?? null,
                 'job_title' => $data['job_title'] ?? null,
                 'branch_id' => $data['branch_id'] ?? null,
+                'delivery_business_id' => $data['delivery_business_id'] ?? null,
                 'is_active' => $data['is_active'] ?? true,
                 'password' => $data['password'] ?? Str::password(16),
                 'email_verified_at' => now(), // موظّف يُنشئه المدير — مُوثَّق.
@@ -48,6 +49,7 @@ class UserAdminService
                 'department' => $data['department'] ?? null,
                 'job_title' => $data['job_title'] ?? null,
                 'branch_id' => $data['branch_id'] ?? null,
+                'delivery_business_id' => $data['delivery_business_id'] ?? null,
                 'is_active' => $data['is_active'] ?? $user->is_active,
             ]);
 

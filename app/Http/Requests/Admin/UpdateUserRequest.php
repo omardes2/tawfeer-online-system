@@ -28,6 +28,7 @@ class UpdateUserRequest extends FormRequest
             'department' => ['nullable', 'string', 'max:100'],
             'job_title' => ['nullable', 'string', 'max:100'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'delivery_business_id' => ['nullable', 'integer', 'exists:delivery_businesses,id'],
             'is_active' => ['nullable', 'boolean'],
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'role' => ['required', 'string', Rule::in(Role::pluck('name')->all())],

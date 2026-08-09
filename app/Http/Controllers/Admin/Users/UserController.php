@@ -7,7 +7,9 @@ use App\Http\Requests\Admin\StoreUserRequest;
 use App\Http\Requests\Admin\UpdateUserRequest;
 use App\Models\User;
 use App\Modules\Foundation\Models\Branch;
+use App\Modules\Foundation\Models\DeliveryBusiness;
 use App\Modules\Foundation\Services\UserAdminService;
+use App\Modules\Shipping\Services\DeliveryBusinessSyncService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -99,12 +101,26 @@ class UserController extends Controller
         return back()->with('success', __('تم تحديث الحالة.'));
     }
 
+    /** جلب/تحديث حسابات البزنس من شركة التوصيل (Opost) إلى القائمة المحلية. */
+    public function syncDeliveryBusinesses(DeliveryBusinessSyncService $sync): RedirectResponse
+    {
+        $result = $sync->sync();
+
+        if ($result['synced'] === 0) {
+            return back()->with('error', __('لم تُجلب أي حسابات — تحقّق من ربط شركة التوصيل.'));
+        }
+
+        return back()->with('success', __('تمت مزامنة :n حساب بزنس من شركة التوصيل.', ['n' => $result['synced']]));
+    }
+
     private function formData(User $user): array
     {
         return [
             'user' => $user,
             'roles' => Role::orderBy('name')->get(),
             'branches' => Branch::orderBy('name')->get(),
+            // حسابات البزنس لدى شركة التوصيل (للقائمة المنسدلة).
+            'deliveryBusinesses' => DeliveryBusiness::orderByDesc('is_active')->orderBy('name')->get(),
         ];
     }
 }

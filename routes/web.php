@@ -330,6 +330,8 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::delete('{user}', [AdminUserController::class, 'destroy'])->name('destroy')->middleware('can:settings.users.delete');
         Route::post('{user}/toggle', [AdminUserController::class, 'toggleActive'])->name('toggle')->middleware('can:settings.users.update');
         Route::post('{user}/reset-password', [AdminUserController::class, 'resetPassword'])->name('reset_password')->middleware('can:settings.users.update');
+        // مزامنة حسابات البزنس من شركة التوصيل (Opost).
+        Route::post('delivery-businesses/sync', [AdminUserController::class, 'syncDeliveryBusinesses'])->name('delivery_businesses.sync')->middleware('can:settings.users.update');
     });
 
     // إدارة الأدوار والصلاحيات (Production)

@@ -24,6 +24,15 @@
                             @foreach ($branches as $b)<option value="{{ $b->id }}" @selected((int) old('branch_id', $user->branch_id) === $b->id)>{{ $b->name }}</option>@endforeach
                         </select>
                     </x-admin.field>
+                    <x-admin.field :label="__('حساب البزنس في شركة التوصيل')" name="delivery_business_id">
+                        <select name="delivery_business_id" class="w-full rounded-md border-gray-300">
+                            <option value="">{{ __('— بلا —') }}</option>
+                            @foreach ($deliveryBusinesses as $biz)
+                                <option value="{{ $biz->id }}" @selected((int) old('delivery_business_id', $user->delivery_business_id) === $biz->id)>{{ $biz->name }}@unless($biz->is_active) ({{ __('غير نشط') }})@endunless</option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-gray-400">{{ __('تُدخَل طرود طلبات هذا المستخدم تحت هذا الحساب في شركة التوصيل. زامِن القائمة من زر «مزامنة حسابات التوصيل» في صفحة المستخدمين.') }}</p>
+                    </x-admin.field>
                     <label class="flex items-center gap-2 text-sm pb-2 pt-6">
                         <input type="hidden" name="is_active" value="0" />
                         <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $user->exists ? $user->is_active : true)) class="rounded border-gray-300 text-emerald-600" />

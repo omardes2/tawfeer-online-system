@@ -4,6 +4,13 @@
         <div class="bg-white shadow-sm sm:rounded-lg p-6">
             <x-admin.flash />
             <x-admin.header :title="__('المستخدمون')">
+                @can('settings.users.update')
+                    <form method="POST" action="{{ route('admin.users.delivery_businesses.sync') }}" class="inline"
+                          onsubmit="return confirm('{{ __('جلب حسابات البزنس من شركة التوصيل؟') }}')">
+                        @csrf
+                        <button class="inline-flex px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50">{{ __('مزامنة حسابات التوصيل') }}</button>
+                    </form>
+                @endcan
                 @can('settings.users.create')
                     <a href="{{ route('admin.users.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('مستخدم جديد') }}</a>
                 @endcan

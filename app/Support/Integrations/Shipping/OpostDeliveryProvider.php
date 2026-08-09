@@ -81,8 +81,9 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
         }
 
         $body = array_filter([
-            'business' => config('services.opost.business_id'),
-            'business_address' => config('services.opost.business_address_id'),
+            // بزنس المستخدم المربوط (من الحمولة) يتجاوز الافتراضي في الإعدادات.
+            'business' => $payload['business_external_id'] ?? config('services.opost.business_id'),
+            'business_address' => $payload['business_address_external_id'] ?? config('services.opost.business_address_id'),
             'shipment_types[0][id]' => config('services.opost.shipment_type_id', 1),
             'consignee[name]' => $payload['consignee_name'] ?? null,
             'consignee[phone]' => $this->normalizePhone($payload['consignee_phone'] ?? null),
@@ -117,6 +118,94 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
             'raw' => $data,
             'driver' => $this->name(),
         ];
+    }
+
+    /**
+     * جلب حسابات «البزنس» من Opost (GET /resources/businesses افتراضيًا — قابل للضبط).
+     * تحليل متسامح لأسماء الحقول (كما في مزامنة الجغرافيا). يعيد عناصر مُطبَّعة.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function pullBusinesses(): iterable
+    {
+        $auth = app(OpostTokenProvider::class);
+        if ($auth->token() === null) {
+            return [];
+        }
+
+        try {
+            $path = (string) config('services.opost.businesses_path', '/resources/businesses');
+            $res = $this->send(fn (PendingRequest $c) => $c->get($path));
+            if (! $res->successful()) {
+                Log::warning('Opost pullBusinesses failed', ['status' => $res->status(), 'body' => $res->body()]);
+
+                return [];
+            }
+
+            return $this->normalizeBusinesses($res->json() ?? []);
+        } catch (\Throwable $e) {
+            Log::warning('Opost pullBusinesses error: '.$e->getMessage());
+
+            return [];
+        }
+    }
+
+    /**
+     * استخراج وتطبيع سجلّات البزنس من ردّ Opost (يدعم مغلّف [{data:[...]}] والقوائم المباشرة).
+     *
+     * @param  array<mixed>  $json
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeBusinesses(array $json): array
+    {
+        // تجميع أجزاء data من شكل Opost [{data:[...]}]، وإلا استخدام القائمة/المغلّف مباشرة.
+        $rows = [];
+        if (array_is_list($json)) {
+            $wrapped = false;
+            foreach ($json as $part) {
+                if (is_array($part) && isset($part['data']) && is_array($part['data'])) {
+                    $rows = array_merge($rows, $part['data']);
+                    $wrapped = true;
+                }
+            }
+            if (! $wrapped) {
+                $rows = $json;
+            }
+        } else {
+            foreach (['data', 'businesses', 'results', 'items'] as $k) {
+                if (isset($json[$k]) && is_array($json[$k])) {
+                    $rows = $json[$k];
+                    break;
+                }
+            }
+            if ($rows === [] && isset($json['id'])) {
+                $rows = [$json]; // كائن بزنس مفرد
+            }
+        }
+
+        $out = [];
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $externalId = $row['id'] ?? $row['business_id'] ?? $row['uuid'] ?? null;
+            if ($externalId === null || $externalId === '') {
+                continue;
+            }
+            // عنوان الالتقاط الافتراضي: قد يأتي ككائن أو معرّف مباشر.
+            $address = $row['default_address'] ?? $row['address'] ?? $row['business_address'] ?? null;
+            $addressId = is_array($address) ? ($address['id'] ?? null) : $address;
+
+            $out[] = [
+                'external_id' => (string) $externalId,
+                'name' => (string) ($row['name'] ?? $row['title'] ?? $row['business_name'] ?? ('#'.$externalId)),
+                'address_external_id' => $addressId !== null && $addressId !== '' ? (string) $addressId : null,
+                'phone' => isset($row['phone']) ? (string) $row['phone'] : (isset($row['mobile']) ? (string) $row['mobile'] : null),
+                'raw' => $row,
+            ];
+        }
+
+        return $out;
     }
 
     /**

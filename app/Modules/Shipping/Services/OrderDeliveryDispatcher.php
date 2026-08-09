@@ -89,7 +89,10 @@ class OrderDeliveryDispatcher
      */
     private function buildPayload(Order $order, ?int $providerId): array
     {
-        $order->loadMissing('items.variant.product');
+        $order->loadMissing('items.variant.product', 'creator.deliveryBusiness');
+
+        // البزنس الذي تُدخَل الشحنة تحته = بزنس مُنشئ الطلب (إن رُبط)، وإلا الافتراضي من الإعدادات.
+        $business = $order->creator?->deliveryBusiness;
 
         $qty = (int) max(1, (int) round($order->items->sum(fn ($i) => (float) $i->qty)));
         $description = $order->items
@@ -113,6 +116,9 @@ class OrderDeliveryDispatcher
             'return_notes' => $order->return_notes,
             'notes' => $order->notes,
             'reference' => $order->number,
+            // بزنس شركة التوصيل (اختياري): يتجاوز الافتراضي في الإعدادات عند ربط المستخدم.
+            'business_external_id' => $business?->external_id,
+            'business_address_external_id' => $business?->address_external_id,
         ];
     }
 
