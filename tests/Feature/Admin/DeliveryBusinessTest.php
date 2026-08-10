@@ -76,6 +76,55 @@ class DeliveryBusinessTest extends TestCase
         $this->assertDatabaseHas('delivery_businesses', ['external_id' => '55', 'name' => 'بزنس رئيسي']);
     }
 
+    public function test_sync_endpoint_reports_reason_when_not_linked(): void
+    {
+        // لا مزوّد ولا بيانات Opost → رسالة خطأ إرشادية بدل نجاح صامت.
+        config(['shipping.provider' => 'null', 'services.opost.username' => null, 'services.opost.token' => null, 'services.opost.client_id' => null]);
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.users.delivery_businesses.sync'))
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseCount('delivery_businesses', 0);
+    }
+
+    public function test_manual_add_edit_and_delete_business(): void
+    {
+        // إضافة يدوية
+        $this->actingAs($this->admin())->post(route('admin.users.delivery_businesses.store'), [
+            'external_id' => '13359', 'name' => 'Tawfeer_web', 'address_external_id' => '42', 'phone' => '0599880023', 'is_active' => 1,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $biz = DeliveryBusiness::where('external_id', '13359')->firstOrFail();
+        $this->assertSame('Tawfeer_web', $biz->name);
+
+        // تعديل + تعطيل
+        $this->actingAs($this->admin())->put(route('admin.users.delivery_businesses.update', $biz), [
+            'external_id' => '13359', 'name' => 'توفير ويب', 'is_active' => 0,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $biz->refresh();
+        $this->assertSame('توفير ويب', $biz->name);
+        $this->assertFalse($biz->is_active);
+
+        // ربط مستخدم ثم حذف الحساب → يُلغى الربط (FK nullOnDelete)
+        $user = User::factory()->create(['delivery_business_id' => $biz->id]);
+        $this->actingAs($this->admin())->delete(route('admin.users.delivery_businesses.destroy', $biz))->assertRedirect();
+        $this->assertDatabaseMissing('delivery_businesses', ['id' => $biz->id]);
+        $this->assertNull($user->fresh()->delivery_business_id);
+    }
+
+    public function test_manual_add_rejects_duplicate_external_id(): void
+    {
+        DeliveryBusiness::create(['provider' => 'opost', 'external_id' => '13359', 'name' => 'موجود']);
+
+        $this->actingAs($this->admin())->post(route('admin.users.delivery_businesses.store'), [
+            'external_id' => '13359', 'name' => 'مكرر',
+        ])->assertSessionHasErrors('external_id');
+
+        $this->assertSame(1, DeliveryBusiness::where('external_id', '13359')->count());
+    }
+
     public function test_user_form_saves_and_clears_delivery_business(): void
     {
         $biz = DeliveryBusiness::create(['provider' => 'opost', 'external_id' => '9', 'name' => 'حساب البزنس']);

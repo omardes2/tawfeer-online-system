@@ -13,20 +13,25 @@ use Illuminate\Support\Facades\DB;
 class DeliveryBusinessSyncService
 {
     /**
-     * @return array{provider: string, synced: int, deactivated: int}
+     * @return array{provider: string, synced: int, deactivated: int, reason: ?string}
      */
     public function sync(): array
     {
-        $code = (string) config('shipping.provider', 'null');
+        $code = $this->resolveProviderCode();
         $class = config("shipping.drivers.$code.delivery");
 
-        if ($class === null) {
-            return ['provider' => $code, 'synced' => 0, 'deactivated' => 0];
+        if ($class === null || $code === 'null') {
+            return ['provider' => $code, 'synced' => 0, 'deactivated' => 0, 'reason' => 'not_linked'];
         }
 
         /** @var DeliveryProviderInterface $driver */
         $driver = app($class);
         $rows = collect($driver->pullBusinesses());
+
+        if ($rows->isEmpty()) {
+            // المزوّد مربوط لكن لم يُرجع أي حسابات (خطأ API/صلاحيات/حساب بلا بزنس).
+            return ['provider' => $code, 'synced' => 0, 'deactivated' => 0, 'reason' => 'empty_response'];
+        }
 
         $seen = [];
         $synced = 0;
@@ -63,6 +68,28 @@ class DeliveryBusinessSyncService
                 ->update(['is_active' => false]);
         }
 
-        return ['provider' => $code, 'synced' => $synced, 'deactivated' => $deactivated];
+        return ['provider' => $code, 'synced' => $synced, 'deactivated' => $deactivated, 'reason' => null];
+    }
+
+    /**
+     * كود المزوّد المستخدم لجلب البزنس: المزوّد الفعّال، وإن كان "null" لكن بيانات
+     * Opost مضبوطة نستخدم opost (حسابات البزنس مفهوم خاص بـOpost — المبدأ 12/13).
+     */
+    private function resolveProviderCode(): string
+    {
+        $code = (string) config('shipping.provider', 'null');
+
+        if ($code === 'null' && config('shipping.drivers.opost.delivery') !== null && $this->opostConfigured()) {
+            return 'opost';
+        }
+
+        return $code;
+    }
+
+    private function opostConfigured(): bool
+    {
+        return filled(config('services.opost.username'))
+            || filled(config('services.opost.token'))
+            || filled(config('services.opost.client_id'));
     }
 }

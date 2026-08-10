@@ -13,8 +13,8 @@ use App\Http\Controllers\Admin\Catalog\BrandController;
 use App\Http\Controllers\Admin\Catalog\CategoryController;
 use App\Http\Controllers\Admin\Catalog\ProductAttributeController;
 use App\Http\Controllers\Admin\Catalog\ProductController;
-use App\Http\Controllers\Admin\Catalog\ProductVariantController;
 use App\Http\Controllers\Admin\Catalog\ProductTagController;
+use App\Http\Controllers\Admin\Catalog\ProductVariantController;
 use App\Http\Controllers\Admin\Catalog\UnitController;
 use App\Http\Controllers\Admin\Commissions\CommissionController as AdminCommissionController;
 use App\Http\Controllers\Admin\Crm\CustomerController as AdminCustomerController;
@@ -44,6 +44,7 @@ use App\Http\Controllers\Admin\Shipping\DeliveryStatusController as AdminDeliver
 use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
 use App\Http\Controllers\Admin\Shipping\ShipmentController as AdminShipmentController;
 use App\Http\Controllers\Admin\System\ClearCacheController;
+use App\Http\Controllers\Admin\Users\DeliveryBusinessController as AdminDeliveryBusinessController;
 use App\Http\Controllers\Admin\Users\UserController as AdminUserController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Storefront\Account\AccountController;
@@ -330,8 +331,15 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::delete('{user}', [AdminUserController::class, 'destroy'])->name('destroy')->middleware('can:settings.users.delete');
         Route::post('{user}/toggle', [AdminUserController::class, 'toggleActive'])->name('toggle')->middleware('can:settings.users.update');
         Route::post('{user}/reset-password', [AdminUserController::class, 'resetPassword'])->name('reset_password')->middleware('can:settings.users.update');
-        // مزامنة حسابات البزنس من شركة التوصيل (Opost).
-        Route::post('delivery-businesses/sync', [AdminUserController::class, 'syncDeliveryBusinesses'])->name('delivery_businesses.sync')->middleware('can:settings.users.update');
+
+        // حسابات البزنس لدى شركة التوصيل: مزامنة تلقائية + إدارة يدوية.
+        Route::middleware('can:settings.users.update')->group(function () {
+            Route::post('delivery-businesses/sync', [AdminUserController::class, 'syncDeliveryBusinesses'])->name('delivery_businesses.sync');
+            Route::get('delivery-businesses', [AdminDeliveryBusinessController::class, 'index'])->name('delivery_businesses.index');
+            Route::post('delivery-businesses', [AdminDeliveryBusinessController::class, 'store'])->name('delivery_businesses.store');
+            Route::put('delivery-businesses/{delivery_business}', [AdminDeliveryBusinessController::class, 'update'])->name('delivery_businesses.update');
+            Route::delete('delivery-businesses/{delivery_business}', [AdminDeliveryBusinessController::class, 'destroy'])->name('delivery_businesses.destroy');
+        });
     });
 
     // إدارة الأدوار والصلاحيات (Production)

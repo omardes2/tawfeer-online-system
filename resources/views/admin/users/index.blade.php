@@ -5,6 +5,7 @@
             <x-admin.flash />
             <x-admin.header :title="__('المستخدمون')">
                 @can('settings.users.update')
+                    <a href="{{ route('admin.users.delivery_businesses.index') }}" class="inline-flex px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50">{{ __('إدارة حسابات التوصيل') }}</a>
                     <form method="POST" action="{{ route('admin.users.delivery_businesses.sync') }}" class="inline"
                           onsubmit="return confirm('{{ __('جلب حسابات البزنس من شركة التوصيل؟') }}')">
                         @csrf

@@ -135,9 +135,9 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
 
         try {
             $path = (string) config('services.opost.businesses_path', '/resources/businesses');
-            $res = $this->send(fn (PendingRequest $c) => $c->get($path));
+            $res = $this->send(fn (PendingRequest $c) => $c->get($path, ['limit' => 200]));
             if (! $res->successful()) {
-                Log::warning('Opost pullBusinesses failed', ['status' => $res->status(), 'body' => $res->body()]);
+                Log::warning('Opost pullBusinesses failed', ['status' => $res->status(), 'body' => mb_substr($res->body(), 0, 500)]);
 
                 return [];
             }

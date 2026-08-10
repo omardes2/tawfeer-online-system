@@ -107,7 +107,13 @@ class UserController extends Controller
         $result = $sync->sync();
 
         if ($result['synced'] === 0) {
-            return back()->with('error', __('لم تُجلب أي حسابات — تحقّق من ربط شركة التوصيل.'));
+            $message = match ($result['reason'] ?? null) {
+                'not_linked' => __('شركة التوصيل غير مربوطة (بيانات OAuth غير مضبوطة في الخادم). يمكنك إضافة الحسابات يدويًا من «إدارة حسابات التوصيل».'),
+                'empty_response' => __('لم يُرجع المزوّد أي حسابات — راجع سجلّ الأخطاء أو أضِف الحسابات يدويًا من «إدارة حسابات التوصيل».'),
+                default => __('تعذّرت المزامنة — أضِف الحسابات يدويًا من «إدارة حسابات التوصيل».'),
+            };
+
+            return back()->with('error', $message);
         }
 
         return back()->with('success', __('تمت مزامنة :n حساب بزنس من شركة التوصيل.', ['n' => $result['synced']]));
