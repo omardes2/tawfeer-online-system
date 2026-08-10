@@ -82,7 +82,12 @@ class DeliveryStatusService
 
             $this->recordTransition($shipment, $from, $to, $source, $opts['actor'] ?? null, $reason, $opts['note'] ?? null, $opts['provider_status'] ?? null);
 
-            // أثر مالي وحيد عند الإغلاق.
+            // احتساب العمولات/الأرباح عند وصول المبلغ لمحاسبة المندوب (Opost: in_accounting).
+            if ($to === DeliveryStatus::FUNDS_AT_ACCOUNTING) {
+                $this->applyFundsAtAccountingEffects($shipment, $opts['actor'] ?? null, $opts['reference'] ?? $shipment->number);
+            }
+
+            // الإغلاق المالي النهائي للشحنة (Opost: close) — تسوية الطلب فقط، لا احتساب عمولة هنا.
             if ($to === DeliveryStatus::CLOSED) {
                 $this->applyCloseEffects($shipment, $opts['actor'] ?? null, $opts['reference'] ?? $shipment->number);
             }
@@ -217,9 +222,36 @@ class DeliveryStatusService
 
     // ---- الآثار المالية (CLOSE فقط) ----
 
+    /** الحدّ الأدنى لقيمة البضاعة المحصّلة (بدون التوصيل) لاحتساب العمولة (BR: > 1). */
+    private const MIN_COLLECTED_GOODS_VALUE = 1.0;
+
     /**
-     * أثر الإغلاق المالي: تسوية الطلب + جعل العمولات eligible (لا دفع تلقائي).
-     * ضمن معاملة الانتقال. idempotent (settled_at مرّة واحدة؛ الاستحقاق يمسّ pending فقط).
+     * أثر «وصول المبلغ لمحاسبة المندوب» (Opost: in_accounting): احتساب العمولات/الأرباح
+     * (accrue ثم eligible) — لموظف المبيعات والمسوّق — شرط أن تكون **قيمة البضاعة المحصّلة
+     * من العميل بدون مبلغ التوصيل** أكثر من 1. مسار الإرجاع لا يمرّ بهذه الحالة إطلاقًا،
+     * فلا تُحتسب عمولة على المرتجعات. idempotent (الاستحقاق يمسّ pending فقط). لا دفع تلقائي.
+     */
+    private function applyFundsAtAccountingEffects(Shipment $shipment, ?User $actor, string $reference): void
+    {
+        $order = $shipment->order;
+        if ($order === null) {
+            return;
+        }
+
+        // القيمة المحصّلة من العميل بدون مبلغ التوصيل = الإجمالي − التوصيل.
+        $collectedGoodsValue = (float) $order->total - (float) $order->shipping_total;
+        if ($collectedGoodsValue <= self::MIN_COLLECTED_GOODS_VALUE) {
+            return; // قيمة ضئيلة/صفرية (أو مرتجَع) ⇒ لا احتساب.
+        }
+
+        $this->commissions->accrueForOrder($order);       // ضمان قيود الاستحقاق (idempotent).
+        $this->commissions->markEligibleForOrder($order, $reference, $actor); // pending → eligible.
+    }
+
+    /**
+     * أثر الإغلاق المالي النهائي للشحنة (Opost: close): تسوية الطلب فقط.
+     * احتساب العمولة يقع سابقًا عند in_accounting؛ لا يُحتسب هنا (يمنع عمولة المرتجعات).
+     * ضمن معاملة الانتقال. idempotent (settled_at مرّة واحدة).
      */
     private function applyCloseEffects(Shipment $shipment, ?User $actor, string $reference): void
     {
@@ -231,10 +263,6 @@ class DeliveryStatusService
         if ($order->settled_at === null) {
             $order->update(['settled_at' => now()]);
         }
-
-        // ضمان وجود قيود الاستحقاق (idempotent) ثم رفعها إلى eligible — لا دفع تلقائي.
-        $this->commissions->accrueForOrder($order);
-        $this->commissions->markEligibleForOrder($order, $reference, $actor);
 
         ShipmentClosed::dispatch($shipment, $order);
     }

@@ -66,9 +66,9 @@ class DeliveryStatusEngineTest extends TestCase
         return $order->fresh('items');
     }
 
-    private function shipment(?User $rep = null, ?int $providerId = null): Shipment
+    private function shipment(?User $rep = null, ?int $providerId = null, float $price = 100, float $qty = 2): Shipment
     {
-        $order = $this->order($rep);
+        $order = $this->order($rep, $price, $qty);
 
         return Shipment::create([
             'number' => 'SHP-T-'.$order->id,
@@ -212,7 +212,7 @@ class DeliveryStatusEngineTest extends TestCase
         $this->assertEquals(0, $s->deliveryTransitions()->count());
     }
 
-    // ---- الإغلاق المالي (CLOSE) — نقطة الاستحقاق الوحيدة ----
+    // ---- احتساب العمولة عند in_accounting (وصول المبلغ لمحاسبة المندوب) ----
 
     public function test_delivered_cod_held_does_not_make_commission_eligible(): void
     {
@@ -222,14 +222,46 @@ class DeliveryStatusEngineTest extends TestCase
 
         $this->svc->submit($s);
         $this->svc->pickup($s);
-        $this->svc->markDeliveredCodHeld($s); // سُلّم، النقد لدى المندوب
+        $this->svc->markDeliveredCodHeld($s); // سُلّم، النقد لدى المندوب — لم يصل للمحاسبة بعد
 
         $entry = CommissionEntry::where('order_id', $s->order_id)->first();
         $this->assertEquals('pending', $entry->state); // ليست مستحقّة بعد
         $this->assertNull($s->order->fresh()->settled_at);
     }
 
-    public function test_close_settles_order_and_makes_commissions_eligible_only(): void
+    public function test_funds_at_accounting_makes_commissions_eligible(): void
+    {
+        $rep = $this->actor('sales');
+        $s = $this->shipment($rep);
+
+        $this->svc->submit($s);
+        $this->svc->pickup($s);
+        $this->svc->markDeliveredCodHeld($s);
+        $this->svc->markFundsAtAccounting($s); // Opost: in_accounting — هنا يقع الاحتساب
+
+        $entry = CommissionEntry::where('order_id', $s->order_id)->first();
+        $this->assertEquals('eligible', $entry->state); // مستحقّة فور وصول المبلغ للمحاسبة
+        $this->assertEquals('2.00', $entry->amount);    // 1% من 200 (قيمة البضاعة)
+        // لا دفع تلقائي، ولم يُغلَق ماليًا بعد.
+        $this->assertEquals(0.0, app(CommissionService::class)->statement($rep->id, 'sales')['paid']);
+        $this->assertNull($s->order->fresh()->settled_at);
+    }
+
+    public function test_funds_at_accounting_skips_commission_when_goods_value_not_above_one(): void
+    {
+        $rep = $this->actor('sales');
+        $s = $this->shipment($rep, price: 0.5, qty: 1); // قيمة بضاعة 0.50 ≤ 1
+
+        $this->svc->submit($s);
+        $this->svc->pickup($s);
+        $this->svc->markDeliveredCodHeld($s);
+        $this->svc->markFundsAtAccounting($s);
+
+        $entry = CommissionEntry::where('order_id', $s->order_id)->first();
+        $this->assertNull($entry); // لا احتساب لقيمة ≤ 1
+    }
+
+    public function test_close_settles_order_without_recomputing_commission(): void
     {
         $finance = $this->actor('finance');
         $rep = $this->actor('sales');
@@ -238,19 +270,33 @@ class DeliveryStatusEngineTest extends TestCase
         $this->svc->submit($s);
         $this->svc->pickup($s);
         $this->svc->markDeliveredCodHeld($s);
-        $this->svc->markFundsAtAccounting($s);
-        $this->svc->close($s, $finance);
+        $this->svc->markFundsAtAccounting($s); // احتُسبت العمولة هنا (eligible)
+        $this->svc->close($s, $finance);       // الإغلاق: تسوية فقط
 
         $s->refresh();
         $this->assertEquals(DeliveryStatus::CLOSED, $s->delivery_status);
         $this->assertNotNull($s->closed_at);
-        $this->assertNotNull($s->order->fresh()->settled_at);
+        $this->assertNotNull($s->order->fresh()->settled_at); // التسوية تقع عند الإغلاق
 
         $entry = CommissionEntry::where('order_id', $s->order_id)->first();
-        $this->assertEquals('eligible', $entry->state); // مستحقّة — لا مدفوعة
-        $this->assertEquals('2.00', $entry->amount);    // 1% من 200
-        // لا دفع تلقائي.
-        $this->assertEquals(0.0, app(CommissionService::class)->statement($rep->id, 'sales')['paid']);
+        $this->assertEquals('eligible', $entry->state); // بقيت مستحقّة (لم تُدفع تلقائيًا)
+        $this->assertEquals(1, CommissionEntry::where('order_id', $s->order_id)->count()); // لا تكرار عند الإغلاق
+    }
+
+    public function test_return_path_does_not_make_commission_eligible(): void
+    {
+        $rep = $this->actor('sales');
+        $s = $this->shipment($rep);
+        app(CommissionService::class)->accrueForOrder($s->order); // عمولة pending عند التسليم
+
+        $this->svc->submit($s);
+        $this->svc->pickup($s);
+        $this->svc->markReturningToCourier($s);
+        $this->svc->markReturnInTransit($s);
+        $this->svc->close($s, $this->actor('finance')); // مسار إرجاع — لا يمرّ بـin_accounting
+
+        $entry = CommissionEntry::where('order_id', $s->order_id)->first();
+        $this->assertEquals('pending', $entry->state); // لا تُحتسب عمولة على المرتجعات
     }
 
     public function test_full_return_path_reaches_close(): void
