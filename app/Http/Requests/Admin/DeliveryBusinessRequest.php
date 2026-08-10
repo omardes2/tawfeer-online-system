@@ -36,7 +36,8 @@ class DeliveryBusinessRequest extends FormRequest
     /** كود المزوّد الفعّال (وإلا opost) — يُخزَّن مع البزنس المُضاف يدويًا. */
     public function providerCode(): string
     {
-        $active = (string) config('shipping.provider', 'null');
+        // env('SHIPPING_PROVIDER=null') يُفسَّر كـnull فعلي؛ نطبّعه إلى السنتينل 'null'.
+        $active = config('shipping.provider') ?: 'null';
 
         return $active !== 'null' ? $active : 'opost';
     }

@@ -77,7 +77,8 @@ class DeliveryBusinessSyncService
      */
     private function resolveProviderCode(): string
     {
-        $code = (string) config('shipping.provider', 'null');
+        // env('SHIPPING_PROVIDER=null') يُفسَّر كـnull فعلي؛ نطبّعه إلى السنتينل 'null'.
+        $code = config('shipping.provider') ?: 'null';
 
         if ($code === 'null' && config('shipping.drivers.opost.delivery') !== null && $this->opostConfigured()) {
             return 'opost';
