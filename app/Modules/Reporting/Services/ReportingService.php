@@ -244,12 +244,13 @@ class ReportingService
         $deliveredTotal = $this->money(DB::table('orders')->whereBetween('delivered_at', [$from, $to])->sum('total'));
         $unsettled = $this->money(max(0, $deliveredTotal - $collected));
 
-        // ربح إجمالي تقريبي: إجمالي السطور − (الكمية × متوسّط التكلفة). لقطة تكلفة غير محفوظة بالسطر.
+        // ربح إجمالي: إجمالي السطور − (الكمية × تكلفة وقت البيع). تُعتمد لقطة السطر
+        // (نفس أساس AnalyticsService وقيد التكلفة)، مع الرجوع لمتوسّط التكلفة عند غيابها.
         $grossProfit = $this->money(DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->leftJoin('product_variants', 'order_items.variant_id', '=', 'product_variants.id')
             ->whereBetween('orders.created_at', [$from, $to])->where('orders.status', '!=', 'cancelled')
-            ->selectRaw('COALESCE(SUM(order_items.line_total - (order_items.qty * COALESCE(product_variants.average_cost, 0))), 0) as gp')
+            ->selectRaw('COALESCE(SUM(order_items.line_total - (order_items.qty * COALESCE(order_items.wholesale_cost_snapshot, product_variants.average_cost, 0))), 0) as gp')
             ->value('gp'));
 
         // توصيل.

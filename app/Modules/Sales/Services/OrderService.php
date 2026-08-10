@@ -440,6 +440,11 @@ class OrderService
 
     private function syncItems(Order $order, array $items): void
     {
+        // لقطة تكلفة الجملة وقت البيع (BR-ORD-18): مرجع ثابت للربح والتكلفة والعمولة —
+        // تُجمَّد هنا فلا تتغيّر بتغيّر WAC لاحقًا. بدونها تُحتسب التكلفة صفرًا في التقارير.
+        $costs = ProductVariant::whereIn('id', array_column($items, 'variant_id'))
+            ->pluck('average_cost', 'id');
+
         foreach ($items as $item) {
             $qty = (float) $item['qty'];
             $unitPrice = (float) $item['unit_price'];
@@ -453,6 +458,7 @@ class OrderService
                 'tax_rate' => 0,
                 'tax_amount' => 0,
                 'line_total' => ($qty * $unitPrice) - $discount,
+                'wholesale_cost_snapshot' => round((float) ($item['wholesale_cost_snapshot'] ?? $costs[$item['variant_id']] ?? 0), 2),
                 'qty_reserved' => 0,
                 'qty_shipped' => 0,
             ]);

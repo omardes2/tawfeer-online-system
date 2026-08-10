@@ -163,7 +163,9 @@ class SalesPostingService
     {
         $revenueByAccount = [];
         foreach ($order->items as $item) {
-            $net = round((float) $item->line_total - (float) $item->discount, 2);
+            // line_total مخصوم أصلًا ((qty × unit_price) − discount) — لا يُطرح الخصم ثانيةً،
+            // وإلا نقصت الذمم والإيراد بمقدار الخصم واختلّ رصيد العميل/شركة التوصيل.
+            $net = round((float) $item->line_total, 2);
             if ($net === 0.0) {
                 continue;
             }
@@ -206,7 +208,9 @@ class SalesPostingService
         $cogsByAccount = [];
         $inventoryByAccount = [];
         foreach ($order->items as $item) {
-            $wac = (float) ($item->variant?->average_cost ?? $item->variant?->cost_price ?? 0);
+            // لقطة التكلفة وقت البيع أولًا: تُبقي قيد التكلفة ثابتًا عند إعادة الترحيل
+            // (تعديل الطلب لاحقًا) وتوافق تقارير الربح وإرجاع المخزون على نفس الأساس.
+            $wac = (float) ($item->wholesale_cost_snapshot ?? $item->variant?->average_cost ?? $item->variant?->cost_price ?? 0);
             $cost = round((float) $item->qty * $wac, 2);
             if ($cost <= 0) {
                 continue;

@@ -116,6 +116,20 @@ class CommissionPaymentTest extends TestCase
         $this->assertEquals(0.0, $b['pending_payout']);
     }
 
+    /** كشف الحساب (وواجهة الـAPI) لا يعدّ الدفعة المسودّة مدفوعة — المال لم يخرج بعد. */
+    public function test_statement_excludes_unposted_payout_from_paid(): void
+    {
+        [$affiliate] = $this->eligibleAffiliate();
+        $actor = User::factory()->create();
+        $payout = $this->svc->payAmount($actor, $affiliate->id, 'affiliate', 15, $this->treasury()->id, $this->expenseAccount()->id);
+
+        $this->assertEquals(0.0, $this->svc->statement($affiliate->id, 'affiliate')['paid']);
+
+        // بعد ترحيل المالية للسند تُحتسب مدفوعة.
+        FinancialVoucher::whereKey($payout->financial_voucher_id)->update(['status' => 'posted']);
+        $this->assertEquals(15.0, $this->svc->statement($affiliate->id, 'affiliate')['paid']);
+    }
+
     public function test_zero_amount_is_rejected(): void
     {
         [$affiliate] = $this->eligibleAffiliate();

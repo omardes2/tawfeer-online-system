@@ -422,7 +422,8 @@ class CommissionService
             'pending' => round($sum('pending'), 2),
             'eligible' => round($sum('eligible'), 2),
             'approved' => round($sum('approved'), 2),
-            'paid' => round((float) DB::table('commission_payouts')->where('earner_id', $earnerId)->where('earner_type', $earnerType)->sum('total'), 2),
+            // المدفوع = الدفعات ذات سند مُرحّل فقط؛ المسودّة/المعتمدة لم يخرج مالها بعد.
+            'paid' => $this->balance($earnerId, $earnerType)['paid'],
         ];
     }
 
