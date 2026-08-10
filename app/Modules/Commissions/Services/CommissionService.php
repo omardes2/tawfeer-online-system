@@ -3,6 +3,7 @@
 namespace App\Modules\Commissions\Services;
 
 use App\Models\User;
+use App\Modules\Accounting\Services\VoucherService;
 use App\Modules\Commissions\Events\CommissionAccrued;
 use App\Modules\Commissions\Events\CommissionAdjusted;
 use App\Modules\Commissions\Events\CommissionReversed;
@@ -320,6 +321,93 @@ class CommissionService
                 $this->transition($entry, 'cancelled', $actor);
             }
         });
+    }
+
+    // ---- دفع الأرباح بمبلغ حرّ عبر سند صرف مالي (ADR-012e) ----
+
+    /**
+     * دفع أرباح مستفيد بمبلغ حرّ (قد يقلّ/يزيد عن المستحق) من خزينة/بنك محدّد،
+     * موثّقًا بسند صرف مالي (payment) بحالة مسودّة تعتمده وتُرحّله المالية.
+     */
+    public function payAmount(
+        User $actor,
+        int $earnerId,
+        string $earnerType,
+        float $amount,
+        int $treasuryId,
+        int $counterAccountId,
+        ?string $periodStart = null,
+        ?string $periodEnd = null,
+        ?string $reference = null,
+        ?string $notes = null,
+    ): CommissionPayout {
+        if ($amount <= 0) {
+            throw ValidationException::withMessages(['amount' => __('المبلغ يجب أن يكون أكبر من صفر.')]);
+        }
+
+        $earner = User::findOrFail($earnerId);
+        $label = $earnerType === 'affiliate' ? __('أرباح مسوّق') : __('عمولة موظف مبيعات');
+        $period = $periodStart ? ' ('.$periodStart.' → '.$periodEnd.')' : '';
+
+        return DB::transaction(function () use ($actor, $earner, $earnerId, $earnerType, $amount, $treasuryId, $counterAccountId, $periodStart, $periodEnd, $reference, $notes, $label, $period) {
+            $voucher = app(VoucherService::class)->create('payment', [
+                'voucher_date' => now()->toDateString(),
+                'treasury_id' => $treasuryId,
+                'counter_account_id' => $counterAccountId,
+                'employee_id' => $earnerId,
+                'party_name' => $earner->name,
+                'amount' => round($amount, 2),
+                'reference' => $reference,
+                'category' => 'commission_payout',
+                'description' => $label.' — '.$earner->name.$period,
+                'notes' => $notes,
+            ]);
+
+            return CommissionPayout::create([
+                'earner_id' => $earnerId,
+                'earner_type' => $earnerType,
+                'treasury_id' => $treasuryId,
+                'financial_voucher_id' => $voucher->id,
+                'total' => round($amount, 2),
+                'reference' => $reference ?: $voucher->number,
+                'period_start' => $periodStart,
+                'period_end' => $periodEnd,
+                'status' => 'draft',
+                'notes' => $notes,
+                'created_by' => $actor->id,
+                'paid_at' => null,
+            ]);
+        });
+    }
+
+    /**
+     * رصيد المستفيد: المستحق (كل الأرباح المؤهّلة صافيةً) − المدفوع فعليًا (سند مُرحّل)
+     * − قيد الاعتماد (سند مسودّة/معتمد لم يُرحّل بعد). سندات ملغاة/معكوسة لا تُحتسب.
+     *
+     * @return array{earned: float, paid: float, pending_payout: float, outstanding: float}
+     */
+    public function balance(int $earnerId, string $earnerType): array
+    {
+        $earned = (float) CommissionEntry::where('earner_id', $earnerId)->where('earner_type', $earnerType)
+            ->whereIn('state', ['eligible', 'approved', 'paid'])->sum('amount');
+
+        $payouts = CommissionPayout::where('earner_id', $earnerId)->where('earner_type', $earnerType)
+            ->with('voucher:id,status')->get();
+
+        // بلا سند = مدفوعة قديمة (النظام السابق) ⇒ تُعتبر مُرحّلة.
+        $posted = fn ($p) => $p->voucher === null || $p->voucher->status === 'posted';
+        $draft = fn ($p) => $p->voucher !== null && in_array($p->voucher->status, ['draft', 'approved'], true);
+
+        $paid = round((float) $payouts->filter($posted)->sum('total'), 2);
+        $pending = round((float) $payouts->filter($draft)->sum('total'), 2);
+        $earned = round($earned, 2);
+
+        return [
+            'earned' => $earned,
+            'paid' => $paid,
+            'pending_payout' => $pending,
+            'outstanding' => round($earned - $paid - $pending, 2),
+        ];
     }
 
     // ---- الأرصدة (مشتقّة من الدفتر — لا عمود رصيد) ----
