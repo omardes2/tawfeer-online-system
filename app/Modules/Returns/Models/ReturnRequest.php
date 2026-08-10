@@ -23,6 +23,7 @@ class ReturnRequest extends Model
     protected $fillable = [
         'number', 'order_id', 'type', 'reason_code', 'resolution', 'scope', 'status',
         'refund_amount', 'price_difference', 'refund_payment_id', 'linked_shipment_id', 'notes',
+        'revenue_entry_id', 'cogs_entry_id',
         'requested_by', 'approved_by', 'received_by', 'inspected_by', 'decided_by', 'reject_reason',
         'approved_at', 'received_at', 'inspected_at', 'completed_at', 'created_by',
     ];

@@ -39,6 +39,7 @@ class ReturnService
         private readonly CommissionService $commissions,
         private readonly OrderService $orders,
         private readonly ShipmentService $shipments,
+        private readonly ReturnPostingService $posting,
     ) {}
 
     /**
@@ -235,7 +236,11 @@ class ReturnService
                 default => $this->orders->markPartiallyReturned($order, $note),
             };
 
-            // 5) الاسترداد المالي (BR-RET-06) — إعادة استخدام PaymentService::refund.
+            // 5) الترحيل المحاسبي (ADR-012f): عكس الإيراد + عكس تكلفة البضاعة المُعادة للمخزون.
+            // بدونه يبقى الإيراد متضخّمًا ويقلّ حساب المخزون عن المخزون الفعلي.
+            $this->posting->post($request);
+
+            // 6) الاسترداد المالي (BR-RET-06) — إعادة استخدام PaymentService::refund.
             if ($request->resolution === 'refund' && (float) $request->refund_amount > 0) {
                 $this->processRefund($request);
             }
