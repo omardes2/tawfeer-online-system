@@ -21,6 +21,30 @@
                 <p class="text-sm text-rose-600">{{ __('سبب الفشل') }}: {{ $shipment->failure_reason }}</p>
             @endif
 
+            {{-- مزامنة فورية مع شركة التوصيل --}}
+            @if ($shipment->delivery_provider_id && ! in_array($shipment->delivery_status, \App\Modules\Shipping\Support\DeliveryStatus::TERMINAL, true))
+                <div class="flex flex-wrap items-center gap-3 pt-2 border-t">
+                    <form method="POST" action="{{ route('admin.shipping.shipments.sync', $shipment) }}"
+                          onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='{{ __('جارٍ الاستعلام...') }}'">
+                        @csrf
+                        <button class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm rounded-md hover:bg-gray-50">{{ __('مزامنة الآن مع شركة التوصيل') }}</button>
+                    </form>
+                    <span class="text-xs text-gray-400">
+                        @if ($shipment->last_synced_at)
+                            {{ __('آخر مزامنة') }}: {{ $shipment->last_synced_at->diffForHumans() }}
+                        @else
+                            {{ __('لم تُزامَن بعد') }}
+                        @endif
+                        @if ($shipment->provider_status)
+                            — {{ __('حالة المزوّد') }}: <span class="font-mono">{{ $shipment->provider_status }}</span>
+                        @endif
+                    </span>
+                    @if ($shipment->sync_status === 'inconsistent')
+                        <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-700 text-xs">{{ __('تحتاج مراجعة يدوية') }}</span>
+                    @endif
+                </div>
+            @endif
+
             {{-- أزرار الانتقالات حسب الحالة --}}
             <div class="flex flex-wrap gap-2 pt-2 border-t" x-data="{ failing: false }">
                 @if (in_array($shipment->status, ['not_shipped', 'preparing']))

@@ -8,7 +8,7 @@ return [
     // المزامنة المجدولة (استطلاع حالة الشحنات النشطة).
     'sync' => [
         'enabled' => env('DELIVERY_SYNC_ENABLED', false),
-        'cron' => env('DELIVERY_SYNC_CRON', '*/15 * * * *'),
+        'cron' => env('DELIVERY_SYNC_CRON', '* * * * *'), // كل دقيقة — أقرب ما يكون للفوري بلا webhook
         'chunk' => 100,
         'max_attempts' => 5, // إعادة محاولة المزامنة الفاشلة.
     ],

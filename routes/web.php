@@ -268,6 +268,8 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('shipments/{shipment}/out-for-delivery', [AdminShipmentController::class, 'outForDelivery'])->name('shipments.out_for_delivery');
         Route::post('shipments/{shipment}/deliver', [AdminShipmentController::class, 'deliver'])->name('shipments.deliver');
         Route::post('shipments/{shipment}/fail', [AdminShipmentController::class, 'fail'])->name('shipments.fail');
+        // استطلاع فوري لحالة الشحنة من شركة التوصيل (بلا انتظار المجدول).
+        Route::post('shipments/{shipment}/sync', [AdminShipmentController::class, 'syncNow'])->name('shipments.sync');
 
         // محرّك حالة التوصيل القانوني (Phase 4.3 / ADR-038)
         Route::get('delivery', [AdminDeliveryStatusController::class, 'index'])->name('delivery.index')->middleware('can:shipping.delivery.view');

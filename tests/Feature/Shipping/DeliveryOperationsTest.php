@@ -309,4 +309,70 @@ class DeliveryOperationsTest extends TestCase
         $this->assertInstanceOf(FakeTrackingDeliveryProvider::class, $manager->driver('faketrack'));
         $this->assertEquals('faketrack', $manager->driver('faketrack')->name());
     }
+    // ---- التحديث الفوري عبر webhook بحمولة Opost الحقيقية ----
+
+    /** بلا سرّ مضبوط: الـwebhook يُقبل ويُحدّث فورًا (التوقيع اختياري حتى يُفعّل). */
+    public function test_unsigned_webhook_updates_status_instantly(): void
+    {
+        config(['delivery.webhook.secrets.opost' => null]);
+        $s = $this->shipment('opost', ['external_id' => '7424419']);
+
+        $this->signedWebhook('opost', ['event_id' => 'u1', 'id' => '7424419', 'status' => 'submitted'], null)
+            ->assertOk()->assertJson(['status' => 'processed']);
+
+        $this->assertEquals(DeliveryStatus::READY_FOR_PICKUP, $s->fresh()->delivery_status);
+    }
+
+    /** حمولة Opost الفعلية: كائن الشحنة الكامل والحالة في status_history. */
+    public function test_webhook_parses_opost_status_history_payload(): void
+    {
+        config(['delivery.webhook.secrets.opost' => null]);
+        $s = $this->shipment('opost', ['external_id' => '7424419']);
+
+        $payload = [
+            'id' => '7424419',
+            'status_history' => [
+                ['id' => 'h1', 'status' => 'submitted', 'created_at' => '2026-08-11 13:39:02'],
+                ['id' => 'h2', 'status' => 'pickup', 'created_at' => '2026-08-11 13:46:45'],
+            ],
+        ];
+
+        $this->signedWebhook('opost', $payload, null)->assertOk()->assertJson(['status' => 'processed']);
+
+        // تُلتقط الحالة الأحدث (pickup) لا الأقدم.
+        $this->assertEquals(DeliveryStatus::PICKED_UP, $s->fresh()->delivery_status);
+        $this->assertEquals('pickup', $s->fresh()->provider_status);
+    }
+
+    /**
+     * سيناريو الطرد 7424419: يصل حدث «delivered» (الراجع دخل فاتورة إرجاع) والشحنة ما
+     * تزال ready_for_pickup ⇒ يُسار المسار القانوني بدل رفض التحديث.
+     */
+    public function test_webhook_jump_walks_legal_path_to_return(): void
+    {
+        config(['delivery.webhook.secrets.opost' => null]);
+        $s = $this->shipment('opost', ['external_id' => '7424419']);
+
+        $this->signedWebhook('opost', ['event_id' => 'p1', 'id' => '7424419', 'status' => 'submitted'], null)->assertOk();
+        $this->signedWebhook('opost', ['event_id' => 'p2', 'id' => '7424419', 'status' => 'delivered'], null)
+            ->assertOk()->assertJson(['status' => 'processed']);
+
+        $s->refresh();
+        $this->assertEquals(DeliveryStatus::RETURN_IN_TRANSIT, $s->delivery_status);
+        $this->assertEquals('delivered', $s->provider_status);
+    }
+
+    /** المزامنة اليدوية الفورية من صفحة الشحنة تستدعي المزوّد وتحدّث الحالة. */
+    public function test_manual_sync_now_endpoint_updates_status(): void
+    {
+        $s = $this->shipment('faketrack', ['external_id' => 'SYNC-1']);
+        $admin = User::factory()->create(['branch_id' => Branch::default()->id]);
+        $admin->assignRole('admin');
+
+        $this->actingAs($admin)
+            ->post(route('admin.shipping.shipments.sync', $s))
+            ->assertRedirect();
+
+        $this->assertNotNull($s->fresh()->last_synced_at);
+    }
 }

@@ -350,14 +350,46 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
     }
 
     /** أحدث عنصر في status_history (بأكبر id). */
+    /**
+     * أحدث عنصر في سجلّ الحالات. الترتيب بأولوية: الطابع الزمني، ثم المعرّف الرقمي، ثم
+     * ترتيب المصفوفة (آخر عنصر). الاعتماد على معرّف رقمي وحده كان يلتقط **أقدم** حالة
+     * حين تُرسل معرّفات نصّية (UUID) فتُطبَّق حالة قديمة.
+     *
+     * @param  array<int, mixed>  $history
+     * @return array<string, mixed>
+     */
     private function latestHistory(array $history): array
     {
-        $latest = [];
-        $maxId = -1;
-        foreach ($history as $h) {
-            if (is_array($h) && (int) ($h['id'] ?? 0) > $maxId) {
-                $maxId = (int) ($h['id'] ?? 0);
-                $latest = $h;
+        $rows = array_values(array_filter($history, 'is_array'));
+        if ($rows === []) {
+            return [];
+        }
+
+        $rank = function (array $row): array {
+            $time = null;
+            foreach (['created_at', 'updated_at', 'date', 'timestamp'] as $key) {
+                if (! empty($row[$key])) {
+                    $ts = strtotime((string) $row[$key]);
+                    if ($ts !== false) {
+                        $time = $ts;
+                        break;
+                    }
+                }
+            }
+            $id = isset($row['id']) && is_numeric($row['id']) ? (int) $row['id'] : null;
+
+            // مفتاح مركّب: وجود الوقت أولًا، ثم الوقت، ثم وجود المعرّف الرقمي، ثم المعرّف.
+            return [$time !== null ? 1 : 0, $time ?? 0, $id !== null ? 1 : 0, $id ?? 0];
+        };
+
+        $latest = $rows[0];
+        $latestRank = $rank($latest);
+        foreach (array_slice($rows, 1) as $row) {
+            $r = $rank($row);
+            // «أكبر أو يساوي» ⇒ عند تساوي الرتب يفوز الأخير (ترتيب المصفوفة = ترتيب زمني).
+            if ($r >= $latestRank) {
+                $latest = $row;
+                $latestRank = $r;
             }
         }
 

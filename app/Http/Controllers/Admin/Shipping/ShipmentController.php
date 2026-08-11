@@ -8,7 +8,9 @@ use App\Http\Requests\Shipping\StoreShipmentRequest;
 use App\Modules\Foundation\Models\DeliveryProvider;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Shipping\Models\Shipment;
+use App\Modules\Shipping\Services\DeliverySyncService;
 use App\Modules\Shipping\Services\ShipmentService;
+use App\Modules\Shipping\Support\DeliveryStatus;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -111,6 +113,28 @@ class ShipmentController extends Controller
         $this->authorize('fail', $shipment);
 
         return $this->guard(fn () => $this->service->fail($shipment, $request->validated('reason')), __('سُجّل فشل التسليم.'));
+    }
+
+    /** استطلاع حالة الشحنة من شركة التوصيل الآن (بلا انتظار المزامنة المجدولة). */
+    public function syncNow(Shipment $shipment, DeliverySyncService $sync): RedirectResponse
+    {
+        $this->authorize('view', $shipment);
+
+        // إعادة ضبط عدّاد المحاولات كي لا تُستبعد شحنة سبق أن فشلت مرارًا.
+        $shipment->update(['sync_attempts' => 0]);
+        $before = $shipment->delivery_status;
+        $result = $sync->syncShipment($shipment);
+        $after = $shipment->fresh()->delivery_status;
+
+        $message = match (true) {
+            $after !== $before => __('حُدّثت الحالة إلى: :s', ['s' => DeliveryStatus::label($after)]),
+            $result === 'skipped' => __('الحالة لدى شركة التوصيل لم تتغيّر.'),
+            $result === 'inconsistent' => __('حالة المزوّد لا يمكن تطبيقها تلقائيًا — تحتاج مراجعة يدوية.'),
+            $result === 'failed' => __('تعذّر الاتصال بشركة التوصيل: :e', ['e' => $shipment->fresh()->sync_error]),
+            default => __('تمت المزامنة.'),
+        };
+
+        return back()->with($result === 'failed' || $result === 'inconsistent' ? 'error' : 'success', $message);
     }
 
     private function guard(callable $fn, string $success): RedirectResponse
