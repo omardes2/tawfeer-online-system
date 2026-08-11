@@ -34,6 +34,7 @@ class Order extends Model
         'customer_name', 'customer_phone', 'customer_email', 'shipping_address',
         'city_id', 'area_id', 'has_return', 'return_notes',
         'tracking_number', 'delivery_external_id', 'delivery_status',
+        'delivery_dispatch_error', 'delivery_dispatch_attempts', 'delivery_dispatch_attempted_at',
         'channel', 'status', 'payment_status', 'assigned_to', 'affiliate_id',
         'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'total', 'amount_paid',
         'notes', 'cancel_reason',

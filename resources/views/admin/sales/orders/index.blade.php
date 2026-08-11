@@ -145,6 +145,13 @@
                                 <span class="inline-flex items-center rounded-md bg-violet-50 text-violet-700 text-[11px] px-1.5 py-0.5">{{ __('مبيعات مباشرة') }}</span>
                             @elseif ($o->tracking_number)
                                 <span class="font-semibold text-emerald-700 group-hover:text-emerald-800">{{ $o->tracking_number }}</span>
+                            @elseif ($o->delivery_dispatch_error)
+                                {{-- فشل الإرسال: يُعاد تلقائيًا كل دقيقة — السبب ظاهر بدل «بانتظار» غامضة --}}
+                                <span class="text-rose-600" title="{{ $o->delivery_dispatch_error }}">
+                                    {{ __('تعذّر الإرسال — إعادة محاولة') }}
+                                    @if ($o->delivery_dispatch_attempts > 1)({{ $o->delivery_dispatch_attempts }})@endif
+                                </span>
+                                <span class="text-[10px] text-rose-400 truncate max-w-[220px]" title="{{ $o->delivery_dispatch_error }}">{{ $o->delivery_dispatch_error }}</span>
                             @else
                                 <span class="text-amber-500">{{ __('بانتظار التتبّع') }}</span>
                             @endif

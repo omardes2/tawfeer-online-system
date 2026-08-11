@@ -48,6 +48,9 @@
                     @can('shipping.delivery.view')
                         <x-nav-link :href="route('admin.shipping.delivery.index')" :active="request()->routeIs('admin.shipping.delivery.*')">{{ __('delivery.title') }}</x-nav-link>
                     @endcan
+                    @can('shipping.shipments.view')
+                        <x-nav-link :href="route('admin.shipping.provider_events.index')" :active="request()->routeIs('admin.shipping.provider_events.*')">{{ __('أحداث شركة التوصيل') }}</x-nav-link>
+                    @endcan
                     @can('returns.view')
                         <x-nav-link :href="route('admin.returns.index')" :active="request()->routeIs('admin.returns.*')">{{ __('returns.title') }}</x-nav-link>
                     @endcan

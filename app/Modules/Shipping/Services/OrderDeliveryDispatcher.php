@@ -65,8 +65,10 @@ class OrderDeliveryDispatcher
 
             if (($result['status'] ?? null) !== 'created' || ($tracking === null && $externalId === null)) {
                 Log::warning('Opost createShipment did not return a shipment', ['order' => $order->id, 'result' => $result]);
+                $message = $result['message'] ?? __('لم تُرجِع شركة التوصيل رقم تتبّع.');
+                $this->recordFailure($order, $message);
 
-                return ['status' => 'failed', 'message' => $result['message'] ?? __('لم تُرجِع شركة التوصيل رقم تتبّع.')];
+                return ['status' => 'failed', 'message' => $message];
             }
 
             $this->persist($order, $provider?->id, $tracking, $externalId, $result);
@@ -74,6 +76,7 @@ class OrderDeliveryDispatcher
             return ['status' => 'created', 'tracking_number' => $tracking];
         } catch (\Throwable $e) {
             Log::warning('Order delivery dispatch failed: '.$e->getMessage(), ['order' => $order->id]);
+            $this->recordFailure($order, $e->getMessage());
 
             return ['status' => 'failed', 'message' => $e->getMessage()];
         } finally {
@@ -171,6 +174,19 @@ class OrderDeliveryDispatcher
     }
 
     /** تخزين لقطة التتبّع على الطلب وإنشاء سجلّ شحنة محلي مطابق. */
+    /**
+     * تسجيل سبب فشل الإرسال على الطلب ليظهر في الواجهة بدل بقائه في سجلّ الأخطاء وحده
+     * (الطلب كان يظهر «بانتظار التتبّع» دون تفسير حتى تنجح محاولة لاحقة).
+     */
+    private function recordFailure(Order $order, string $message): void
+    {
+        $order->forceFill([
+            'delivery_dispatch_error' => mb_substr($message, 0, 500),
+            'delivery_dispatch_attempts' => (int) $order->delivery_dispatch_attempts + 1,
+            'delivery_dispatch_attempted_at' => now(),
+        ])->saveQuietly();
+    }
+
     private function persist(Order $order, ?int $providerId, ?string $tracking, ?string $externalId, array $result): void
     {
         DB::transaction(function () use ($order, $providerId, $tracking, $externalId, $result) {
@@ -178,6 +194,8 @@ class OrderDeliveryDispatcher
                 'tracking_number' => $tracking,
                 'delivery_external_id' => $externalId,
                 'delivery_status' => $result['provider_status'] ?? 'submitted',
+                'delivery_dispatch_error' => null, // نجح ⇒ يُمسح سبب الفشل السابق.
+                'delivery_dispatch_attempted_at' => now(),
             ]);
 
             Shipment::create([

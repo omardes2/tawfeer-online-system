@@ -406,4 +406,49 @@ class DeliveryStatusEngineTest extends TestCase
         $this->assertEquals(DeliveryStatus::PICKED_UP, $s->delivery_status); // لم تتغيّر
         $this->assertEquals('close', $s->provider_status);                   // لكن حالة المزوّد موثّقة
     }
+
+    /**
+     * تغطية كل تبويبات Opost الاثني عشر. الحالة غير المعروفة تُتجاهَل بصمت فلا تتغيّر
+     * الحالة عندنا — لذا يجب أن تُعيَّن كل حالة يعرضها المزوّد.
+     */
+    public function test_every_opost_tab_status_is_mapped(): void
+    {
+        $mapper = new OpostDeliveryProvider;
+        $tabs = [
+            'Darfts' => DeliveryStatus::DRAFT,
+            'Submitted' => DeliveryStatus::READY_FOR_PICKUP,
+            'Pending Pickup' => DeliveryStatus::READY_FOR_PICKUP,
+            'Picked Up' => DeliveryStatus::PICKED_UP,
+            'On Deliver' => DeliveryStatus::PICKED_UP,
+            'Pending' => DeliveryStatus::ON_HOLD,
+            'COD Pickup' => DeliveryStatus::DELIVERED_COD_HELD,
+            'Returned' => DeliveryStatus::RETURNING_TO_COURIER,
+            'Delivered' => DeliveryStatus::RETURN_IN_TRANSIT,
+            'In Accounting' => DeliveryStatus::FUNDS_AT_ACCOUNTING,
+            'Closed' => DeliveryStatus::CLOSED,
+            'Cancelled' => DeliveryStatus::CANCELLED,
+        ];
+
+        foreach ($tabs as $tab => $expected) {
+            $slug = strtolower(str_replace(' ', '_', $tab));
+            $this->assertSame($expected, $mapper->mapProviderStatus($slug), "فشل تعيين: {$tab}");
+            // صيغة المسافة أيضًا (قد يرسلها المزوّد كما تُعرض).
+            $this->assertSame($expected, $mapper->mapProviderStatus(strtolower($tab)), "فشل تعيين (مسافة): {$tab}");
+        }
+    }
+
+    /** «On Deliver» (مع المندوب) لا يقفز لحالة تسليم ولا يمنح عمولة. */
+    public function test_on_deliver_is_treated_as_picked_up_without_commission(): void
+    {
+        $provider = DeliveryProvider::create(['name' => 'Opost', 'code' => 'opost', 'driver' => 'opost']);
+        $rep = $this->actor('sales');
+        $s = $this->shipment($rep, $provider->id);
+        app(CommissionService::class)->accrueForOrder($s->order);
+
+        $this->svc->applyProviderStatus($s, 'submitted', ['event_id' => 'd1']);
+        $this->svc->applyProviderStatus($s->fresh(), 'on_deliver', ['event_id' => 'd2']);
+
+        $this->assertEquals(DeliveryStatus::PICKED_UP, $s->fresh()->delivery_status);
+        $this->assertEquals('pending', CommissionEntry::where('order_id', $s->order_id)->first()->state);
+    }
 }

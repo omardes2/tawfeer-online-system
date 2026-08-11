@@ -42,6 +42,7 @@ use App\Http\Controllers\Admin\Shipping\AreaController;
 use App\Http\Controllers\Admin\Shipping\DeliveryRateController;
 use App\Http\Controllers\Admin\Shipping\DeliveryStatusController as AdminDeliveryStatusController;
 use App\Http\Controllers\Admin\Shipping\GeographyController as AdminGeographyController;
+use App\Http\Controllers\Admin\Shipping\ProviderEventController as AdminProviderEventController;
 use App\Http\Controllers\Admin\Shipping\ShipmentController as AdminShipmentController;
 use App\Http\Controllers\Admin\System\ClearCacheController;
 use App\Http\Controllers\Admin\Users\DeliveryBusinessController as AdminDeliveryBusinessController;
@@ -270,6 +271,9 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('shipments/{shipment}/fail', [AdminShipmentController::class, 'fail'])->name('shipments.fail');
         // استطلاع فوري لحالة الشحنة من شركة التوصيل (بلا انتظار المجدول).
         Route::post('shipments/{shipment}/sync', [AdminShipmentController::class, 'syncNow'])->name('shipments.sync');
+        // أحداث شركة التوصيل الواردة (تشخيص الـwebhook والمزامنة).
+        Route::get('provider-events', [AdminProviderEventController::class, 'index'])->name('provider_events.index');
+        Route::get('provider-events/{providerEvent}', [AdminProviderEventController::class, 'show'])->name('provider_events.show');
 
         // محرّك حالة التوصيل القانوني (Phase 4.3 / ADR-038)
         Route::get('delivery', [AdminDeliveryStatusController::class, 'index'])->name('delivery.index')->middleware('can:shipping.delivery.view');

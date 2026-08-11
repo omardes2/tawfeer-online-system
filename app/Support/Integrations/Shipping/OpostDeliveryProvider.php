@@ -27,16 +27,30 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
      */
     private const STATUS_MAP = [
         'draft' => DeliveryStatus::DRAFT,
+        'drafts' => DeliveryStatus::DRAFT,
+        'darft' => DeliveryStatus::DRAFT,  // خطأ إملائي في واجهة Opost («Darfts») — تحصين.
+        'darfts' => DeliveryStatus::DRAFT,
         // أسماء Opost الفعلية (submitted/cancelled/…) + المختصرة (submit/cancel/…) كمرادفات.
         'submit' => DeliveryStatus::READY_FOR_PICKUP,
         'submitted' => DeliveryStatus::READY_FOR_PICKUP,
+        // «Pending Pickup»: سُلّمت للشركة وتنتظر تحميل المندوب — ما تزال قبل الاستلام.
+        'pending_pickup' => DeliveryStatus::READY_FOR_PICKUP,
+        'pending pickup' => DeliveryStatus::READY_FOR_PICKUP,
         'cancel' => DeliveryStatus::CANCELLED,
         'cancelled' => DeliveryStatus::CANCELLED,
         'pickup' => DeliveryStatus::PICKED_UP,
         'picked_up' => DeliveryStatus::PICKED_UP,
+        'picked up' => DeliveryStatus::PICKED_UP,
+        // «On Deliver»: الطرد مع المندوب في طريقه للعميل — محمول لدى الشركة.
+        'on_deliver' => DeliveryStatus::PICKED_UP,
+        'on deliver' => DeliveryStatus::PICKED_UP,
+        'on_delivery' => DeliveryStatus::PICKED_UP,
+        'out_for_delivery' => DeliveryStatus::PICKED_UP,
         'pending' => DeliveryStatus::ON_HOLD,
         'cod_pickup' => DeliveryStatus::DELIVERED_COD_HELD,
+        'cod pickup' => DeliveryStatus::DELIVERED_COD_HELD,
         'in_accounting' => DeliveryStatus::FUNDS_AT_ACCOUNTING,
+        'in accounting' => DeliveryStatus::FUNDS_AT_ACCOUNTING,
         // «return/returned» في Opost = الطرد راجع وموجود في المكتب (لم يصلنا بعد).
         'return' => DeliveryStatus::RETURNING_TO_COURIER,
         'returned' => DeliveryStatus::RETURNING_TO_COURIER,
