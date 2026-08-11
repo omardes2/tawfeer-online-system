@@ -70,6 +70,14 @@
                 <div x-show="tab === 'delivery'" x-cloak class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <x-admin.field :label="__('settings.default_fee')" name="delivery_default_fee"><input type="number" step="0.01" name="delivery_default_fee" value="{{ old('delivery_default_fee', $values['delivery_default_fee']) }}" class="w-full rounded-md border-gray-300" /></x-admin.field>
                     <x-admin.field :label="__('settings.free_threshold')" name="delivery_free_threshold"><input type="number" step="0.01" name="delivery_free_threshold" value="{{ old('delivery_free_threshold', $values['delivery_free_threshold']) }}" class="w-full rounded-md border-gray-300" /></x-admin.field>
+                    <x-admin.field :label="__('settings.cod_treasury')" name="delivery_cod_treasury_id">
+                        <select name="delivery_cod_treasury_id" class="w-full rounded-md border-gray-300">
+                            <option value="">{{ __('settings.cod_treasury_default') }}</option>
+                            @foreach ($treasuries as $t)
+                                <option value="{{ $t->id }}" @selected((string) old('delivery_cod_treasury_id', $values['delivery_cod_treasury_id']) === (string) $t->id)>{{ $t->name }}</option>
+                            @endforeach
+                        </select>
+                    </x-admin.field>
                     <x-admin.field label="Opost Base URL" name="opost_base_url"><input type="url" name="opost_base_url" value="{{ old('opost_base_url', $values['opost_base_url']) }}" class="w-full rounded-md border-gray-300" /></x-admin.field>
                     <x-admin.field label="Opost API Key" name="opost_api_key"><input type="password" name="opost_api_key" placeholder="{{ $values['opost_api_key'] ? __('settings.secret_set') : __('settings.secret_unset') }}" autocomplete="new-password" class="w-full rounded-md border-gray-300" /></x-admin.field>
                     <x-admin.field label="Opost Webhook Secret" name="opost_webhook_secret"><input type="password" name="opost_webhook_secret" placeholder="{{ $values['opost_webhook_secret'] ? __('settings.secret_set') : __('settings.secret_unset') }}" autocomplete="new-password" class="w-full rounded-md border-gray-300" /></x-admin.field>

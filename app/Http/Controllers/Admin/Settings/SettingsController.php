@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin\Settings;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Foundation\Services\SystemSettingsService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -37,6 +38,7 @@ class SettingsController extends Controller
         'whatsapp_token' => 'whatsapp.token',
         'delivery_default_fee' => 'delivery.default_fee',
         'delivery_free_threshold' => 'delivery.free_threshold',
+        'delivery_cod_treasury_id' => 'delivery.cod_treasury_id',
         'opost_base_url' => 'opost.base_url',
         'opost_api_key' => 'opost.api_key',
         'opost_webhook_secret' => 'opost.webhook_secret',
@@ -63,6 +65,9 @@ class SettingsController extends Controller
         return view('admin.settings.edit', [
             'values' => $values,
             'timezones' => timezone_identifiers_list(),
+            // خزائن نشطة لاختيار وجهة تحصيلات COD (عند in_accounting).
+            'treasuries' => Treasury::active()
+                ->whereNotNull('gl_account_id')->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -88,6 +93,7 @@ class SettingsController extends Controller
             'whatsapp_token' => ['nullable', 'string', 'max:300'],
             'delivery_default_fee' => ['nullable', 'numeric', 'min:0'],
             'delivery_free_threshold' => ['nullable', 'numeric', 'min:0'],
+            'delivery_cod_treasury_id' => ['nullable', 'integer', 'exists:treasuries,id'],
             'opost_base_url' => ['nullable', 'url', 'max:250'],
             'opost_api_key' => ['nullable', 'string', 'max:200'],
             'opost_webhook_secret' => ['nullable', 'string', 'max:200'],

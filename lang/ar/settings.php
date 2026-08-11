@@ -32,6 +32,8 @@ return [
 
     'default_fee' => 'رسوم التوصيل الافتراضية',
     'free_threshold' => 'عتبة الشحن المجاني',
+    'cod_treasury' => 'خزينة تحصيلات COD (عند وصول المبلغ لمحاسبة المندوب)',
+    'cod_treasury_default' => '— الافتراضي: صندوق الأونلاين —',
 
     'meta_title' => 'عنوان Meta الافتراضي',
     'meta_description' => 'وصف Meta الافتراضي',

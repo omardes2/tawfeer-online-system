@@ -31,6 +31,20 @@ class TreasurySeeder extends Seeder
             );
         }
 
+        if ($cashParent) {
+            // صندوق الأونلاين: يستقبل تحصيلات COD عند وصول المبلغ لمحاسبة المندوب (in_accounting).
+            $onlineGl = Account::query()->firstOrCreate(
+                ['code' => '1011-0002'],
+                ['name' => 'صندوق الأونلاين', 'name_en' => 'Online Cashbox', 'type' => 'asset',
+                    'parent_id' => $cashParent->id, 'is_postable' => true, 'currency' => 'SAR', 'is_active' => true],
+            );
+            Treasury::query()->firstOrCreate(
+                ['code' => 'CB-ONLINE'],
+                ['name' => 'صندوق الأونلاين', 'name_en' => 'Online Cashbox', 'type' => 'cash',
+                    'gl_account_id' => $onlineGl->id, 'currency' => 'SAR', 'is_active' => true, 'is_default' => false],
+            );
+        }
+
         if ($bankParent) {
             $bankGl = Account::query()->firstOrCreate(
                 ['code' => '1020-0001'],

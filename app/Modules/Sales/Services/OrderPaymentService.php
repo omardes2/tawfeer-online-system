@@ -6,6 +6,7 @@ use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Accounting\Services\VoucherService;
+use App\Modules\Foundation\Services\Settings;
 use App\Modules\Sales\Models\Order;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -103,5 +104,60 @@ class OrderPaymentService
         $order->update(['amount_paid' => $total, 'payment_status' => 'paid']);
 
         return true;
+    }
+
+    /**
+     * إدخال تحصيل COD إلى **«صندوق الأونلاين»** عبر سند قبض مُرحّل:
+     * مدين صندوق الأونلاين / دائن «ذمم شركة التوصيل 1050» بكامل إجمالي الطلب —
+     * فيصفَّر رصيد الطلب على 1050 ويظهر المبلغ رصيدًا في الصندوق.
+     *
+     * تُستدعى فقط بعد أن يُرجِع markCollected() صحيحًا (انتقال فعلي غير مدفوع → مدفوع)،
+     * وهذا يستثني تلقائيًا الطلبات المدفوعة إلكترونيًا مسبقًا (لم يقبض المندوب شيئًا)
+     * ويمنع الازدواج عند تكرار الحدث. تحويل المبلغ لاحقًا من الصندوق إلى البنك/الصندوق
+     * الرئيسي (بعد خصم أجور الشركة) يقع في تسوية التوصيل.
+     */
+    public function collectCodToTreasury(Order $order): ?FinancialVoucher
+    {
+        $treasury = self::codTreasury();
+        if ($treasury === null) {
+            return null; // لا خزينة مُهيّأة — تُسجَّل الحالة «مدفوع» ويبقى المبلغ على 1050.
+        }
+
+        $code = $this->posting->receivableAccountCode($order);
+        $account = $code ? Account::where('code', $code)->first() : null;
+        if ($account === null) {
+            return null;
+        }
+
+        $voucher = $this->vouchers->create('receipt', [
+            'treasury_id' => $treasury->id,
+            'amount' => round((float) $order->total, 2),
+            'counter_account_id' => $account->id,
+            'customer_id' => $order->customer_id,
+            'reference' => $order->number,
+            'description' => __('تحصيل COD من شركة التوصيل — طلب :n', ['n' => $order->number]),
+            'voucher_date' => now()->toDateString(),
+        ]);
+        $this->vouchers->approve($voucher);
+        $this->vouchers->post($voucher);
+
+        return $voucher;
+    }
+
+    /**
+     * خزينة تحصيلات COD: المحدَّدة في الإعدادات (delivery.cod_treasury_id)، وإلا
+     * «صندوق الأونلاين» (CB-ONLINE)، وإلا أي خزينة اسمها يحوي «اونلاين/أونلاين».
+     */
+    public static function codTreasury(): ?Treasury
+    {
+        $base = fn () => Treasury::query()->active()->whereNotNull('gl_account_id');
+
+        $id = Settings::get('delivery.cod_treasury_id');
+        if ($id && ($t = $base()->find((int) $id))) {
+            return $t;
+        }
+
+        return $base()->where('code', 'CB-ONLINE')->first()
+            ?? $base()->where(fn ($q) => $q->where('name', 'like', '%أونلاين%')->orWhere('name', 'like', '%اونلاين%'))->first();
     }
 }

@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Accounting\Services\AccountingService;
 use App\Modules\Commissions\Services\CommissionService;
+use App\Modules\Sales\Services\OrderPaymentService;
 use App\Modules\Settlements\Models\DeliverySettlement;
 use App\Modules\Settlements\Models\SettlementLine;
 use App\Modules\Shipping\Models\Shipment;
@@ -204,7 +205,12 @@ class SettlementService
         if ($deductions > 0) {
             $lines[] = ['account_code' => self::ACC_DISCOUNTS, 'debit' => $deductions, 'credit' => 0, 'description' => __('خصومات التسوية')];
         }
-        $lines[] = ['account_code' => self::ACC_COD_CLEARING, 'debit' => 0, 'credit' => $cod, 'description' => __('تحصيل COD عبر المزوّد')];
+        // الطرف الدائن: «صندوق الأونلاين» إن كان مُهيّأً — فمنذ ADR-012g يُنقل تحصيل كل طلب
+        // من «ذمم شركة التوصيل 1050» إلى الصندوق لحظة in_accounting، فتسوية المزوّد تُفرغ
+        // الصندوق (تحويل للنقد الرئيسي + أجور الشركة). fallback: 1050 (بلا صندوق مُهيّأ).
+        $codCreditCode = OrderPaymentService::codTreasury()?->glAccount?->code
+            ?? self::ACC_COD_CLEARING;
+        $lines[] = ['account_code' => $codCreditCode, 'debit' => 0, 'credit' => $cod, 'description' => __('تحصيل COD عبر المزوّد')];
 
         return $this->accounting->postEntry([
             'entry_date' => now()->toDateString(),

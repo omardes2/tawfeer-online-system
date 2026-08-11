@@ -512,12 +512,17 @@ class OrderController extends Controller
         }
 
         try {
-            $orderPayments->markCollected($order);
+            // نفس أثر وصول in_accounting: مدفوع + سند قبض في «صندوق الأونلاين» — ذرّيًا.
+            DB::transaction(function () use ($order, $orderPayments) {
+                if ($orderPayments->markCollected($order)) {
+                    $orderPayments->collectCodToTreasury($order);
+                }
+            });
         } catch (ValidationException $e) {
             return back()->with('error', collect($e->errors())->flatten()->first());
         }
 
-        return back()->with('success', __('تم تحويل الفاتورة إلى «مدفوعة».'));
+        return back()->with('success', __('تم تحويل الفاتورة إلى «مدفوعة» وإدخال التحصيل إلى صندوق الأونلاين.'));
     }
 
     /** حذف الطلب — مسموح فقط إذا كانت حالته «ملغى» وحالة توصيله «ملغاة». */

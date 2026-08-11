@@ -32,6 +32,8 @@ return [
 
     'default_fee' => 'Default delivery fee',
     'free_threshold' => 'Free-shipping threshold',
+    'cod_treasury' => 'COD collections treasury (at courier in-accounting)',
+    'cod_treasury_default' => '— Default: Online Cashbox —',
 
     'meta_title' => 'Default meta title',
     'meta_description' => 'Default meta description',

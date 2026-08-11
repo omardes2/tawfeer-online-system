@@ -258,7 +258,12 @@ class DeliveryStatusService
             return; // قيمة ضئيلة/صفرية (أو مرتجَع) ⇒ لا احتساب.
         }
 
-        $this->payments->markCollected($order);            // الفاتورة → مدفوعة (idempotent).
+        // الفاتورة → مدفوعة، والتحصيل يدخل «صندوق الأونلاين» (مدين الصندوق / دائن ذمم
+        // شركة التوصيل 1050). السند يُنشأ فقط عند انتقال فعلي غير مدفوع → مدفوع، فالطلبات
+        // المدفوعة إلكترونيًا مسبقًا (لم يقبض المندوب) وتكرار الحدث مستثنيان تلقائيًا.
+        if ($this->payments->markCollected($order)) {
+            $this->payments->collectCodToTreasury($order);
+        }
         $this->commissions->accrueForOrder($order);       // ضمان قيود الاستحقاق (idempotent).
         $this->commissions->markEligibleForOrder($order, $reference, $actor); // pending → eligible.
     }

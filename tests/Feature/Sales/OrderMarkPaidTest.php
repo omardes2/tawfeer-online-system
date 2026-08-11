@@ -3,12 +3,15 @@
 namespace Tests\Feature\Sales;
 
 use App\Models\User;
-use App\Modules\Accounting\Models\JournalEntry;
+use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Models\FinancialVoucher;
+use App\Modules\Accounting\Services\AccountingService;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Sales\Models\Order;
+use App\Modules\Sales\Services\OrderPaymentService;
 use App\Modules\Sales\Services\OrderService;
 use App\Modules\Shipping\Models\Shipment;
 use App\Modules\Shipping\Services\DeliveryStatusService;
@@ -20,8 +23,8 @@ use Tests\TestCase;
 
 /**
  * تحوّل فاتورة طلب التوصيل إلى «مدفوعة» عند وصول المبلغ لمحاسبة المندوب (Opost: in_accounting)،
- * وتجاوز يدوي لمدير النظام فقط حين لا تصل حالة المزوّد. لا قيد محاسبي جديد في الحالتين:
- * المبلغ مُثبَت على «ذمم شركة التوصيل 1050» منذ البيع ويُقفَل بتسوية التوصيل.
+ * وتجاوز يدوي لمدير النظام فقط حين لا تصل حالة المزوّد. في الحالتين يدخل التحصيل
+ * «صندوق الأونلاين» بسند قبض مُرحّل: مدين الصندوق / دائن «ذمم شركة التوصيل 1050».
  */
 class OrderMarkPaidTest extends TestCase
 {
@@ -66,6 +69,10 @@ class OrderMarkPaidTest extends TestCase
             'total' => round((float) $order->total + $shipping, 2),
         ]);
 
+        // التأكيد يُرحّل قيد البيع (مدين «ذمم شركة التوصيل 1050» بالإجمالي) — كما في الواقع
+        // قبل الإرسال لشركة التوصيل؛ سند التحصيل لاحقًا يقفل هذه الذمّة.
+        app(OrderService::class)->confirm($order->fresh('items'));
+
         return $order->fresh('items');
     }
 
@@ -109,15 +116,54 @@ class OrderMarkPaidTest extends TestCase
         $this->assertEqualsWithDelta($total, (float) $order->amount_paid, 0.001);
     }
 
-    /** لا قيد محاسبي جديد: الذمّة على شركة التوصيل مثبتة منذ البيع وتُقفَل بالتسوية. */
-    public function test_marking_paid_posts_no_extra_journal_entry(): void
+    /**
+     * التحصيل يدخل «صندوق الأونلاين» بسند قبض مُرحّل: مدين الصندوق بكامل الإجمالي /
+     * دائن «ذمم شركة التوصيل 1050» — فيصفَّر رصيد الطلب على 1050.
+     */
+    public function test_funds_at_accounting_posts_collection_into_online_cashbox(): void
     {
         $s = $this->shipment();
-        $before = JournalEntry::count();
+        $order = $s->order;
+        $total = (float) $order->total;
+
+        // بعد تأكيد البيع (في المساعد): 1050 مدين بالإجمالي — التحصيل يجب أن يقفله.
+        $codBefore = $this->balance('1050');
+        $this->assertEqualsWithDelta($total, $codBefore, 0.001);
 
         $this->toAccounting($s);
 
-        $this->assertEquals($before, JournalEntry::count());
+        // سند قبض مُرحّل بمرجع رقم الطلب على خزينة صندوق الأونلاين.
+        $treasury = OrderPaymentService::codTreasury();
+        $this->assertNotNull($treasury);
+        $this->assertEquals('CB-ONLINE', $treasury->code);
+
+        $voucher = FinancialVoucher::where('reference', $order->number)->where('kind', 'receipt')->first();
+        $this->assertNotNull($voucher);
+        $this->assertEquals('posted', $voucher->status);
+        $this->assertEqualsWithDelta($total, (float) $voucher->amount, 0.001);
+        $this->assertEquals($treasury->id, $voucher->treasury_id);
+
+        // الصندوق زاد بالإجمالي، وذمّة الطلب على 1050 أُقفلت (عاد الرصيد صفرًا).
+        $this->assertEqualsWithDelta($total, $this->balance($treasury->glAccount->code), 0.001);
+        $this->assertEqualsWithDelta($codBefore - $total, $this->balance('1050'), 0.001);
+    }
+
+    /** المدفوع إلكترونيًا مسبقًا: المندوب لم يقبض شيئًا ⇒ لا سند تحصيل عند in_accounting. */
+    public function test_prepaid_order_gets_no_cod_collection_voucher(): void
+    {
+        $s = $this->shipment();
+        $s->order->update(['payment_status' => 'paid', 'amount_paid' => $s->order->total]);
+
+        $this->toAccounting($s);
+
+        $this->assertNull(FinancialVoucher::where('reference', $s->order->number)->where('kind', 'receipt')->first());
+    }
+
+    private function balance(string $code): float
+    {
+        $account = Account::where('code', $code)->firstOrFail();
+
+        return app(AccountingService::class)->accountBalance($account);
     }
 
     /** الحالة السابقة على in_accounting (النقد لدى المندوب) لا تُسدِّد الفاتورة. */
@@ -160,6 +206,11 @@ class OrderMarkPaidTest extends TestCase
         $order = $s->order->fresh();
         $this->assertEquals('paid', $order->payment_status);
         $this->assertEqualsWithDelta((float) $order->total, (float) $order->amount_paid, 0.001);
+
+        // التجاوز اليدوي بنفس أثر in_accounting: سند تحصيل مُرحّل في صندوق الأونلاين.
+        $voucher = FinancialVoucher::where('reference', $order->number)->where('kind', 'receipt')->first();
+        $this->assertNotNull($voucher);
+        $this->assertEquals('posted', $voucher->status);
     }
 
     public function test_non_admin_cannot_mark_invoice_paid(): void
