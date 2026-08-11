@@ -42,7 +42,7 @@ class VariantStockDistributionTest extends TestCase
     /** @return array{0: Product, 1: int, 2: int} المنتج ومعرّفا قيمتَي المقاس S و M */
     private function productWithStock(float $qty = 100): array
     {
-        $product = Product::factory()->create(['name' => 'بلوزة']);
+        $product = Product::factory()->active()->create(['name' => 'بلوزة']);
         app(InventoryService::class)->receive($product->defaultVariant, $this->warehouse, $qty, 10);
 
         $attribute = ProductAttribute::create(['name' => 'مقاسات', 'slug' => 'sizes-'.uniqid(), 'is_active' => true]);
@@ -134,5 +134,46 @@ class VariantStockDistributionTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertEqualsWithDelta(100, $this->totalStock($product->fresh()), 0.001);
+    }
+
+    /**
+     * صفحة «إنشاء أوردر» يجب أن تعرض كل مقاس بكميته الفعلية — لا بطاقة واحدة على
+     * المتغيّر الافتراضي (كميته تصبح صفرًا بعد التوزيع فيبدو الصنف نافدًا خطأً).
+     */
+    public function test_order_create_page_lists_each_variant_with_its_quantity(): void
+    {
+        [$product, $s, $m] = $this->productWithStock(100);
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->post(route('admin.products.variants.sync', $product), [
+            'combos' => [
+                ['values' => [$s], 'price' => 50, 'stock' => 60],
+                ['values' => [$m], 'price' => 50, 'stock' => 40],
+            ],
+        ])->assertSessionHasNoErrors();
+
+        $res = $this->actingAs($admin)->get(route('admin.sales.orders.create'))->assertOk();
+        $products = collect($res->viewData('products'));
+
+        // بطاقتان (مقاسان) بكميتيهما، ولا بطاقة للمتغيّر الافتراضي بكمية صفر.
+        $cards = $products->filter(fn ($c) => str_contains($c['name'], 'بلوزة'))->values();
+        $this->assertCount(2, $cards);
+        $this->assertEqualsCanonicalizing([60.0, 40.0], $cards->pluck('available')->map(fn ($v) => (float) $v)->all());
+        foreach ($cards as $card) {
+            $this->assertStringContainsString('—', $card['name']); // الاسم يحمل المقاس
+        }
+    }
+
+    /** المنتج بلا مقاسات يبقى ببطاقة واحدة (سلوك غير متغيّر). */
+    public function test_product_without_variants_still_shows_single_card(): void
+    {
+        $product = Product::factory()->active()->create(['name' => 'معطر']);
+        app(InventoryService::class)->receive($product->defaultVariant, $this->warehouse, 10, 5);
+
+        $res = $this->actingAs($this->admin())->get(route('admin.sales.orders.create'))->assertOk();
+        $cards = collect($res->viewData('products'))->filter(fn ($c) => $c['name'] === 'معطر')->values();
+
+        $this->assertCount(1, $cards);
+        $this->assertEqualsWithDelta(10, (float) $cards[0]['available'], 0.001);
     }
 }

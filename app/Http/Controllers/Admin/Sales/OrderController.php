@@ -184,16 +184,8 @@ class OrderController extends Controller
     {
         $this->authorize('createDirect', Order::class);
 
-        $products = Product::query()->active()
-            ->with(['defaultVariant', 'primaryImage'])
-            ->orderBy('name')->get()
-            ->filter(fn ($p) => $p->defaultVariant)
-            ->map(fn ($p) => [
-                'name' => $p->name, 'sku' => $p->sku,
-                'variant' => $p->defaultVariant->uuid,
-                'price' => (float) $p->defaultVariant->retail_price,
-                'image' => $p->primaryImage?->url(),
-            ])->values();
+        // نفس مصدر الأصناف المستخدم في «إنشاء أوردر»: بطاقة لكل مقاس/لون بكميته.
+        $products = $this->productCards();
 
         return view('admin.sales.orders.direct', [
             'products' => $products,
@@ -670,19 +662,30 @@ class OrderController extends Controller
             ->groupBy('variant_id')
             ->pluck('qty', 'variant_id');
 
+        // بطاقة لكل **متغيّر قابل للبيع**: المنتج ذو المقاسات/الألوان يظهر بمقاساته
+        // (كمية كل مقاس على حدة)، لا ببطاقة واحدة على المتغيّر الافتراضي — فكميته
+        // تُوزَّع على المقاسات وتصبح صفرًا، وخصم المخزون يجب أن يقع على المقاس المُباع.
         return Product::query()->active()
-            ->with(['defaultVariant', 'primaryImage'])
+            ->with(['variants.attributeValues', 'defaultVariant', 'primaryImage'])
             ->orderBy('name')
             ->get()
-            ->filter(fn ($p) => $p->defaultVariant)
-            ->map(fn ($p) => [
-                'name' => $p->name,
-                'sku' => $p->sku,
-                'variant' => $p->defaultVariant->uuid,
-                'price' => (float) $p->defaultVariant->retail_price,
-                'image' => $p->primaryImage?->url(),
-                'available' => (float) ($availableByVariant[$p->defaultVariant->id] ?? 0),
-            ])->values();
+            ->flatMap(function ($p) use ($availableByVariant) {
+                $optionVariants = $p->variants->filter(fn ($v) => $v->attributeValues->isNotEmpty())->values();
+                $hasOptions = $optionVariants->isNotEmpty();
+
+                $sellable = $hasOptions
+                    ? $optionVariants
+                    : collect([$p->defaultVariant])->filter();
+
+                return $sellable->map(fn ($v) => [
+                    'name' => $hasOptions ? $p->name.' — '.$v->optionLabel() : $p->name,
+                    'sku' => $v->sku ?: $p->sku,
+                    'variant' => $v->uuid,
+                    'price' => (float) ($v->retail_price ?: $p->retail_price),
+                    'image' => $p->primaryImage?->url(),
+                    'available' => (float) ($availableByVariant[$v->id] ?? 0),
+                ]);
+            })->values();
     }
 
     /**
