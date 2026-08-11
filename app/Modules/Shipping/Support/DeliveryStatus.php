@@ -113,6 +113,62 @@ final class DeliveryStatus
         return in_array($status, self::TERMINAL, true);
     }
 
+    /**
+     * أقصر مسار قانوني بين حالتين — لاستيعاب «قفزات» المزوّد (المزامنة كل عدّة دقائق بينما
+     * الطرد يتنقّل بين حالات في ثوانٍ، أو حدث webhook ضائع). بدونه يُرفض الانتقال وتعلق
+     * الشحنة على حالة قديمة للأبد.
+     *
+     * الأمان أوّلًا: يُعاد المسار **فقط إن كان وحيدًا**. عند تعدّد المسارات بنفس الطول
+     * (مثلًا picked_up ← closed عبر مسار التحصيل أو مسار الإرجاع) يُعاد null لأن الاختيار
+     * الخاطئ يمنح/يمنع عمولة بغير حق — تُترك للمراجعة البشرية.
+     *
+     * @return list<string>|null الحالات الوسيطة والهدف بالترتيب (بلا حالة البداية)
+     */
+    public static function path(string $from, string $to): ?array
+    {
+        if ($from === $to || ! self::isValid($from) || ! self::isValid($to)) {
+            return null;
+        }
+
+        // BFS طبقة بطبقة: نتوقّف عند أول طبقة تحوي الهدف، ونتحقّق من وحدانية المسار.
+        /** @var array<string, list<list<string>>> $paths */
+        $paths = [$from => [[]]];
+        $frontier = [$from];
+        $visited = [$from => true];
+
+        while ($frontier !== []) {
+            $next = [];
+            /** @var array<string, list<list<string>>> $nextPaths */
+            $nextPaths = [];
+
+            foreach ($frontier as $node) {
+                foreach (self::TRANSITIONS[$node] ?? [] as $neighbour) {
+                    if (isset($visited[$neighbour])) {
+                        continue; // طبقة أبعد — لا يعنينا (نبحث عن الأقصر).
+                    }
+                    foreach ($paths[$node] as $prefix) {
+                        $nextPaths[$neighbour][] = [...$prefix, $neighbour];
+                    }
+                    if (! in_array($neighbour, $next, true)) {
+                        $next[] = $neighbour;
+                    }
+                }
+            }
+
+            if (isset($nextPaths[$to])) {
+                return count($nextPaths[$to]) === 1 ? $nextPaths[$to][0] : null; // وحيد فقط
+            }
+
+            foreach ($next as $node) {
+                $visited[$node] = true;
+            }
+            $paths = $nextPaths;
+            $frontier = $next;
+        }
+
+        return null;
+    }
+
     public static function canTransition(string $from, string $to): bool
     {
         return in_array($to, self::TRANSITIONS[$from] ?? [], true);

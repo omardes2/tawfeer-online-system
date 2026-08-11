@@ -63,9 +63,12 @@ class DeliverySyncService
 
             $canonical = $driver->mapProviderStatus($providerStatus);
 
-            // تعارض: حالة قانونية معروفة لكنّ الانتقال غير مسموح داخليًا.
+            // تعارض حقيقي: لا انتقال مباشر ولا مسار قانوني وحيد يوصل إليه (قفزة غامضة أو
+            // رجوع للخلف) ⇒ تُترك للمراجعة البشرية بدل التخمين. القفزة ذات المسار الوحيد
+            // تُستوعَب في DeliveryStatusService بالسير خطوة خطوة.
             if ($canonical !== null && $canonical !== $shipment->delivery_status
-                && ! DeliveryStatus::canTransition($shipment->delivery_status, $canonical)) {
+                && ! DeliveryStatus::canTransition($shipment->delivery_status, $canonical)
+                && DeliveryStatus::path($shipment->delivery_status, $canonical) === null) {
                 $this->logEvent($shipment, $providerStatus, $reference, 'inconsistent', "canonical=$canonical illegal from {$shipment->delivery_status}");
                 $shipment->update(['last_synced_at' => now(), 'sync_status' => 'inconsistent', 'sync_error' => "provider=$providerStatus → $canonical"]);
 

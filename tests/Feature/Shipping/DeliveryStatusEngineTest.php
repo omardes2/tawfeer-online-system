@@ -342,4 +342,68 @@ class DeliveryStatusEngineTest extends TestCase
         $this->actingAs($ops)->get("/admin/shipping/delivery/{$s->uuid}")
             ->assertOk()->assertSee(__('delivery.status.ready_for_pickup'));
     }
+    // ---- استيعاب «قفزات» المزوّد (سيناريو الطرد 7424419) ----
+
+    /**
+     * الطرد تنقّل عند Opost خلال دقائق: submitted → pickup → pending → pickup → return →
+     * delivered، بينما المزامنة كل عدّة دقائق فترى الحالة الأخيرة فقط. سابقًا كان الانتقال
+     * يُرفض وتعلق الشحنة على حالتها القديمة؛ الآن يُسار المسار القانوني الوحيد.
+     */
+    public function test_provider_jump_to_return_walks_the_legal_path(): void
+    {
+        $provider = DeliveryProvider::create(['name' => 'Opost', 'code' => 'opost', 'driver' => 'opost']);
+        $rep = $this->actor('sales');
+        $s = $this->shipment($rep, $provider->id);
+
+        $this->svc->applyProviderStatus($s, 'submitted', ['event_id' => 'e1']);
+        // قفزة: المزوّد يبلّغ «delivered» (الراجع دخل فاتورة إرجاع) من ready_for_pickup.
+        $this->svc->applyProviderStatus($s->fresh(), 'delivered', ['event_id' => 'e2']);
+
+        $s->refresh();
+        $this->assertEquals(DeliveryStatus::RETURN_IN_TRANSIT, $s->delivery_status);
+        $this->assertEquals('delivered', $s->provider_status);
+        // سُجّلت الخطوات الوسيطة (لا قفزة صامتة).
+        $this->assertEquals(DeliveryStatus::PICKED_UP, $s->deliveryTransitions()->where('to_status', DeliveryStatus::PICKED_UP)->first()?->to_status);
+        $this->assertEquals(1, $s->deliveryTransitions()->where('to_status', DeliveryStatus::RETURNING_TO_COURIER)->count());
+    }
+
+    /** «returned» في Opost = راجع في المكتب (لا وصل إلينا) — لا يُقفز به لمرحلة أبعد. */
+    public function test_opost_returned_maps_to_returning_to_courier(): void
+    {
+        $mapper = new OpostDeliveryProvider;
+        $this->assertEquals(DeliveryStatus::RETURNING_TO_COURIER, $mapper->mapProviderStatus('returned'));
+        $this->assertEquals(DeliveryStatus::RETURNING_TO_COURIER, $mapper->mapProviderStatus('return'));
+        $this->assertEquals(DeliveryStatus::RETURN_IN_TRANSIT, $mapper->mapProviderStatus('delivered'));
+    }
+
+    /** مسار الإرجاع لا يمنح عمولة مهما كانت القفزة (لا يمرّ بـin_accounting). */
+    public function test_jump_through_return_path_grants_no_commission(): void
+    {
+        $provider = DeliveryProvider::create(['name' => 'Opost', 'code' => 'opost', 'driver' => 'opost']);
+        $rep = $this->actor('sales');
+        $s = $this->shipment($rep, $provider->id);
+        app(CommissionService::class)->accrueForOrder($s->order);
+
+        $this->svc->applyProviderStatus($s, 'submitted', ['event_id' => 'j1']);
+        $this->svc->applyProviderStatus($s->fresh(), 'delivered', ['event_id' => 'j2']);
+
+        $entry = CommissionEntry::where('order_id', $s->order_id)->first();
+        $this->assertEquals('pending', $entry->state); // لا استحقاق على الراجع
+    }
+
+    /** قفزة غامضة (مساران بنفس الطول: تحصيل أم إرجاع؟) تُترك للمراجعة بلا تخمين مالي. */
+    public function test_ambiguous_jump_is_not_guessed(): void
+    {
+        $provider = DeliveryProvider::create(['name' => 'Opost', 'code' => 'opost', 'driver' => 'opost']);
+        $s = $this->shipment($this->actor('sales'), $provider->id);
+
+        $this->svc->applyProviderStatus($s, 'submitted', ['event_id' => 'a1']);
+        $this->svc->applyProviderStatus($s->fresh(), 'pickup', ['event_id' => 'a2']);
+        // من picked_up إلى closed مساران (تحصيل/إرجاع) ⇒ لا انتقال تلقائي.
+        $this->svc->applyProviderStatus($s->fresh(), 'close', ['event_id' => 'a3']);
+
+        $s->refresh();
+        $this->assertEquals(DeliveryStatus::PICKED_UP, $s->delivery_status); // لم تتغيّر
+        $this->assertEquals('close', $s->provider_status);                   // لكن حالة المزوّد موثّقة
+    }
 }

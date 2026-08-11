@@ -187,15 +187,23 @@ class DeliveryStatusService
             ]);
             $shipment->update(['provider_status' => $providerStatus, 'last_synced_at' => now(), 'sync_status' => 'synced']);
 
-            // عيّن الحالة القانونية إن أمكن وكان الانتقال قانونيًا (وإلا وثّق حالة المزوّد فقط).
-            if ($canonical !== null
-                && $canonical !== $shipment->delivery_status
-                && DeliveryStatus::canTransition($shipment->delivery_status, $canonical)) {
-                $this->transitionTo($shipment, $canonical, [
-                    'source' => 'provider',
-                    'actor' => $opts['actor'] ?? null,
-                    'provider_status' => $providerStatus,
-                ]);
+            // عيّن الحالة القانونية. المزوّد قد يقفز عدّة حالات بين استطلاعين (أو يضيع حدث
+            // webhook)، فنسير المسار القانوني الوحيد خطوة خطوة بدل رفض الانتقال وتعليق
+            // الشحنة على حالة قديمة. المسار المتعدّد يُترك للمراجعة (لا تخمين مالي).
+            if ($canonical !== null && $canonical !== $shipment->delivery_status) {
+                $steps = DeliveryStatus::canTransition($shipment->delivery_status, $canonical)
+                    ? [$canonical]
+                    : DeliveryStatus::path($shipment->delivery_status, $canonical);
+
+                foreach ($steps ?? [] as $step) {
+                    $this->transitionTo($shipment, $step, [
+                        'source' => 'provider',
+                        'actor' => $opts['actor'] ?? null,
+                        // حالة المزوّد الخام تُثبَّت على الخطوة الأخيرة فقط (هي الواقع الحالي).
+                        'provider_status' => $step === $canonical ? $providerStatus : null,
+                        'note' => $step === $canonical ? null : __('خطوة وسيطة مستنتجة من قفزة المزوّد'),
+                    ]);
+                }
             }
         });
 

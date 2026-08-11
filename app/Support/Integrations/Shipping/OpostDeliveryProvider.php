@@ -37,8 +37,10 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
         'pending' => DeliveryStatus::ON_HOLD,
         'cod_pickup' => DeliveryStatus::DELIVERED_COD_HELD,
         'in_accounting' => DeliveryStatus::FUNDS_AT_ACCOUNTING,
+        // «return/returned» في Opost = الطرد راجع وموجود في المكتب (لم يصلنا بعد).
         'return' => DeliveryStatus::RETURNING_TO_COURIER,
-        'returned' => DeliveryStatus::RETURN_IN_TRANSIT,
+        'returned' => DeliveryStatus::RETURNING_TO_COURIER,
+        // «delivered» في Opost = الطرد الراجع دخل فاتورة إرجاع في طريقه إلينا (لا تسليم للعميل).
         'delivered' => DeliveryStatus::RETURN_IN_TRANSIT,
         'close' => DeliveryStatus::CLOSED,
         'closed' => DeliveryStatus::CLOSED,
