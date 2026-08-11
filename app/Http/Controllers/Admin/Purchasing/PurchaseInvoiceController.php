@@ -88,17 +88,27 @@ class PurchaseInvoiceController extends Controller
         ];
     }
 
+    /** الحفظ = إنشاء + ترحيل محاسبي فوري (بلا مسودّة/اعتماد منفصلين — قرار إداري). */
     public function store(StorePurchaseInvoiceRequest $request): RedirectResponse
     {
-        $invoice = $this->service->create($request->safe()->except('items'), $this->mapItems($request->validated('items')));
+        try {
+            $invoice = $this->service->createAndPost(
+                $request->safe()->except('items'),
+                $this->mapItems($request->validated('items')),
+            );
+        } catch (ValidationException $e) {
+            return back()->withInput()->with('error', collect($e->errors())->flatten()->first());
+        }
 
-        return redirect()->route('admin.purchasing.invoices.show', $invoice)->with('success', __('أُنشئت فاتورة الشراء.'));
+        return redirect()->route('admin.purchasing.invoices.show', $invoice)
+            ->with('success', __('حُفظت الفاتورة ورُحّلت محاسبيًا.'));
     }
 
     public function edit(PurchaseInvoice $invoice): View
     {
         $this->authorize('purchasing.invoices.create');
-        abort_unless(in_array($invoice->status, ['draft', 'approved'], true), 403, __('لا يمكن تعديل فاتورة بهذه الحالة.'));
+        // المُرحّلة قابلة للتعديل ما لم يُسدَّد منها شيء (يُعكس أثر المخزون ويُحدَّث القيد).
+        abort_unless($this->isEditable($invoice), 403, __('لا يمكن تعديل فاتورة بهذه الحالة.'));
 
         return view('admin.purchasing.invoices.form', $this->formViewData($invoice->load('items.variant.product')));
     }
@@ -106,15 +116,16 @@ class PurchaseInvoiceController extends Controller
     public function update(StorePurchaseInvoiceRequest $request, PurchaseInvoice $invoice): RedirectResponse
     {
         $this->authorize('purchasing.invoices.create');
-        abort_unless(in_array($invoice->status, ['draft', 'approved'], true), 403, __('لا يمكن تعديل فاتورة بهذه الحالة.'));
+        abort_unless($this->isEditable($invoice), 403, __('لا يمكن تعديل فاتورة بهذه الحالة.'));
 
         try {
-            $this->service->update($invoice, $request->safe()->except('items'), $this->mapItems($request->validated('items')));
+            $this->service->updatePosted($invoice, $request->safe()->except('items'), $this->mapItems($request->validated('items')));
         } catch (ValidationException $e) {
             return back()->withInput()->with('error', collect($e->errors())->flatten()->first());
         }
 
-        return redirect()->route('admin.purchasing.invoices.show', $invoice)->with('success', __('حُدّثت الفاتورة.'));
+        return redirect()->route('admin.purchasing.invoices.show', $invoice)
+            ->with('success', __('حُدّثت الفاتورة وقيدها المحاسبي وأثرها المخزوني.'));
     }
 
     /**
@@ -195,12 +206,22 @@ class PurchaseInvoiceController extends Controller
     {
         $this->authorize('purchasing.invoices.delete');
 
-        if (! in_array($invoice->status, ['draft', 'cancelled'], true)) {
-            return back()->with('error', __('لا يمكن حذف فاتورة مُرحّلة — استخدم العكس.'));
+        try {
+            // يسحب البضاعة المُدخَلة ويحذف القيد المحاسبي المرتبط (المسدَّدة تُمنع).
+            $this->service->deletePosted($invoice);
+        } catch (ValidationException $e) {
+            return back()->with('error', collect($e->errors())->flatten()->first());
         }
-        $invoice->delete();
 
-        return redirect()->route('admin.purchasing.invoices.index')->with('success', __('حُذفت الفاتورة.'));
+        return redirect()->route('admin.purchasing.invoices.index')
+            ->with('success', __('حُذفت الفاتورة مع قيدها المحاسبي وأثرها المخزوني.'));
+    }
+
+    /** الفاتورة قابلة للتعديل ما لم تكن ملغاة/معكوسة أو سُدّد منها شيء. */
+    public static function isEditable(PurchaseInvoice $invoice): bool
+    {
+        return ! in_array($invoice->status, ['cancelled', 'reversed'], true)
+            && (float) $invoice->amount_paid <= 0;
     }
 
     /** ينفّذ إجراء الخدمة ويحوّل أخطاء التحقّق إلى رسالة راجعة. */

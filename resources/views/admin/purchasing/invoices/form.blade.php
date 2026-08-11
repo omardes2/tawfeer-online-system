@@ -101,7 +101,7 @@
 
         <div class="flex items-center justify-end gap-2">
             <a href="{{ $editing ? route('admin.purchasing.invoices.show', $invoice) : route('admin.purchasing.invoices.index') }}" class="btn-secondary">{{ __('إلغاء') }}</a>
-            <button type="submit" class="btn-primary">{{ $editing ? __('حفظ التعديل') : __('حفظ كمسودّة') }}</button>
+            <button type="submit" class="btn-primary">{{ __('حفظ') }}</button>
         </div>
     </form>
 

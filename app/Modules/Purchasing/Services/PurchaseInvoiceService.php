@@ -3,6 +3,7 @@
 namespace App\Modules\Purchasing\Services;
 
 use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Accounting\Services\AccountingService;
 use App\Modules\Accounting\Services\VoucherService;
 use App\Modules\Catalog\Models\Category;
@@ -85,6 +86,177 @@ class PurchaseInvoiceService
 
             return $invoice->load('items');
         });
+    }
+
+    /**
+     * إنشاء فاتورة وترحيلها محاسبيًا فورًا في خطوة واحدة (قرار إداري: لا مسودّة ولا اعتماد
+     * منفصل). كل شيء داخل معاملة واحدة: إن فشل الترحيل لا تبقى فاتورة معلّقة.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<int, array<string, mixed>>  $items
+     */
+    public function createAndPost(array $data, array $items): PurchaseInvoice
+    {
+        return DB::transaction(function () use ($data, $items) {
+            $invoice = $this->create($data, $items);
+            $invoice->update(['status' => 'approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
+
+            return $this->post($invoice->fresh('items'));
+        });
+    }
+
+    /**
+     * تعديل فاتورة **مُرحّلة**: يعكس أثر المخزون القديم، يستبدل البنود، يُدخل الجديد،
+     * ويُحدّث القيد المحاسبي **في مكانه** (نفس رقم القيد) بدل إنشاء قيد جديد — مطابقًا
+     * لسياسة فواتير المبيعات. كل ذلك داخل معاملة واحدة.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<int, array<string, mixed>>  $items
+     */
+    public function updatePosted(PurchaseInvoice $invoice, array $data, array $items): PurchaseInvoice
+    {
+        if ($invoice->status !== 'posted') {
+            return $this->update($invoice, $data, $items); // غير مُرحّلة ⇒ المسار العادي.
+        }
+        if ((float) $invoice->amount_paid > 0) {
+            throw ValidationException::withMessages([
+                'status' => __('لا يمكن تعديل فاتورة سُدّد جزء منها — اعكس الدفعات أولًا.'),
+            ]);
+        }
+
+        return DB::transaction(function () use ($invoice, $data, $items) {
+            $this->reverseStock($invoice);            // 1) سحب البضاعة المُدخَلة سابقًا.
+
+            [$prepared, $subtotal, $tax] = $this->prepareItems($items);
+            $date = Carbon::parse($data['invoice_date'] ?? $invoice->invoice_date);
+
+            $invoice->update([
+                'supplier_id' => $data['supplier_id'] ?? $invoice->supplier_id,
+                'supplier_reference' => $data['supplier_reference'] ?? null,
+                'invoice_date' => $date->toDateString(),
+                'due_date' => $data['due_date'] ?? null,
+                'subtotal' => $subtotal,
+                'tax_amount' => $tax,
+                'total' => round($subtotal + $tax, 2),
+                'notes' => $data['notes'] ?? null,
+            ]);
+            $invoice->items()->delete();
+            $invoice->items()->createMany($prepared);
+            $invoice->load('items');
+
+            // 2) إنشاء متغيّرات الأصناف الجديدة ثم إدخال البضاعة بالكميات/التكاليف الجديدة.
+            foreach ($invoice->items as $item) {
+                if (! $item->variant_id && $item->new_product_name) {
+                    $item->update(['variant_id' => $this->createProductVariant($item)->id]);
+                }
+            }
+            $this->applyStock($invoice->load('items'));
+
+            // 3) تحديث القيد المحاسبي في مكانه بالمبالغ الجديدة.
+            $entry = $invoice->journal_entry_id ? JournalEntry::find($invoice->journal_entry_id) : null;
+            if ($entry) {
+                $this->accounting->replaceLines($entry, $this->postingLines($invoice));
+            }
+
+            return $invoice->load('items');
+        });
+    }
+
+    /**
+     * حذف فاتورة **مُرحّلة** نهائيًا: يسحب البضاعة المُدخَلة ويحذف قيدها المحاسبي
+     * (لا عكس) — مطابقًا لسياسة حذف فاتورة المبيعات. المسدَّدة تُمنع.
+     */
+    public function deletePosted(PurchaseInvoice $invoice): void
+    {
+        if ((float) $invoice->amount_paid > 0) {
+            throw ValidationException::withMessages([
+                'status' => __('لا يمكن حذف فاتورة سُدّد جزء منها — اعكس الدفعات أولًا.'),
+            ]);
+        }
+
+        DB::transaction(function () use ($invoice) {
+            if ($invoice->status === 'posted') {
+                $this->reverseStock($invoice);
+
+                $entry = $invoice->journal_entry_id ? JournalEntry::find($invoice->journal_entry_id) : null;
+                if ($entry) {
+                    $this->accounting->deleteEntry($entry);
+                }
+                $invoice->update(['journal_entry_id' => null]);
+            }
+
+            $invoice->items()->delete();
+            $invoice->delete();
+        });
+    }
+
+    /** سطور قيد الشراء: مدين المخزون [+ ضريبة] / دائن ذمم المورد. */
+    private function postingLines(PurchaseInvoice $invoice): array
+    {
+        $cfg = config('accounting.purchasing');
+        $lines = [['account_code' => $cfg['inventory_account'], 'debit' => (float) $invoice->subtotal, 'credit' => 0]];
+        if ((float) $invoice->tax_amount > 0) {
+            $lines[] = ['account_code' => $cfg['tax_account'], 'debit' => (float) $invoice->tax_amount, 'credit' => 0];
+        }
+        $lines[] = ['account_code' => $this->payableAccountCode($invoice), 'debit' => 0, 'credit' => (float) $invoice->total];
+
+        return $lines;
+    }
+
+    /** إدخال بضاعة الفاتورة للمخزون (المستودع الافتراضي) — يُستخدم عند الترحيل والتعديل. */
+    private function applyStock(PurchaseInvoice $invoice): void
+    {
+        if ($invoice->goods_receipt_id !== null) {
+            return; // دخلت عبر إذن استلام مستقل.
+        }
+        $warehouse = $this->defaultWarehouse();
+        if (! $warehouse) {
+            return;
+        }
+
+        foreach ($invoice->items as $item) {
+            $variant = $item->variant_id ? ProductVariant::find($item->variant_id) : null;
+            if (! $variant) {
+                continue;
+            }
+            $this->inventory->receive($variant, $warehouse, (float) $item->qty, (float) $item->unit_cost, [
+                'reference_type' => PurchaseInvoice::class,
+                'reference_id' => $invoice->id,
+                'reason' => 'purchase_invoice:'.$invoice->number,
+            ]);
+        }
+    }
+
+    /**
+     * سحب البضاعة التي أدخلتها الفاتورة (عكس الاستلام) عند تعديلها أو حذفها.
+     * يفشل بوضوح إن بيعت الكمية ولم تعُد متاحة — أفضل من إفساد رصيد المخزون.
+     */
+    private function reverseStock(PurchaseInvoice $invoice): void
+    {
+        if ($invoice->goods_receipt_id !== null) {
+            return;
+        }
+        $warehouse = $this->defaultWarehouse();
+        if (! $warehouse) {
+            return;
+        }
+
+        foreach ($invoice->items as $item) {
+            $variant = $item->variant_id ? ProductVariant::find($item->variant_id) : null;
+            if (! $variant || (float) $item->qty <= 0) {
+                continue;
+            }
+            $this->inventory->purchaseReturn($variant, $warehouse, (float) $item->qty, [
+                'reference_type' => PurchaseInvoice::class,
+                'reference_id' => $invoice->id,
+                'reason' => 'purchase_invoice_revert:'.$invoice->number,
+            ]);
+        }
+    }
+
+    private function defaultWarehouse(): ?Warehouse
+    {
+        return Warehouse::where('is_default', true)->first() ?? Warehouse::orderBy('id')->first();
     }
 
     /**
@@ -229,15 +401,6 @@ class PurchaseInvoiceService
         }
 
         return DB::transaction(function () use ($invoice) {
-            $cfg = config('accounting.purchasing');
-            $lines = [
-                ['account_code' => $cfg['inventory_account'], 'debit' => (float) $invoice->subtotal, 'credit' => 0],
-            ];
-            if ((float) $invoice->tax_amount > 0) {
-                $lines[] = ['account_code' => $cfg['tax_account'], 'debit' => (float) $invoice->tax_amount, 'credit' => 0];
-            }
-            $lines[] = ['account_code' => $this->payableAccountCode($invoice), 'debit' => 0, 'credit' => (float) $invoice->total];
-
             $entry = $this->accounting->postEntry([
                 'entry_date' => $invoice->invoice_date->toDateString(),
                 'description' => __('فاتورة شراء :n', ['n' => $invoice->number]),
@@ -245,7 +408,7 @@ class PurchaseInvoiceService
                 'reference_type' => 'purchase_invoice',
                 'reference_id' => $invoice->id,
                 'idempotency_key' => 'purchase_invoice:'.$invoice->id,
-            ], $lines);
+            ], $this->postingLines($invoice));
 
             $invoice->update([
                 'status' => 'posted',
@@ -262,26 +425,8 @@ class PurchaseInvoiceService
             }
             $invoice->load('items');
 
-            // إدخال البضاعة للمخزون: كل بند بمتغيّر يزيد الكمية بالتكلفة (WAC) في المستودع الافتراضي.
-            if ($invoice->goods_receipt_id === null) {
-                $warehouse = Warehouse::where('is_default', true)->first() ?? Warehouse::orderBy('id')->first();
-                if ($warehouse) {
-                    foreach ($invoice->items as $item) {
-                        if (! $item->variant_id) {
-                            continue;
-                        }
-                        $variant = ProductVariant::find($item->variant_id);
-                        if (! $variant) {
-                            continue;
-                        }
-                        $this->inventory->receive($variant, $warehouse, (float) $item->qty, (float) $item->unit_cost, [
-                            'reference_type' => PurchaseInvoice::class,
-                            'reference_id' => $invoice->id,
-                            'reason' => 'purchase_invoice:'.$invoice->number,
-                        ]);
-                    }
-                }
-            }
+            // إدخال البضاعة للمخزون بالتكلفة (WAC) في المستودع الافتراضي.
+            $this->applyStock($invoice);
 
             return $invoice;
         });

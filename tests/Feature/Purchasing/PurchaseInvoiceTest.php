@@ -98,7 +98,7 @@ class PurchaseInvoiceTest extends TestCase
         $this->assertEqualsWithDelta($before + 10, $after, 0.001);
     }
 
-    public function test_new_product_defined_and_stocked_only_on_posting(): void
+    public function test_new_product_defined_and_stocked_immediately_on_save(): void
     {
         $admin = User::whereHas('roles', fn ($q) => $q->where('name', 'admin'))->first();
         $this->actingAs($admin);
@@ -109,16 +109,11 @@ class PurchaseInvoiceTest extends TestCase
             'items' => [['new_name' => 'صنف جديد للاختبار', 'sell_price' => 120, 'qty' => 5, 'unit_cost' => 80, 'tax_rate' => 0]],
         ])->assertRedirect();
 
-        // مسودّة: لا يُنشأ منتج ولا يدخل مخزون بعد.
-        $this->assertNull(Product::where('name', 'صنف جديد للاختبار')->first());
+        // الحفظ = ترحيل فوري: يُنشأ المنتج ويدخل المخزون في الحال (لا مسودّة).
         $inv = PurchaseInvoice::latest('id')->first();
-        $item = $inv->items->first();
-        $this->assertNull($item->variant_id);
-        $this->assertSame('صنف جديد للاختبار', $item->new_product_name);
-
-        // بعد الترحيل: يُنشأ المنتج ويدخل المخزون.
-        $this->service->approve($inv);
-        $this->service->post($inv->fresh());
+        $this->assertSame('posted', $inv->status);
+        $this->assertNotNull($inv->journal_entry_id);
+        $this->assertNotNull($inv->items->first()->variant_id);
 
         $product = Product::where('name', 'صنف جديد للاختبار')->first();
         $this->assertNotNull($product);
@@ -146,13 +141,9 @@ class PurchaseInvoiceTest extends TestCase
             'items' => [['new_name' => 'خشب', 'qty' => 10, 'unit_cost' => 20, 'tax_rate' => 0]],
         ])->assertRedirect()->assertSessionHasNoErrors();
 
-        // لا منتج في المسودّة؛ يُنشأ عند الترحيل.
-        $this->assertDatabaseMissing('products', ['name' => 'خشب']);
-        $inv = PurchaseInvoice::latest('id')->first();
-        $this->service->approve($inv);
-        $this->service->post($inv->fresh());
-
+        // يُنشأ فورًا مع الحفظ (فئة افتراضية تُستحدث عند غيابها).
         $this->assertDatabaseHas('products', ['name' => 'خشب']);
+        $this->assertSame('posted', PurchaseInvoice::latest('id')->first()->status);
         $this->assertGreaterThan(0, Category::count());
     }
 
@@ -185,7 +176,8 @@ class PurchaseInvoiceTest extends TestCase
         $this->assertEqualsWithDelta(3, (float) $inv->items->first()->qty, 0.001);
     }
 
-    public function test_cannot_update_posted_invoice(): void
+    /** الفاتورة المُرحّلة صارت قابلة للتعديل (يُصحَّح قيدها ومخزونها) — قرار إداري. */
+    public function test_posted_invoice_can_be_updated_via_web(): void
     {
         $inv = $this->makeInvoice(50, 10, 0);
         $this->service->approve($inv);
@@ -195,10 +187,10 @@ class PurchaseInvoiceTest extends TestCase
         $this->actingAs($admin)->put(route('admin.purchasing.invoices.update', $inv->fresh()), [
             'supplier_id' => $this->supplier->id,
             'invoice_date' => now()->toDateString(),
-            'items' => [['variant_id' => $this->variant->id, 'qty' => 99, 'unit_cost' => 1, 'tax_rate' => 0]],
-        ])->assertForbidden(); // فاتورة مُرحّلة لا تُعدَّل
+            'items' => [['variant_id' => $this->variant->id, 'qty' => 3, 'unit_cost' => 100, 'tax_rate' => 0]],
+        ])->assertRedirect()->assertSessionHasNoErrors();
 
-        $this->assertEqualsWithDelta(500, (float) $inv->fresh()->total, 0.01); // لم تتغيّر
+        $this->assertEqualsWithDelta(300, (float) $inv->fresh()->total, 0.01);
     }
 
     public function test_post_is_idempotent(): void
@@ -284,5 +276,91 @@ class PurchaseInvoiceTest extends TestCase
         $this->post(route('admin.purchasing.invoices.approve', $inv))->assertRedirect();
         $this->post(route('admin.purchasing.invoices.post', $inv))->assertRedirect();
         $this->assertEquals('posted', $inv->fresh()->status);
+    }
+    // ---- الحفظ الفوري + تعديل/حذف المُرحّلة (قرار إداري: خطوة واحدة) ----
+
+    private function stock(): float
+    {
+        $warehouse = Warehouse::where('is_default', true)->firstOrFail();
+
+        return (float) (InventoryStock::where('variant_id', $this->variant->id)
+            ->where('warehouse_id', $warehouse->id)->value('on_hand') ?? 0);
+    }
+
+    /** الحفظ خطوة واحدة: تُنشأ الفاتورة وتُرحّل محاسبيًا ويدخل المخزون فورًا. */
+    public function test_create_and_post_in_one_step(): void
+    {
+        $before = $this->stock();
+
+        $inv = $this->service->createAndPost(
+            ['supplier_id' => $this->supplier->id, 'invoice_date' => now()->toDateString()],
+            [['variant_id' => $this->variant->id, 'qty' => 10, 'unit_cost' => 50, 'tax_rate' => 15]],
+        );
+
+        $this->assertEquals('posted', $inv->status);
+        $this->assertNotNull($inv->journal_entry_id);
+        $this->assertEqualsWithDelta(500, $this->balance('1200'), 0.01);
+        $this->assertEqualsWithDelta(575, $this->balance('2010'), 0.01);
+        $this->assertEqualsWithDelta($before + 10, $this->stock(), 0.001);
+    }
+
+    /** تعديل فاتورة مُرحّلة: يُحدَّث القيد في مكانه ويُصحَّح المخزون بالفرق. */
+    public function test_update_posted_adjusts_ledger_and_stock_in_place(): void
+    {
+        $before = $this->stock();
+        $inv = $this->service->createAndPost(
+            ['supplier_id' => $this->supplier->id, 'invoice_date' => now()->toDateString()],
+            [['variant_id' => $this->variant->id, 'qty' => 10, 'unit_cost' => 50, 'tax_rate' => 0]],
+        );
+        $entryId = $inv->journal_entry_id;
+
+        // تعديل: 4 قطع بتكلفة 25 ⇒ 100 بدل 500.
+        $this->service->updatePosted($inv->fresh('items'),
+            ['supplier_id' => $this->supplier->id, 'invoice_date' => now()->toDateString()],
+            [['variant_id' => $this->variant->id, 'qty' => 4, 'unit_cost' => 25, 'tax_rate' => 0]],
+        );
+
+        $inv->refresh();
+        $this->assertSame($entryId, $inv->journal_entry_id);   // نفس القيد لا قيد جديد
+        $this->assertEqualsWithDelta(100, (float) $inv->total, 0.01);
+        $this->assertEqualsWithDelta(100, $this->balance('1200'), 0.01);
+        $this->assertEqualsWithDelta(100, $this->balance('2010'), 0.01);
+        $this->assertEqualsWithDelta($before + 4, $this->stock(), 0.001); // 10 سُحبت ثم 4 دخلت
+    }
+
+    /** حذف فاتورة مُرحّلة: يُحذف القيد ويُسحب المخزون — لا أثر متبقٍّ. */
+    public function test_delete_posted_removes_ledger_and_stock(): void
+    {
+        $beforeStock = $this->stock();
+        $beforeInv = $this->balance('1200');
+        $beforePayable = $this->balance('2010');
+
+        $inv = $this->service->createAndPost(
+            ['supplier_id' => $this->supplier->id, 'invoice_date' => now()->toDateString()],
+            [['variant_id' => $this->variant->id, 'qty' => 6, 'unit_cost' => 30, 'tax_rate' => 0]],
+        );
+        $entryId = $inv->journal_entry_id;
+
+        $this->service->deletePosted($inv->fresh('items'));
+
+        $this->assertDatabaseMissing('journal_entries', ['id' => $entryId]);
+        $this->assertEqualsWithDelta($beforeInv, $this->balance('1200'), 0.01);
+        $this->assertEqualsWithDelta($beforePayable, $this->balance('2010'), 0.01);
+        $this->assertEqualsWithDelta($beforeStock, $this->stock(), 0.001);
+        $this->assertSoftDeleted('purchase_invoices', ['id' => $inv->id]);
+    }
+
+    /** الفاتورة المسدَّدة محميّة: لا تُعدَّل ولا تُحذف قبل عكس دفعاتها. */
+    public function test_paid_invoice_is_protected_from_edit_and_delete(): void
+    {
+        $inv = $this->service->createAndPost(
+            ['supplier_id' => $this->supplier->id, 'invoice_date' => now()->toDateString()],
+            [['variant_id' => $this->variant->id, 'qty' => 2, 'unit_cost' => 100, 'tax_rate' => 0]],
+        );
+        $treasury = Treasury::where('is_active', true)->whereNotNull('gl_account_id')->firstOrFail();
+        $this->service->pay($inv->fresh(), $treasury->id, 50);
+
+        $this->expectException(ValidationException::class);
+        $this->service->deletePosted($inv->fresh('items'));
     }
 }

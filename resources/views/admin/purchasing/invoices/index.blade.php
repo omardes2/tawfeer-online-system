@@ -63,7 +63,28 @@
                     <td class="text-start tabular-nums whitespace-nowrap {{ $inv->balanceDue() > 0 ? 'text-rose-600' : 'text-gray-400' }}">{{ number_format($inv->balanceDue(), 2) }}</td>
                     <td><x-admin.badge :tone="$statusTone[$inv->status] ?? 'gray'" :label="__($labels[$inv->status] ?? $inv->status)" /></td>
                     <td><x-admin.badge :tone="$payTone[$inv->payment_status] ?? 'gray'" :label="__($payLabel[$inv->payment_status] ?? $inv->payment_status)" /></td>
-                    <td class="text-end"><a href="{{ route('admin.purchasing.invoices.show', $inv) }}" class="text-emerald-600 hover:underline text-sm">{{ __('عرض') }}</a></td>
+                    <td class="text-end whitespace-nowrap">
+                        <div class="inline-flex items-center gap-2 text-sm">
+                            <a href="{{ route('admin.purchasing.invoices.show', $inv) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a>
+                            @php $editable = \App\Http\Controllers\Admin\Purchasing\PurchaseInvoiceController::isEditable($inv); @endphp
+                            @can('purchasing.invoices.create')
+                                @if ($editable)
+                                    <span class="text-gray-300">|</span>
+                                    <a href="{{ route('admin.purchasing.invoices.edit', $inv) }}" class="text-sky-600 hover:underline">{{ __('تعديل') }}</a>
+                                @endif
+                            @endcan
+                            @can('purchasing.invoices.delete')
+                                @if ($editable)
+                                    <span class="text-gray-300">|</span>
+                                    <form method="POST" action="{{ route('admin.purchasing.invoices.destroy', $inv) }}" class="inline"
+                                          onsubmit="return confirm('{{ __('حذف الفاتورة نهائيًا؟ سيُحذف قيدها المحاسبي وتُسحب بضاعتها من المخزون.') }}')">
+                                        @csrf @method('DELETE')
+                                        <button class="text-rose-600 hover:underline">{{ __('حذف') }}</button>
+                                    </form>
+                                @endif
+                            @endcan
+                        </div>
+                    </td>
                 </tr>
             @empty
                 <tr><td colspan="8" class="!p-0">
