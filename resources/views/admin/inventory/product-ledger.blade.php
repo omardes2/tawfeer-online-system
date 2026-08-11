@@ -54,6 +54,51 @@
             </div>
         </div>
 
+        {{-- تفصيل الكميات حسب المقاس/المتغيّر — مطابقة إجمالي الصنف --}}
+        @if ($variants->count() > 1)
+            @php($variantsAvailable = $variants->sum(fn ($v) => (float) ($v->on_hand_sum ?? 0) - (float) ($v->reserved_sum ?? 0)))
+            @php($mismatch = abs($variantsAvailable - $available) > 0.001)
+            <div class="bg-white shadow-sm sm:rounded-lg mb-6">
+                <div class="p-5 border-b border-gray-100">
+                    <h3 class="text-lg font-bold text-gray-900">{{ __('الكميات حسب المقاس/المتغيّر') }}</h3>
+                    <p class="text-sm text-gray-400">{{ __('مجموع هذه الكميات يجب أن يساوي الكمية المتوفرة للصنف.') }}</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="text-gray-500 bg-gray-50 border-b border-gray-100">
+                            <tr>
+                                <th class="py-3 px-4 font-medium text-start">{{ __('المتغيّر') }}</th>
+                                <th class="py-3 px-4 font-medium text-start">{{ __('الكود') }}</th>
+                                <th class="py-3 px-4 font-medium text-start">{{ __('المتوفّر') }}</th>
+                                <th class="py-3 px-4 font-medium text-start">{{ __('المحجوز') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach ($variants as $v)
+                                @php($vAvail = (float) ($v->on_hand_sum ?? 0) - (float) ($v->reserved_sum ?? 0))
+                                <tr>
+                                    <td class="py-3 px-4 text-gray-800">{{ $v->optionLabel() }}</td>
+                                    <td class="py-3 px-4 text-xs text-gray-400 font-mono">{{ $v->sku }}</td>
+                                    <td class="py-3 px-4 tabular-nums font-medium {{ $vAvail > 0 ? 'text-emerald-700' : 'text-gray-400' }}">{{ $num($vAvail) }}</td>
+                                    <td class="py-3 px-4 tabular-nums text-gray-500">{{ $num((float) ($v->reserved_sum ?? 0)) }}</td>
+                                </tr>
+                            @endforeach
+                            <tr class="bg-gray-50 font-semibold">
+                                <td class="py-3 px-4" colspan="2">{{ __('المجموع') }}</td>
+                                <td class="py-3 px-4 tabular-nums {{ $mismatch ? 'text-rose-600' : 'text-emerald-700' }}">{{ $num($variantsAvailable) }}</td>
+                                <td class="py-3 px-4"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                @if ($mismatch)
+                    <div class="p-4 border-t border-rose-100 bg-rose-50 text-sm text-rose-700">
+                        {{ __('تنبيه: مجموع المتغيّرات (:v) لا يساوي الكمية المتوفرة للصنف (:t) — راجع الحركات أدناه.', ['v' => $num($variantsAvailable), 't' => $num($available)]) }}
+                    </div>
+                @endif
+            </div>
+        @endif
+
         {{-- سجل المخزن --}}
         <div class="bg-white shadow-sm sm:rounded-lg">
             <div class="p-5 border-b border-gray-100">

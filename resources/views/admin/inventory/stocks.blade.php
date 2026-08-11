@@ -51,7 +51,39 @@
                                 </td>
                                 <td class="py-3 px-4 text-gray-500">{{ $p->category?->name ?? '—' }}</td>
                                 <td class="py-3 px-4">
-                                    <span class="font-semibold tabular-nums {{ $available > 0 ? 'text-emerald-700' : 'text-gray-400' }}">{{ $num($available) }}</span>
+                                    {{-- مطابقة: مجموع كميات المتغيّرات يجب أن يساوي إجمالي الصنف --}}
+                                    @php($variants = $p->variants)
+                                    @php($variantsAvailable = $variants->sum(fn ($v) => (float) ($v->on_hand_sum ?? 0) - (float) ($v->reserved_sum ?? 0)))
+                                    @php($mismatch = abs($variantsAvailable - $available) > 0.001)
+                                    <div x-data="{ open: false }">
+                                        <button type="button" x-on:click="open = !open"
+                                                class="inline-flex items-center gap-1 font-semibold tabular-nums {{ $available > 0 ? 'text-emerald-700' : 'text-gray-400' }} hover:underline"
+                                                title="{{ __('عرض تفصيل المقاسات/المتغيّرات') }}">
+                                            {{ $num($available) }}
+                                            @if ($variants->count() > 1)
+                                                <svg class="w-3 h-3 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                            @endif
+                                        </button>
+
+                                        @if ($variants->count() > 1)
+                                            <div x-show="open" x-cloak class="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-2 min-w-[11rem]">
+                                                @foreach ($variants as $v)
+                                                    @php($vAvail = (float) ($v->on_hand_sum ?? 0) - (float) ($v->reserved_sum ?? 0))
+                                                    <div class="flex items-center justify-between gap-4 text-xs py-0.5">
+                                                        <span class="text-gray-600">{{ $v->optionLabel() }}</span>
+                                                        <span class="tabular-nums font-medium {{ $vAvail > 0 ? 'text-gray-800' : 'text-gray-400' }}">{{ $num($vAvail) }}</span>
+                                                    </div>
+                                                @endforeach
+                                                <div class="flex items-center justify-between gap-4 text-xs pt-1 mt-1 border-t border-gray-200">
+                                                    <span class="text-gray-500">{{ __('المجموع') }}</span>
+                                                    <span class="tabular-nums font-semibold {{ $mismatch ? 'text-rose-600' : 'text-emerald-700' }}">{{ $num($variantsAvailable) }}</span>
+                                                </div>
+                                                @if ($mismatch)
+                                                    <p class="mt-1 text-[11px] text-rose-600">{{ __('لا يطابق إجمالي الصنف — راجع كرت الصنف.') }}</p>
+                                                @endif
+                                            </div>
+                                        @endif
+                                    </div>
                                 </td>
                                 <td class="py-3 px-4 tabular-nums text-gray-800">{{ $num($p->retail_price) }} {{ $currency }}</td>
                                 <td class="py-3 px-4 tabular-nums text-gray-600">{{ $num($p->wholesale_price) }} {{ $currency }}</td>

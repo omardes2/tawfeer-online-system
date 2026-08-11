@@ -35,7 +35,15 @@ class InventoryController extends Controller
     {
         $this->authorize('inventory.stocks.view');
 
-        $products = Product::query()->with('category:id,name')
+        // تفصيل المتغيّرات مع كمياتها: يجعل مجموع الصنف قابلًا للمطابقة بصريًا
+        // (إجمالي الصنف = مجموع كميات متغيّراته) ويكشف أي متغيّر خارج مصفوفة المنتج.
+        $products = Product::query()->with([
+            'category:id,name',
+            'variants' => fn ($q) => $q->select('id', 'product_id', 'sku', 'name')
+                ->with('attributeValues:id,value,label')
+                ->withSum('inventoryStocks as on_hand_sum', 'on_hand')
+                ->withSum('inventoryStocks as reserved_sum', 'reserved'),
+        ])
             ->withSum('stocks as on_hand_sum', 'on_hand')
             ->withSum('stocks as reserved_sum', 'reserved')
             ->when($request->filled('search'), function ($q) use ($request) {
@@ -70,6 +78,11 @@ class InventoryController extends Controller
 
         return view('admin.inventory.product-ledger', [
             'product' => $product->load('category:id,name'),
+            // تفصيل الكميات لكل متغيّر — لمطابقة إجمالي الصنف مع مقاساته.
+            'variants' => $product->variants()->with('attributeValues:id,value,label')
+                ->withSum('inventoryStocks as on_hand_sum', 'on_hand')
+                ->withSum('inventoryStocks as reserved_sum', 'reserved')
+                ->orderBy('id')->get(),
             'ledger' => $ledger,
             'available' => $onHand - $reserved,
             'onHand' => $onHand,
