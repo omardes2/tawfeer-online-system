@@ -27,7 +27,7 @@ class DeliverySyncService
      */
     public function syncActive(): array
     {
-        $counts = ['synced' => 0, 'skipped' => 0, 'failed' => 0, 'inconsistent' => 0];
+        $counts = ['synced' => 0, 'skipped' => 0, 'failed' => 0, 'inconsistent' => 0, 'no_reference' => 0];
 
         Shipment::whereNotNull('delivery_provider_id')
             ->whereNotIn('delivery_status', DeliveryStatus::TERMINAL)
@@ -45,14 +45,24 @@ class DeliverySyncService
     public function syncShipment(Shipment $shipment): string
     {
         $reference = $shipment->external_id ?: $shipment->tracking_number;
-        if ($reference === null) {
-            return 'skipped';
+        if (empty($reference)) {
+            return 'no_reference'; // لم تُرسَل للمزوّد بعد ⇒ لا شيء نستعلم عنه.
         }
 
         try {
             $driver = $this->providers->forShipment($shipment);
             $result = $driver->track($reference);
             $providerStatus = $result['provider_status'] ?? null;
+
+            // فشل الاستعلام (شبكة/صلاحية/مرجع مجهول) ⇒ فشل صريح لا «تخطٍّ» صامت،
+            // وإلا ظهر العطل وكأنّ كل شيء سليم («synced» بلا خطأ).
+            if (! empty($result['error'])) {
+                $shipment->increment('sync_attempts');
+                $shipment->update(['sync_status' => 'failed', 'sync_error' => mb_substr((string) $result['error'], 0, 500)]);
+                $this->logEvent($shipment, $providerStatus, $reference, 'failed', mb_substr((string) $result['error'], 0, 500));
+
+                return 'failed';
+            }
 
             // لا حالة أو لم تتغيّر ⇒ لا استيعاب مكرّر (idempotent).
             if ($providerStatus === null || $providerStatus === $shipment->provider_status) {

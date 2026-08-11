@@ -255,9 +255,27 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
             // Opost يتتبّع بالمعرّف عبر ?id= ويعيد [ { data: [ {shipment} ] } ]، والحالة في last_status.
             $res = $this->send(fn (PendingRequest $c) => $c->get('/resources/shipments', ['id' => $trackingNumber]));
             if (! $res->successful()) {
-                return ['provider_status' => null, 'external_id' => $trackingNumber, 'driver' => $this->name()];
+                Log::warning('Opost track failed', ['status' => $res->status(), 'ref' => $trackingNumber]);
+
+                // `error` صريح: بدونه يُفسَّر الفشل كـ«لا تغيير» فيُخفى العطل تمامًا.
+                return [
+                    'provider_status' => null,
+                    'external_id' => $trackingNumber,
+                    'error' => __('تعذّر الاستعلام عن الشحنة (HTTP :s).', ['s' => $res->status()]),
+                    'driver' => $this->name(),
+                ];
             }
             $shipment = $this->firstShipment($res->json() ?? []);
+
+            // ردّ ناجح بلا شحنة مطابقة ⇒ المرجع غير معروف لدى المزوّد (لا «لا تغيير»).
+            if ($shipment === []) {
+                return [
+                    'provider_status' => null,
+                    'external_id' => $trackingNumber,
+                    'error' => __('لم تُعثَر الشحنة لدى شركة التوصيل بهذا المرجع.'),
+                    'driver' => $this->name(),
+                ];
+            }
 
             return [
                 'provider_status' => $shipment['last_status']['status'] ?? $shipment['status'] ?? null,
@@ -268,7 +286,12 @@ class OpostDeliveryProvider implements DeliveryProviderInterface
         } catch (\Throwable $e) {
             Log::warning('Opost track error: '.$e->getMessage());
 
-            return ['provider_status' => null, 'external_id' => $trackingNumber, 'driver' => $this->name()];
+            return [
+                'provider_status' => null,
+                'external_id' => $trackingNumber,
+                'error' => $e->getMessage(),
+                'driver' => $this->name(),
+            ];
         }
     }
 

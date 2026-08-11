@@ -129,12 +129,13 @@ class ShipmentController extends Controller
         $message = match (true) {
             $after !== $before => __('حُدّثت الحالة إلى: :s', ['s' => DeliveryStatus::label($after)]),
             $result === 'skipped' => __('الحالة لدى شركة التوصيل لم تتغيّر.'),
+            $result === 'no_reference' => __('لم تُرسَل هذه الشحنة لشركة التوصيل بعد (لا يوجد رقم تتبّع).'),
             $result === 'inconsistent' => __('حالة المزوّد لا يمكن تطبيقها تلقائيًا — تحتاج مراجعة يدوية.'),
-            $result === 'failed' => __('تعذّر الاتصال بشركة التوصيل: :e', ['e' => $shipment->fresh()->sync_error]),
+            $result === 'failed' => __('تعذّر الاستعلام من شركة التوصيل: :e', ['e' => $shipment->fresh()->sync_error]),
             default => __('تمت المزامنة.'),
         };
 
-        return back()->with($result === 'failed' || $result === 'inconsistent' ? 'error' : 'success', $message);
+        return back()->with(in_array($result, ['failed', 'inconsistent', 'no_reference'], true) ? 'error' : 'success', $message);
     }
 
     private function guard(callable $fn, string $success): RedirectResponse
