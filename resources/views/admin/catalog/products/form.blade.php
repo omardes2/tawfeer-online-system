@@ -203,8 +203,25 @@
                                     </div>
                                 </template>
 
+                                {{-- مطابقة الكميات: المصفوفة توزّع كمية الصنف ولا تضيف إليها --}}
+                                <div class="pt-3 mt-3 border-t border-gray-100" x-show="originalQty > 0" x-cloak>
+                                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"
+                                         :class="qtyMatches ? 'text-emerald-700' : 'text-rose-600'">
+                                        <span>{{ __('العدد الأصلي') }}: <span class="font-semibold" x-text="originalQty"></span></span>
+                                        <span>{{ __('مجموع المُدخل') }}: <span class="font-semibold" x-text="enteredQty"></span></span>
+                                        <span x-show="!qtyMatches">
+                                            ({{ __('الفرق') }}: <span class="font-semibold" x-text="(enteredQty - originalQty) > 0 ? '+' + (enteredQty - originalQty) : (enteredQty - originalQty)"></span>)
+                                        </span>
+                                        <span x-show="qtyMatches" class="font-semibold">✓ {{ __('مطابق') }}</span>
+                                    </div>
+                                    <p x-show="!qtyMatches" class="text-xs text-rose-500 mt-1">
+                                        {{ __('يجب أن يساوي مجموع كميات المقاسات كمية الصنف تمامًا — لا زيادة ولا نقصان.') }}
+                                    </p>
+                                </div>
+
                                 <div class="pt-3">
-                                    <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('حفظ المتغيّرات') }}</button>
+                                    <button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                                            :disabled="!qtyMatches">{{ __('حفظ المتغيّرات') }}</button>
                                     <span class="text-xs text-gray-400 ms-2"><span x-text="rows.length"></span> {{ __('تركيبة') }}</span>
                                 </div>
                             </div>
@@ -297,6 +314,14 @@
             return {
                 attributes: config.attributes || [],
                 defaultPrice: config.defaultPrice || 0,
+                originalQty: config.originalQty || 0,
+                // مجموع الكميات المُدخلة الآن — يجب أن يساوي العدد الأصلي (توزيع لا إضافة).
+                get enteredQty() {
+                    return this.rows.reduce((sum, r) => sum + (Number(this.cells[r.key]?.stock) || 0), 0);
+                },
+                get qtyMatches() {
+                    return this.originalQty <= 0 || Math.abs(this.enteredQty - this.originalQty) < 0.001;
+                },
                 selected: {},
                 cells: {},
                 rows: [],

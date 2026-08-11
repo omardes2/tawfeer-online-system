@@ -184,6 +184,13 @@ class ProductController extends Controller
                     ->pluck('on_hand', 'variant_id')->all()
                 : [];
 
+            $defaultVariant = $product->variants->first(fn ($v) => $v->attributeValues->isEmpty());
+            $defaultQty = $warehouse && $defaultVariant
+                ? (float) InventoryStock::where('warehouse_id', $warehouse->id)
+                    ->where('variant_id', $defaultVariant->id)->value('on_hand')
+                : 0.0;
+            $originalQty = $defaultQty > 0 ? $defaultQty : array_sum($stock);
+
             $attributes = ProductAttribute::where('is_active', true)
                 ->with(['values' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order')->orderBy('id')])
                 ->orderBy('name')->get()
@@ -206,6 +213,9 @@ class ProductController extends Controller
                     'stock' => (float) ($stock[$v->id] ?? 0),
                 ])->values(),
                 'defaultPrice' => (float) ($product->defaultVariant?->retail_price ?? $product->retail_price ?? 0),
+                // العدد الأصلي: كمية المتغيّر الافتراضي إن لم تُوزَّع بعد، وإلا مجموع المقاسات.
+                // المصفوفة توزّع هذا العدد ولا تضيف إليه.
+                'originalQty' => (float) $originalQty,
             ];
         }
 

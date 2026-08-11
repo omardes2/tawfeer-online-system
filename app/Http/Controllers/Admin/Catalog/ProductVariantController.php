@@ -27,14 +27,69 @@ class ProductVariantController extends Controller
     {
         $this->authorize('update', $product);
 
-        $rows = $this->service->sync($product, $request->validated('combos', []));
+        $combos = $request->validated('combos', []);
+        $entered = round(collect($combos)->sum(fn ($c) => (float) ($c['stock'] ?? 0)), 3);
+        $original = $this->originalQuantity($product);
+
+        // المصفوفة **توزّع** كمية الصنف ولا تضيف إليها: مجموع المتغيّرات = العدد الأصلي.
+        // (بدون هذا الشرط تُحتسب كمية المتغيّر الافتراضي مرّتين فيتضخّم رصيد المخزن.)
+        if ($combos !== [] && $original > 0 && abs($entered - $original) > 0.001) {
+            return back()->withInput()->with('error', __(
+                'مجموع كميات المتغيّرات (:sum) يجب أن يساوي كمية الصنف (:total). الفرق: :diff.',
+                ['sum' => $this->num($entered), 'total' => $this->num($original), 'diff' => $this->num($entered - $original)],
+            ));
+        }
+
+        $rows = $this->service->sync($product, $combos);
 
         foreach ($rows as $row) {
             $this->setStock($row['variant'], $row['stock']);
         }
 
+        // تصفير المتغيّر الافتراضي: كميته وُزّعت على المقاسات فلا تُحتسب مرّة ثانية.
+        if ($rows->isNotEmpty()) {
+            $default = $product->variants()->whereDoesntHave('attributeValues')->first();
+            if ($default) {
+                $this->setStock($default, 0);
+            }
+        }
+
         return redirect()->route('admin.products.edit', $product)
             ->with('success', __('تم حفظ المتغيّرات (:n).', ['n' => $rows->count()]));
+    }
+
+    /**
+     * «العدد الأصلي» للصنف: كمية المتغيّر الافتراضي إن كانت موجودة (لم تُوزَّع بعد)،
+     * وإلا مجموع كميات متغيّراته الحالية. هكذا تبقى المصفوفة توزيعًا لا إضافة.
+     */
+    private function originalQuantity(Product $product): float
+    {
+        $warehouseId = $this->warehouseId();
+        if ($warehouseId === null) {
+            return 0.0;
+        }
+
+        $default = $product->variants()->whereDoesntHave('attributeValues')->first();
+        $defaultQty = $default
+            ? (float) InventoryStock::where('variant_id', $default->id)->where('warehouse_id', $warehouseId)->value('on_hand')
+            : 0.0;
+
+        if ($defaultQty > 0) {
+            return round($defaultQty, 3);
+        }
+
+        return round((float) InventoryStock::whereIn('variant_id', $product->variants()->pluck('id'))
+            ->where('warehouse_id', $warehouseId)->sum('on_hand'), 3);
+    }
+
+    private function num(float $v): string
+    {
+        return rtrim(rtrim(number_format($v, 3, '.', ''), '0'), '.') ?: '0';
+    }
+
+    private function warehouseId(): ?int
+    {
+        return Warehouse::where('is_default', true)->value('id') ?? Warehouse::orderBy('id')->value('id');
     }
 
     /** يضبط رصيد المتغيّر في المستودع الافتراضي إلى القيمة المطلوبة عبر تسوية (فرق الكمية). */
