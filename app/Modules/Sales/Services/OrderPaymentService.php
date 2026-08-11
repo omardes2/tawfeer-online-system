@@ -70,4 +70,38 @@ class OrderPaymentService
             return $voucher;
         });
     }
+
+    /**
+     * تعليم طلب توصيل بأنه **محصَّل من العميل** (المندوب قبض ثمنه) — دون قيد محاسبي جديد.
+     *
+     * طلبات التوصيل تُرحَّل عند البيع على «ذمم شركة التوصيل 1050» لا على ذمم العميل، فالمبلغ
+     * مُثبَت أصلًا كذمّة على شركة التوصيل؛ ما يتغيّر عند التحصيل هو **واقعة قبض العميل** فقط.
+     * إقفال 1050 يقع لاحقًا في تسوية التوصيل (مدين الخزينة + الرسوم / دائن 1050) — فأي قيد
+     * هنا يعني ازدواجًا. لذلك تُحدَّث الحقول فقط (والتغيير مسجَّل في Audit Log).
+     *
+     * idempotent: الطلب المسدَّد أو الملغى أو الصفري لا يتأثّر.
+     *
+     * @return bool هل تغيّرت الحالة فعلًا
+     */
+    public function markCollected(Order $order): bool
+    {
+        if ($order->status === 'cancelled' || $order->payment_status === 'paid') {
+            return false;
+        }
+
+        if ($order->channel === 'pos') {
+            throw ValidationException::withMessages([
+                'order' => __('المبيعات المباشرة تُسدَّد عبر «دفع» باختيار الخزينة (يلزمها سند قبض).'),
+            ]);
+        }
+
+        $total = round((float) $order->total, 2);
+        if ($total <= 0) {
+            return false;
+        }
+
+        $order->update(['amount_paid' => $total, 'payment_status' => 'paid']);
+
+        return true;
+    }
 }

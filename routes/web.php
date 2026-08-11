@@ -256,6 +256,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('orders/{order}/cancel', [AdminOrderController::class, 'cancel'])->name('orders.cancel');
         Route::post('orders/{order}/receive-return', [AdminOrderController::class, 'receiveReturn'])->name('orders.receive_return');
         Route::post('orders/{order}/settle', [AdminOrderController::class, 'settle'])->name('orders.settle');
+        Route::post('orders/{order}/mark-paid', [AdminOrderController::class, 'markPaid'])->name('orders.mark_paid');
         Route::delete('orders/bulk', [AdminOrderController::class, 'bulkDestroy'])->name('orders.bulk_destroy');
         Route::delete('orders/{order}/force', [AdminOrderController::class, 'forceDestroy'])->name('orders.force_destroy');
         Route::delete('orders/{order}', [AdminOrderController::class, 'destroy'])->name('orders.destroy');

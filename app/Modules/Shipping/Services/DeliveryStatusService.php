@@ -4,6 +4,7 @@ namespace App\Modules\Shipping\Services;
 
 use App\Models\User;
 use App\Modules\Commissions\Services\CommissionService;
+use App\Modules\Sales\Services\OrderPaymentService;
 use App\Modules\Shipping\Events\DeliveryStatusChanged;
 use App\Modules\Shipping\Events\ShipmentClosed;
 use App\Modules\Shipping\Models\Shipment;
@@ -31,6 +32,7 @@ class DeliveryStatusService
     public function __construct(
         private readonly CommissionService $commissions,
         private readonly DeliveryProviderManager $providers,
+        private readonly OrderPaymentService $payments,
     ) {}
 
     /**
@@ -234,10 +236,14 @@ class DeliveryStatusService
     private const MIN_COLLECTED_GOODS_VALUE = 1.0;
 
     /**
-     * أثر «وصول المبلغ لمحاسبة المندوب» (Opost: in_accounting): احتساب العمولات/الأرباح
-     * (accrue ثم eligible) — لموظف المبيعات والمسوّق — شرط أن تكون **قيمة البضاعة المحصّلة
-     * من العميل بدون مبلغ التوصيل** أكثر من 1. مسار الإرجاع لا يمرّ بهذه الحالة إطلاقًا،
-     * فلا تُحتسب عمولة على المرتجعات. idempotent (الاستحقاق يمسّ pending فقط). لا دفع تلقائي.
+     * أثر «وصول المبلغ لمحاسبة المندوب» (Opost: in_accounting):
+     *   1) **الفاتورة تصبح مدفوعة** — المندوب قبض المبلغ من العميل فعلًا (بلا قيد جديد؛
+     *      المبلغ مُثبَت أصلًا على «ذمم شركة التوصيل 1050» ويُقفَل بتسوية التوصيل).
+     *   2) احتساب العمولات/الأرباح (accrue ثم eligible) لموظف المبيعات والمسوّق.
+     *
+     * كلاهما مشروط بأن تكون **قيمة البضاعة المحصّلة من العميل بدون مبلغ التوصيل** أكثر من 1.
+     * مسار الإرجاع لا يمرّ بهذه الحالة إطلاقًا، فلا عمولة ولا «مدفوع» على المرتجعات.
+     * idempotent (الاستحقاق يمسّ pending فقط، والتسديد يتخطّى المسدَّد). لا دفع عمولات تلقائي.
      */
     private function applyFundsAtAccountingEffects(Shipment $shipment, ?User $actor, string $reference): void
     {
@@ -252,6 +258,7 @@ class DeliveryStatusService
             return; // قيمة ضئيلة/صفرية (أو مرتجَع) ⇒ لا احتساب.
         }
 
+        $this->payments->markCollected($order);            // الفاتورة → مدفوعة (idempotent).
         $this->commissions->accrueForOrder($order);       // ضمان قيود الاستحقاق (idempotent).
         $this->commissions->markEligibleForOrder($order, $reference, $actor); // pending → eligible.
     }

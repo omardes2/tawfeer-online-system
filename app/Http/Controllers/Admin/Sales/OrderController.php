@@ -486,6 +486,40 @@ class OrderController extends Controller
         return back()->with('success', __('تم تحصيل الدفعة وترحيلها محاسبيًا.'));
     }
 
+    /**
+     * تحويل فاتورة طلب توصيل إلى «مدفوعة» يدويًا — **لمدير النظام فقط**. تجاوز يدوي لحين
+     * وصول حالة «المبلغ في محاسبة المندوب» من المزوّد (أو تعذّر وصولها). لا قيد محاسبي جديد:
+     * المبلغ مُثبَت على «ذمم شركة التوصيل» منذ البيع ويُقفَل بتسوية التوصيل.
+     *
+     * يُشترط أن يكون الطلب قد أُرسل لشركة التوصيل فعلًا (له شحنة) — قبل الإرسال يُحدَّد
+     * «الدفع عند الاستلام» من حالة الدفع، فتعليمه مدفوعًا مسبقًا يُرسله بمبلغ تحصيل صفر.
+     */
+    public function markPaid(Order $order, OrderPaymentService $orderPayments): RedirectResponse
+    {
+        $this->authorize('markPaid', $order);
+
+        if ($order->channel === 'pos') {
+            return back()->with('error', __('المبيعات المباشرة تُسدَّد عبر زر «دفع» باختيار الخزينة.'));
+        }
+        if ($order->status === 'cancelled') {
+            return back()->with('error', __('لا يمكن تسديد طلب ملغى.'));
+        }
+        if ($order->payment_status === 'paid') {
+            return back()->with('error', __('الطلب مسدَّد بالفعل.'));
+        }
+        if ($order->latestShipment === null) {
+            return back()->with('error', __('لم يُرسَل الطلب لشركة التوصيل بعد؛ لا يمكن تعليمه مدفوعًا.'));
+        }
+
+        try {
+            $orderPayments->markCollected($order);
+        } catch (ValidationException $e) {
+            return back()->with('error', collect($e->errors())->flatten()->first());
+        }
+
+        return back()->with('success', __('تم تحويل الفاتورة إلى «مدفوعة».'));
+    }
+
     /** حذف الطلب — مسموح فقط إذا كانت حالته «ملغى» وحالة توصيله «ملغاة». */
     public function destroy(Order $order): RedirectResponse
     {

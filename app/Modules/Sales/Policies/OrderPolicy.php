@@ -55,6 +55,15 @@ class OrderPolicy
         return $user->hasRole('admin');
     }
 
+    /**
+     * تحويل فاتورة طلب توصيل إلى «مدفوعة» يدويًا (تجاوز حين لا تصل حالة المزوّد) —
+     * لمدير النظام فقط، لأنها تُثبت واقعة قبض دون مرور بمسار التحصيل العادي.
+     */
+    public function markPaid(User $user, Order $m): bool
+    {
+        return $user->hasRole('admin');
+    }
+
     public function confirm(User $user, Order $m): bool
     {
         return $user->can('sales.orders.confirm');
