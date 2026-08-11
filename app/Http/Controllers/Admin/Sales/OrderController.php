@@ -96,15 +96,14 @@ class OrderController extends Controller
 
         return view('admin.sales.orders.index', [
             'orders' => $query->paginate(20)->withQueryString(),
-            'statuses' => self::STATUSES,
+            // الحالة الداخلية لم تعد تُعرض في القائمة (المتابعة على حالة شركة التوصيل)،
+            // لكن الفلترة بها تبقى مدعومة عبر ?status= للروابط المحفوظة والتقارير.
             'activeStatus' => $status,
             'activeDeliveryStatus' => $deliveryStatus,
             'activePaymentStatus' => $paymentStatus,
             'activeSearch' => $search,
             'activeSaleType' => $saleType,
             'deliveryLabels' => OpostStatus::options(),
-            'statusCounts' => $this->visibleOrders($request)->selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status'),
-            'totalCount' => $this->visibleOrders($request)->count(),
             // خزائن التحصيل (نقدية/بنكية) لنافذة الدفع — مربوطة بحساب GL فقط.
             'treasuries' => Treasury::query()
                 ->where('is_active', true)->whereNotNull('gl_account_id')

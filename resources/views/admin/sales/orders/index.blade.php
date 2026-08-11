@@ -17,12 +17,9 @@
         <x-admin.delivery-status />
     @endcan
 
-    {{-- فلاتر (قوائم منسدلة): الحالة + حالة التوصيل + حالة الدفع --}}
+    {{-- فلاتر: نوع البيع + حالة أوبتيموس + حالة الدفع. الحالة الداخلية غير معروضة
+         (المتابعة التشغيلية تعتمد حالة شركة التوصيل وحدها — قرار إداري). --}}
     @php
-        $statusLabels = [
-            'draft' => 'مسودّة', 'confirmed' => 'مؤكّد', 'processing' => 'قيد المعالجة',
-            'shipped' => 'مُشحَن', 'delivered' => 'مُسلَّم', 'cancelled' => 'مُلغى',
-        ];
         $selectCls = 'rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500 min-w-[10rem]';
         $hasFilter = ($activeStatus ?? null) || ($activeDeliveryStatus ?? null) || ($activePaymentStatus ?? null) || ($activeSearch ?? null) || ($activeSaleType ?? null);
     @endphp
@@ -48,17 +45,6 @@
                 <option value="direct" @selected(($activeSaleType ?? null) === 'direct')>{{ __('مبيعات مباشرة') }}</option>
             </select>
         </div>
-        <div>
-            <select name="status" onchange="this.form.submit()" class="{{ $selectCls }}">
-                <option value="">{{ __('كل الحالات') }} ({{ $totalCount }})</option>
-                @foreach ($statuses as $s)
-                    <option value="{{ $s }}" @selected(($activeStatus ?? null) === $s)>
-                        {{ __($statusLabels[$s] ?? $s) }} ({{ (int) ($statusCounts[$s] ?? 0) }})
-                    </option>
-                @endforeach
-            </select>
-        </div>
-
         <div>
             <select name="delivery_status" onchange="this.form.submit()" class="{{ $selectCls }}">
                 <option value="">{{ __('كل حالات أوبتيموس') }}</option>
@@ -116,7 +102,6 @@
                 <th>{{ __('التاريخ والوقت') }}</th>
                 <th>{{ __('اسم المستلم') }}</th>
                 <th>{{ __('المستخدم') }}</th>
-                <th>{{ __('الحالة') }}</th>
                 <th>{{ __('حالة أوبتيموس') }}</th>
                 <th>{{ __('حالة الدفع') }}</th>
                 <th class="text-start">{{ __('الإجمالي') }}</th>
@@ -177,7 +162,6 @@
                             <x-admin.badge tone="blue" :label="__('زبون')" :icon="false" />
                         @endif
                     </td>
-                    <td><x-sales.status :status="$o->status" /></td>
                     <td class="whitespace-nowrap text-xs">
                         @php $ps = $o->latestShipment?->provider_status; @endphp
                         @if ($ps)
