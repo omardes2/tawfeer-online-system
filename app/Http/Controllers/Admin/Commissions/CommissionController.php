@@ -32,7 +32,10 @@ class CommissionController extends Controller
     {
         [$from, $to, $range] = $this->period($request);
 
-        $people = fn (array $roles, string $type) => User::role($roles)->orderBy('name')->get()
+        // whereHas بدل User::role() — الأخير يرمي RoleDoesNotExist إن غاب دور من القاعدة
+        // (كما على إنتاج لم يُزرع فيه sales_supervisor) فتسقط الصفحة بخطأ 500.
+        $people = fn (array $roles, string $type) => User::whereHas('roles', fn ($q) => $q->whereIn('name', $roles))
+            ->orderBy('name')->get()
             ->map(function (User $u) use ($type, $range) {
                 $period = (float) CommissionEntry::where('earner_id', $u->id)->where('earner_type', $type)
                     ->whereIn('state', ['eligible', 'approved', 'paid'])
