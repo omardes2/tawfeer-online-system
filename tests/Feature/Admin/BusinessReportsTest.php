@@ -7,6 +7,7 @@ use App\Modules\Catalog\Models\Product;
 use App\Modules\Crm\Models\Customer;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\Warehouse;
+use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -113,6 +114,31 @@ class BusinessReportsTest extends TestCase
         // وصفحة الموظفين: الموظف فقط.
         $this->actingAs($this->admin())->get(route('admin.reports.sales.by_employee'))
             ->assertOk()->assertSee('موظف تجريبي')->assertDontSee('مسوّق تجريبي');
+    }
+
+    /**
+     * قائمة الفلتر تُبنى من الأدوار: تظهر الأسماء **حتى بلا أي طلبات** (بناؤها من
+     * الطلبات وحدها كان يُفرغها بعد تفريغ البيانات).
+     */
+    public function test_people_filter_lists_staff_even_with_no_orders(): void
+    {
+        $this->assertSame(0, Order::count());
+
+        $rep = User::factory()->create(['branch_id' => Branch::default()->id, 'name' => 'موظف بلا طلبات']);
+        $rep->assignRole('sales');
+        $marketer = User::factory()->create(['branch_id' => Branch::default()->id, 'name' => 'مسوّق بلا طلبات']);
+        $marketer->assignRole('affiliate');
+
+        $names = fn (string $route) => collect(
+            $this->actingAs($this->admin())->get(route($route))->assertOk()->viewData('people')
+        )->pluck('name');
+
+        // كلٌّ في صفحته، ولا تختلط الأدوار.
+        $this->assertContains('موظف بلا طلبات', $names('admin.reports.sales.by_employee')->all());
+        $this->assertNotContains('مسوّق بلا طلبات', $names('admin.reports.sales.by_employee')->all());
+
+        $this->assertContains('مسوّق بلا طلبات', $names('admin.reports.sales.by_affiliate')->all());
+        $this->assertNotContains('موظف بلا طلبات', $names('admin.reports.sales.by_affiliate')->all());
     }
 
     /** فلتر الأشخاص: تحديد اسم أو أكثر يقصر التقرير عليهم، وبلا تحديد يظهر الجميع. */

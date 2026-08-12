@@ -129,6 +129,7 @@ class BusinessReportController extends Controller
             'person' => __('الموظف'),
             'empty' => __('لم يُسجّل أي موظف مبيعات بعد.'),
             'file' => 'sales-by-employee',
+            'roles' => ['sales', 'sales_supervisor'],
         ]);
     }
 
@@ -140,6 +141,7 @@ class BusinessReportController extends Controller
             'person' => __('المسوّق'),
             'empty' => __('لم يُسجّل أي مسوّق مبيعات بعد.'),
             'file' => 'sales-by-affiliate',
+            'roles' => ['affiliate'],
         ]);
     }
 
@@ -148,7 +150,7 @@ class BusinessReportController extends Controller
      * المبيعات أو `affiliate_id` للمسوّق)، فالمنطق واحد لا يُكرَّر. المبالغ من `subtotal`
      * أي **بلا رسوم التوصيل** (لا تخصّنا)، والطلبات الملغاة/المحذوفة مستثناة.
      *
-     * @param  array{title: string, person: string, empty: string, file: string}  $labels
+     * @param  array{title: string, person: string, empty: string, file: string, roles: array<int, string>}  $labels
      */
     private function salesByEarner(Request $request, string $column, array $labels): View|StreamedResponse
     {
@@ -186,9 +188,13 @@ class BusinessReportController extends Controller
             'reportTitle' => $labels['title'],
             'personLabel' => $labels['person'],
             'emptyDescription' => $labels['empty'],
-            // قائمة الفلتر: من له طلبات فعلًا على هذا العمود (لا كل المستخدمين) — قائمة
-            // قصيرة ومفيدة، وغير مقيَّدة بالفترة كي لا تختفي الأسماء عند تضييق المدى.
-            'people' => User::whereIn('id', Order::whereNotNull($column)->distinct()->pluck($column))
+            // قائمة الفلتر: أصحاب الدور (تظهر حتى قبل تسجيل أي طلب — بناؤها من الطلبات
+            // وحدها كان يُفرغها بعد تفريغ البيانات) **مع** من له طلبات فعلًا على العمود،
+            // فلا يسقط من غُيِّر دوره لاحقًا. غير مقيَّدة بالفترة كي لا تختفي عند تضييق المدى.
+            'people' => User::query()
+                ->where(fn ($q) => $q
+                    ->whereHas('roles', fn ($r) => $r->whereIn('name', $labels['roles']))
+                    ->orWhereIn('id', Order::whereNotNull($column)->distinct()->pluck($column)))
                 ->orderBy('name')->get(['id', 'name']),
             'selectedPeople' => $selected,
             'peopleLabel' => $labels['person'],
