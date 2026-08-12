@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Accounting\Services\TreasuryService;
+use App\Modules\Commissions\Models\CommissionEntry;
+use App\Modules\Commissions\Services\CommissionService;
 use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Inventory\Services\WarehouseService;
 use App\Modules\Reporting\Services\ReportingService;
@@ -13,6 +16,7 @@ use App\Modules\Reporting\Support\DateRange;
 use App\Modules\Sales\Models\Order;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * لوحة التحكّم التنفيذية (Production) — للقراءة فقط، متحكّم رفيع فوق الخدمات القائمة
@@ -24,9 +28,28 @@ class DashboardController extends Controller
         private readonly ReportingService $reports,
         private readonly WarehouseService $warehouses,
         private readonly TreasuryService $treasuries,
+        private readonly CommissionService $commissions,
     ) {}
 
+    /**
+     * لوحة واحدة لكل دور: من يتابع الفريق يرى النظرة العامة، ومن يبيع لنفسه
+     * (موظف مبيعات أو مسوّق) يرى شاشته الشخصية — أرقامه هو لا أرقام الشركة.
+     */
     public function index(): View
+    {
+        $user = auth()->user();
+
+        $seesTeam = Gate::allows('commissions.view_team')
+            || Gate::allows('reports.sales_summary.view')
+            || Gate::allows('accounting.reports.view');
+
+        return $user->hasAnyRole(['sales', 'affiliate']) && ! $seesTeam
+            ? $this->personal($user)
+            : $this->overview();
+    }
+
+    /** النظرة العامة — للمدير والمحاسب ومن يتابع أداء الفريق. */
+    private function overview(): View
     {
         $today = DateRange::resolve('day');
         $month = DateRange::resolve('month');
@@ -55,8 +78,52 @@ class DashboardController extends Controller
             'deliveryByStatus' => $deliveryByStatus,
             'latestOrders' => $latestOrders,
             'warehouse' => $mainWarehouse ? $this->warehouses->dashboard($mainWarehouse) : null,
+            'byStatus' => Order::selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status'),
+            'pendingCommissions' => Gate::allows('commissions.view_team')
+                ? (float) CommissionEntry::whereIn('state', ['pending', 'approved'])->sum('amount')
+                : null,
         ], ['finance' => $this->financeSection($from, $to)]));
     }
+
+    /**
+     * الشاشة الشخصية لموظف المبيعات/المسوّق: طلباته، وما يستحقّه، وما يحتاج متابعته.
+     * لا أرصدة خزائن ولا أداء زملاء — لا يمرّ على أرقام لا تعنيه ولا يملك صلاحيتها.
+     */
+    private function personal(User $user): View
+    {
+        $isAffiliate = $user->hasRole('affiliate');
+        $earnerType = $isAffiliate ? 'affiliate' : 'sales';
+        $ownerColumn = $isAffiliate ? 'affiliate_id' : 'assigned_to';
+
+        $mine = fn () => Order::where($ownerColumn, $user->id)->whereNotNull('number');
+
+        [$monthFrom, $monthTo] = DateRange::resolve('month')->bounds();
+
+        // المبيعات بلا رسوم التوصيل — وهو الأساس الذي تُحتسب عليه العمولة.
+        $netSales = fn ($query) => (float) $query
+            ->selectRaw('COALESCE(SUM(total - shipping_total), 0) as v')->value('v');
+
+        return view('admin.dashboard.personal', [
+            'earnerType' => $earnerType,
+            'todayOrders' => (clone $mine())->whereDate('created_at', today())->count(),
+            'todaySales' => $netSales((clone $mine())->whereDate('created_at', today())),
+            'monthOrders' => (clone $mine())->whereBetween('created_at', [$monthFrom, $monthTo])->count(),
+            'monthSales' => $netSales((clone $mine())->whereBetween('created_at', [$monthFrom, $monthTo])),
+            'balance' => $this->commissions->balance($user->id, $earnerType),
+            'statement' => $this->commissions->statement($user->id, $earnerType),
+            'latestOrders' => (clone $mine())->latest('id')->limit(8)
+                ->get(['id', 'uuid', 'number', 'total', 'status', 'created_at']),
+            'needsAttention' => (clone $mine())
+                ->whereIn('status', self::NEEDS_ATTENTION)
+                ->latest('id')->limit(5)
+                ->get(['id', 'uuid', 'number', 'total', 'status', 'created_at']),
+        ]);
+    }
+
+    /** حالات تعني أن الطلب متوقّف بانتظار تصرّف من صاحبه. */
+    private const NEEDS_ATTENTION = [
+        'awaiting_contact', 'awaiting_confirmation', 'customer_unavailable', 'delayed', 'delivery_failed',
+    ];
 
     /**
      * قسم المالية بلوحة التحكّم (Phase 7.1) — كل الأرقام من السندات المُرحّلة/القيود.

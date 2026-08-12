@@ -89,7 +89,7 @@
             </div>
         @endcan
 
-    <x-admin.table>
+    <x-admin.table stack>
         <thead>
             <tr>
                 @can('sales.orders.delete')
@@ -115,7 +115,7 @@
                         @php
                             $deletable = \App\Http\Controllers\Admin\Sales\OrderController::isDeletable($o);
                         @endphp
-                        <td class="w-8">
+                        <td class="w-8" data-label="{{ __('تحديد') }}">
                             <input type="checkbox" name="ids[]" value="{{ $o->id }}" form="orders-bulk-delete"
                                    data-row-check x-on:change="recount()"
                                    @disabled(! $deletable)
@@ -123,7 +123,7 @@
                                    class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed" />
                         </td>
                     @endcan
-                    <td class="font-mono text-xs">
+                    <td class="font-mono text-xs" data-label="{{ __('رقم التتبّع') }}">
                         {{-- رقم التتبّع/الطلب رابطٌ لصفحة التفاصيل (بديلًا عن زر «عرض») --}}
                         <a href="{{ route('admin.sales.orders.show', $o) }}" class="group inline-flex flex-col hover:underline">
                             @if ($o->channel === 'pos')
@@ -143,14 +143,14 @@
                             <span class="text-[10px] text-gray-400 font-sans">{{ $o->number }}</span>
                         </a>
                     </td>
-                    <td class="whitespace-nowrap text-gray-600">
+                    <td class="whitespace-nowrap text-gray-600" data-label="{{ __('التاريخ والوقت') }}">
                         <div>{{ \Illuminate\Support\Carbon::parse($o->created_at)->format('Y-m-d') }}</div>
                         <div class="text-xs text-gray-400">{{ \Illuminate\Support\Carbon::parse($o->created_at)->format('h:i A') }}</div>
                     </td>
-                    <td class="font-medium text-gray-800">
+                    <td class="font-medium text-gray-800" data-label="{{ __('اسم المستلم') }}">
                         {{ $o->latestShipment?->recipient_name ?: ($o->customer_name ?: '—') }}
                     </td>
-                    <td>
+                    <td data-label="{{ __('المستخدم') }}">
                         {{-- الصفة تتبع ربط الطلب الفعلي: المسوّق (affiliate_id) أو موظف المبيعات
                              (assigned_to)، وإلا فمنشئه. كتابة «موظف المبيعات» للجميع كانت تصف
                              المسوّقين بصفة ليست لهم. --}}
@@ -167,7 +167,7 @@
                             <x-admin.badge tone="blue" :label="__('زبون')" :icon="false" />
                         @endif
                     </td>
-                    <td class="whitespace-nowrap text-xs">
+                    <td class="whitespace-nowrap text-xs" data-label="{{ __('حالة أوبتيموس') }}">
                         @if ($o->delivery_cancel_error)
                             {{-- الطرد ما زال نشطًا لدى شركة التوصيل رغم إلغاء الطلب — يُعاد المحاولة كل دقيقة. --}}
                             <span class="inline-flex items-center gap-1 rounded-md bg-rose-50 text-rose-700 px-2 py-0.5 mb-1"
@@ -191,14 +191,14 @@
                             <span class="text-gray-300">—</span>
                         @endif
                     </td>
-                    <td class="whitespace-nowrap">
+                    <td class="whitespace-nowrap" data-label="{{ __('حالة الدفع') }}">
                         <x-payment.status :status="$o->payment_status ?: 'unpaid'" />
                         @if ($o->payment_status === 'partially_paid')
                             @php $rem = max(0, round((float) $o->total - (float) $o->amount_paid, 2)); @endphp
                             <span class="block text-[11px] text-gray-400 mt-0.5">{{ __('المتبقّي') }}: {{ number_format($rem, 2) }}</span>
                         @endif
                     </td>
-                    <td class="text-start font-medium tabular-nums whitespace-nowrap">{{ number_format($o->total, 2) }} {{ \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪') }}</td>
+                    <td class="text-start font-medium tabular-nums whitespace-nowrap" data-label="{{ __('الإجمالي') }}">{{ number_format($o->total, 2) }} {{ \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪') }}</td>
                     <td class="text-end">
                         @php
                             $isEditable = \App\Http\Controllers\Admin\Sales\OrderController::isEditable($o);
@@ -277,7 +277,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="{{ auth()->user()?->can('sales.orders.delete') ? 10 : 9 }}" class="!p-0">
+                <tr><td colspan="{{ auth()->user()?->can('sales.orders.delete') ? 10 : 9 }}" class="!p-0" data-label="">
                     <x-admin.empty-state
                         :title="__('لا توجد طلبات')"
                         :description="($activeStatus ?? null) ? __('لا توجد طلبات بهذه الحالة.') : __('ابدأ بإنشاء أول طلب بيع.')"

@@ -1,7 +1,6 @@
 <x-app-layout :title="__('dashboard.title')">
     @php
-        // Read-only aggregates for the operations cards (real data; no writes).
-        $byStatus = \App\Modules\Sales\Models\Order::selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status');
+        // الأرقام تصل جاهزة من المتحكّم؛ هنا العرض فقط.
         $count = fn (...$s) => (int) collect($s)->sum(fn ($k) => (int) ($byStatus[$k] ?? 0));
 
         $ops = [
@@ -40,7 +39,6 @@
     {{-- Finance (only for finance-permitted roles) --}}
     @can('accounting.reports.view')
         @isset($finance)
-            @php $pendingCommissions = \Illuminate\Support\Facades\Gate::allows('commissions.view_team') ? (float) \App\Modules\Commissions\Models\CommissionEntry::whereIn('state', ['pending', 'approved'])->sum('amount') : null; @endphp
             <div class="mt-6">
                 <h2 class="text-sm font-semibold text-gray-500 mb-3">{{ __('الملخّص المالي') }}</h2>
                 <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">

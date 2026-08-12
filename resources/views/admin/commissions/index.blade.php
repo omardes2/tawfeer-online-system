@@ -30,7 +30,7 @@
             <div class="bg-white border border-gray-200 rounded-lg p-5">
                 <h3 class="font-semibold text-gray-800 mb-4">{{ $group['title'] }}</h3>
                 <div class="overflow-x-auto">
-                    <table class="min-w-full text-sm text-right">
+                    <table class="min-w-full text-sm text-right admin-table-stack">
                         <thead class="text-gray-500 border-b"><tr>
                             <th class="py-2 px-3 font-medium">{{ __('commissions.earner') }}</th>
                             <th class="py-2 px-3 font-medium">{{ __('commissions.period_earned') }}</th>
@@ -43,22 +43,22 @@
                         <tbody>
                             @forelse ($group['rows'] as $row)
                                 <tr class="border-b hover:bg-gray-50">
-                                    <td class="py-2.5 px-3 font-medium text-gray-800">
+                                    <td class="py-2.5 px-3 font-medium text-gray-800" data-label="{{ __('commissions.earner') }}">
                                         <a href="{{ route('admin.commissions.statement', ['earnerId' => $row['user']->id, 'earner_type' => $group['type'], 'from' => $from, 'to' => $to]) }}"
                                            class="text-emerald-700 hover:underline">{{ $row['user']->name }}</a>
                                     </td>
-                                    <td class="py-2.5 px-3 tabular-nums">{{ number_format($row['period'], 2) }}</td>
-                                    <td class="py-2.5 px-3 tabular-nums">{{ number_format($row['earned'], 2) }}</td>
-                                    <td class="py-2.5 px-3 tabular-nums text-emerald-700">{{ number_format($row['paid'], 2) }}</td>
-                                    <td class="py-2.5 px-3 tabular-nums text-amber-600">{{ number_format($row['pending_payout'], 2) }}</td>
-                                    <td class="py-2.5 px-3 tabular-nums font-bold {{ $row['outstanding'] < 0 ? 'text-rose-600' : 'text-indigo-700' }}">{{ number_format($row['outstanding'], 2) }}</td>
+                                    <td class="py-2.5 px-3 tabular-nums" data-label="{{ __('commissions.period_earned') }}">{{ number_format($row['period'], 2) }}</td>
+                                    <td class="py-2.5 px-3 tabular-nums" data-label="{{ __('commissions.earned') }}">{{ number_format($row['earned'], 2) }}</td>
+                                    <td class="py-2.5 px-3 tabular-nums text-emerald-700" data-label="{{ __('commissions.total_paid') }}">{{ number_format($row['paid'], 2) }}</td>
+                                    <td class="py-2.5 px-3 tabular-nums text-amber-600" data-label="{{ __('commissions.pending_payout') }}">{{ number_format($row['pending_payout'], 2) }}</td>
+                                    <td class="py-2.5 px-3 tabular-nums font-bold {{ $row['outstanding'] < 0 ? 'text-rose-600' : 'text-indigo-700' }}" data-label="{{ __('commissions.outstanding') }}">{{ number_format($row['outstanding'], 2) }}</td>
                                     <td class="py-2.5 px-3 text-end">
                                         <a href="{{ route('admin.commissions.statement', ['earnerId' => $row['user']->id, 'earner_type' => $group['type'], 'from' => $from, 'to' => $to]) }}"
                                            class="inline-flex items-center px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs hover:bg-emerald-700">{{ __('commissions.open_file') }}</a>
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="7" class="py-6 text-center text-gray-400">{{ __('commissions.no_people') }}</td></tr>
+                                <tr><td colspan="7" class="py-6 text-center text-gray-400" data-label="">{{ __('commissions.no_people') }}</td></tr>
                             @endforelse
                         </tbody>
                     </table>

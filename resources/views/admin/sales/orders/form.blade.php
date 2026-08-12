@@ -193,8 +193,10 @@
             </x-admin.form-section>
         </div>
 
-        {{-- ————— العمود الأيسر: مرتجع/ملاحظات + ملخّص ————— --}}
-        <div class="space-y-6">
+        {{-- ————— العمود الأيسر: مرتجع/ملاحظات + ملخّص —————
+             يلتصق بأعلى الشاشة على الحواسيب: قائمة الأصناف تطول، والإجمالي وزرّ
+             التقديم يجب أن يبقيا في المدى دون تمرير للأسفل في كل مرّة. --}}
+        <div class="space-y-6 lg:sticky lg:top-20 lg:self-start">
             <x-admin.form-section :title="__('خيارات إضافية')">
                 <label class="flex items-center justify-between gap-3 cursor-pointer">
                     <span class="text-sm font-medium text-gray-700">{{ __('هل يوجد مرتجع؟') }}</span>
