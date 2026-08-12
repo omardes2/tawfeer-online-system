@@ -7,10 +7,13 @@ use App\Http\Requests\Commissions\CommissionRuleRequest;
 use App\Models\User;
 use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Models\Treasury;
+use App\Modules\Catalog\Models\Category;
+use App\Modules\Catalog\Models\Product;
 use App\Modules\Commissions\Models\CommissionEntry;
 use App\Modules\Commissions\Models\CommissionPayout;
 use App\Modules\Commissions\Models\CommissionRule;
 use App\Modules\Commissions\Services\CommissionService;
+use App\Modules\Foundation\Models\Branch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -74,13 +77,20 @@ class CommissionController extends Controller
     public function rules(): View
     {
         return view('admin.commissions.rules', [
-            'rules' => CommissionRule::latest('id')->paginate(25),
+            'rules' => CommissionRule::with(['user:id,name', 'product:id,name', 'category:id,name', 'branch:id,name'])
+                ->orderByDesc('priority')->latest('id')->paginate(25),
+            // قوائم بالأسماء بدل إدخال المعرّفات يدويًا.
+            'people' => User::whereHas('roles', fn ($q) => $q->whereIn('name', ['sales', 'sales_supervisor', 'affiliate']))
+                ->orderBy('name')->get(['id', 'name']),
+            'branches' => Branch::orderBy('name')->get(['id', 'name']),
+            'products' => Product::orderBy('name')->get(['id', 'name']),
+            'categories' => Category::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
     public function storeRule(CommissionRuleRequest $request): RedirectResponse
     {
-        $rule = new CommissionRule($request->validated());
+        $rule = new CommissionRule($request->safe()->except('rate_percent'));
         $rule->created_by = $request->user()->id;
         $rule->priority = $this->commissions->ruleScorePriority($rule);
         $rule->save();

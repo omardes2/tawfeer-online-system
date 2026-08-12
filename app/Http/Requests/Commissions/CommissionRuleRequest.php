@@ -15,12 +15,24 @@ class CommissionRuleRequest extends FormRequest
         return true; // can:commissions.rules.manage على المسار.
     }
 
+    /**
+     * الواجهة تُدخل النسبة مئويةً (3 = 3%) لأنها أوضح للمستخدم، والتخزين كسري (0.03).
+     * يبقى تمرير `rate` الكسري مباشرةً مدعومًا (الـAPI والاختبارات القديمة).
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('rate_percent') && ! $this->filled('rate')) {
+            $this->merge(['rate' => round((float) $this->input('rate_percent') / 100, 6)]);
+        }
+    }
+
     /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
             'earner_type' => ['required', Rule::in(['sales', 'affiliate'])],
             'method' => ['required', Rule::in(['percent', 'fixed', 'margin'])],
+            'rate_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'rate' => ['nullable', 'numeric', 'min:0', 'max:1', 'required_unless:method,fixed'],
             'amount' => ['nullable', 'numeric', 'min:0', 'required_if:method,fixed'],
             'user_id' => ['nullable', 'exists:users,id'],

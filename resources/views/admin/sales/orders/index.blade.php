@@ -230,16 +230,6 @@
                                             class="btn-primary btn-sm">{{ __('دفع') }}</button>
                                 @endcan
                             @endif
-                            {{-- تجاوز إداري: تحويل فاتورة طلب توصيل إلى «مدفوعة» حين لا تصل حالة المزوّد (مدير النظام فقط) --}}
-                            @if ($o->channel !== 'pos' && $o->payment_status !== 'paid' && $o->status !== 'cancelled' && $o->latestShipment)
-                                @can('markPaid', $o)
-                                    <form method="POST" action="{{ route('admin.sales.orders.mark_paid', $o) }}"
-                                          onsubmit="return confirm('{{ __('تحويل الفاتورة إلى «مدفوعة»؟ يُثبت أن المندوب قبض المبلغ من العميل.') }}')">
-                                        @csrf
-                                        <button type="submit" class="text-emerald-700 hover:underline text-sm font-medium">{{ __('تحويل إلى مدفوعة') }}</button>
-                                    </form>
-                                @endcan
-                            @endif
                             {{-- إلغاء الطلب: للطلبات غير المُنتهية (يعكس الأثر المحاسبي/المخزوني ويُلغي الشحنة إن أُرسلت). المبيعات المباشرة تُلغى بالحذف النهائي. --}}
                             @if ($isCancellable && $o->channel !== 'pos')
                                 @can('cancel', $o)

@@ -264,7 +264,29 @@ class CommissionLedgerTest extends TestCase
         // دفتر الحركات التفصيلي انتقل إلى /ledger.
         $this->actingAs($finance)->get('/admin/commissions/ledger?state=pending')
             ->assertOk()->assertSee($order->number);
-        $this->actingAs($finance)->get('/admin/commissions/rules')->assertOk()->assertSee(__('commissions.add_rule'));
+        // صفحة القواعد: أسماء الأشخاص في القائمة بدل إدخال المعرّفات يدويًا.
+        $this->actingAs($finance)->get('/admin/commissions/rules')
+            ->assertOk()->assertSee(__('commissions.add_rule'))->assertSee($rep->name);
+    }
+
+    /** النسبة تُدخل مئويةً (3 = 3%) وتُخزَّن كسريّة (0.03)، والقاعدة تُطبَّق على صاحبها. */
+    public function test_rule_percent_input_is_stored_as_fraction_and_applied(): void
+    {
+        $admin = User::where('email', 'admin@tawfeer.online')->first();
+        $rep = $this->actor('sales');
+
+        $this->actingAs($admin)->post('/admin/commissions/rules', [
+            'earner_type' => 'sales', 'method' => 'percent', 'rate_percent' => 3, 'user_id' => $rep->id,
+        ])->assertRedirect();
+
+        $rule = CommissionRule::latest('id')->first();
+        $this->assertEqualsWithDelta(0.03, (float) $rule->rate, 0.000001);
+        $this->assertSame($rep->id, $rule->user_id);
+
+        // تُطبَّق فعلًا: طلب 200 ⇒ 6.00 بدل 2.00 الافتراضية (1%).
+        $order = $this->order($rep);
+        $this->svc->accrueForOrder($order);
+        $this->assertEquals('6.00', CommissionEntry::where('order_id', $order->id)->first()->amount);
     }
 
     public function test_admin_approve_via_web(): void

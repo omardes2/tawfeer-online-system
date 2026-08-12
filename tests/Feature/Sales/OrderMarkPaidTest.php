@@ -22,9 +22,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * تحوّل فاتورة طلب التوصيل إلى «مدفوعة» عند وصول المبلغ لمحاسبة المندوب (Opost: in_accounting)،
- * وتجاوز يدوي لمدير النظام فقط حين لا تصل حالة المزوّد. في الحالتين يدخل التحصيل
- * «صندوق الأونلاين» بسند قبض مُرحّل: مدين الصندوق / دائن «ذمم شركة التوصيل 1050».
+ * تحوّل فاتورة طلب التوصيل إلى «مدفوعة» **حصريًا** بوصول حالة شركة التوصيل إلى
+ * «المبلغ في محاسبة المندوب» (Opost: in_accounting) — لا تسديد يدويًا. ومعها يدخل
+ * التحصيل «صندوق الأونلاين» بسند قبض مُرحّل: مدين الصندوق / دائن «ذمم شركة التوصيل 1050».
  */
 class OrderMarkPaidTest extends TestCase
 {
@@ -190,74 +190,5 @@ class OrderMarkPaidTest extends TestCase
         $this->svc->close($s, $this->actor('finance'));
 
         $this->assertNotEquals('paid', $s->order->fresh()->payment_status);
-    }
-
-    // ---- التجاوز اليدوي: مدير النظام فقط ----
-
-    public function test_admin_can_mark_delivery_invoice_paid(): void
-    {
-        $s = $this->shipment();
-        $this->svc->submit($s); // أُرسل لشركة التوصيل
-
-        $this->actingAs($this->actor('admin'))
-            ->post(route('admin.sales.orders.mark_paid', $s->order))
-            ->assertRedirect()->assertSessionHas('success');
-
-        $order = $s->order->fresh();
-        $this->assertEquals('paid', $order->payment_status);
-        $this->assertEqualsWithDelta((float) $order->total, (float) $order->amount_paid, 0.001);
-
-        // التجاوز اليدوي بنفس أثر in_accounting: سند تحصيل مُرحّل في صندوق الأونلاين.
-        $voucher = FinancialVoucher::where('reference', $order->number)->where('kind', 'receipt')->first();
-        $this->assertNotNull($voucher);
-        $this->assertEquals('posted', $voucher->status);
-    }
-
-    public function test_non_admin_cannot_mark_invoice_paid(): void
-    {
-        $s = $this->shipment();
-        $this->svc->submit($s);
-
-        $this->actingAs($this->actor('sales'))
-            ->post(route('admin.sales.orders.mark_paid', $s->order))
-            ->assertForbidden();
-
-        $this->assertNotEquals('paid', $s->order->fresh()->payment_status);
-    }
-
-    /** قبل الإرسال لشركة التوصيل: يُمنع (وإلا خرجت الشحنة بمبلغ تحصيل صفر). */
-    public function test_order_without_shipment_cannot_be_marked_paid(): void
-    {
-        $order = $this->order();
-
-        $this->actingAs($this->actor('admin'))
-            ->post(route('admin.sales.orders.mark_paid', $order))
-            ->assertRedirect()->assertSessionHas('error');
-
-        $this->assertNotEquals('paid', $order->fresh()->payment_status);
-    }
-
-    /** المبيعات المباشرة تُسدَّد بسند قبض (خزينة)، لا بهذا التجاوز. */
-    public function test_direct_sale_is_rejected_by_manual_mark_paid(): void
-    {
-        $order = $this->order();
-        $order->update(['channel' => 'pos']);
-
-        $this->actingAs($this->actor('admin'))
-            ->post(route('admin.sales.orders.mark_paid', $order))
-            ->assertRedirect()->assertSessionHas('error');
-
-        $this->assertNotEquals('paid', $order->fresh()->payment_status);
-    }
-
-    /** idempotent: طلب مسدَّد لا يُسدَّد مرّتين. */
-    public function test_already_paid_order_is_rejected(): void
-    {
-        $s = $this->shipment();
-        $this->toAccounting($s);
-
-        $this->actingAs($this->actor('admin'))
-            ->post(route('admin.sales.orders.mark_paid', $s->order->fresh()))
-            ->assertRedirect()->assertSessionHas('error');
     }
 }

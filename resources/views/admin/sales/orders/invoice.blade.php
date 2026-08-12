@@ -164,16 +164,6 @@
                 <button type="button" class="btn btn-pay" onclick="document.getElementById('payModal').classList.add('open')">{{ __('تحصيل دفعة') }}</button>
             @endif
         @endcan
-        {{-- تجاوز إداري (مدير النظام فقط): تحويل فاتورة طلب توصيل إلى «مدفوعة» بلا سند قبض --}}
-        @if ($canPay && $order->channel !== 'pos' && $order->latestShipment)
-            @can('markPaid', $order)
-                <form method="POST" action="{{ route('admin.sales.orders.mark_paid', $order) }}" style="display:inline"
-                      onsubmit="return confirm('{{ __('تحويل الفاتورة إلى «مدفوعة»؟ يُثبت أن المندوب قبض المبلغ من العميل.') }}')">
-                    @csrf
-                    <button type="submit" class="btn btn-pay">{{ __('تحويل إلى مدفوعة') }}</button>
-                </form>
-            @endcan
-        @endif
         <button type="button" class="btn btn-print" onclick="window.print()">{{ __('طباعة') }}</button>
     </div>
 

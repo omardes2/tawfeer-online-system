@@ -2,8 +2,13 @@
 
 namespace App\Modules\Commissions\Models;
 
+use App\Models\User;
+use App\Modules\Catalog\Models\Category;
+use App\Modules\Catalog\Models\Product;
+use App\Modules\Foundation\Models\Branch;
 use App\Support\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -28,4 +33,41 @@ class CommissionRule extends Model
         'priority' => 'integer',
         'is_active' => 'boolean',
     ];
+
+    // العلاقات — لعرض نطاق القاعدة بالأسماء بدل المعرّفات.
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    /** وصف مقروء لنطاق القاعدة: «عامة» أو الأبعاد المحدَّدة بأسمائها. */
+    public function scopeLabel(): string
+    {
+        $parts = array_filter([
+            $this->user?->name,
+            $this->product?->name,
+            $this->category?->name,
+            $this->branch?->name,
+            $this->campaign,
+            $this->role,
+        ]);
+
+        return $parts === [] ? __('commissions.scope_general') : implode(' • ', $parts);
+    }
 }
