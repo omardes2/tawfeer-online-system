@@ -13,6 +13,7 @@ use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Sales\Events\OrderDelivered;
+use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -151,6 +152,21 @@ class CommissionPaymentTest extends TestCase
             ->assertSee(__('commissions.outstanding'))
             ->assertSee(__('commissions.pay_profit'))
             ->assertSee(__('commissions.payments_archive'));
+    }
+
+    /** جدول الحركات: رقم الطلب رابط إلى فاتورته، ومعه عمود تاريخ الطلب. */
+    public function test_statement_entries_link_to_invoice_and_show_order_date(): void
+    {
+        [$affiliate] = $this->eligibleAffiliate();
+        $order = Order::latest('id')->firstOrFail();
+        $admin = User::where('email', 'admin@tawfeer.online')->first();
+
+        $this->actingAs($admin)
+            ->get(route('admin.commissions.statement', ['earnerId' => $affiliate->id, 'earner_type' => 'affiliate']))
+            ->assertOk()
+            ->assertSee(__('commissions.order_date'))
+            ->assertSee(route('admin.sales.orders.invoice', $order), false)
+            ->assertSee($order->created_at->format('Y-m-d'));
     }
 
     public function test_pay_profit_endpoint_records_payment(): void

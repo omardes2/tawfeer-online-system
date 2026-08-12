@@ -153,6 +153,7 @@
                 <table class="min-w-full text-sm text-right">
                     <thead class="text-gray-500 border-b"><tr>
                         <th class="py-2 px-3 font-medium">{{ __('commissions.order') }}</th>
+                        <th class="py-2 px-3 font-medium">{{ __('commissions.order_date') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('commissions.entry_type') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('commissions.basis') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('commissions.amount') }}</th>
@@ -161,7 +162,16 @@
                     <tbody>
                         @foreach ($entries as $e)
                             <tr class="border-b">
-                                <td class="py-2 px-3">{{ $e->order?->number }}</td>
+                                <td class="py-2 px-3">
+                                    @if ($e->order)
+                                        {{-- رقم الطلب يفتح فاتورته في تبويب جديد --}}
+                                        <a href="{{ route('admin.sales.orders.invoice', $e->order) }}" target="_blank"
+                                           class="text-emerald-600 hover:underline font-medium">{{ $e->order->number }}</a>
+                                    @else
+                                        <span class="text-gray-400">—</span>
+                                    @endif
+                                </td>
+                                <td class="py-2 px-3 text-gray-500 whitespace-nowrap">{{ $e->order?->created_at?->format('Y-m-d') ?? '—' }}</td>
                                 <td class="py-2 px-3">{{ __('commissions.'.$e->entry_type) }}</td>
                                 <td class="py-2 px-3">{{ number_format((float) $e->basis, 2) }}</td>
                                 <td class="py-2 px-3 {{ (float) $e->amount < 0 ? 'text-rose-600' : '' }}">{{ number_format((float) $e->amount, 2) }}</td>

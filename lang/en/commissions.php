@@ -123,4 +123,5 @@ return [
     'scope_general' => 'General rule',
     'no_rules_default' => 'No rules — the default applies (:rate for sales staff).',
     'margin_sales_not_allowed' => 'Sales-staff commission is a percentage of sales value (delivery excluded) — margin-based is for marketers only.',
+    'order_date' => 'Order date',
 ];
