@@ -23,13 +23,49 @@ class CommissionController extends Controller
 {
     public function __construct(private readonly CommissionService $commissions) {}
 
+    /**
+     * الصفحة الرئيسية: قائمة الأشخاص (موظفو المبيعات ثم المسوّقون) بأرصدتهم — مستحق
+     * الفترة (حسب الفلتر) والإجمالي والمدفوع والرصيد. الضغط على الاسم يفتح ملفه
+     * (كل حركاته + الصرف). دفتر الحركات التفصيلي انتقل إلى ledger.
+     */
     public function index(Request $request): View
     {
-        $state = $request->query('state', 'pending');
+        [$from, $to, $range] = $this->period($request);
+
+        $people = fn (array $roles, string $type) => User::role($roles)->orderBy('name')->get()
+            ->map(function (User $u) use ($type, $range) {
+                $period = (float) CommissionEntry::where('earner_id', $u->id)->where('earner_type', $type)
+                    ->whereIn('state', ['eligible', 'approved', 'paid'])
+                    ->whereBetween('created_at', $range)->sum('amount');
+
+                return ['user' => $u, 'period' => round($period, 2)] + $this->commissions->balance($u->id, $type);
+            })->values();
+
+        return view('admin.commissions.index', [
+            'sales' => $people(['sales', 'sales_supervisor'], 'sales'),
+            'affiliates' => $people(['affiliate'], 'affiliate'),
+            'from' => $from,
+            'to' => $to,
+        ]);
+    }
+
+    /** دفتر الحركات التفصيلي (فلترة بالحالة + اعتماد بالدفعات) — كانت الصفحة الرئيسية سابقًا. */
+    public function ledger(Request $request): View
+    {
+        $state = $request->query('state', 'eligible');
         $entries = CommissionEntry::with(['order:id,number', 'earner:id,name'])
             ->where('state', $state)->latest('id')->paginate(25)->withQueryString();
 
-        return view('admin.commissions.index', ['entries' => $entries, 'state' => $state]);
+        return view('admin.commissions.ledger', ['entries' => $entries, 'state' => $state]);
+    }
+
+    /** @return array{0: string, 1: string, 2: array} from/to (نصًّا) والمدى الزمني للاستعلام */
+    private function period(Request $request): array
+    {
+        $from = $request->date('from') ?: now()->startOfMonth();
+        $to = $request->date('to') ?: now()->endOfMonth();
+
+        return [$from->toDateString(), $to->toDateString(), [$from->copy()->startOfDay(), $to->copy()->endOfDay()]];
     }
 
     public function rules(): View
@@ -81,9 +117,8 @@ class CommissionController extends Controller
     public function statement(Request $request, int $earnerId): View
     {
         $type = $request->query('earner_type', 'sales');
-        $from = $request->date('from') ?: now()->startOfMonth();
-        $to = $request->date('to') ?: now()->endOfMonth();
-        $range = [$from->copy()->startOfDay(), $to->copy()->endOfDay()];
+        [$fromStr, $toStr, $range] = $this->period($request);
+        [$from, $to] = [$range[0], $range[1]];
 
         // مستحقّات الفترة (الأرباح المؤهّلة صافيةً ضمن المدى الزمني).
         $periodEarned = (float) CommissionEntry::where('earner_id', $earnerId)->where('earner_type', $type)
@@ -97,15 +132,15 @@ class CommissionController extends Controller
             'statement' => $this->commissions->statement($earnerId, $type),
             'balance' => $this->commissions->balance($earnerId, $type),
             'periodEarned' => round($periodEarned, 2),
-            'from' => $from->toDateString(),
-            'to' => $to->toDateString(),
+            'from' => $fromStr,
+            'to' => $toStr,
             'entries' => CommissionEntry::where('earner_id', $earnerId)->where('earner_type', $type)
                 ->whereBetween('created_at', $range)
                 ->with('order:id,number')->latest('id')->paginate(30)->withQueryString(),
             'payouts' => CommissionPayout::where('earner_id', $earnerId)->where('earner_type', $type)
                 ->with(['voucher:id,number,status,kind', 'treasury:id,name'])->latest('id')->get(),
-            'treasuries' => Treasury::active()->orderBy('name')->get(),
-            'counterAccounts' => Account::postable()->where('is_active', true)->orderBy('code')->get(),
+            // البنوك أولًا (الصرف من الحسابات البنكية هو الأصل) ثم الخزائن النقدية.
+            'treasuries' => Treasury::active()->orderByRaw("type = 'bank' desc")->orderBy('name')->get(),
         ]);
     }
 
@@ -117,16 +152,24 @@ class CommissionController extends Controller
             'earner_type' => ['required', 'in:sales,affiliate'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'treasury_id' => ['required', 'integer', 'exists:treasuries,id'],
-            'counter_account_id' => ['required', 'integer', 'exists:accounts,id'],
+            // اختياري: يُحسم تلقائيًا لحساب مصروف العمولات الافتراضي (تبسيط النموذج).
+            'counter_account_id' => ['nullable', 'integer', 'exists:accounts,id'],
             'period_start' => ['nullable', 'date'],
             'period_end' => ['nullable', 'date', 'after_or_equal:period_start'],
             'reference' => ['nullable', 'string', 'max:80'],
             'notes' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $counterId = $data['counter_account_id']
+            ?? Account::where('code', config('accounting.commissions.expense_account', '5040'))->value('id');
+
+        if (! $counterId) {
+            return back()->withErrors(['counter_account_id' => __('حساب مصروف العمولات الافتراضي (5040) غير موجود في الدليل.')])->withInput();
+        }
+
         $this->commissions->payAmount(
             $request->user(), (int) $data['earner_id'], $data['earner_type'], (float) $data['amount'],
-            (int) $data['treasury_id'], (int) $data['counter_account_id'],
+            (int) $data['treasury_id'], (int) $counterId,
             $data['period_start'] ?? null, $data['period_end'] ?? null,
             $data['reference'] ?? null, $data['notes'] ?? null,
         );

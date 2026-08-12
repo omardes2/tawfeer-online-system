@@ -7,6 +7,7 @@ use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Commissions\Models\CommissionPayout;
 use App\Modules\Commissions\Services\CommissionService;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\Warehouse;
@@ -164,5 +165,22 @@ class CommissionPaymentTest extends TestCase
         ])->assertRedirect()->assertSessionHas('status');
 
         $this->assertDatabaseHas('commission_payouts', ['earner_id' => $affiliate->id, 'total' => '25.00', 'status' => 'draft']);
+    }
+
+    /** النموذج المبسّط: بلا حساب مقابل ⇒ يُحسم تلقائيًا لحساب مصروف العمولات (5040). */
+    public function test_pay_profit_defaults_expense_account_when_omitted(): void
+    {
+        [$affiliate] = $this->eligibleAffiliate();
+        $admin = User::where('email', 'admin@tawfeer.online')->first();
+
+        $this->actingAs($admin)->post(route('admin.commissions.pay_profit'), [
+            'earner_id' => $affiliate->id, 'earner_type' => 'affiliate', 'amount' => 10,
+            'treasury_id' => $this->treasury()->id,
+        ])->assertRedirect()->assertSessionHas('status');
+
+        $payout = CommissionPayout::where('earner_id', $affiliate->id)->latest('id')->first();
+        $this->assertNotNull($payout->financial_voucher_id);
+        $expected = Account::where('code', config('accounting.commissions.expense_account', '5040'))->value('id');
+        $this->assertEquals($expected, FinancialVoucher::find($payout->financial_voucher_id)->counter_account_id);
     }
 }

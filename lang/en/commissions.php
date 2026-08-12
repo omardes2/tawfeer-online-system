@@ -90,4 +90,15 @@ return [
     'view_voucher' => 'View voucher',
     'select_treasury' => '— Select treasury/bank —',
     'select_account' => '— Select account —',
+
+    'ledger_title' => 'Entries ledger',
+    'back_to_people' => 'Commissions & profits',
+    'sales_people' => 'Sales staff',
+    'affiliate_people' => 'Marketers',
+    'open_file' => 'Open file',
+    'no_people' => 'No people with this role.',
+    'bank_accounts' => 'Bank accounts',
+    'cash_boxes' => 'Cash boxes',
+    'notes_placeholder' => 'Optional note shown on the voucher',
+    'pay_hint' => 'Creates a draft payment voucher for finance to approve and post.',
 ];

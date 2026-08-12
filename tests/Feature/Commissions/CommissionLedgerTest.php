@@ -257,8 +257,13 @@ class CommissionLedgerTest extends TestCase
         $order = $this->order($rep);
         $this->svc->accrueForOrder($order);
 
-        $this->actingAs($finance)->get('/admin/commissions?state=pending')
-            ->assertOk()->assertSee(__('commissions.title'))->assertSee($order->number);
+        // الرئيسية: قائمة الأشخاص بأسمائهم (لا بنود) — والاسم يقود إلى كشف الحساب.
+        $this->actingAs($finance)->get('/admin/commissions')
+            ->assertOk()->assertSee(__('commissions.sales_people'))->assertSee($rep->name)
+            ->assertSee(route('admin.commissions.statement', ['earnerId' => $rep->id, 'earner_type' => 'sales'], false));
+        // دفتر الحركات التفصيلي انتقل إلى /ledger.
+        $this->actingAs($finance)->get('/admin/commissions/ledger?state=pending')
+            ->assertOk()->assertSee($order->number);
         $this->actingAs($finance)->get('/admin/commissions/rules')->assertOk()->assertSee(__('commissions.add_rule'));
     }
 

@@ -308,6 +308,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     // العمولات/الأرباح (Phase 4.2)
     Route::prefix('commissions')->name('commissions.')->group(function () {
         Route::get('/', [AdminCommissionController::class, 'index'])->name('index')->middleware('can:commissions.view_team');
+        Route::get('ledger', [AdminCommissionController::class, 'ledger'])->name('ledger')->middleware('can:commissions.view_team');
         Route::get('statement/{earnerId}', [AdminCommissionController::class, 'statement'])->name('statement')->middleware('can:commissions.view_team');
         Route::post('approve', [AdminCommissionController::class, 'approve'])->name('approve')->middleware('can:commissions.approve');
         Route::post('payout', [AdminCommissionController::class, 'payout'])->name('payout')->middleware('can:commissions.payout');

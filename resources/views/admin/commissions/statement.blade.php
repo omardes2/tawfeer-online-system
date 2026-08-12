@@ -4,7 +4,7 @@
     </h2></x-slot>
 
     <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-        <a href="{{ route('admin.commissions.index') }}" class="text-sm text-gray-500 hover:text-emerald-600">← {{ __('commissions.ledger') }}</a>
+        <a href="{{ route('admin.commissions.index') }}" class="text-sm text-gray-500 hover:text-emerald-600">← {{ __('commissions.back_to_people') }}</a>
 
         @if (session('status'))
             <div class="rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm px-4 py-3">{{ session('status') }}</div>
@@ -66,35 +66,36 @@
                         <label class="block text-xs text-gray-500 mb-1">{{ __('commissions.amount_to_pay') }} *</label>
                         <input type="number" step="0.01" min="0.01" name="amount" value="{{ old('amount', max($balance['outstanding'], 0)) }}" required class="w-full rounded-md border-gray-300 text-sm">
                     </div>
-                    <div>
+                    <div class="md:col-span-2">
                         <label class="block text-xs text-gray-500 mb-1">{{ __('commissions.from_treasury') }} *</label>
                         <select name="treasury_id" required class="w-full rounded-md border-gray-300 text-sm">
                             <option value="">{{ __('commissions.select_treasury') }}</option>
-                            @foreach ($treasuries as $t)
-                                <option value="{{ $t->id }}" @selected(old('treasury_id') == $t->id)>{{ $t->name }} @if($t->type === 'bank' && $t->bank_name)— {{ $t->bank_name }}@endif</option>
-                            @endforeach
+                            @php($banks = $treasuries->where('type', 'bank'))
+                            @php($cash = $treasuries->where('type', '!=', 'bank'))
+                            @if ($banks->isNotEmpty())
+                                <optgroup label="{{ __('commissions.bank_accounts') }}">
+                                    @foreach ($banks as $t)
+                                        <option value="{{ $t->id }}" @selected(old('treasury_id') == $t->id)>{{ $t->name }}@if($t->bank_name) — {{ $t->bank_name }}@endif @if($t->account_number) ({{ $t->account_number }})@endif</option>
+                                    @endforeach
+                                </optgroup>
+                            @endif
+                            @if ($cash->isNotEmpty())
+                                <optgroup label="{{ __('commissions.cash_boxes') }}">
+                                    @foreach ($cash as $t)
+                                        <option value="{{ $t->id }}" @selected(old('treasury_id') == $t->id)>{{ $t->name }}</option>
+                                    @endforeach
+                                </optgroup>
+                            @endif
                         </select>
+                        {{-- حساب المصروف يُحسم تلقائيًا (عمولات 5040) — لا حاجة لاختياره. --}}
                     </div>
-                    <div>
-                        <label class="block text-xs text-gray-500 mb-1">{{ __('commissions.expense_account') }} *</label>
-                        <select name="counter_account_id" required class="w-full rounded-md border-gray-300 text-sm">
-                            <option value="">{{ __('commissions.select_account') }}</option>
-                            @foreach ($counterAccounts as $a)
-                                <option value="{{ $a->id }}" @selected(old('counter_account_id') == $a->id)>{{ $a->code }} — {{ $a->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-gray-500 mb-1">{{ __('commissions.reference') }}</label>
-                        <input type="text" name="reference" value="{{ old('reference') }}" class="w-full rounded-md border-gray-300 text-sm">
-                    </div>
-                    <div class="md:col-span-2">
+                    <div class="md:col-span-3">
                         <label class="block text-xs text-gray-500 mb-1">{{ __('commissions.notes') }}</label>
-                        <input type="text" name="notes" value="{{ old('notes') }}" class="w-full rounded-md border-gray-300 text-sm">
+                        <input type="text" name="notes" value="{{ old('notes') }}" placeholder="{{ __('commissions.notes_placeholder') }}" class="w-full rounded-md border-gray-300 text-sm">
                     </div>
                     <div class="md:col-span-3">
                         <button type="submit" class="px-5 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('commissions.pay') }}</button>
-                        <span class="text-xs text-gray-400 ms-2">{{ __('commissions.payment_recorded') }}</span>
+                        <span class="text-xs text-gray-400 ms-2">{{ __('commissions.pay_hint') }}</span>
                     </div>
                 </form>
             </div>
@@ -134,7 +135,7 @@
                                 </td>
                                 <td class="py-2 px-3">
                                     @if ($p->voucher)
-                                        <a href="{{ route('admin.accounting.vouchers.show', ['kind' => 'payment', 'voucher' => $p->voucher_id]) }}" class="text-emerald-600 hover:underline">{{ __('commissions.view_voucher') }}</a>
+                                        <a href="{{ route('admin.accounting.vouchers.show', ['kind' => 'payment', 'voucher' => $p->financial_voucher_id]) }}" class="text-emerald-600 hover:underline">{{ __('commissions.view_voucher') }}</a>
                                     @endif
                                 </td>
                             </tr>

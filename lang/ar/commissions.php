@@ -95,4 +95,15 @@ return [
     'view_voucher' => 'عرض السند',
     'select_treasury' => '— اختر الخزينة/البنك —',
     'select_account' => '— اختر الحساب —',
+
+    'ledger_title' => 'دفتر الحركات',
+    'back_to_people' => 'العمولات والأرباح',
+    'sales_people' => 'موظفو المبيعات',
+    'affiliate_people' => 'المسوّقون',
+    'open_file' => 'فتح الملف',
+    'no_people' => 'لا يوجد أشخاص بهذا الدور.',
+    'bank_accounts' => 'الحسابات البنكية',
+    'cash_boxes' => 'الخزائن النقدية',
+    'notes_placeholder' => 'ملاحظة اختيارية تظهر على السند',
+    'pay_hint' => 'يُنشأ سند صرف مسودّة تعتمده وترحّله المالية.',
 ];
