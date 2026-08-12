@@ -289,22 +289,47 @@ class CommissionLedgerTest extends TestCase
         $this->assertEquals('6.00', CommissionEntry::where('order_id', $order->id)->first()->amount);
     }
 
-    /**
-     * «هامش الربح كاملًا»: الأساس يصبح (سعر البيع − التكلفة) × الكمية ويُمنح كاملًا
-     * بلا نسبة — لموظف المبيعات كما للمسوّق.
-     */
+    /** «هامش الربح كاملًا» للمسوّق: الهامش يُمنح كاملًا بلا نسبة. */
     public function test_margin_method_grants_full_margin_without_rate(): void
     {
-        $rep = $this->actor('sales');
-        CommissionRule::create(['earner_type' => 'sales', 'method' => 'margin', 'user_id' => $rep->id, 'priority' => 6]);
+        $aff = $this->actor('affiliate');
+        CommissionRule::create(['earner_type' => 'affiliate', 'method' => 'margin', 'rate' => 0.25, 'user_id' => $aff->id, 'priority' => 6]);
 
-        $order = $this->order($rep, price: 100, cost: 60, qty: 2); // الهامش = (100−60)×2 = 80
+        $order = $this->order(affiliate: $aff, price: 100, cost: 60, qty: 2); // الهامش = (100−60)×2 = 80
         $this->svc->accrueForOrder($order);
 
-        $entry = CommissionEntry::where('order_id', $order->id)->first();
-        $this->assertEquals('80.00', $entry->amount);  // الهامش كاملًا لا نسبة منه
-        $this->assertEquals('80.00', $entry->basis);   // الأساس هو الهامش نفسه
-        $this->assertEquals('60.00', $entry->wholesale_cost_snapshot);
+        $entry = CommissionEntry::where('earner_type', 'affiliate')->first();
+        $this->assertEquals('80.00', $entry->amount); // الهامش كاملًا — النسبة 25% مُهمَلة
+    }
+
+    /**
+     * عمولة موظف المبيعات نسبة من **قيمة المبيعات** لا من الهامش، و**بدون التوصيل**:
+     * صنف 100×2 مع خصم 10 ورسوم توصيل 20 ⇒ الأساس 190 (لا 210 ولا الهامش).
+     */
+    public function test_sales_commission_basis_is_sales_value_excluding_delivery(): void
+    {
+        $rep = $this->actor('sales');
+        CommissionRule::create(['earner_type' => 'sales', 'method' => 'percent', 'rate' => 0.10, 'user_id' => $rep->id, 'priority' => 6]);
+
+        $order = $this->order($rep, price: 100, cost: 60, qty: 2, discount: 10);
+        $order->update(['shipping_total' => 20, 'total' => (float) $order->total + 20]);
+        $this->svc->accrueForOrder($order->fresh('items.variant'));
+
+        $entry = CommissionEntry::where('earner_type', 'sales')->first();
+        $this->assertEquals('190.00', $entry->basis);  // (100×2 − 10) — التوصيل خارجها
+        $this->assertEquals('19.00', $entry->amount);  // 10% من 190
+    }
+
+    /** «هامش الربح» ممنوع لموظفي المبيعات — يُرفض بالتحقّق. */
+    public function test_margin_rule_is_rejected_for_sales_staff(): void
+    {
+        $admin = User::where('email', 'admin@tawfeer.online')->first();
+
+        $this->actingAs($admin)->post('/admin/commissions/rules', [
+            'earner_type' => 'sales', 'method' => 'margin',
+        ])->assertSessionHasErrors('method');
+
+        $this->assertEquals(0, CommissionRule::where('method', 'margin')->count());
     }
 
     public function test_admin_approve_via_web(): void

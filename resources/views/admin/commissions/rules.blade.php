@@ -11,7 +11,9 @@
 
         {{-- إضافة قاعدة: سؤالان أساسيان (لمن؟ وكم؟) والباقي اختياري مطويّ. --}}
         <form method="POST" action="{{ route('admin.commissions.rules.store') }}"
-              x-data="{ method: '{{ old('method', 'percent') }}', advanced: false }"
+              x-data="{ type: '{{ old('earner_type', 'sales') }}', method: '{{ old('method', 'percent') }}', advanced: false,
+                        // «هامش الربح» للمسوّقين فقط — عمولة المبيعات على قيمة المبيعات.
+                        syncMethod() { if (this.type === 'sales' && this.method === 'margin') this.method = 'percent' } }"
               class="bg-white border border-gray-200 rounded-lg p-6 space-y-5">
             @csrf
             <h3 class="font-semibold text-gray-800">{{ __('commissions.add_rule') }}</h3>
@@ -20,7 +22,7 @@
             <div>
                 <p class="text-sm font-medium text-gray-700 mb-2">{{ __('commissions.q_who') }}</p>
                 <div class="grid gap-3 sm:grid-cols-2">
-                    <select name="earner_type" class="w-full rounded-md border-gray-300 text-sm">
+                    <select name="earner_type" x-model="type" x-on:change="syncMethod()" class="w-full rounded-md border-gray-300 text-sm">
                         <option value="sales">{{ __('commissions.all_sales_staff') }}</option>
                         <option value="affiliate">{{ __('commissions.all_affiliates') }}</option>
                     </select>
@@ -40,7 +42,8 @@
                 <div class="grid gap-3 sm:grid-cols-2">
                     <select name="method" x-model="method" class="w-full rounded-md border-gray-300 text-sm">
                         <option value="percent">{{ __('commissions.method_percent') }}</option>
-                        <option value="margin">{{ __('commissions.method_margin') }}</option>
+                        {{-- هامش الربح للمسوّقين فقط. --}}
+                        <option value="margin" x-show="type === 'affiliate'">{{ __('commissions.method_margin') }}</option>
                         <option value="fixed">{{ __('commissions.method_fixed') }}</option>
                     </select>
 

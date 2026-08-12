@@ -110,16 +110,13 @@ class CommissionService
             'branch_id' => $order->branch_id,
         ]);
 
-        // «هامش الربح» يغيّر الأساس نفسه (سعر البيع − التكلفة) لا نسبةً من قيمة البضاعة،
-        // وإلا صار اختيار الطريقة بلا أثر لموظف المبيعات.
-        $cost = $rule?->method === 'margin' ? $this->itemCost($item) : null;
-        $basis = $cost !== null
-            ? $this->itemMargin($item, $cost)
-            : (float) $item->qty * (float) $item->unit_price - (float) $item->discount;
+        // أساس عمولة موظف المبيعات هو **قيمة المبيعات** دائمًا (بعد الخصم، بلا توصيل) —
+        // لا هامش الربح (قرار المالك). لذلك «هامش الربح» متاح للمسوّقين فقط.
+        $basis = (float) $item->qty * (float) $item->unit_price - (float) $item->discount;
 
         [$amount, $rate] = $this->computeAmount($rule, 'sales', $basis, self::DEFAULT_SALES_RATE);
 
-        $this->createAccrual($order, $item, 'sales', $order->assigned_to, $basis, $rate, $amount, $cost, $rule);
+        $this->createAccrual($order, $item, 'sales', $order->assigned_to, $basis, $rate, $amount, null, $rule);
     }
 
     /** تكلفة البند وقت البيع (لقطة WAC) — أساس احتساب الهامش. */

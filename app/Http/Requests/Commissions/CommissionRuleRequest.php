@@ -31,7 +31,11 @@ class CommissionRuleRequest extends FormRequest
     {
         return [
             'earner_type' => ['required', Rule::in(['sales', 'affiliate'])],
-            'method' => ['required', Rule::in(['percent', 'fixed', 'margin'])],
+            // «هامش الربح» للمسوّقين فقط: عمولة موظف المبيعات تُحتسب على قيمة المبيعات.
+            'method' => ['required', Rule::in(['percent', 'fixed', 'margin']), Rule::when(
+                $this->input('earner_type') === 'sales',
+                [Rule::in(['percent', 'fixed'])],
+            )],
             'rate_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             // النسبة تلزم لطريقة «نسبة» فقط: «هامش الربح» يمنح الهامش كاملًا، و«مبلغ ثابت» له حقله.
             'rate' => ['nullable', 'numeric', 'min:0', 'max:1', 'required_if:method,percent'],
@@ -47,6 +51,14 @@ class CommissionRuleRequest extends FormRequest
             'include_shipping' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'method.in' => __('commissions.margin_sales_not_allowed'),
         ];
     }
 }
