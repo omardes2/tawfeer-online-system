@@ -14,8 +14,16 @@ use Illuminate\Support\Str;
  */
 class ProductImageService
 {
-    /** الحدّ الأقصى لأطول ضلع (px) — يُصغَّر ما يتجاوزه مع الحفاظ على النسبة. */
-    private const MAX_EDGE = 1600;
+    /**
+     * الحدّ الأقصى لأطول ضلع (px) حسب دور الصورة — ضِعف مقاس العرض في الموقع ليبقى
+     * حادًّا على شاشات الريتينا دون حمل زائد:
+     *   • المصغّرة تُعرض 300×300  ⇒ 600
+     *   • صور الألبوم تُعرض 800×800 ⇒ 1600
+     * الصورة الأصغر من الحدّ تبقى كما هي (لا تكبير يفسد الجودة).
+     */
+    private const MAX_EDGE_THUMBNAIL = 600;
+
+    private const MAX_EDGE_GALLERY = 1600;
 
     /** جودة WebP (0-100): توازن بين حجم الملف ووضوح الصورة. */
     private const WEBP_QUALITY = 82;
@@ -23,11 +31,12 @@ class ProductImageService
     public function store(Product $product, UploadedFile $file, array $meta = []): ProductImage
     {
         return DB::transaction(function () use ($product, $file, $meta) {
-            // تحويل الصورة إلى WebP (أخفّ حجمًا مع جودة جيدة) — للحفاظ على سرعة الموقع.
-            $path = $this->storeAsWebp($file);
-
             // أول صورة للمنتج تصبح أساسية تلقائيًا.
             $makePrimary = ($meta['is_primary'] ?? false) || ! $product->images()->exists();
+
+            // تحويل إلى WebP بحدّ أبعاد يناسب دور الصورة (المصغّرة أصغر من صور الألبوم)
+            // — أخفّ حجمًا مع بقاء الوضوح، فتبقى صفحات الموقع سريعة.
+            $path = $this->storeAsWebp($file, $makePrimary ? self::MAX_EDGE_THUMBNAIL : self::MAX_EDGE_GALLERY);
 
             $image = $product->images()->create([
                 'path' => $path,
@@ -83,14 +92,14 @@ class ProductImageService
      * يُصغّر الأبعاد الكبيرة ويحافظ على الشفافية. عند تعذّر التحويل (امتداد GD
      * غير متاح أو ملف تالف) يعود لحفظ الأصل كما هو دون تعطيل الرفع.
      */
-    private function storeAsWebp(UploadedFile $file): string
+    private function storeAsWebp(UploadedFile $file, int $maxEdge): string
     {
         $image = $this->createGdImage($file);
         if ($image === null) {
             return $file->store('products', 'public'); // fallback: حفظ الأصل
         }
 
-        $image = $this->downscale($image, self::MAX_EDGE);
+        $image = $this->downscale($image, $maxEdge);
 
         $path = 'products/'.Str::random(40).'.webp';
         ob_start();
