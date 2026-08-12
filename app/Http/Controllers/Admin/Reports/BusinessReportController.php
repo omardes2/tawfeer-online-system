@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin\Reports;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Accounting\Models\JournalLine;
 use App\Modules\Crm\Models\Customer;
@@ -153,8 +154,13 @@ class BusinessReportController extends Controller
     {
         $range = $this->range($request);
 
+        // فلتر الأشخاص: تحديد واحد أو أكثر يقصر التقرير عليهم؛ بلا تحديد = الكل.
+        $selected = collect((array) $request->query('users', []))
+            ->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
+
         $rows = Order::query()
             ->whereNotNull($column)
+            ->when($selected !== [], fn ($q) => $q->whereIn('orders.'.$column, $selected))
             ->whereNotIn('status', self::EXCLUDED_STATUSES)
             ->whereBetween('orders.created_at', [$range->from, $range->to])
             ->join('users', 'users.id', '=', 'orders.'.$column)
@@ -180,6 +186,12 @@ class BusinessReportController extends Controller
             'reportTitle' => $labels['title'],
             'personLabel' => $labels['person'],
             'emptyDescription' => $labels['empty'],
+            // قائمة الفلتر: من له طلبات فعلًا على هذا العمود (لا كل المستخدمين) — قائمة
+            // قصيرة ومفيدة، وغير مقيَّدة بالفترة كي لا تختفي الأسماء عند تضييق المدى.
+            'people' => User::whereIn('id', Order::whereNotNull($column)->distinct()->pluck($column))
+                ->orderBy('name')->get(['id', 'name']),
+            'selectedPeople' => $selected,
+            'peopleLabel' => $labels['person'],
         ] + $this->viewMeta($range));
     }
 

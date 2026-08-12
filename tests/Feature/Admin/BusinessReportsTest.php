@@ -115,6 +115,45 @@ class BusinessReportsTest extends TestCase
             ->assertOk()->assertSee('موظف تجريبي')->assertDontSee('مسوّق تجريبي');
     }
 
+    /** فلتر الأشخاص: تحديد اسم أو أكثر يقصر التقرير عليهم، وبلا تحديد يظهر الجميع. */
+    public function test_employee_report_can_be_filtered_by_selected_people(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $variant = Product::factory()->create(['name' => 'صنف'])->defaultVariant;
+
+        $make = function (string $name) use ($warehouse, $variant) {
+            $user = User::factory()->create(['branch_id' => Branch::default()->id, 'name' => $name]);
+            $o = app(OrderService::class)->create([
+                'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id,
+                'customer_name' => 'زبون', 'customer_phone' => '0599000000',
+            ], [['variant_id' => $variant->id, 'qty' => 1, 'unit_price' => 100]], 2026);
+            $o->update(['assigned_to' => $user->id, 'status' => 'delivered']);
+
+            return $user;
+        };
+
+        $a = $make('أحمد الأول');
+        $b = $make('باسل الثاني');
+        $c = $make('كريم الثالث');
+
+        // التحقّق على صفوف التقرير لا على الصفحة كلّها: كل الأسماء تظهر في قائمة الفلتر
+        // نفسها (وهو المطلوب)، والفلترة تخصّ الصفوف.
+        $names = fn (array $query = []) => collect(
+            $this->actingAs($this->admin())
+                ->get(route('admin.reports.sales.by_employee', $query))->assertOk()
+                ->viewData('rows')
+        )->pluck('name');
+
+        // بلا فلتر: الثلاثة.
+        $this->assertEqualsCanonicalizing([$a->name, $b->name, $c->name], $names()->all());
+
+        // باختيار اثنين: هما فقط، وقائمة الفلتر تعرض الثلاثة للاختيار منها.
+        $this->assertEqualsCanonicalizing([$a->name, $b->name], $names(['users' => [$a->id, $b->id]])->all());
+        $this->actingAs($this->admin())
+            ->get(route('admin.reports.sales.by_employee', ['users' => [$a->id]]))
+            ->assertOk()->assertSee($c->name); // موجود كخيار في الفلتر
+    }
+
     public function test_csv_export_streams_arabic(): void
     {
         $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();

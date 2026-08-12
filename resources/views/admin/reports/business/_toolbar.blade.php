@@ -26,6 +26,33 @@
             <input type="date" name="to" value="{{ $range->toString() }}" @change="preset = 'custom'"
                    class="rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
         </div>
+        {{-- فلتر الأشخاص (اختياري): يظهر في التقارير التي تمرّر $people. تحديد متعدّد
+             بمربّعات اختيار داخل قائمة منسدلة — أوضح من select متعدّد يحتاج Ctrl. --}}
+        @isset($people)
+            <div x-data="{ open: false, count: {{ count($selectedPeople ?? []) }} }" class="relative">
+                <label class="block text-xs text-gray-500 mb-1">{{ $peopleLabel ?? __('الأشخاص') }}</label>
+                <button type="button" x-on:click="open = ! open"
+                        class="rounded-lg border border-gray-300 bg-white text-sm px-3 py-2 min-w-[11rem] text-start flex items-center justify-between gap-2">
+                    <span x-text="count === 0 ? '{{ __('الكل') }}' : count + ' {{ __('محدَّد') }}'"></span>
+                    <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+                </button>
+                <div x-show="open" x-cloak x-on:click.outside="open = false"
+                     class="absolute z-30 mt-1 w-64 max-h-64 overflow-y-auto rounded-lg bg-white shadow-lg ring-1 ring-black/5 p-2">
+                    @forelse ($people as $p)
+                        <label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 text-sm cursor-pointer">
+                            <input type="checkbox" name="users[]" value="{{ $p->id }}"
+                                   @checked(in_array($p->id, $selectedPeople ?? [], true))
+                                   x-on:change="count += $el.checked ? 1 : -1"
+                                   class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                            <span class="text-gray-700">{{ $p->name }}</span>
+                        </label>
+                    @empty
+                        <p class="px-2 py-3 text-center text-sm text-gray-400">{{ __('لا يوجد أحد بعد.') }}</p>
+                    @endforelse
+                </div>
+            </div>
+        @endisset
+
         <button type="submit" class="btn-primary btn-sm">{{ __('إنشاء التقرير') }}</button>
         <a href="{{ request()->fullUrlWithQuery(['export' => 'csv']) }}" class="btn-secondary btn-sm">{{ __('تصدير Excel') }}</a>
         <button type="button" onclick="window.print()" class="btn-secondary btn-sm">{{ __('طباعة / PDF') }}</button>
