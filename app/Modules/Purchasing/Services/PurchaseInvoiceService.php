@@ -178,9 +178,17 @@ class PurchaseInvoiceService
             if ($invoice->status === 'posted') {
                 $this->reverseStock($invoice);
 
+                // **عكس** قيد الشراء لا حذفه (ADR-016): الأثر المالي صفر كما في الحذف،
+                // ويبقى القيد وعكسه في الدفتر بلا فجوة في الترقيم. المسودّة تُحذف (بلا أثر).
                 $entry = $invoice->journal_entry_id ? JournalEntry::find($invoice->journal_entry_id) : null;
                 if ($entry) {
-                    $this->accounting->deleteEntry($entry);
+                    if (! $entry->isPosted()) {
+                        $this->accounting->deleteEntry($entry);
+                    } elseif (! $entry->isReversed()) {
+                        $this->accounting->reverse($entry, [
+                            'description' => __('عكس فاتورة مشتريات :n (حذف)', ['n' => $invoice->number]),
+                        ]);
+                    }
                 }
                 $invoice->update(['journal_entry_id' => null]);
             }

@@ -4,6 +4,7 @@ namespace Tests\Feature\Purchasing;
 
 use App\Models\User;
 use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Accounting\Services\AccountingService;
 use App\Modules\Catalog\Models\Category;
@@ -328,8 +329,11 @@ class PurchaseInvoiceTest extends TestCase
         $this->assertEqualsWithDelta($before + 4, $this->stock(), 0.001); // 10 سُحبت ثم 4 دخلت
     }
 
-    /** حذف فاتورة مُرحّلة: يُحذف القيد ويُسحب المخزون — لا أثر متبقٍّ. */
-    public function test_delete_posted_removes_ledger_and_stock(): void
+    /**
+     * حذف فاتورة مُرحّلة: يُسحب المخزون و**يُعكس** القيد بقيد عاكس (لا حذف — ADR-016b).
+     * الأثر المالي صفر كما لو حُذف، لكن الأصل باقٍ في الدفتر فلا فجوة في الترقيم.
+     */
+    public function test_delete_posted_reverses_ledger_and_pulls_stock(): void
     {
         $beforeStock = $this->stock();
         $beforeInv = $this->balance('1200');
@@ -343,7 +347,9 @@ class PurchaseInvoiceTest extends TestCase
 
         $this->service->deletePosted($inv->fresh('items'));
 
-        $this->assertDatabaseMissing('journal_entries', ['id' => $entryId]);
+        // القيد الأصلي باقٍ ومعه قيد عاكس واحد — والمحصّلة صفر على الأرصدة.
+        $this->assertDatabaseHas('journal_entries', ['id' => $entryId]);
+        $this->assertEquals(1, JournalEntry::where('reverses_entry_id', $entryId)->count());
         $this->assertEqualsWithDelta($beforeInv, $this->balance('1200'), 0.01);
         $this->assertEqualsWithDelta($beforePayable, $this->balance('2010'), 0.01);
         $this->assertEqualsWithDelta($beforeStock, $this->stock(), 0.001);
