@@ -151,10 +151,15 @@
                         {{ $o->latestShipment?->recipient_name ?: ($o->customer_name ?: '—') }}
                     </td>
                     <td>
-                        @php $staff = $o->assignee ?? ($o->channel === 'manual' ? $o->creator : null); @endphp
+                        {{-- الصفة تتبع ربط الطلب الفعلي: المسوّق (affiliate_id) أو موظف المبيعات
+                             (assigned_to)، وإلا فمنشئه. كتابة «موظف المبيعات» للجميع كانت تصف
+                             المسوّقين بصفة ليست لهم. --}}
+                        @php
+                            $staff = $o->affiliate ?? $o->assignee ?? ($o->channel === 'manual' ? $o->creator : null);
+                            $staffLabel = $o->affiliate_id ? __('المسوّق') : __('موظف المبيعات');
+                        @endphp
                         @if ($staff || $o->channel === 'manual')
-                            {{-- موظف مبيعات: نُظهر الوصف واسمه أسفله --}}
-                            <span class="block text-xs text-gray-400">{{ __('موظف المبيعات') }}</span>
+                            <span class="block text-xs text-gray-400">{{ $staffLabel }}</span>
                             <span class="text-gray-700">{{ $staff?->name ?? '—' }}</span>
                         @elseif ($o->customer?->user_id)
                             <span class="text-gray-700">{{ $o->customer->name }}</span>

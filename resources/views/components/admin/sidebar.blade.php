@@ -88,6 +88,7 @@
                 ['admin.reports.sales.by_customer', 'المبيعات حسب الزبون', 'reports.sales_summary.view', 'admin.reports.sales.by_customer'],
                 ['admin.reports.sales.by_product', 'المبيعات حسب المنتج', 'reports.sales_summary.view', 'admin.reports.sales.by_product'],
                 ['admin.reports.sales.by_employee', 'المبيعات حسب موظف المبيعات', 'reports.sales_summary.view', 'admin.reports.sales.by_employee'],
+                ['admin.reports.sales.by_affiliate', 'المبيعات حسب المسوّقين', 'reports.sales_summary.view', 'admin.reports.sales.by_affiliate'],
             ]],
             ['__group', 'الذمم المدينة', [
                 ['admin.reports.receivables.customers', 'كشف حساب العملاء', 'reports.statements.view', 'admin.reports.receivables.customers'],

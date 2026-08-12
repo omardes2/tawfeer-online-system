@@ -123,32 +123,63 @@ class BusinessReportController extends Controller
     /** المبيعات حسب موظف المبيعات: عدد الطلبات وإجمالي المبيعات من غير التوصيل (subtotal). */
     public function salesByEmployee(Request $request): View|StreamedResponse
     {
+        return $this->salesByEarner($request, 'assigned_to', [
+            'title' => __('المبيعات حسب موظف المبيعات'),
+            'person' => __('الموظف'),
+            'empty' => __('لم يُسجّل أي موظف مبيعات بعد.'),
+            'file' => 'sales-by-employee',
+        ]);
+    }
+
+    /** نفس تقرير الموظفين لكن على **المسوّقين** (الطلب مرتبط بمسوّقه لا بموظف مبيعات). */
+    public function salesByAffiliate(Request $request): View|StreamedResponse
+    {
+        return $this->salesByEarner($request, 'affiliate_id', [
+            'title' => __('المبيعات حسب المسوّقين'),
+            'person' => __('المسوّق'),
+            'empty' => __('لم يُسجّل أي مسوّق مبيعات بعد.'),
+            'file' => 'sales-by-affiliate',
+        ]);
+    }
+
+    /**
+     * تقرير المبيعات مجمَّعًا حسب مستفيد الطلب — بعمود الربط فقط (`assigned_to` لموظف
+     * المبيعات أو `affiliate_id` للمسوّق)، فالمنطق واحد لا يُكرَّر. المبالغ من `subtotal`
+     * أي **بلا رسوم التوصيل** (لا تخصّنا)، والطلبات الملغاة/المحذوفة مستثناة.
+     *
+     * @param  array{title: string, person: string, empty: string, file: string}  $labels
+     */
+    private function salesByEarner(Request $request, string $column, array $labels): View|StreamedResponse
+    {
         $range = $this->range($request);
 
         $rows = Order::query()
-            ->whereNotNull('assigned_to')
+            ->whereNotNull($column)
             ->whereNotIn('status', self::EXCLUDED_STATUSES)
             ->whereBetween('orders.created_at', [$range->from, $range->to])
-            ->join('users', 'users.id', '=', 'orders.assigned_to')
-            ->groupBy('orders.assigned_to', 'users.name')
-            ->selectRaw('users.name as emp_name, COUNT(*) as orders_count, SUM(orders.subtotal) as sales_ex_shipping')
+            ->join('users', 'users.id', '=', 'orders.'.$column)
+            ->groupBy('orders.'.$column, 'users.name')
+            ->selectRaw('users.name as earner_name, COUNT(*) as orders_count, SUM(orders.subtotal) as sales_ex_shipping')
             ->orderByDesc('sales_ex_shipping')
             ->get()
             ->map(fn ($r) => [
-                'name' => $r->emp_name,
+                'name' => $r->earner_name,
                 'orders_count' => (int) $r->orders_count,
                 'sales' => (float) $r->sales_ex_shipping,
             ]);
 
         if ($request->query('export') === 'csv') {
-            return $this->csv('sales-by-employee', [__('الموظف'), __('عدد الطلبات'), __('إجمالي المبيعات (من غير توصيل)')],
+            return $this->csv($labels['file'], [$labels['person'], __('عدد الطلبات'), __('إجمالي المبيعات (من غير توصيل)')],
                 $rows->map(fn ($r) => [$r['name'], $r['orders_count'], number_format($r['sales'], 2, '.', '')]));
         }
 
-        return view('admin.reports.business.sales_by_employee', [
+        return view('admin.reports.business.sales_by_earner', [
             'rows' => $rows,
             'totalOrders' => $rows->sum('orders_count'),
             'totalSales' => $rows->sum('sales'),
+            'reportTitle' => $labels['title'],
+            'personLabel' => $labels['person'],
+            'emptyDescription' => $labels['empty'],
         ] + $this->viewMeta($range));
     }
 

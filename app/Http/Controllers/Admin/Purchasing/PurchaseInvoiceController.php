@@ -206,15 +206,19 @@ class PurchaseInvoiceController extends Controller
     {
         $this->authorize('purchasing.invoices.delete');
 
+        if (! self::isDeletable($invoice)) {
+            return back()->with('error', __('الفاتورة ملغاة/معكوسة — لا أثر لها ليُعكس.'));
+        }
+
         try {
-            // يسحب البضاعة المُدخَلة ويحذف القيد المحاسبي المرتبط (المسدَّدة تُمنع).
+            // يعكس الدفعات (يعيد النقد للخزينة)، يسحب البضاعة، ويعكس قيد الشراء.
             $this->service->deletePosted($invoice);
         } catch (ValidationException $e) {
             return back()->with('error', collect($e->errors())->flatten()->first());
         }
 
         return redirect()->route('admin.purchasing.invoices.index')
-            ->with('success', __('حُذفت الفاتورة مع قيدها المحاسبي وأثرها المخزوني.'));
+            ->with('success', __('حُذفت الفاتورة: عُكست دفعاتها وقيدها المحاسبي وسُحبت بضاعتها من المخزون.'));
     }
 
     /** الفاتورة قابلة للتعديل ما لم تكن ملغاة/معكوسة أو سُدّد منها شيء. */
@@ -222,6 +226,15 @@ class PurchaseInvoiceController extends Controller
     {
         return ! in_array($invoice->status, ['cancelled', 'reversed'], true)
             && (float) $invoice->amount_paid <= 0;
+    }
+
+    /**
+     * الحذف متاح حتى للفاتورة المسدَّدة — الخدمة تعكس دفعاتها أولًا (يعود النقد للخزينة)
+     * ثم تسحب المخزون وتعكس قيد الشراء. يبقى الملغى/المعكوس خارج النطاق (لا أثر ليُعكس).
+     */
+    public static function isDeletable(PurchaseInvoice $invoice): bool
+    {
+        return ! in_array($invoice->status, ['cancelled', 'reversed'], true);
     }
 
     /** ينفّذ إجراء الخدمة ويحوّل أخطاء التحقّق إلى رسالة راجعة. */

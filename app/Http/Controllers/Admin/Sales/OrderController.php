@@ -62,7 +62,8 @@ class OrderController extends Controller
         $saleType = $request->query('sale_type');
         $saleType = in_array($saleType, ['direct', 'normal'], true) ? $saleType : null;
 
-        $query = $this->visibleOrders($request)->with(['assignee', 'creator', 'customer', 'latestShipment'])->latest('id');
+        // affiliate ضمن التحميل المسبق: عمود «المستخدم» يعرض المسوّق بصفته لا كموظف مبيعات.
+        $query = $this->visibleOrders($request)->with(['affiliate', 'assignee', 'creator', 'customer', 'latestShipment'])->latest('id');
 
         match ($saleType) {
             'direct' => $query->where('channel', 'pos'),

@@ -356,8 +356,41 @@ class PurchaseInvoiceTest extends TestCase
         $this->assertSoftDeleted('purchase_invoices', ['id' => $inv->id]);
     }
 
-    /** الفاتورة المسدَّدة محميّة: لا تُعدَّل ولا تُحذف قبل عكس دفعاتها. */
-    public function test_paid_invoice_is_protected_from_edit_and_delete(): void
+    /**
+     * حذف فاتورة **مسدَّدة**: تُعكس دفعاتها (يعود النقد للخزينة) ثم يُسحب المخزون ويُعكس
+     * قيد الشراء — فلا يبقى أثر على النقد ولا على ذمّة المورد ولا على الكميات.
+     */
+    public function test_deleting_paid_invoice_reverses_payments_stock_and_ledger(): void
+    {
+        $treasury = Treasury::where('is_active', true)->whereNotNull('gl_account_id')->firstOrFail();
+        $cashCode = $treasury->glAccount->code;
+
+        $beforeStock = $this->stock();
+        $beforeCash = $this->balance($cashCode);
+        $beforePayable = $this->balance('2010');
+
+        $inv = $this->service->createAndPost(
+            ['supplier_id' => $this->supplier->id, 'invoice_date' => now()->toDateString()],
+            [['variant_id' => $this->variant->id, 'qty' => 2, 'unit_cost' => 100, 'tax_rate' => 0]],
+        );
+        $this->service->pay($inv->fresh(), $treasury->id, 200); // سداد كامل
+        $this->assertEqualsWithDelta($beforeCash - 200, $this->balance($cashCode), 0.01);
+
+        $this->service->deletePosted($inv->fresh('items'));
+
+        // لا أثر متبقٍّ: النقد وذمّة المورد والمخزون كما كانت قبل الفاتورة.
+        $this->assertEqualsWithDelta($beforeCash, $this->balance($cashCode), 0.01);
+        $this->assertEqualsWithDelta($beforePayable, $this->balance('2010'), 0.01);
+        $this->assertEqualsWithDelta($beforeStock, $this->stock(), 0.001);
+
+        // سند الدفع مُعلَّم معكوسًا، والفاتورة محذوفة ناعمًا بلا مبالغ مسدَّدة.
+        $this->assertDatabaseHas('financial_vouchers', ['reference' => $inv->number, 'kind' => 'payment', 'status' => 'reversed']);
+        $this->assertSoftDeleted('purchase_invoices', ['id' => $inv->id]);
+        $this->assertEqualsWithDelta(0, (float) PurchaseInvoice::withTrashed()->find($inv->id)->amount_paid, 0.01);
+    }
+
+    /** التعديل يبقى محظورًا على الفاتورة المسدَّدة (الحذف وحده هو المتاح). */
+    public function test_paid_invoice_is_still_protected_from_edit(): void
     {
         $inv = $this->service->createAndPost(
             ['supplier_id' => $this->supplier->id, 'invoice_date' => now()->toDateString()],
@@ -367,6 +400,9 @@ class PurchaseInvoiceTest extends TestCase
         $this->service->pay($inv->fresh(), $treasury->id, 50);
 
         $this->expectException(ValidationException::class);
-        $this->service->deletePosted($inv->fresh('items'));
+        $this->service->updatePosted($inv->fresh('items'),
+            ['supplier_id' => $this->supplier->id, 'invoice_date' => now()->toDateString()],
+            [['variant_id' => $this->variant->id, 'qty' => 1, 'unit_cost' => 100, 'tax_rate' => 0]],
+        );
     }
 }

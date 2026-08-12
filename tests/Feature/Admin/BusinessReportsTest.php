@@ -39,6 +39,7 @@ class BusinessReportsTest extends TestCase
         'admin.reports.sales.by_customer',
         'admin.reports.sales.by_product',
         'admin.reports.sales.by_employee',
+        'admin.reports.sales.by_affiliate',
         'admin.reports.receivables.customers',
         'admin.reports.receivables.suppliers',
     ];
@@ -84,6 +85,34 @@ class BusinessReportsTest extends TestCase
 
         $this->actingAs($this->admin())->get(route('admin.reports.sales.by_employee'))
             ->assertOk()->assertSee('موظف تجريبي')->assertSee('200.00');
+    }
+
+    /** تقرير المسوّقين: يجمّع على affiliate_id ولا يخلط موظفي المبيعات به. */
+    public function test_sales_by_affiliate_report_lists_marketers_only(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+        $employee = User::factory()->create(['branch_id' => Branch::default()->id, 'name' => 'موظف تجريبي']);
+        $marketer = User::factory()->create(['branch_id' => Branch::default()->id, 'name' => 'مسوّق تجريبي']);
+        $variant = Product::factory()->create(['name' => 'صنف'])->defaultVariant;
+
+        $make = function (array $attrs) use ($warehouse, $variant) {
+            $o = app(OrderService::class)->create([
+                'branch_id' => Branch::default()->id, 'warehouse_id' => $warehouse->id,
+                'customer_name' => 'زبون', 'customer_phone' => '0599000000',
+            ], [['variant_id' => $variant->id, 'qty' => 1, 'unit_price' => 300]], 2026);
+            $o->update($attrs + ['status' => 'delivered']);
+        };
+
+        $make(['affiliate_id' => $marketer->id]);
+        $make(['assigned_to' => $employee->id]);
+
+        // صفحة المسوّقين: المسوّق فقط.
+        $this->actingAs($this->admin())->get(route('admin.reports.sales.by_affiliate'))
+            ->assertOk()->assertSee('مسوّق تجريبي')->assertDontSee('موظف تجريبي');
+
+        // وصفحة الموظفين: الموظف فقط.
+        $this->actingAs($this->admin())->get(route('admin.reports.sales.by_employee'))
+            ->assertOk()->assertSee('موظف تجريبي')->assertDontSee('مسوّق تجريبي');
     }
 
     public function test_csv_export_streams_arabic(): void

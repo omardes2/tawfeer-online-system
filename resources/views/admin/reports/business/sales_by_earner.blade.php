@@ -1,17 +1,17 @@
-<x-app-layout :title="__('المبيعات حسب موظف المبيعات')">
+<x-app-layout :title="$reportTitle">
     @php $sym = \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪'); @endphp
     <div class="report-no-print">
         <x-admin.header
-            :title="__('المبيعات حسب موظف المبيعات')"
-            :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('التقارير') => null, __('المبيعات حسب موظف المبيعات') => null]" />
+            :title="$reportTitle"
+            :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('التقارير') => null, $reportTitle => null]" />
     </div>
 
-    @include('admin.reports.business._toolbar', ['title' => __('المبيعات حسب موظف المبيعات')])
+    @include('admin.reports.business._toolbar', ['title' => $reportTitle])
 
     <x-admin.table>
         <thead>
             <tr>
-                <th>{{ __('الموظف') }}</th>
+                <th>{{ $personLabel }}</th>
                 <th class="text-start">{{ __('عدد الطلبات') }}</th>
                 <th class="text-start">{{ __('إجمالي المبيعات (من غير توصيل)') }}</th>
             </tr>
@@ -25,7 +25,7 @@
                 </tr>
             @empty
                 <tr><td colspan="3" class="!p-0">
-                    <x-admin.empty-state :title="__('لا توجد مبيعات')" :description="__('لم يُسجّل أي موظف مبيعات بعد.')" />
+                    <x-admin.empty-state :title="__('لا توجد مبيعات')" :description="$emptyDescription" />
                 </td></tr>
             @endforelse
         </tbody>

@@ -3,6 +3,7 @@
 namespace App\Modules\Purchasing\Services;
 
 use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Accounting\Services\AccountingService;
 use App\Modules\Accounting\Services\VoucherService;
@@ -166,15 +167,26 @@ class PurchaseInvoiceService
      * حذف فاتورة **مُرحّلة** نهائيًا: يسحب البضاعة المُدخَلة ويحذف قيدها المحاسبي
      * (لا عكس) — مطابقًا لسياسة حذف فاتورة المبيعات. المسدَّدة تُمنع.
      */
+    /**
+     * حذف فاتورة مشتريات مع **عكس كامل لأثرها**: الدفعات المُرحّلة تُعكس (يعود النقد
+     * للخزينة)، ثم يُسحب المخزون، ثم يُعكس قيد الشراء (فتُصفَّر ذمّة المورد). المستند
+     * يُحذف حذفًا ناعمًا. كل ذلك داخل معاملة واحدة، وكل خطوة idempotent.
+     */
     public function deletePosted(PurchaseInvoice $invoice): void
     {
-        if ((float) $invoice->amount_paid > 0) {
-            throw ValidationException::withMessages([
-                'status' => __('لا يمكن حذف فاتورة سُدّد جزء منها — اعكس الدفعات أولًا.'),
-            ]);
-        }
-
         DB::transaction(function () use ($invoice) {
+            // عكس دفعات الفاتورة المُرحّلة (مرجعها رقم الفاتورة) — يعيد المال للخزينة
+            // ويُلغي أثرها على حساب المورد قبل عكس قيد الشراء نفسه.
+            FinancialVoucher::where('kind', 'payment')
+                ->where('reference', $invoice->number)
+                ->where('status', 'posted')
+                ->get()
+                ->each(fn (FinancialVoucher $v) => $this->vouchers->reverse(
+                    $v, __('حذف فاتورة مشتريات :n', ['n' => $invoice->number]),
+                ));
+
+            $invoice->update(['amount_paid' => 0, 'payment_status' => 'unpaid']);
+
             if ($invoice->status === 'posted') {
                 $this->reverseStock($invoice);
 

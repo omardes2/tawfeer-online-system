@@ -322,6 +322,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('sales/by-customer', [BusinessReportController::class, 'salesByCustomer'])->name('sales.by_customer')->middleware('can:reports.sales_summary.view');
         Route::get('sales/by-product', [BusinessReportController::class, 'salesByProduct'])->name('sales.by_product')->middleware('can:reports.sales_summary.view');
         Route::get('sales/by-employee', [BusinessReportController::class, 'salesByEmployee'])->name('sales.by_employee')->middleware('can:reports.sales_summary.view');
+        Route::get('sales/by-affiliate', [BusinessReportController::class, 'salesByAffiliate'])->name('sales.by_affiliate')->middleware('can:reports.sales_summary.view');
         Route::get('receivables/customers', [BusinessReportController::class, 'receivablesCustomers'])->name('receivables.customers')->middleware('can:reports.statements.view');
         Route::get('receivables/suppliers', [BusinessReportController::class, 'receivablesSuppliers'])->name('receivables.suppliers')->middleware('can:reports.statements.view');
     });

@@ -74,10 +74,10 @@
                                 @endif
                             @endcan
                             @can('purchasing.invoices.delete')
-                                @if ($editable)
+                                @if (\App\Http\Controllers\Admin\Purchasing\PurchaseInvoiceController::isDeletable($inv))
                                     <span class="text-gray-300">|</span>
                                     <form method="POST" action="{{ route('admin.purchasing.invoices.destroy', $inv) }}" class="inline"
-                                          onsubmit="return confirm('{{ __('حذف الفاتورة نهائيًا؟ سيُحذف قيدها المحاسبي وتُسحب بضاعتها من المخزون.') }}')">
+                                          onsubmit="return confirm('{{ __('حذف الفاتورة؟ ستُعكس دفعاتها (يعود المال للخزينة) وتُسحب بضاعتها من المخزون ويُعكس قيدها المحاسبي.') }}')">
                                         @csrf @method('DELETE')
                                         <button class="text-rose-600 hover:underline">{{ __('حذف') }}</button>
                                     </form>
