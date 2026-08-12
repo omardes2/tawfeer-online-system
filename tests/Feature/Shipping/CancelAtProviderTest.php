@@ -10,7 +10,11 @@ use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
 use App\Modules\Sales\Services\OrderVoidService;
+use App\Modules\Shipping\Models\Shipment;
 use App\Modules\Shipping\Services\OrderDeliveryDispatcher;
+use App\Modules\Shipping\Support\OpostStatus;
+use App\Support\Contracts\Shipping\DeliveryProviderInterface;
+use App\Support\Integrations\Shipping\DeliveryProviderManager;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
@@ -123,6 +127,44 @@ class CancelAtProviderTest extends TestCase
         $this->artisan('shipping:cancel-pending')->assertSuccessful();
 
         $this->assertNull(Order::withTrashed()->find($order->id)->delivery_cancel_error);
+    }
+
+    /**
+     * بعد نجاح الإلغاء لدى المزوّد، عمود «حالة أوبتيموس» يعرض «ملغى» لا الحالة القديمة —
+     * كان يبقى «بانتظار الاستلام» لأن provider_status لم يُحدَّث.
+     */
+    public function test_successful_cancellation_marks_provider_status_cancelled(): void
+    {
+        $order = $this->dispatchedOrder();
+        $shipment = Shipment::create([
+            'number' => 'SHP-C-'.$order->id,
+            'order_id' => $order->id,
+            'branch_id' => $order->branch_id,
+            'warehouse_id' => $order->warehouse_id,
+            'status' => 'not_shipped',
+            'recipient_name' => 'x', 'recipient_phone' => '0500000000',
+            'external_id' => '7432406',
+            'provider_status' => 'pending_pickup',
+            'delivery_status' => 'ready_for_pickup',
+        ]);
+
+        // مزوّد حقيقي يُرجع نجاحًا (لا نزيّف الـDispatcher كي يُنفَّذ تحديث اللقطة).
+        $driver = Mockery::mock(DeliveryProviderInterface::class);
+        $driver->shouldReceive('cancel')->andReturn(true);
+        $manager = Mockery::mock(DeliveryProviderManager::class);
+        $manager->shouldReceive('driver')->andReturn($driver);
+        $this->app->instance(DeliveryProviderManager::class, $manager);
+
+        app(OrderVoidService::class)->cancelWithReversal($order, $this->admin(), 'إلغاء');
+
+        $this->assertSame('cancelled', $shipment->fresh()->provider_status);
+        $this->assertSame('cancelled', $shipment->fresh()->delivery_status);
+
+        // العمود يقرأ provider_status لأحدث شحنة ⇒ يعرض «ملغى» بدل الحالة القديمة.
+        // (التحقّق على المصدر لا على نصّ الصفحة: قائمة فلتر الحالات تذكر كل الحالات.)
+        $this->assertSame('ملغى', OpostStatus::label(
+            $order->fresh()->latestShipment->provider_status,
+        ));
     }
 
     /** تنبيه مرئي في قائمة الطلبات ما دام الطرد نشطًا لدى المزوّد. */

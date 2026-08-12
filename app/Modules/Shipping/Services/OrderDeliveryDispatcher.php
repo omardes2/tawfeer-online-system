@@ -144,9 +144,12 @@ class OrderDeliveryDispatcher
 
             if ($ok) {
                 // تحديث لقطة الشحنة المحلية (خارج آلة الحالات — مجرّد انعكاس).
+                // provider_status ضمنها: هو المعروض في عمود «حالة أوبتيموس»، وبدونه يبقى
+                // الطلب ظاهرًا «بانتظار الاستلام» رغم إلغاء طرده فعلًا لديهم.
                 $order->shipments()->whereNotNull('external_id')->update([
                     'status' => 'cancelled',
                     'delivery_status' => 'cancelled',
+                    'provider_status' => 'cancelled',
                 ]);
                 $order->update(['delivery_status' => 'cancelled']);
 
