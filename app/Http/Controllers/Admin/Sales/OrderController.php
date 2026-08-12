@@ -151,9 +151,15 @@ class OrderController extends Controller
 
         $cityId = $request->validated('city_id');
 
+        // ربط الطلب بمنشئه ليستحق عمولته عند in_accounting: موظف المبيعات يُسنَد إليه
+        // (assigned_to)، والمسوّق يُسجَّل مسوّقًا (affiliate_id) — بدونهما لا مستفيد عمولة.
+        $creator = $request->user();
+
         $order = $this->service->create([
             'warehouse_id' => $warehouse->id,
             'branch_id' => $warehouse->branch_id,
+            'assigned_to' => $creator->hasAnyRole(['sales', 'sales_supervisor']) ? $creator->id : null,
+            'affiliate_id' => $creator->hasRole('affiliate') ? $creator->id : null,
             'customer_name' => $request->validated('customer_name'),
             'customer_phone' => $request->validated('customer_phone'),
             'customer_email' => $request->validated('customer_email'),

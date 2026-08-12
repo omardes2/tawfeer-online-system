@@ -59,6 +59,7 @@ class OrderService
                 'channel' => $data['channel'] ?? 'manual',
                 'status' => 'draft',
                 'assigned_to' => $data['assigned_to'] ?? null,
+                'affiliate_id' => $data['affiliate_id'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'created_by' => auth()->id(),
             ]);

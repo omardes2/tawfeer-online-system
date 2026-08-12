@@ -134,6 +134,42 @@ class SalesAdminWebTest extends TestCase
         $this->assertEmpty($order->tracking_number);
     }
 
+    /**
+     * ربط الطلب بمنشئه لاستحقاق العمولة: موظف المبيعات يُسنَد إليه (assigned_to)،
+     * والمسوّق يُسجَّل مسوّقًا (affiliate_id)، والأدمن بلا مستفيد — فالعمولة عند
+     * in_accounting تُحتسب للمستفيد المرتبط فقط.
+     */
+    public function test_order_creator_becomes_commission_beneficiary_by_role(): void
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+
+        $submit = function (User $creator) use ($warehouse) {
+            $variant = Product::factory()->create()->defaultVariant;
+            app(InventoryService::class)->receive($variant, $warehouse, 10, 50);
+            $this->actingAs($creator)->post('/admin/sales/orders', [
+                'customer_name' => 'زبون', 'customer_phone' => '0599000001',
+                ...$this->geo(),
+                'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 100]],
+            ])->assertSessionHasNoErrors();
+
+            return Order::latest('id')->first();
+        };
+
+        $sales = $this->withRole('sales');
+        $order = $submit($sales);
+        $this->assertSame($sales->id, $order->assigned_to);
+        $this->assertNull($order->affiliate_id);
+
+        $affiliate = $this->withRole('affiliate'); // يملك sales.orders.create من الـseeder.
+        $order = $submit($affiliate);
+        $this->assertSame($affiliate->id, $order->affiliate_id);
+        $this->assertNull($order->assigned_to);
+
+        $order = $submit($this->admin());
+        $this->assertNull($order->assigned_to);
+        $this->assertNull($order->affiliate_id);
+    }
+
     public function test_create_order_requires_name_phone_city_area_and_item(): void
     {
         // حقول مفقودة ⇒ أخطاء تحقّق لكل حقل (لا يُنشأ طلب).
