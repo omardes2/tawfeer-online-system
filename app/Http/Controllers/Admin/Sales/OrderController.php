@@ -156,30 +156,37 @@ class OrderController extends Controller
         // (assigned_to)، والمسوّق يُسجَّل مسوّقًا (affiliate_id) — بدونهما لا مستفيد عمولة.
         $creator = $request->user();
 
-        $order = $this->service->create([
-            'warehouse_id' => $warehouse->id,
-            'branch_id' => $warehouse->branch_id,
-            'assigned_to' => $creator->hasAnyRole(['sales', 'sales_supervisor']) ? $creator->id : null,
-            'affiliate_id' => $creator->hasRole('affiliate') ? $creator->id : null,
-            'customer_name' => $request->validated('customer_name'),
-            'customer_phone' => $request->validated('customer_phone'),
-            'customer_email' => $request->validated('customer_email'),
-            'shipping_address' => $request->validated('shipping_address'),
-            'city_id' => $cityId,
-            'area_id' => $request->validated('area_id'),
-            'has_return' => $request->boolean('has_return'),
-            'return_notes' => $request->validated('return_notes'),
-            'shipping_total' => $this->deliveryFeeFor($cityId),
-            'channel' => 'manual', // طلب توصيل — يُخصم مخزونيًا ومحاسبيًا فور التقديم، ثم يؤكّده الأدمن للتوصيل.
-            'notes' => $request->validated('notes'),
-        ], $items, (int) now()->year);
-
-        // «تقديم الطلب» = احتساب البيع فورًا: ترحيل محاسبي كامل + خصم الكميات من المخزون
-        // (حتى «الشحن»). إرسال الطلب لشركة التوصيل يبقى خطوة «تأكيد» لاحقة (للأدمن/المدير).
+        // الإنشاء والمعالجة في **معاملة واحدة**: أي فشل (ترحيل محاسبي، نقص مخزون…) يتراجع
+        // بالطلب كلّه فلا يبقى طلب معلّق لا يُرحَّل ولا يصل شركة التوصيل. «تقديم الطلب» =
+        // احتساب البيع فورًا (ترحيل + خصم مخزون حتى «الشحن»)، والإرسال للتوصيل خطوة تأكيد لاحقة.
         try {
-            $this->service->fulfillToShipped($order);
+            $order = DB::transaction(function () use ($request, $warehouse, $creator, $cityId, $items) {
+                $order = $this->service->create([
+                    'warehouse_id' => $warehouse->id,
+                    'branch_id' => $warehouse->branch_id,
+                    'assigned_to' => $creator->hasAnyRole(['sales', 'sales_supervisor']) ? $creator->id : null,
+                    'affiliate_id' => $creator->hasRole('affiliate') ? $creator->id : null,
+                    'customer_name' => $request->validated('customer_name'),
+                    'customer_phone' => $request->validated('customer_phone'),
+                    'customer_email' => $request->validated('customer_email'),
+                    'shipping_address' => $request->validated('shipping_address'),
+                    'city_id' => $cityId,
+                    'area_id' => $request->validated('area_id'),
+                    'has_return' => $request->boolean('has_return'),
+                    'return_notes' => $request->validated('return_notes'),
+                    'shipping_total' => $this->deliveryFeeFor($cityId),
+                    'channel' => 'manual',
+                    'notes' => $request->validated('notes'),
+                ], $items, (int) now()->year);
+
+                $this->service->fulfillToShipped($order);
+
+                return $order;
+            });
         } catch (ValidationException $e) {
             return back()->withInput()->with('error', collect($e->errors())->flatten()->first());
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', __('تعذّر تقديم الطلب ولم يُحفظ: :m', ['m' => $e->getMessage()]));
         }
 
         return redirect()->route('admin.sales.orders.show', $order)
@@ -229,20 +236,27 @@ class OrderController extends Controller
                 $warehouse->branch_id,
             );
 
-        $order = $this->service->create([
-            'warehouse_id' => $warehouse->id,
-            'branch_id' => $warehouse->branch_id,
-            'customer_id' => $customer?->id,
-            'customer_name' => $customer?->name ?? $request->validated('customer_name'),
-            'customer_phone' => $customer?->primary_phone ?? ($request->validated('customer_phone') ?? ''),
-            'channel' => 'pos', // علامة «مبيعات مباشرة»
-            'notes' => $request->validated('notes'),
-        ], $items, (int) now()->year);
-
+        // كالطلب العادي: الإنشاء والمعالجة معاملة واحدة — الفشل لا يترك مبيعة معلّقة.
         try {
-            $this->service->fulfillDirect($order);
+            $order = DB::transaction(function () use ($request, $warehouse, $customer, $items) {
+                $order = $this->service->create([
+                    'warehouse_id' => $warehouse->id,
+                    'branch_id' => $warehouse->branch_id,
+                    'customer_id' => $customer?->id,
+                    'customer_name' => $customer?->name ?? $request->validated('customer_name'),
+                    'customer_phone' => $customer?->primary_phone ?? ($request->validated('customer_phone') ?? ''),
+                    'channel' => 'pos', // علامة «مبيعات مباشرة»
+                    'notes' => $request->validated('notes'),
+                ], $items, (int) now()->year);
+
+                $this->service->fulfillDirect($order);
+
+                return $order;
+            });
         } catch (ValidationException $e) {
             return back()->withInput()->with('error', collect($e->errors())->flatten()->first());
+        } catch (\Throwable $e) {
+            return back()->withInput()->with('error', __('تعذّرت المبيعة ولم تُحفظ: :m', ['m' => $e->getMessage()]));
         }
 
         return redirect()->route('admin.sales.orders.show', $order)

@@ -40,7 +40,9 @@ class StoreOrderRequest extends FormRequest
             'items' => ['required', 'array', 'min:1'],
             'items.*.variant' => ['required', 'string', 'distinct', 'exists:product_variants,uuid'],
             'items.*.qty' => ['required', 'numeric', 'gt:0'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            // سعر أكبر من صفر: الصنف بلا سعر يُنتج قيدًا بلا إيراد فيسقط الترحيل لاحقًا،
+            // فيُمنع مبكرًا برسالة مفهومة بدل خطأ محاسبي غامض.
+            'items.*.unit_price' => ['required', 'numeric', 'gt:0'],
             'items.*.discount' => ['nullable', 'numeric', 'min:0'],
         ];
     }
@@ -64,6 +66,8 @@ class StoreOrderRequest extends FormRequest
             'items.*.variant.required' => __('اختر الصنف.'),
             'items.*.qty.required' => __('الكمية مطلوبة.'),
             'items.*.qty.gt' => __('الكمية يجب أن تكون أكبر من صفر.'),
+            'items.*.unit_price.required' => __('سعر الصنف مطلوب — حدّد سعر بيع للمنتج أولًا.'),
+            'items.*.unit_price.gt' => __('سعر الصنف يجب أن يكون أكبر من صفر — حدّد سعر بيع للمنتج أولًا.'),
         ];
     }
 

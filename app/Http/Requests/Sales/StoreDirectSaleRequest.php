@@ -26,7 +26,8 @@ class StoreDirectSaleRequest extends FormRequest
             'items' => ['required', 'array', 'min:1'],
             'items.*.variant' => ['required', 'string', 'distinct', 'exists:product_variants,uuid'],
             'items.*.qty' => ['required', 'numeric', 'gt:0'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            // كالطلب العادي: الصنف بلا سعر يُسقط الترحيل المحاسبي لاحقًا.
+            'items.*.unit_price' => ['required', 'numeric', 'gt:0'],
             'items.*.discount' => ['nullable', 'numeric', 'min:0'],
         ];
     }
