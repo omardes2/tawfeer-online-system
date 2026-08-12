@@ -61,7 +61,14 @@ class InventoryController extends Controller
         ]);
     }
 
-    /** كرت الصنف: بياناته + سجل المخزن (كل حركات المخزون على الصنف). */
+    /**
+     * كرت الصنف: بياناته + سجل المخزن — **الحركات الفعلية على الكمية فقط**.
+     *
+     * الحجز وتحرير الحجز إجراءان داخليان على دلو `reserved` لا يغيّران الرصيد الفعلي
+     * (كل بيع يولّد ثلاثتها: حجز ثم تحرير ثم صرف)، فعرضهما يُربك القراءة ويوحي بحركات
+     * لم تقع. تُستبعَد بالفلترة على `bucket = on_hand` لا بقائمة أنواع، فتظهر تلقائيًا
+     * أي أنواع جديدة تمسّ الرصيد فعلًا.
+     */
     public function showProduct(Product $product): View
     {
         $this->authorize('inventory.stocks.view');
@@ -70,6 +77,7 @@ class InventoryController extends Controller
 
         $ledger = InventoryLedger::query()
             ->whereIn('variant_id', $variantIds)
+            ->where('bucket', 'on_hand')
             ->with(['warehouse:id,name', 'movement:id,reason,reference_type,reference_id'])
             ->latest('id')->paginate(20);
 
