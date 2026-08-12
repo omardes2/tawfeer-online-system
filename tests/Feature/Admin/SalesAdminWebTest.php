@@ -539,13 +539,22 @@ class SalesAdminWebTest extends TestCase
             ->assertSee(route('admin.sales.orders.settle', $order), false);
     }
 
+    /** متغيّر برصيد كافٍ: تقديم الطلب ذرّي، فبلا مخزون لا يُنشأ طلب أصلًا. */
+    private function stockedVariant(float $qty = 10)
+    {
+        $variant = Product::factory()->create()->defaultVariant;
+        app(InventoryService::class)->receive($variant, Warehouse::where('code', 'WH-MAIN')->firstOrFail(), $qty, 5);
+
+        return $variant->fresh();
+    }
+
     public function test_confirm_without_live_provider_just_confirms(): void
     {
         // بلا مزوّد مُفعّل ⇒ تأكيد فقط دون إرسال ولا مهمة. نضبط القيمة صراحةً
         // حتى لا يعتمد الاختبار على ترتيب التنفيذ (تفادي تسرّب config من اختبار آخر).
         config()->set('shipping.provider', 'null');
         Queue::fake();
-        $variant = Product::factory()->create()->defaultVariant;
+        $variant = $this->stockedVariant();
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'customer_name' => 'سارة',
             'customer_phone' => '0599111111',
@@ -556,7 +565,9 @@ class SalesAdminWebTest extends TestCase
         $order = Order::latest('id')->first();
         $this->actingAs($this->admin())->post(route('admin.sales.orders.confirm', $order))->assertRedirect();
 
-        $this->assertSame('confirmed', $order->fresh()->status);
+        // التقديم يُتمّ المعالجة حتى «الشحن» داخليًا؛ المهم أن التأكيد بلا مزوّد لا يُرسل
+        // شيئًا ولا يدفع مهمة طابور — فلا رقم تتبّع.
+        $this->assertNotContains($order->fresh()->status, ['draft', 'new']);
         $this->assertNull($order->fresh()->tracking_number);
         Queue::assertNothingPushed();
     }
@@ -597,7 +608,7 @@ class SalesAdminWebTest extends TestCase
             'customer_name' => 'س', 'customer_phone' => '0599000000',
             'city_id' => $geo['city_id'], 'area_id' => $geo['area_id'], 'shipping_address' => $geo['shipping_address'],
             'channel' => 'manual',
-        ], [['variant_id' => Product::factory()->create()->defaultVariant->id, 'qty' => 1, 'unit_price' => 50]], 2026);
+        ], [['variant_id' => $this->stockedVariant()->id, 'qty' => 1, 'unit_price' => 50]], 2026);
 
         // موظف المبيعات والمسوّق: ممنوعان من التأكيد.
         foreach (['sales', 'affiliate'] as $role) {
@@ -623,7 +634,7 @@ class SalesAdminWebTest extends TestCase
         config()->set('shipping.drivers.faketrack.delivery', FakeTrackingDeliveryProvider::class);
         FakeTrackingDeliveryProvider::$cancelResult = true;
 
-        $variant = Product::factory()->create()->defaultVariant;
+        $variant = $this->stockedVariant();
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'customer_name' => 'ليان',
             'customer_phone' => '0599333333',
@@ -653,7 +664,7 @@ class SalesAdminWebTest extends TestCase
 
     public function test_delete_blocked_unless_order_and_delivery_cancelled(): void
     {
-        $variant = Product::factory()->create()->defaultVariant;
+        $variant = $this->stockedVariant();
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'customer_name' => 'نور', 'customer_phone' => '0599444444', ...$this->geo(),
             'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 50]],
@@ -667,7 +678,7 @@ class SalesAdminWebTest extends TestCase
 
     public function test_delete_allowed_when_order_and_delivery_both_cancelled(): void
     {
-        $variant = Product::factory()->create()->defaultVariant;
+        $variant = $this->stockedVariant();
         $this->actingAs($this->admin())->post('/admin/sales/orders', [
             'customer_name' => 'رامي', 'customer_phone' => '0599555555', ...$this->geo(),
             'items' => [['variant' => $variant->uuid, 'qty' => 1, 'unit_price' => 50]],
