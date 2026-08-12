@@ -33,7 +33,8 @@ class CommissionRuleRequest extends FormRequest
             'earner_type' => ['required', Rule::in(['sales', 'affiliate'])],
             'method' => ['required', Rule::in(['percent', 'fixed', 'margin'])],
             'rate_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'rate' => ['nullable', 'numeric', 'min:0', 'max:1', 'required_unless:method,fixed'],
+            // النسبة تلزم لطريقة «نسبة» فقط: «هامش الربح» يمنح الهامش كاملًا، و«مبلغ ثابت» له حقله.
+            'rate' => ['nullable', 'numeric', 'min:0', 'max:1', 'required_if:method,percent'],
             'amount' => ['nullable', 'numeric', 'min:0', 'required_if:method,fixed'],
             'user_id' => ['nullable', 'exists:users,id'],
             'campaign' => ['nullable', 'string', 'max:60'],

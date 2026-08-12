@@ -44,14 +44,18 @@
                         <option value="fixed">{{ __('commissions.method_fixed') }}</option>
                     </select>
 
-                    <div x-show="method !== 'fixed'">
+                    <div x-show="method === 'percent'">
                         <div class="relative">
                             <input type="number" step="0.01" min="0" max="100" name="rate_percent" value="{{ old('rate_percent') }}"
                                    placeholder="3" class="w-full rounded-md border-gray-300 text-sm pe-9">
                             <span class="absolute inset-y-0 end-3 grid place-items-center text-gray-400 text-sm">%</span>
                         </div>
-                        <p class="text-xs text-gray-400 mt-1" x-show="method === 'percent'">{{ __('commissions.percent_hint') }}</p>
-                        <p class="text-xs text-gray-400 mt-1" x-show="method === 'margin'" x-cloak>{{ __('commissions.margin_hint') }}</p>
+                        <p class="text-xs text-gray-400 mt-1">{{ __('commissions.percent_hint') }}</p>
+                    </div>
+
+                    {{-- الهامش يُمنح كاملًا — لا حقل نسبة. --}}
+                    <div x-show="method === 'margin'" x-cloak class="flex items-center">
+                        <p class="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2 w-full">{{ __('commissions.margin_hint') }}</p>
                     </div>
 
                     <div x-show="method === 'fixed'" x-cloak>
@@ -138,9 +142,12 @@
                                 <td class="py-2.5 px-3 tabular-nums">
                                     @if ($rule->method === 'fixed')
                                         {{ number_format((float) $rule->amount, 2) }}
+                                        <span class="text-xs text-gray-400">{{ __('commissions.method_fixed') }}</span>
+                                    @elseif ($rule->method === 'margin')
+                                        <span class="text-gray-800">{{ __('commissions.method_margin') }}</span>
                                     @else
                                         {{ rtrim(rtrim(number_format((float) $rule->rate * 100, 2), '0'), '.') }}%
-                                        <span class="text-xs text-gray-400">{{ __('commissions.method_'.$rule->method) }}</span>
+                                        <span class="text-xs text-gray-400">{{ __('commissions.method_percent') }}</span>
                                     @endif
                                 </td>
                                 <td class="py-2.5 px-3 text-gray-500 text-xs">

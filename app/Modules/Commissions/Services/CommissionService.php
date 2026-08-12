@@ -105,22 +105,39 @@ class CommissionService
 
     private function accrueSales(Order $order, OrderItem $item): void
     {
-        $basis = (float) $item->qty * (float) $item->unit_price - (float) $item->discount;
         $rule = $this->resolveRule('sales', [
             'user_id' => $order->assigned_to, 'product_id' => $item->variant?->product_id,
             'branch_id' => $order->branch_id,
         ]);
 
+        // «هامش الربح» يغيّر الأساس نفسه (سعر البيع − التكلفة) لا نسبةً من قيمة البضاعة،
+        // وإلا صار اختيار الطريقة بلا أثر لموظف المبيعات.
+        $cost = $rule?->method === 'margin' ? $this->itemCost($item) : null;
+        $basis = $cost !== null
+            ? $this->itemMargin($item, $cost)
+            : (float) $item->qty * (float) $item->unit_price - (float) $item->discount;
+
         [$amount, $rate] = $this->computeAmount($rule, 'sales', $basis, self::DEFAULT_SALES_RATE);
 
-        $this->createAccrual($order, $item, 'sales', $order->assigned_to, $basis, $rate, $amount, null, $rule);
+        $this->createAccrual($order, $item, 'sales', $order->assigned_to, $basis, $rate, $amount, $cost, $rule);
+    }
+
+    /** تكلفة البند وقت البيع (لقطة WAC) — أساس احتساب الهامش. */
+    private function itemCost(OrderItem $item): float
+    {
+        return (float) ($item->wholesale_cost_snapshot ?? $item->variant?->average_cost ?? 0);
+    }
+
+    /** هامش الربح للبند: (سعر البيع − التكلفة) × الكمية، بلا سالب. */
+    private function itemMargin(OrderItem $item, float $cost): float
+    {
+        return max(((float) $item->unit_price - $cost) * (float) $item->qty, 0);
     }
 
     private function accrueAffiliate(Order $order, OrderItem $item): void
     {
-        $cost = (float) ($item->wholesale_cost_snapshot ?? $item->variant?->average_cost ?? 0);
-        $margin = ((float) $item->unit_price - $cost) * (float) $item->qty;
-        $margin = max($margin, 0);
+        $cost = $this->itemCost($item);
+        $margin = $this->itemMargin($item, $cost);
         $rule = $this->resolveRule('affiliate', [
             'user_id' => $order->affiliate_id, 'product_id' => $item->variant?->product_id,
             'branch_id' => $order->branch_id,
@@ -139,6 +156,10 @@ class CommissionService
         }
         if ($rule->method === 'fixed') {
             return [(float) $rule->amount, null];
+        }
+        // «هامش الربح» = الهامش كاملًا للمستفيد — لا نسبة منه (قرار المالك).
+        if ($rule->method === 'margin') {
+            return [round($basis, 2), 1.0];
         }
         $rate = (float) ($rule->rate ?? $defaultRate);
 

@@ -289,6 +289,24 @@ class CommissionLedgerTest extends TestCase
         $this->assertEquals('6.00', CommissionEntry::where('order_id', $order->id)->first()->amount);
     }
 
+    /**
+     * «هامش الربح كاملًا»: الأساس يصبح (سعر البيع − التكلفة) × الكمية ويُمنح كاملًا
+     * بلا نسبة — لموظف المبيعات كما للمسوّق.
+     */
+    public function test_margin_method_grants_full_margin_without_rate(): void
+    {
+        $rep = $this->actor('sales');
+        CommissionRule::create(['earner_type' => 'sales', 'method' => 'margin', 'user_id' => $rep->id, 'priority' => 6]);
+
+        $order = $this->order($rep, price: 100, cost: 60, qty: 2); // الهامش = (100−60)×2 = 80
+        $this->svc->accrueForOrder($order);
+
+        $entry = CommissionEntry::where('order_id', $order->id)->first();
+        $this->assertEquals('80.00', $entry->amount);  // الهامش كاملًا لا نسبة منه
+        $this->assertEquals('80.00', $entry->basis);   // الأساس هو الهامش نفسه
+        $this->assertEquals('60.00', $entry->wholesale_cost_snapshot);
+    }
+
     public function test_admin_approve_via_web(): void
     {
         $finance = $this->actor('finance');
