@@ -353,7 +353,9 @@ class CommissionService
 
     /**
      * دفع أرباح مستفيد بمبلغ حرّ (قد يقلّ/يزيد عن المستحق) من خزينة/بنك محدّد،
-     * موثّقًا بسند صرف مالي (payment) بحالة مسودّة تعتمده وتُرحّله المالية.
+     * موثّقًا بسند صرف مالي (payment) **يُعتمد ويُرحّل فورًا** (قرار المالك): الصرف
+     * يقع لحظة الضغط، فيخرج المبلغ من الخزينة ويُقيَّد مصروف العمولات مباشرةً بلا
+     * انتظار اعتماد المالية. التصحيح لاحقًا يكون بعكس السند لا بحذفه (ADR-016).
      */
     public function payAmount(
         User $actor,
@@ -389,6 +391,10 @@ class CommissionService
                 'notes' => $notes,
             ]);
 
+            // اعتماد وترحيل فوريان: مدين مصروف العمولات / دائن الخزينة.
+            app(VoucherService::class)->approve($voucher, $actor);
+            app(VoucherService::class)->post($voucher, $actor);
+
             return CommissionPayout::create([
                 'earner_id' => $earnerId,
                 'earner_type' => $earnerType,
@@ -398,10 +404,10 @@ class CommissionService
                 'reference' => $reference ?: $voucher->number,
                 'period_start' => $periodStart,
                 'period_end' => $periodEnd,
-                'status' => 'draft',
+                'status' => 'paid',
                 'notes' => $notes,
                 'created_by' => $actor->id,
-                'paid_at' => null,
+                'paid_at' => now(),
             ]);
         });
     }

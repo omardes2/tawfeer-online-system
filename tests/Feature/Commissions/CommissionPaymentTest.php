@@ -61,9 +61,13 @@ class CommissionPaymentTest extends TestCase
         return [$affiliate, $earned];
     }
 
+    /** خزينة بحساب GL — الترحيل الفوري للسند يتطلّبه. */
     private function treasury(): Treasury
     {
-        return Treasury::create(['code' => 'CB-T', 'name' => 'الصندوق', 'type' => 'cash', 'currency' => 'ILS', 'is_active' => true]);
+        $gl = Account::create(['code' => '1011-9999', 'name' => 'صندوق اختبار', 'type' => 'asset', 'is_postable' => true, 'is_active' => true]);
+
+        return Treasury::create(['code' => 'CB-T', 'name' => 'الصندوق', 'type' => 'cash', 'currency' => 'ILS',
+            'gl_account_id' => $gl->id, 'is_active' => true]);
     }
 
     private function expenseAccount(): Account
@@ -71,7 +75,8 @@ class CommissionPaymentTest extends TestCase
         return Account::create(['code' => '5199', 'name' => 'عمولات المسوّقين', 'type' => 'expense', 'is_postable' => true, 'is_active' => true]);
     }
 
-    public function test_pay_partial_amount_creates_draft_voucher_and_reduces_outstanding(): void
+    /** الصرف يُرحَّل فورًا: سند مُرحّل + دفعة مدفوعة + خصم مباشر من الرصيد. */
+    public function test_pay_partial_amount_posts_voucher_immediately(): void
     {
         [$affiliate, $earned] = $this->eligibleAffiliate();
         $this->assertGreaterThan(0, $earned);
@@ -79,17 +84,18 @@ class CommissionPaymentTest extends TestCase
 
         $payout = $this->svc->payAmount($actor, $affiliate->id, 'affiliate', 30, $this->treasury()->id, $this->expenseAccount()->id, '2026-08-01', '2026-08-31', 'REF1', 'دفعة أولى');
 
-        // سند صرف مسودّة مرتبط
+        // سند صرف **مُرحّل** لا مسودّة، وله قيد محاسبي.
         $this->assertDatabaseHas('financial_vouchers', [
-            'id' => $payout->financial_voucher_id, 'kind' => 'payment', 'status' => 'draft',
+            'id' => $payout->financial_voucher_id, 'kind' => 'payment', 'status' => 'posted',
             'employee_id' => $affiliate->id, 'amount' => '30.00',
         ]);
-        $this->assertDatabaseHas('commission_payouts', ['id' => $payout->id, 'total' => '30.00', 'status' => 'draft']);
+        $this->assertNotNull(FinancialVoucher::find($payout->financial_voucher_id)->journal_entry_id);
+        $this->assertDatabaseHas('commission_payouts', ['id' => $payout->id, 'total' => '30.00', 'status' => 'paid']);
 
-        // الرصيد: لم يُرحَّل بعد ⇒ مدفوع 0، قيد الاعتماد 30، المتبقّي = earned − 30
+        // الرصيد: مدفوع 30 فورًا، لا شيء قيد الاعتماد.
         $b = $this->svc->balance($affiliate->id, 'affiliate');
-        $this->assertEquals(0.0, $b['paid']);
-        $this->assertEquals(30.0, $b['pending_payout']);
+        $this->assertEquals(30.0, $b['paid']);
+        $this->assertEquals(0.0, $b['pending_payout']);
         $this->assertEquals(round($earned - 30, 2), $b['outstanding']);
     }
 
@@ -104,31 +110,33 @@ class CommissionPaymentTest extends TestCase
         $this->assertEquals(-50.0, $b['outstanding']); // سلفة تتجاوز المستحق
     }
 
-    public function test_posted_voucher_counts_as_paid(): void
+    /** القيد المُرحّل: مدين مصروف العمولات / دائن الخزينة — والمبلغ يُحتسب مدفوعًا. */
+    public function test_payment_posts_expense_against_treasury(): void
     {
         [$affiliate] = $this->eligibleAffiliate();
         $actor = User::factory()->create();
-        $payout = $this->svc->payAmount($actor, $affiliate->id, 'affiliate', 20, $this->treasury()->id, $this->expenseAccount()->id);
+        $treasury = $this->treasury();
+        $expense = $this->expenseAccount();
 
-        // محاكاة اعتماد وترحيل المالية للسند
-        FinancialVoucher::whereKey($payout->financial_voucher_id)->update(['status' => 'posted']);
+        $payout = $this->svc->payAmount($actor, $affiliate->id, 'affiliate', 20, $treasury->id, $expense->id);
+
+        $entry = FinancialVoucher::find($payout->financial_voucher_id)->journalEntry;
+        $this->assertNotNull($entry);
+        $this->assertEquals(20.0, round((float) $entry->lines->where('account_id', $expense->id)->sum('debit'), 2));
+        $this->assertEquals(20.0, round((float) $entry->lines->where('account_id', $treasury->gl_account_id)->sum('credit'), 2));
 
         $b = $this->svc->balance($affiliate->id, 'affiliate');
         $this->assertEquals(20.0, $b['paid']);
         $this->assertEquals(0.0, $b['pending_payout']);
     }
 
-    /** كشف الحساب (وواجهة الـAPI) لا يعدّ الدفعة المسودّة مدفوعة — المال لم يخرج بعد. */
-    public function test_statement_excludes_unposted_payout_from_paid(): void
+    /** كشف الحساب يعدّ الدفعة مدفوعة فور الصرف (السند مُرحّل لحظتها). */
+    public function test_statement_counts_payment_as_paid_immediately(): void
     {
         [$affiliate] = $this->eligibleAffiliate();
         $actor = User::factory()->create();
-        $payout = $this->svc->payAmount($actor, $affiliate->id, 'affiliate', 15, $this->treasury()->id, $this->expenseAccount()->id);
+        $this->svc->payAmount($actor, $affiliate->id, 'affiliate', 15, $this->treasury()->id, $this->expenseAccount()->id);
 
-        $this->assertEquals(0.0, $this->svc->statement($affiliate->id, 'affiliate')['paid']);
-
-        // بعد ترحيل المالية للسند تُحتسب مدفوعة.
-        FinancialVoucher::whereKey($payout->financial_voucher_id)->update(['status' => 'posted']);
         $this->assertEquals(15.0, $this->svc->statement($affiliate->id, 'affiliate')['paid']);
     }
 
@@ -180,7 +188,7 @@ class CommissionPaymentTest extends TestCase
             'period_start' => '2026-08-01', 'period_end' => '2026-08-31',
         ])->assertRedirect()->assertSessionHas('status');
 
-        $this->assertDatabaseHas('commission_payouts', ['earner_id' => $affiliate->id, 'total' => '25.00', 'status' => 'draft']);
+        $this->assertDatabaseHas('commission_payouts', ['earner_id' => $affiliate->id, 'total' => '25.00', 'status' => 'paid']);
     }
 
     /** النموذج المبسّط: بلا حساب مقابل ⇒ يُحسم تلقائيًا لحساب مصروف العمولات (5040). */

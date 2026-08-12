@@ -80,7 +80,7 @@ return [
     'reference' => 'Reference',
     'notes' => 'Notes',
     'pay' => 'Pay',
-    'payment_recorded' => 'Payment voucher created as draft — awaiting finance approval and posting.',
+    'payment_recorded' => 'Payment made and posted to the ledger.',
     'payments_archive' => 'Payments archive',
     'payment_date' => 'Date',
     'voucher' => 'Voucher',
@@ -100,7 +100,7 @@ return [
     'bank_accounts' => 'Bank accounts',
     'cash_boxes' => 'Cash boxes',
     'notes_placeholder' => 'Optional note shown on the voucher',
-    'pay_hint' => 'Creates a draft payment voucher for finance to approve and post.',
+    'pay_hint' => 'Posted immediately: cash leaves the treasury/bank and commission expense is booked.',
 
     'q_who' => '1) Who does this rule apply to?',
     'q_how_much' => '2) How much is the commission?',
