@@ -30,16 +30,21 @@ class SupplierService
         });
     }
 
-    /** الرمز التسلسلي التالي للمورد: أكبر رمز رقمي + 1، بدءًا من 1000. */
+    /**
+     * الرمز التسلسلي التالي للمورد: أكبر رمز رقمي + 1، بدءًا من 1000.
+     *
+     * **يشمل المحذوفين ناعمًا** لأن قيد التفرّد في قاعدة البيانات يشملهم: بدون
+     * `withTrashed()` يُعاد استخدام رمز موردٍ محذوف فيفشل الإدراج بـUniqueConstraintViolation.
+     */
     public function nextCode(): string
     {
-        $max = Supplier::query()->pluck('code')
+        $max = Supplier::withTrashed()->pluck('code')
             ->filter(fn ($c) => ctype_digit((string) $c))
             ->map(fn ($c) => (int) $c)
             ->max();
 
         $next = max(1000, ($max ?? 999) + 1);
-        while (Supplier::where('code', (string) $next)->exists()) {
+        while (Supplier::withTrashed()->where('code', (string) $next)->exists()) {
             $next++;
         }
 

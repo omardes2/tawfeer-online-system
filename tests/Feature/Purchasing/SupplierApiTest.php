@@ -55,6 +55,23 @@ class SupplierApiTest extends TestCase
         ])->assertUnprocessable();
     }
 
+    /**
+     * الرمز التلقائي يتخطّى رموز المحذوفين ناعمًا — قيد التفرّد في قاعدة البيانات يشملهم،
+     * فإعادة استخدام رمز موردٍ محذوف كانت تُفشل الحفظ بـUniqueConstraintViolation (500).
+     */
+    public function test_auto_code_skips_soft_deleted_supplier_codes(): void
+    {
+        Sanctum::actingAs($this->admin());
+
+        $first = Supplier::factory()->create(['code' => '1000']);
+        $first->delete(); // حذف ناعم — الصف باقٍ في الجدول
+
+        $res = $this->postJson('/api/v1/purchasing/suppliers', ['name' => 'مورد جديد'])->assertCreated();
+
+        $this->assertNotEquals('1000', $res->json('data.code'));
+        $this->assertEquals('1001', $res->json('data.code'));
+    }
+
     public function test_update_and_delete_supplier(): void
     {
         Sanctum::actingAs($this->admin());
