@@ -36,6 +36,7 @@
         ]],
         ['المنتجات', 'box', [
             ['admin.products.index', 'المنتجات', ['viewAny', $P('Catalog\\Models\\Product')], 'admin.products.*'],
+            ['admin.products.import', 'استيراد أصناف', ['create', $P('Catalog\\Models\\Product')], 'admin.products.import*'],
             ['admin.categories.index', 'الفئات', ['viewAny', $P('Catalog\\Models\\Category')], 'admin.categories.*'],
             ['admin.brands.index', 'العلامات التجارية', ['viewAny', $P('Catalog\\Models\\Brand')], 'admin.brands.*'],
             ['admin.tags.index', 'الوسوم', ['viewAny', $P('Catalog\\Models\\ProductTag')], 'admin.tags.*'],

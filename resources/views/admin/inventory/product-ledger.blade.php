@@ -5,6 +5,7 @@
     @php($num = fn ($v) => rtrim(rtrim(number_format((float) $v, 2, '.', ''), '0'), '.') ?: '0')
     @php($typeLabels = [
         'purchase_in' => __('إدخال (شراء)'), 'sale_out' => __('صرف (بيع)'),
+        'opening_in' => __('رصيد افتتاحي'),
         'adjustment_in' => __('تسوية زيادة'), 'adjustment_out' => __('تسوية نقص'),
         'transfer_in' => __('تحويل وارد'), 'transfer_out' => __('تحويل صادر'),
         'purchase_return_out' => __('مرتجع مشتريات'), 'return_in' => __('مرتجع عميل'),

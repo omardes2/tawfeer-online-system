@@ -90,6 +90,18 @@ class InventoryService
         return $this->tx(fn () => $this->record($variant, $warehouse, 'damage_out', 'damaged', $qty, null, false, $opts));
     }
 
+    /**
+     * رصيد افتتاحي — بضاعة موجودة أصلًا عند بدء التشغيل (لا شراء من مورد).
+     * يزيد on_hand ويؤسّس WAC بتكلفتها. القيد المقابل يُرحَّل مرّة واحدة للاستيراد كلّه
+     * في ProductImportService (مدين المخزون / دائن الأرصدة الافتتاحية).
+     */
+    public function openingStock(ProductVariant $variant, Warehouse $warehouse, float $qty, ?float $unitCost = null, array $opts = []): InventoryMovement
+    {
+        $this->assertPositive($qty);
+
+        return $this->tx(fn () => $this->record($variant, $warehouse, 'opening_in', 'on_hand', $qty, $unitCost, $unitCost !== null, $opts));
+    }
+
     /** حجز — يزيد دلو reserved (لا يمسّ on_hand). */
     public function reserve(ProductVariant $variant, Warehouse $warehouse, float $qty, array $opts = []): InventoryMovement
     {

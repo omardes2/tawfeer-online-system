@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\Catalog\BrandController;
 use App\Http\Controllers\Admin\Catalog\CategoryController;
 use App\Http\Controllers\Admin\Catalog\ProductAttributeController;
 use App\Http\Controllers\Admin\Catalog\ProductController;
+use App\Http\Controllers\Admin\Catalog\ProductImportController;
 use App\Http\Controllers\Admin\Catalog\ProductTagController;
 use App\Http\Controllers\Admin\Catalog\ProductVariantController;
 use App\Http\Controllers\Admin\Catalog\UnitController;
@@ -170,6 +171,9 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::delete('attributes/{attribute}/values/{value}', [ProductAttributeController::class, 'destroyValue'])->name('attributes.values.destroy');
 
     // المنتجات ووسائطها (Phase 2.3)
+    // الاستيراد قبل الـresource كي لا تبتلع products/{product} المسار «products/import».
+    Route::get('products/import', [ProductImportController::class, 'form'])->name('products.import');
+    Route::post('products/import', [ProductImportController::class, 'upload'])->name('products.import.upload');
     Route::resource('products', ProductController::class)->except('show');
     Route::post('products/{product}/toggle-visibility', [ProductController::class, 'toggleVisibility'])->name('products.toggle-visibility');
     Route::post('products/{product}/images', [ProductController::class, 'storeImage'])->name('products.images.store');
