@@ -119,10 +119,18 @@ class CommissionService
         $this->createAccrual($order, $item, 'sales', $order->assigned_to, $basis, $rate, $amount, null, $rule);
     }
 
-    /** تكلفة البند وقت البيع (لقطة WAC) — أساس احتساب الهامش. */
+    /**
+     * **سعر الجملة** وقت البيع — أساس ربح المسوّق (يشتري بالجملة ويبيع بالمفرّق)،
+     * لا تكلفة الشراء (WAC) التي تخصّ تكلفة البضاعة المباعة محاسبيًا. الاحتياط:
+     * سعر الجملة الحالي للمتغيّر، ثم التكلفة إن لم يُحدَّد سعر جملة أصلًا.
+     */
     private function itemCost(OrderItem $item): float
     {
-        return (float) ($item->wholesale_cost_snapshot ?? $item->variant?->average_cost ?? 0);
+        $wholesale = $item->wholesale_price_snapshot ?? $item->variant?->wholesale_price;
+
+        return (float) ($wholesale > 0
+            ? $wholesale
+            : ($item->wholesale_cost_snapshot ?? $item->variant?->average_cost ?? 0));
     }
 
     /** هامش الربح للبند: (سعر البيع − التكلفة) × الكمية، بلا سالب. */

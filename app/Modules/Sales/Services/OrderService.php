@@ -441,10 +441,14 @@ class OrderService
 
     private function syncItems(Order $order, array $items): void
     {
-        // لقطة تكلفة الجملة وقت البيع (BR-ORD-18): مرجع ثابت للربح والتكلفة والعمولة —
-        // تُجمَّد هنا فلا تتغيّر بتغيّر WAC لاحقًا. بدونها تُحتسب التكلفة صفرًا في التقارير.
-        $costs = ProductVariant::whereIn('id', array_column($items, 'variant_id'))
-            ->pluck('average_cost', 'id');
+        // لقطتان مختلفتان وقت البيع (BR-ORD-18) تُجمَّدان فلا تتغيّران لاحقًا:
+        //  • تكلفة الشراء (WAC) — أساس تكلفة البضاعة المباعة محاسبيًا.
+        //  • سعر الجملة — أساس ربح المسوّق (سعر البيع − سعر الجملة). خلطهما كان يجعل
+        //    ربح المسوّق يُحتسب على تكلفة الشراء بدل سعر الجملة.
+        $variants = ProductVariant::whereIn('id', array_column($items, 'variant_id'))
+            ->get(['id', 'average_cost', 'wholesale_price']);
+        $costs = $variants->pluck('average_cost', 'id');
+        $wholesale = $variants->pluck('wholesale_price', 'id');
 
         foreach ($items as $item) {
             $qty = (float) $item['qty'];
@@ -460,6 +464,7 @@ class OrderService
                 'tax_amount' => 0,
                 'line_total' => ($qty * $unitPrice) - $discount,
                 'wholesale_cost_snapshot' => round((float) ($item['wholesale_cost_snapshot'] ?? $costs[$item['variant_id']] ?? 0), 2),
+                'wholesale_price_snapshot' => round((float) ($item['wholesale_price_snapshot'] ?? $wholesale[$item['variant_id']] ?? 0), 2),
                 'qty_reserved' => 0,
                 'qty_shipped' => 0,
             ]);

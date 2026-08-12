@@ -289,6 +289,29 @@ class CommissionLedgerTest extends TestCase
         $this->assertEquals('6.00', CommissionEntry::where('order_id', $order->id)->first()->amount);
     }
 
+    /**
+     * ربح المسوّق = سعر البيع − **سعر الجملة** (لا تكلفة الشراء WAC):
+     * جملة 70 وبيع 100 ⇒ 30 للقطعة — حتى لو كان متوسط تكلفة الشراء مختلفًا (73.81).
+     */
+    public function test_affiliate_margin_uses_wholesale_price_not_purchase_cost(): void
+    {
+        $aff = $this->actor('affiliate');
+        $variant = $this->variant(price: 100, cost: 73.81);
+        $variant->update(['wholesale_price' => 70]);
+
+        $order = app(OrderService::class)->create([
+            'branch_id' => Branch::default()->id, 'warehouse_id' => $this->warehouse->id,
+            'customer_id' => null, 'customer_name' => 'x', 'customer_phone' => '0500000000',
+            'affiliate_id' => $aff->id,
+        ], [['variant_id' => $variant->id, 'qty' => 1, 'unit_price' => 100, 'discount' => 0]], 2026);
+
+        $this->svc->accrueForOrder($order->fresh('items.variant'));
+
+        $entry = CommissionEntry::where('earner_type', 'affiliate')->first();
+        $this->assertEquals('30.00', $entry->amount); // 100 − 70 (لا 26.19)
+        $this->assertEquals('70.00', $order->items()->first()->wholesale_price_snapshot);
+    }
+
     /** «هامش الربح كاملًا» للمسوّق: الهامش يُمنح كاملًا بلا نسبة. */
     public function test_margin_method_grants_full_margin_without_rate(): void
     {

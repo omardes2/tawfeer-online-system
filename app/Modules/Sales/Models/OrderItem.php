@@ -16,6 +16,8 @@ class OrderItem extends Model
         'tax_rate', 'tax_amount', 'line_total', 'qty_reserved', 'qty_shipped',
         // Phase 4.1 — لقطات السعر/التكلفة وتعديل السعر اليدوي (BR-ORD-18، المتطلّب 2).
         'retail_price_snapshot', 'wholesale_cost_snapshot', 'price_change_reason', 'price_approved_by',
+        // سعر الجملة وقت البيع — أساس ربح المسوّق (منفصل عن تكلفة الشراء أعلاه).
+        'wholesale_price_snapshot',
     ];
 
     protected $casts = [
@@ -29,6 +31,7 @@ class OrderItem extends Model
         'qty_shipped' => 'decimal:3',
         'retail_price_snapshot' => 'decimal:2',
         'wholesale_cost_snapshot' => 'decimal:2',
+        'wholesale_price_snapshot' => 'decimal:2',
     ];
 
     public function order(): BelongsTo
