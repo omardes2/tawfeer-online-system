@@ -53,16 +53,41 @@ class OrderVoidService
         $this->reverseEffects($order, $actor, $reason ?: __('إلغاء الطلب (عكس الأثر المحاسبي)'), delete: false);
     }
 
+    /**
+     * إلغاء الشحنة لدى المزوّد وتسجيل النتيجة على الطلب.
+     *
+     * ينجح ⇒ يُمسح أثر الفشل. يفشل ⇒ يُحفظ السبب فيظهر تنبيه في قائمة الطلبات وتلتقطه
+     * المكنسة (shipping:cancel-pending) فتعيد المحاولة كل دقيقة حتى ينجح.
+     *
+     * @return array{status: string, message?: string}
+     */
+    public function cancelAtProvider(Order $order): array
+    {
+        if (empty($order->tracking_number) && empty($order->delivery_external_id)) {
+            return ['status' => 'skipped']; // لم يُرسَل للمزوّد أصلًا.
+        }
+
+        try {
+            $result = $this->dispatcher->cancelShipment($order);
+        } catch (\Throwable $e) {
+            $result = ['status' => 'failed', 'message' => $e->getMessage()];
+        }
+
+        $failed = ($result['status'] ?? null) === 'failed';
+        $order->forceFill([
+            'delivery_cancel_error' => $failed ? mb_substr((string) ($result['message'] ?? __('تعذّر الإلغاء لدى المزوّد.')), 0, 500) : null,
+            'delivery_cancel_attempted_at' => now(),
+        ])->save();
+
+        return $result;
+    }
+
     private function reverseEffects(Order $order, ?User $actor, string $reason, bool $delete): void
     {
-        // 1) إلغاء الشحنة لدى المزوّد — خارج المعاملة (اتصال شبكي)، أفضل جهد.
-        if (! empty($order->tracking_number) || ! empty($order->delivery_external_id)) {
-            try {
-                $this->dispatcher->cancelShipment($order);
-            } catch (\Throwable) {
-                // فشل الإلغاء لدى المزوّد لا يمنع العكس المحاسبي.
-            }
-        }
+        // 1) إلغاء الشحنة لدى المزوّد — خارج المعاملة (اتصال شبكي). الفشل لا يمنع العكس
+        //    المحاسبي، لكنه **يُسجَّل** على الطلب: ابتلاعه صمتًا كان يُبقي الطرد نشطًا لدى
+        //    شركة التوصيل فيصل العميل بضاعةً لطلب ملغى. المكنسة تعيد المحاولة حتى ينجح.
+        $this->cancelAtProvider($order);
 
         DB::transaction(function () use ($order, $actor, $reason, $delete) {
             $order->loadMissing('items');

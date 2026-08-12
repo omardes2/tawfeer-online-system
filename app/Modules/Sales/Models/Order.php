@@ -35,6 +35,7 @@ class Order extends Model
         'city_id', 'area_id', 'has_return', 'return_notes',
         'tracking_number', 'delivery_external_id', 'delivery_status',
         'delivery_dispatch_error', 'delivery_dispatch_attempts', 'delivery_dispatch_attempted_at',
+        'delivery_cancel_error', 'delivery_cancel_attempted_at',
         'channel', 'status', 'payment_status', 'assigned_to', 'affiliate_id',
         'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'total', 'amount_paid',
         'notes', 'cancel_reason',
@@ -57,6 +58,7 @@ class Order extends Model
         'cancelled_at' => 'datetime',
         'settled_at' => 'datetime',
         'return_received_at' => 'datetime',
+        'delivery_cancel_attempted_at' => 'datetime',
     ];
 
     public function branch(): BelongsTo

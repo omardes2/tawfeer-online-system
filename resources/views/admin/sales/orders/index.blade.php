@@ -168,6 +168,14 @@
                         @endif
                     </td>
                     <td class="whitespace-nowrap text-xs">
+                        @if ($o->delivery_cancel_error)
+                            {{-- الطرد ما زال نشطًا لدى شركة التوصيل رغم إلغاء الطلب — يُعاد المحاولة كل دقيقة. --}}
+                            <span class="inline-flex items-center gap-1 rounded-md bg-rose-50 text-rose-700 px-2 py-0.5 mb-1"
+                                  title="{{ $o->delivery_cancel_error }}">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                                {{ __('لم تُلغَ لدى التوصيل') }}
+                            </span>
+                        @endif
                         @php $ps = $o->latestShipment?->provider_status; @endphp
                         @if ($ps)
                             <div class="flex flex-col items-start gap-1">

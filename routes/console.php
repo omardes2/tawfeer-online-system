@@ -14,6 +14,8 @@ Artisan::command('inspire', function () {
 | ومتوقّفة ذاتيًا حين لا مزوّد توصيل مُفعّل (no-op)، و idempotent (لا تكرار للشحنات).
 */
 Schedule::command('shipping:dispatch-pending')->everyMinute()->withoutOverlapping();
+// إلغاء الطرود لدى المزوّد للطلبات الملغاة التي تعذّر إلغاؤها — الطرد النشط لطلب ملغى خسارة.
+Schedule::command('shipping:cancel-pending')->everyMinute()->withoutOverlapping();
 
 /*
 | جدولة عمليات التوصيل (Phase 4.3 / ADR-039) — مفعّلة بالإعداد فقط (config/delivery.php).

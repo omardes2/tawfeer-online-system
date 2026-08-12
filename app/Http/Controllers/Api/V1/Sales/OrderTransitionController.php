@@ -7,6 +7,7 @@ use App\Http\Requests\Sales\CancelOrderRequest;
 use App\Http\Resources\Sales\OrderResource;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
+use App\Modules\Sales\Services\OrderVoidService;
 
 class OrderTransitionController extends Controller
 {
@@ -55,11 +56,19 @@ class OrderTransitionController extends Controller
         return $this->respond($this->service->deliver($order));
     }
 
-    public function cancel(CancelOrderRequest $request, Order $order): OrderResource
+    /**
+     * الإلغاء عبر الـAPI يسلك نفس مسار الواجهة: يُلغي الطلب **ويُلغي طرده لدى شركة
+     * التوصيل** (وإن تعذّر سُجّل الفشل وأعادت المكنسة المحاولة). كان يُلغي محليًا فقط
+     * فيبقى الطرد نشطًا لديهم.
+     */
+    public function cancel(CancelOrderRequest $request, Order $order, OrderVoidService $void): OrderResource
     {
         $this->authorize('cancel', $order);
 
-        return $this->respond($this->service->cancel($order, $request->validated('reason')));
+        $order = $this->service->cancel($order, $request->validated('reason'));
+        $void->cancelAtProvider($order);
+
+        return $this->respond($order->fresh());
     }
 
     private function respond(Order $order): OrderResource

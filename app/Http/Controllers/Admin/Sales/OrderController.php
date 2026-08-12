@@ -639,13 +639,14 @@ class OrderController extends Controller
         // إلغاء الشحنة من شركة التوصيل (Opost) مباشرةً (متزامن) — لا اعتماد على طابور خلفية،
         // فالإلغاء ينعكس فورًا لدى المزوّد (يعالج مشكلة بقاء الشحنة نشطة بعد إلغاء الطلب).
         if ($sentToProvider && config('shipping.provider', 'null') !== 'null') {
-            $result = $dispatcher->cancelShipment($order);
+            // عبر خدمة الإلغاء كي يُسجَّل الفشل على الطلب فتلتقطه المكنسة وتعيد المحاولة.
+            $result = $void->cancelAtProvider($order);
 
             if (($result['status'] ?? null) === 'cancelled') {
                 return back()->with('success', __('أُلغي الطلب وحُرّر الحجز، وأُلغيت الشحنة من شركة التوصيل.'));
             }
 
-            return back()->with('warning', __('أُلغي الطلب وحُرّر الحجز، لكن تعذّر إلغاء الشحنة من شركة التوصيل: :msg', ['msg' => $result['message'] ?? '']));
+            return back()->with('warning', __('أُلغي الطلب وحُرّر الحجز، لكن **لم تُلغَ الشحنة لدى شركة التوصيل**: :msg — سيُعاد المحاولة تلقائيًا كل دقيقة، وتظهر علامة تنبيه على الطلب حتى ينجح.', ['msg' => $result['message'] ?? '']));
         }
 
         return back()->with('success', __('أُلغي الطلب وحُرّر الحجز.'));
