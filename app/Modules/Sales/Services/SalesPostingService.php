@@ -128,6 +128,18 @@ class SalesPostingService
      * طلبات التوصيل → ذمم شركة التوصيل (1050)؛ المبيعات المباشرة → حساب العميل الفرعي
      * تحت «ذمم العملاء 1100» (أو الحساب العام 1100 لعميل غير مسجّل).
      */
+    /**
+     * المبلغ الذي يدخل الدفاتر فعلًا = إجمالي الطلب − رسوم التوصيل.
+     *
+     * رسوم التوصيل تمرّ من العميل إلى شركة التوصيل مباشرةً (المندوب يقبضها ويحتفظ بها)،
+     * فلا تُقيَّد لا في قيد البيع ولا في قيد التحصيل. المصدر الوحيد لهذا الحساب حتى تبقى
+     * الذمّة على شركة التوصيل مطابقة تمامًا لما يُورَّد إلينا.
+     */
+    public function bookableTotal(Order $order): float
+    {
+        return round(max((float) $order->total - (float) $order->shipping_total, 0), 2);
+    }
+
     public function receivableAccountCode(Order $order): ?string
     {
         if ($order->channel !== 'pos') {
@@ -173,16 +185,15 @@ class SalesPostingService
             $revenueByAccount[$code] = round(($revenueByAccount[$code] ?? 0) + $net, 2);
         }
 
-        $shipping = max(0.0, (float) $order->shipping_total);
+        // رسوم التوصيل **خارج الدفاتر** (قرار المالك): المندوب يقبضها من العميل ويحتفظ بها
+        // أجرةً له، فلا تُقيَّد إيرادًا ولا مصروفًا ولا ذمّة — الذمّة على شركة التوصيل هي
+        // قيمة البضاعة وحدها، وهي نفسها ما يُورَّد لنا لاحقًا. راجع bookableTotal().
         $tax = max(0.0, (float) $order->tax_total);
-        $creditTotal = round(array_sum($revenueByAccount) + $shipping + $tax, 2);
+        $creditTotal = round(array_sum($revenueByAccount) + $tax, 2);
 
         $lines = [['account_code' => $debitCode, 'debit' => $creditTotal, 'credit' => 0]];
         foreach ($revenueByAccount as $code => $amount) {
             $lines[] = ['account_code' => $code, 'debit' => 0, 'credit' => $amount];
-        }
-        if ($shipping > 0) {
-            $lines[] = ['account_code' => $this->resolver->code('shipping_revenue', null, self::DOC), 'debit' => 0, 'credit' => $shipping];
         }
         if ($tax > 0) {
             $lines[] = ['account_code' => $this->resolver->code('tax', null, self::DOC), 'debit' => 0, 'credit' => $tax];

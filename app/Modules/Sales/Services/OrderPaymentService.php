@@ -129,9 +129,16 @@ class OrderPaymentService
             return null;
         }
 
+        // نفس أساس قيد البيع: قيمة البضاعة بلا رسوم التوصيل — فتُقفَل ذمّة الطلب على
+        // «ذمم شركة التوصيل» تمامًا (لو حُصّل الإجمالي لصار الحساب دائنًا بقيمة التوصيل).
+        $bookable = $this->posting->bookableTotal($order);
+        if ($bookable <= 0) {
+            return null;
+        }
+
         $voucher = $this->vouchers->create('receipt', [
             'treasury_id' => $treasury->id,
-            'amount' => round((float) $order->total, 2),
+            'amount' => $bookable,
             'counter_account_id' => $account->id,
             'customer_id' => $order->customer_id,
             'reference' => $order->number,

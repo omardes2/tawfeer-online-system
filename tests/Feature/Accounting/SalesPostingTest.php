@@ -183,8 +183,11 @@ class SalesPostingTest extends TestCase
         $this->assertSame('paid', $order->fresh()->payment_status);
     }
 
-    /** قيد الإيراد يشمل الشحن والذمم تساوي الإجمالي مع وجود خصم وشحن معًا. */
-    public function test_receivable_matches_total_with_discount_and_shipping(): void
+    /**
+     * رسوم التوصيل خارج الدفاتر: الذمّة على شركة التوصيل = قيمة البضاعة بعد الخصم فقط،
+     * ولا يظهر «إيراد الشحن» في القيد — المندوب يقبض الرسوم ويحتفظ بها أجرةً له.
+     */
+    public function test_shipping_is_excluded_from_revenue_entry(): void
     {
         $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
         $product = Product::factory()->create();
@@ -200,8 +203,10 @@ class SalesPostingTest extends TestCase
         app(OrderService::class)->confirm($order);
         $order->refresh();
 
-        // 100 − 10 + 20 شحن = 110.
+        // إجمالي الفاتورة على العميل 110 (100 − 10 + 20 شحن)…
         $this->assertEqualsWithDelta(110, (float) $order->total, 0.01);
-        $this->assertEqualsWithDelta(110, $this->balance('1050'), 0.01);
+        // …لكن الذمّة المُقيَّدة 90 فقط (بلا الشحن)، ولا سطر لإيراد الشحن.
+        $this->assertEqualsWithDelta(90, $this->balance('1050'), 0.01);
+        $this->assertEqualsWithDelta(0, $this->balance('4020'), 0.01);
     }
 }

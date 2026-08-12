@@ -7,6 +7,7 @@ use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Accounting\Services\AccountingService;
 use App\Modules\Commissions\Services\CommissionService;
 use App\Modules\Sales\Services\OrderPaymentService;
+use App\Modules\Sales\Services\SalesPostingService;
 use App\Modules\Settlements\Models\DeliverySettlement;
 use App\Modules\Settlements\Models\SettlementLine;
 use App\Modules\Shipping\Models\Shipment;
@@ -77,7 +78,8 @@ class SettlementService
                 if ($settlement->lines()->where('shipment_id', $shipment->id)->exists()) {
                     continue;
                 }
-                $cod = (float) $shipment->order->total;
+                // ما يُورَّد إلينا هو قيمة البضاعة بلا رسوم التوصيل (المندوب يحتفظ بها).
+                $cod = app(SalesPostingService::class)->bookableTotal($shipment->order);
                 $fees = (float) ShipmentFeeComponent::where('shipment_id', $shipment->id)->sum('amount');
                 $this->pushLine($settlement, $shipment->order_id, $shipment->id, $cod, $fees, 0);
             }

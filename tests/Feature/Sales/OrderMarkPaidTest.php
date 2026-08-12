@@ -117,18 +117,18 @@ class OrderMarkPaidTest extends TestCase
     }
 
     /**
-     * التحصيل يدخل «صندوق الأونلاين» بسند قبض مُرحّل: مدين الصندوق بكامل الإجمالي /
-     * دائن «ذمم شركة التوصيل 1050» — فيصفَّر رصيد الطلب على 1050.
+     * التحصيل يدخل «صندوق الأونلاين» بسند قبض مُرحّل **بقيمة البضاعة بلا رسوم التوصيل**
+     * (المندوب يحتفظ بها): مدين الصندوق / دائن «ذمم شركة التوصيل 1050» — فتُقفَل الذمّة تمامًا.
      */
     public function test_funds_at_accounting_posts_collection_into_online_cashbox(): void
     {
         $s = $this->shipment();
         $order = $s->order;
-        $total = (float) $order->total;
+        $goods = (float) $order->total - (float) $order->shipping_total; // 220 − 20 = 200
 
-        // بعد تأكيد البيع (في المساعد): 1050 مدين بالإجمالي — التحصيل يجب أن يقفله.
+        // قيد البيع أثبت الذمّة بقيمة البضاعة وحدها — التحصيل يجب أن يقفلها بالكامل.
         $codBefore = $this->balance('1050');
-        $this->assertEqualsWithDelta($total, $codBefore, 0.001);
+        $this->assertEqualsWithDelta($goods, $codBefore, 0.001);
 
         $this->toAccounting($s);
 
@@ -140,12 +140,12 @@ class OrderMarkPaidTest extends TestCase
         $voucher = FinancialVoucher::where('reference', $order->number)->where('kind', 'receipt')->first();
         $this->assertNotNull($voucher);
         $this->assertEquals('posted', $voucher->status);
-        $this->assertEqualsWithDelta($total, (float) $voucher->amount, 0.001);
+        $this->assertEqualsWithDelta($goods, (float) $voucher->amount, 0.001); // بلا التوصيل
         $this->assertEquals($treasury->id, $voucher->treasury_id);
 
-        // الصندوق زاد بالإجمالي، وذمّة الطلب على 1050 أُقفلت (عاد الرصيد صفرًا).
-        $this->assertEqualsWithDelta($total, $this->balance($treasury->glAccount->code), 0.001);
-        $this->assertEqualsWithDelta($codBefore - $total, $this->balance('1050'), 0.001);
+        // الصندوق زاد بقيمة البضاعة، وذمّة الطلب على 1050 عادت صفرًا.
+        $this->assertEqualsWithDelta($goods, $this->balance($treasury->glAccount->code), 0.001);
+        $this->assertEqualsWithDelta(0, $this->balance('1050'), 0.001);
     }
 
     /** المدفوع إلكترونيًا مسبقًا: المندوب لم يقبض شيئًا ⇒ لا سند تحصيل عند in_accounting. */
