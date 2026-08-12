@@ -38,11 +38,14 @@ class TreasurySeeder extends Seeder
                 ['name' => 'صندوق الأونلاين', 'name_en' => 'Online Cashbox', 'type' => 'asset',
                     'parent_id' => $cashParent->id, 'is_postable' => true, 'currency' => 'SAR', 'is_active' => true],
             );
-            Treasury::query()->firstOrCreate(
-                ['code' => 'CB-ONLINE'],
-                ['name' => 'صندوق الأونلاين', 'name_en' => 'Online Cashbox', 'type' => 'cash',
-                    'gl_account_id' => $onlineGl->id, 'currency' => 'SAR', 'is_active' => true, 'is_default' => false],
-            );
+            // لا إنشاء إن وُجدت خزينة على نفس الحساب (قيد تفرّد gl_account_id).
+            if (! Treasury::withTrashed()->where('gl_account_id', $onlineGl->id)->exists()) {
+                Treasury::query()->firstOrCreate(
+                    ['code' => 'CB-ONLINE'],
+                    ['name' => 'صندوق الأونلاين', 'name_en' => 'Online Cashbox', 'type' => 'cash',
+                        'gl_account_id' => $onlineGl->id, 'currency' => 'SAR', 'is_active' => true, 'is_default' => false],
+                );
+            }
         }
 
         if ($bankParent) {

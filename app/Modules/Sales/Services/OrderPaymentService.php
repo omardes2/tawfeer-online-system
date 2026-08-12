@@ -158,6 +158,8 @@ class OrderPaymentService
         }
 
         return $base()->where('code', 'CB-ONLINE')->first()
+            // خزينة قائمة على حساب «صندوق الأونلاين» 1011-0002 (أنشأها المستخدم يدويًا بأي رمز/اسم).
+            ?? $base()->whereHas('glAccount', fn ($q) => $q->where('code', '1011-0002'))->first()
             ?? $base()->where(fn ($q) => $q->where('name', 'like', '%أونلاين%')->orWhere('name', 'like', '%اونلاين%'))->first();
     }
 }

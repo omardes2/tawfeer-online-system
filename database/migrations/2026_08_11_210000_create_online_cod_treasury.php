@@ -25,6 +25,13 @@ return new class extends Migration
                 'parent_id' => $cashParent->id, 'is_postable' => true, 'currency' => 'SAR', 'is_active' => true],
         );
 
+        // خزينة قائمة على نفس الحساب (أنشأها المستخدم يدويًا بأي رمز) تفي بالغرض — إنشاء
+        // ثانية يكسر قيد تفرّد gl_account_id (كما حدث على الإنتاج). withTrashed لأن القيد
+        // يشمل الصفوف المحذوفة ناعمًا.
+        if (Treasury::withTrashed()->where('gl_account_id', $gl->id)->exists()) {
+            return;
+        }
+
         Treasury::query()->firstOrCreate(
             ['code' => 'CB-ONLINE'],
             ['name' => 'صندوق الأونلاين', 'name_en' => 'Online Cashbox', 'type' => 'cash',
