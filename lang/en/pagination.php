@@ -16,4 +16,6 @@ return [
     'previous' => '&laquo; Previous',
     'next' => 'Next &raquo;',
 
+    'go_to_page' => 'Go to page :page',
+    'page_of' => 'Page :current of :last',
 ];

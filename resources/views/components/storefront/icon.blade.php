@@ -1,4 +1,4 @@
-@props(['name', 'class' => 'w-5 h-5', 'filled' => false])
+@props(['name', 'class' => 'w-5 h-5', 'filled' => false, 'strokeWidth' => '1.7'])
 
 {{--
     أيقونات خطّية موحّدة (نمط واحد عبر الموقع). مسار واحد لكل أيقونة بدل تكرار
@@ -38,7 +38,7 @@
     </svg>
 @else
     <svg {{ $attributes->merge(['class' => $class]) }} fill="none" viewBox="0 0 24 24"
-         stroke-width="1.7" stroke="currentColor" aria-hidden="true">
+         stroke-width="{{ $strokeWidth }}" stroke="currentColor" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" d="{{ $d }}"/>
     </svg>
 @endif

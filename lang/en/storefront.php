@@ -135,5 +135,18 @@ return [
     'footer_help' => 'Help',
     'my_orders' => 'My orders',
 
+
+    // Listing & filters (stage 3)
+    'price_range' => 'Price range',
+    'clear_all' => 'Clear all',
+    'remove_filter' => 'Remove filter: :name',
+    'breadcrumb' => 'Breadcrumb',
+    'pagination' => 'Pagination',
+    'clear_search' => 'Clear search',
+    'no_search_results' => 'No products matched “:q”',
+    'no_categories_hint' => 'Categories will appear here once added.',
+    'products_count' => '{0} No products|{1} 1 product|[2,*] :count products',
+    'categories_count' => '{0} No categories|{1} 1 category|[2,*] :count categories',
+
     'all_rights' => 'All rights reserved',
 ];

@@ -65,6 +65,8 @@ class RecommendationService
         $ids = DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->join('product_variants', 'order_items.variant_id', '=', 'product_variants.id')
+            // الطلب المحذوف عُكِست قيوده، فلا يُبقي أثره في «الأكثر مبيعًا».
+            ->whereNull('orders.deleted_at')
             ->where('orders.status', '!=', 'cancelled')
             ->where('orders.created_at', '>=', now()->subDays(90))
             ->groupBy('product_variants.product_id')

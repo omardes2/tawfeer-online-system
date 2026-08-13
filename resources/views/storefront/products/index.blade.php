@@ -2,6 +2,7 @@
     $q = $filters['q'] ?? null;
     $activeCategory = $category ?? null;
     $activeBrand = $brand ?? null;
+
     if ($q) {
         $pageEvent = ['name' => 'SearchPerformed', 'payload' => ['q' => $q, 'results' => $products->total()]];
     } elseif ($activeCategory) {
@@ -9,103 +10,149 @@
     } else {
         $pageEvent = ['name' => 'ProductListViewed', 'payload' => []];
     }
+
+    // خيارات الترتيب — المدعومة في `StorefrontService::applySort` فقط.
+    $sortOptions = [
+        'newest' => __('storefront.sort_newest'),
+        'price_asc' => __('storefront.sort_price_asc'),
+        'price_desc' => __('storefront.sort_price_desc'),
+        'name' => __('storefront.sort_name'),
+    ];
+    $currentSort = $filters['sort'] ?? 'newest';
+
+    // الفلاتر المطبَّقة — تُعرض كرقائق قابلة للإزالة.
+    $chips = [];
+    if ($activeCategory) {
+        $chips[] = ['label' => $activeCategory->name, 'remove' => array_merge($filters, ['category' => null])];
+    } elseif (! empty($filters['category'])) {
+        $chips[] = ['label' => $filters['category'], 'remove' => array_merge($filters, ['category' => null])];
+    }
+    if ($activeBrand) {
+        $chips[] = ['label' => $activeBrand->name, 'remove' => array_merge($filters, ['brand' => null])];
+    } elseif (! empty($filters['brand'])) {
+        $chips[] = ['label' => $filters['brand'], 'remove' => array_merge($filters, ['brand' => null])];
+    }
+    if (($filters['min'] ?? '') !== '' || ($filters['max'] ?? '') !== '') {
+        $chips[] = [
+            'label' => trim(($filters['min'] ?? '0').' – '.($filters['max'] ?? '∞').' '.__('storefront.currency')),
+            'remove' => array_merge($filters, ['min' => null, 'max' => null]),
+        ];
+    }
+
+    $breadcrumbs = [__('storefront.home') => route('storefront.home')];
+    if ($activeCategory) {
+        $breadcrumbs[__('storefront.categories')] = route('storefront.categories');
+    }
+    $breadcrumbs[$heading] = null;
 @endphp
 
 <x-storefront.layout :title="$heading" :page-event="$pageEvent">
-    <div class="flex items-center justify-between gap-3 mb-4">
-        <div>
-            <h1 class="text-xl font-bold text-gray-900">{{ $heading }}</h1>
-            <p class="text-sm text-gray-500">{{ __('storefront.results_count') }}: {{ $products->total() }}</p>
-        </div>
 
-        {{-- الترتيب --}}
+    <x-storefront.page-header :title="$heading" :breadcrumbs="$breadcrumbs"
+        :subtitle="trans_choice('storefront.products_count', $products->total(), ['count' => $products->total()])">
+
+        {{-- الترتيب: نموذج يُرسَل عند التغيير، ويحمل بقية المعاملات كي لا تضيع --}}
         <form action="{{ route('storefront.shop') }}" method="GET" class="shrink-0">
             @foreach (['category', 'brand', 'q', 'min', 'max'] as $k)
-                @if (! empty($filters[$k])) <input type="hidden" name="{{ $k }}" value="{{ $filters[$k] }}"> @endif
+                @if (($filters[$k] ?? '') !== '') <input type="hidden" name="{{ $k }}" value="{{ $filters[$k] }}"> @endif
             @endforeach
             <label for="sort" class="sr-only">{{ __('storefront.sort') }}</label>
-            <select id="sort" name="sort" onchange="this.form.submit()"
-                    class="rounded-lg border-gray-300 text-sm py-2 focus:border-emerald-500 focus:ring-emerald-500">
-                <option value="newest" @selected(($filters['sort'] ?? '') === 'newest')>{{ __('storefront.sort_newest') }}</option>
-                <option value="price_asc" @selected(($filters['sort'] ?? '') === 'price_asc')>{{ __('storefront.sort_price_asc') }}</option>
-                <option value="price_desc" @selected(($filters['sort'] ?? '') === 'price_desc')>{{ __('storefront.sort_price_desc') }}</option>
-                <option value="name" @selected(($filters['sort'] ?? '') === 'name')>{{ __('storefront.sort_name') }}</option>
+            <select id="sort" name="sort" onchange="this.form.submit()" class="sf-select !py-2.5 min-h-10">
+                @foreach ($sortOptions as $value => $label)
+                    <option value="{{ $value }}" @selected($currentSort === $value)>{{ $label }}</option>
+                @endforeach
             </select>
         </form>
-    </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {{-- التصفية --}}
-        <aside class="lg:col-span-1" x-data="{ open: false }">
-            <button type="button" @click="open = !open"
-                    class="lg:hidden w-full mb-3 inline-flex items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm">
-                {{ __('storefront.filters') }}
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
-            </button>
+        {{-- الجوّال: زرّ يفتح درج التصفية --}}
+        {{-- `x-data` المجرّدة تُنشئ سياق Alpine؛ بدونها لا يُسجَّل `@click` أصلًا
+             ولا يُطلق الحدث، فيبقى الدرج مغلقًا. --}}
+        <button type="button" x-data @click="$dispatch('open-filters')"
+                class="sf-btn-outline lg:hidden min-h-10 !px-3">
+            <x-storefront.icon name="tag" class="w-4 h-4" />
+            {{ __('storefront.filters') }}
+            @if (count($chips))
+                <span class="grid place-items-center min-w-5 h-5 px-1 rounded-full bg-brand-600 text-white text-[11px] font-bold">{{ count($chips) }}</span>
+            @endif
+        </button>
+    </x-storefront.page-header>
 
-            <form action="{{ route('storefront.shop') }}" method="GET"
-                  class="bg-white rounded-xl border border-gray-200 p-4 space-y-4"
-                  :class="{ 'hidden lg:block': !open }">
-                @if ($q) <input type="hidden" name="q" value="{{ $q }}"> @endif
-                @if (! empty($filters['sort'])) <input type="hidden" name="sort" value="{{ $filters['sort'] }}"> @endif
+    {{-- رقائق الفلاتر المطبَّقة --}}
+    @if (count($chips))
+        <div class="flex items-center gap-2 flex-wrap mb-4">
+            @foreach ($chips as $chip)
+                <a href="{{ route('storefront.shop', array_filter($chip['remove'], fn ($v) => $v !== null && $v !== '')) }}"
+                   class="sf-badge sf-badge-soft min-h-8 ps-3 pe-2 gap-1.5 hover:bg-brand-100 transition-colors"
+                   aria-label="{{ __('storefront.remove_filter', ['name' => $chip['label']]) }}">
+                    {{ $chip['label'] }}
+                    <x-storefront.icon name="close" class="w-3.5 h-3.5" />
+                </a>
+            @endforeach
+            <a href="{{ route('storefront.shop', array_filter(['q' => $q, 'sort' => $filters['sort'] ?? null])) }}"
+               class="text-xs font-semibold text-[color:var(--sf-text-soft)] hover:text-brand-600 py-2 px-1 transition-colors">
+                {{ __('storefront.clear_all') }}
+            </a>
+        </div>
+    @endif
 
-                <div>
-                    <label for="f-category" class="block text-sm font-medium text-gray-700 mb-1">{{ __('storefront.category') }}</label>
-                    <select id="f-category" name="category" class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
-                        <option value="">{{ __('storefront.all') }}</option>
-                        @foreach ($categories as $c)
-                            <option value="{{ $c->slug }}" @selected(($filters['category'] ?? '') === $c->slug)>{{ $c->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div>
-                    <label for="f-brand" class="block text-sm font-medium text-gray-700 mb-1">{{ __('storefront.brand') }}</label>
-                    <select id="f-brand" name="brand" class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
-                        <option value="">{{ __('storefront.all') }}</option>
-                        @foreach ($brands as $b)
-                            <option value="{{ $b->slug }}" @selected(($filters['brand'] ?? '') === $b->slug)>{{ $b->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label for="f-min" class="block text-sm font-medium text-gray-700 mb-1">{{ __('storefront.min_price') }}</label>
-                        <input id="f-min" type="number" min="0" step="0.01" name="min" value="{{ $filters['min'] ?? '' }}"
-                               class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
-                    </div>
-                    <div>
-                        <label for="f-max" class="block text-sm font-medium text-gray-700 mb-1">{{ __('storefront.max_price') }}</label>
-                        <input id="f-max" type="number" min="0" step="0.01" name="max" value="{{ $filters['max'] ?? '' }}"
-                               class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-2 pt-1">
-                    <button type="submit" class="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium py-2">{{ __('storefront.apply') }}</button>
-                    <a href="{{ route('storefront.shop') }}" class="rounded-lg border border-gray-300 text-sm text-gray-600 px-3 py-2 hover:bg-gray-50">{{ __('storefront.clear') }}</a>
-                </div>
-            </form>
+    <div class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
+        {{-- الشريط الجانبي (حواسيب) --}}
+        <aside class="hidden lg:block">
+            <div class="sf-card sf-card-pad sticky top-[7.5rem]">
+                <h2 class="font-bold mb-4 text-[color:var(--sf-text)]">{{ __('storefront.filters') }}</h2>
+                <x-storefront.filters :filters="$filters" :categories="$categories" :brands="$brands"
+                    :action="route('storefront.shop')" uid="d" />
+            </div>
         </aside>
 
         {{-- الشبكة --}}
-        <div class="lg:col-span-3">
+        <div class="min-w-0">
             @if ($products->isEmpty())
-                <div class="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center">
-                    <svg class="mx-auto h-12 w-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5 12 3 3.75 7.5m16.5 0L12 12m8.25-4.5v9L12 21m0-9L3.75 7.5m0 0v9L12 21"/></svg>
-                    <p class="text-gray-700 font-medium">{{ __('storefront.no_products') }}</p>
-                    <p class="text-sm text-gray-500 mt-1">{{ __('storefront.no_products_hint') }}</p>
-                    <a href="{{ route('storefront.shop') }}" class="inline-block mt-4 text-sm text-emerald-600 hover:underline">{{ __('storefront.back_to_shop') }}</a>
-                </div>
+                <x-storefront.empty-state
+                    :icon="$q ? 'search' : 'box'"
+                    :title="$q ? __('storefront.no_search_results', ['q' => $q]) : __('storefront.no_products')"
+                    :description="__('storefront.no_products_hint')"
+                    :action="count($chips) || $q ? route('storefront.shop') : null"
+                    :action-label="count($chips) || $q ? __('storefront.clear_all') : null" />
             @else
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
                     @foreach ($products as $product)
                         <x-storefront.product-card :product="$product" />
                     @endforeach
                 </div>
-                <div class="mt-6">{{ $products->links() }}</div>
+
+                @if ($products->hasPages())
+                    <nav class="mt-8" aria-label="{{ __('storefront.pagination') }}">{{ $products->links('vendor.pagination.storefront') }}</nav>
+                @endif
             @endif
+        </div>
+    </div>
+
+    {{-- درج التصفية (جوّال) — نفس مكوّن الفلاتر، بلا تكرار للحقول --}}
+    <div x-data="{ open: false }" @open-filters.window="open = true"
+         @keydown.escape.window="open = false" class="lg:hidden">
+        <div x-show="open" x-cloak x-transition.opacity @click="open = false"
+             class="fixed inset-0 z-40 sf-scrim"></div>
+
+        <div x-show="open" x-cloak
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="translate-y-0" x-transition:leave-end="translate-y-full"
+             class="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] flex flex-col bg-white rounded-t-2xl shadow-xl sf-safe-bottom"
+             role="dialog" aria-modal="true" :aria-label="'{{ __('storefront.filters') }}'">
+            <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-[color:var(--sf-border)]">
+                <h2 class="font-bold text-[color:var(--sf-text)]">{{ __('storefront.filters') }}</h2>
+                <button type="button" @click="open = false"
+                        class="grid place-items-center w-10 h-10 rounded-xl text-[color:var(--sf-text-soft)] hover:bg-[color:var(--sf-bg)]"
+                        aria-label="{{ __('storefront.close_menu') }}">
+                    <x-storefront.icon name="close" class="w-6 h-6" />
+                </button>
+            </div>
+            <div class="overflow-y-auto p-4">
+                <x-storefront.filters :filters="$filters" :categories="$categories" :brands="$brands"
+                    :action="route('storefront.shop')" uid="m" />
+            </div>
         </div>
     </div>
 

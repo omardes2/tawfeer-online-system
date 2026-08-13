@@ -68,7 +68,7 @@
         @endauth
 
         @unless ($inStock)
-            <span class="absolute inset-x-0 bottom-0 bg-[color:var(--sf-text)]/75 text-white text-xs font-semibold text-center py-1.5">
+            <span class="sf-oos">
                 {{ __('storefront.out_of_stock') }}
             </span>
         @endunless

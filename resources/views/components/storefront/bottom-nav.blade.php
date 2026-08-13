@@ -22,7 +22,10 @@
         <a href="{{ route($item['route']) }}" @class(['is-active' => $item['active']])
            @if ($item['active']) aria-current="page" @endif>
             <span class="relative">
-                <x-storefront.icon :name="$item['icon']" :filled="$item['active']" />
+                {{-- بلا تعبئة: أيقونات مثل «البحث» و«السلة» مسارها مفتوح، فتعبئتها
+                     تُنتج كتلة مصمتة. النشاط يُميَّز باللون وسماكة الخطّ. --}}
+                <x-storefront.icon :name="$item['icon']"
+                                   :stroke-width="$item['active'] ? '2.2' : '1.7'" />
                 @if (! empty($item['badge']))
                     <span x-data x-show="$store.cart.count > 0" x-text="$store.cart.count" x-cloak
                           class="absolute -top-1.5 -end-2 min-w-[18px] h-[18px] px-1 grid place-items-center

@@ -62,9 +62,7 @@
     {{-- Structured data (JSON-LD) — pages push here --}}
     @stack('structured-data')
 
-    <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
-    <link href="https://fonts.bunny.net/css?family=cairo:400,500,600,700,800&display=swap" rel="stylesheet" />
-
+    {{-- الخطّ مُستضاف محليًا داخل حزمة CSS — لا طلب لطرف ثالث --}}
     @vite(['resources/css/storefront.css', 'resources/js/storefront.js'])
 </head>
 <body class="min-h-screen flex flex-col antialiased sf-has-bottomnav">
@@ -132,10 +130,17 @@
                 <form action="{{ route('storefront.search') }}" method="GET" role="search"
                       class="hidden md:block flex-1 max-w-2xl xl:max-w-4xl mx-6 lg:mx-10">
                     <label for="sf-search" class="sr-only">{{ __('storefront.search') }}</label>
-                    <div class="relative">
-                        <input id="sf-search" type="search" name="q" value="{{ request('q') }}"
+                    <div class="relative" x-data="{ q: @js(request('q') ?? '') }">
+                        <input id="sf-search" x-ref="sfq" type="search" name="q" x-model="q"
                                placeholder="{{ __('storefront.search_placeholder_long') }}"
-                               class="sf-input !rounded-full !bg-[color:var(--sf-bg)] ps-4 pe-12 !py-3">
+                               class="sf-input !rounded-full !bg-[color:var(--sf-bg)] ps-4 pe-24 !py-3">
+                        {{-- مسح النصّ دون مغادرة الصفحة --}}
+                        <button type="button" x-show="q.length > 0" x-cloak @click="q = ''; $refs.sfq.focus()"
+                                class="absolute inset-y-0 my-auto end-12 grid place-items-center w-9 h-9 rounded-full
+                                       text-[color:var(--sf-text-soft)] hover:text-[color:var(--sf-text)] transition-colors"
+                                aria-label="{{ __('storefront.clear_search') }}">
+                            <x-storefront.icon name="close" class="w-4 h-4" />
+                        </button>
                         <button type="submit" aria-label="{{ __('storefront.search') }}"
                                 class="absolute inset-y-0 my-auto end-1 grid place-items-center w-10 h-10 rounded-full bg-brand-600 text-white hover:bg-brand-700 transition-colors">
                             <x-storefront.icon name="search" class="w-5 h-5" />
@@ -171,13 +176,19 @@
             {{-- البحث (جوّال) — بعرض الشاشة تحت الترويسة --}}
             <form action="{{ route('storefront.search') }}" method="GET" role="search" class="md:hidden pb-3">
                 <label for="sf-search-m" class="sr-only">{{ __('storefront.search') }}</label>
-                <div class="relative">
+                <div class="relative" x-data="{ q: @js(request('q') ?? '') }">
                     <span class="absolute inset-y-0 start-0 ps-3.5 grid place-items-center text-[color:var(--sf-text-soft)] pointer-events-none">
                         <x-storefront.icon name="search" class="w-5 h-5" />
                     </span>
-                    <input id="sf-search-m" type="search" name="q" value="{{ request('q') }}"
+                    <input id="sf-search-m" x-ref="sfqm" type="search" name="q" x-model="q"
                            placeholder="{{ __('storefront.search_placeholder_long') }}"
-                           class="sf-input !rounded-full !bg-[color:var(--sf-bg)] ps-11 pe-4">
+                           class="sf-input !rounded-full !bg-[color:var(--sf-bg)] ps-11 pe-12">
+                    <button type="button" x-show="q.length > 0" x-cloak @click="q = ''; $refs.sfqm.focus()"
+                            class="absolute inset-y-0 my-auto end-1 grid place-items-center w-10 h-10 rounded-full
+                                   text-[color:var(--sf-text-soft)]"
+                            aria-label="{{ __('storefront.clear_search') }}">
+                        <x-storefront.icon name="close" class="w-5 h-5" />
+                    </button>
                 </div>
             </form>
 
@@ -198,7 +209,7 @@
         {{-- درج القائمة (جوّال) --}}
         <div x-show="menu" x-cloak @keydown.escape.window="menu = false" class="md:hidden">
             <div x-show="menu" x-transition.opacity @click="menu = false"
-                 class="fixed inset-0 z-40 bg-[color:var(--sf-text)]/40"></div>
+                 class="fixed inset-0 z-40 sf-scrim"></div>
 
             {{-- يفتح من جهة زرّ القائمة: `start` = اليمين في العربية.
                  التحويلات لا تنقلب مع الاتجاه، فتُقلب يدويًا للإنجليزية. --}}

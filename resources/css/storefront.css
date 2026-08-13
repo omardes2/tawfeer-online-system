@@ -1,6 +1,20 @@
+/* ==========================================================================
+   خطّ Cairo — مُستضاف محليًا (لا CDN): لا طلب لطرف ثالث ولا انتظار شبكة خارجية
+   قبل رسم النصّ. أربعة أوزان فقط بمجموعتَي المحارف العربية واللاتينية،
+   و`font-display: swap` يأتي ضمن الحزمة فيظهر النصّ فورًا بخطّ احتياطي.
+   ========================================================================== */
+@import '@fontsource/cairo/arabic-400.css';
+@import '@fontsource/cairo/arabic-500.css';
+@import '@fontsource/cairo/arabic-600.css';
+@import '@fontsource/cairo/arabic-700.css';
+@import '@fontsource/cairo/latin-400.css';
+@import '@fontsource/cairo/latin-600.css';
+@import '@fontsource/cairo/latin-700.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 
 /* ==========================================================================
    نظام تصميم متجر توفير أونلاين — RTL عربي، Mobile-first.
@@ -214,6 +228,37 @@
         animation: sf-pulse 1.4s ease-in-out infinite;
     }
     @keyframes sf-pulse { 0%, 100% { opacity: 1 } 50% { opacity: .55 } }
+
+    /* ---- طبقات التعتيم ----
+       `bg-[color:var(--sf-text)]/40` لا تُولّد قاعدة: Tailwind لا يحسب الشفافية فوق
+       متغيّر CSS، فكانت الطبقة شفّافة تمامًا — الدرج بلا تعتيم، وشريط «غير متوفّر»
+       نصّه أبيض على صورة فاتحة. القيم هنا صريحة فتعمل دائمًا. */
+    .sf-scrim { background: rgba(34, 34, 34, .45); }
+    .sf-oos {
+        @apply absolute inset-x-0 bottom-0 text-white text-xs font-semibold text-center py-1.5;
+        background: rgba(34, 34, 34, .78);
+    }
+
+    /* ---- ترقيم الصفحات ---- */
+    .sf-page-link {
+        @apply inline-flex items-center justify-center min-w-10 h-10 px-3 text-sm font-semibold
+               bg-white transition-colors;
+        border: 1px solid var(--sf-border);
+        border-radius: var(--sf-radius-sm);
+        color: var(--sf-text);
+    }
+    .sf-page-link:hover { background: var(--sf-primary-light); border-color: var(--sf-primary); color: var(--sf-primary); }
+    .sf-page-link[aria-current="page"] { background: var(--sf-primary); border-color: var(--sf-primary); @apply text-white; }
+    .sf-page-link[aria-disabled="true"] { @apply opacity-40 cursor-not-allowed; }
+    .sf-page-link[aria-disabled="true"]:hover { background: #fff; border-color: var(--sf-border); color: var(--sf-text); }
+
+    /* ---- سهم القوائم المنسدلة في RTL ----
+       إضافة `forms` تضع السهم يمينًا دائمًا، فيقع فوق بداية النصّ العربي. */
+    [dir="rtl"] select.sf-select {
+        background-position: left .6rem center;
+        padding-right: .9rem;
+        padding-left: 2.2rem;
+    }
 
     /* ---- تمرير أفقي أنيق (الفئات على الجوّال) ---- */
     .sf-scroll-x {
