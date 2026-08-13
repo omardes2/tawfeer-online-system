@@ -29,8 +29,9 @@
         {{-- مكرّر لرابط الاسم أدناه: يُخرَج من ترتيب التركيز ومن قارئ الشاشة معًا --}}
         <a href="{{ $url }}" class="block w-full h-full" tabindex="-1" aria-hidden="true">
             @if ($img)
+                {{-- width/height: نسبة أبعاد صريحة تحجز مساحة الصورة قبل تحميلها فلا يقفز التخطيط --}}
                 <img src="{{ $img->url() }}" alt="{{ $img->alt ?: $product->name }}"
-                     loading="lazy" decoding="async"
+                     width="600" height="600" loading="lazy" decoding="async"
                      class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105">
             @else
                 <span class="w-full h-full grid place-items-center text-gray-300">

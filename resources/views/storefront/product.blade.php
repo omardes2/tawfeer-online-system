@@ -380,24 +380,28 @@
     @endif
 
     {{-- بيانات مهيكلة: منتج --}}
+    {{-- تُبنى هنا لا داخل كتلة الدفع (لا يراها المكوّن هناك)، وداخل كتلة php
+         لأن مفتاح السياق يُفسَّر كموجّه Blade خارجها فيخرج JSON-LD تالفًا. --}}
+    @php
+            $productLd = [
+                '@context' => 'https://schema.org',
+                '@type' => 'Product',
+                'name' => $displayName,
+                'sku' => $product->sku,
+                'description' => (string) $metaDesc,
+                'image' => $primary ? [$primary->url()] : [],
+                'brand' => $product->brand ? ['@type' => 'Brand', 'name' => $product->brand->name] : null,
+                'offers' => [
+                    '@type' => 'Offer',
+                    'price' => number_format($price, 2, '.', ''),
+                    'priceCurrency' => \App\Modules\Foundation\Services\Settings::get('store.currency', 'ILS'),
+                    'availability' => $inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+                    'url' => route('storefront.product', $product->slug),
+                ],
+            ];
+    @endphp
+
     @push('structured-data')
-        <script type="application/ld+json">
-        {!! json_encode([
-            '@context' => 'https://schema.org',
-            '@type' => 'Product',
-            'name' => $displayName,
-            'sku' => $product->sku,
-            'description' => (string) $metaDesc,
-            'image' => $primary ? [$primary->url()] : [],
-            'brand' => $product->brand ? ['@type' => 'Brand', 'name' => $product->brand->name] : null,
-            'offers' => [
-                '@type' => 'Offer',
-                'price' => number_format($price, 2, '.', ''),
-                'priceCurrency' => \App\Modules\Foundation\Services\Settings::get('store.currency', 'ILS'),
-                'availability' => $inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-                'url' => route('storefront.product', $product->slug),
-            ],
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
-        </script>
+        <x-storefront.json-ld :data="$productLd" />
     @endpush
 </x-storefront.layout>

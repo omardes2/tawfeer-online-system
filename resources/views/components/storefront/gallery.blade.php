@@ -29,7 +29,9 @@
                  @scroll.debounce.100ms="i = Math.round($el.scrollLeft / $el.clientWidth) * ({{ $count > 1 ? 1 : 0 }})">
                 @foreach ($images as $image)
                     <img src="{{ $image->url() }}" alt="{{ $image->alt ?: $alt }}"
+                         width="800" height="800"
                          loading="{{ $loop->first ? 'eager' : 'lazy' }}" decoding="async"
+                         @if ($loop->first) fetchpriority="high" @endif
                          class="w-full aspect-square object-cover shrink-0 snap-center">
                 @endforeach
             </div>
@@ -49,7 +51,9 @@
             <div class="relative sf-card overflow-hidden aspect-square bg-[color:var(--sf-bg)]">
                 @foreach ($images as $idx => $image)
                     <img src="{{ $image->url() }}" alt="{{ $image->alt ?: $alt }}"
+                         width="800" height="800"
                          loading="{{ $loop->first ? 'eager' : 'lazy' }}" decoding="async"
+                         @if ($loop->first) fetchpriority="high" @endif
                          x-show="i === {{ $idx }}" @if (! $loop->first) x-cloak @endif
                          class="absolute inset-0 w-full h-full object-cover">
                 @endforeach
@@ -63,7 +67,8 @@
                                 class="aspect-square rounded-lg overflow-hidden border-2 transition-colors"
                                 :class="i === {{ $idx }} ? 'border-brand-600' : 'border-[color:var(--sf-border)] hover:border-brand-300'"
                                 aria-label="{{ __('storefront.image_number', ['n' => $idx + 1]) }}">
-                            <img src="{{ $image->url() }}" alt="" loading="lazy" class="w-full h-full object-cover">
+                            <img src="{{ $image->url() }}" alt="" width="160" height="160"
+                                 loading="lazy" decoding="async" class="w-full h-full object-cover">
                         </button>
                     @endforeach
                 </div>

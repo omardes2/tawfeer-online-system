@@ -64,8 +64,34 @@
 
     {{-- الخطّ مُستضاف محليًا داخل حزمة CSS — لا طلب لطرف ثالث --}}
     @vite(['resources/css/storefront.css', 'resources/js/storefront.js'])
+
+    {{--
+        تحميل مسبق لوزنَي النصّ العربي الأساسيين (المتن 400 والعناوين 700).
+        بدونه لا يكتشف المتصفّح ملفّ الخطّ إلا بعد تنزيل CSS وتحليله، فيدفع
+        رحلة ذهاب وإياب إضافية قبل رسم النصّ بخطّه النهائي. البقية تُكتشف
+        بالطريقة المعتادة. `try` لأن ملفّ البيان غير موجود أثناء التطوير.
+    --}}
+    @php
+        $preloadFonts = [];
+        try {
+            foreach (['arabic-400', 'arabic-700'] as $face) {
+                $preloadFonts[] = Illuminate\Support\Facades\Vite::asset(
+                    "node_modules/@fontsource/cairo/files/cairo-{$face}-normal.woff2"
+                );
+            }
+        } catch (Throwable) {
+            $preloadFonts = [];
+        }
+    @endphp
+    @foreach ($preloadFonts as $font)
+        <link rel="preload" href="{{ $font }}" as="font" type="font/woff2" crossorigin>
+    @endforeach
 </head>
 <body class="min-h-screen flex flex-col antialiased sf-has-bottomnav">
+
+    {{-- تخطّي إلى المحتوى: بدونه يمرّ مستخدم لوحة المفاتيح على الشريط العلوي
+         والبحث والتنقّل كاملًا في كل صفحة قبل بلوغ المحتوى. يظهر عند التركيز فقط. --}}
+    <a href="#main" class="sf-skip-link">{{ __('storefront.skip_to_content') }}</a>
 
     {{-- حدث تحليلات الصفحة (نقطة امتداد — بلا مزوّد) --}}
     @if ($pageEvent)
@@ -276,7 +302,7 @@
     @endif
 
     {{-- ══════════ المحتوى ══════════ --}}
-    <main class="flex-1 w-full">
+    <main id="main" tabindex="-1" class="flex-1 w-full">
         <div class="{{ $wide ? 'w-full' : 'sf-container' }} py-5 sm:py-7">
             {{ $slot }}
         </div>

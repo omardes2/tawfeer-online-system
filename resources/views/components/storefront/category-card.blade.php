@@ -18,7 +18,8 @@
         'w-16 h-16' => $wide,
     ])>
         @if ($category->iconUrl())
-            <img src="{{ $category->iconUrl() }}" alt="{{ $category->name }}" loading="lazy"
+            <img src="{{ $category->iconUrl() }}" alt="{{ $category->name }}"
+                 width="200" height="200" loading="lazy" decoding="async"
                  class="w-full h-full object-cover" />
         @else
             <x-storefront.icon name="grid" :class="$wide ? 'w-7 h-7' : 'w-6 h-6'" />

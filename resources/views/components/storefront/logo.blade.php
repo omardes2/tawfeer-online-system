@@ -12,7 +12,8 @@
 <a href="{{ route('storefront.home') }}" class="inline-flex items-center gap-2.5 shrink-0 min-h-10" aria-label="{{ $siteName }}">
     @if ($logo)
         <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($logo) }}"
-             alt="{{ $siteName }}" class="{{ $class }} w-auto object-contain" />
+             alt="{{ $siteName }}" width="160" height="40" decoding="async" fetchpriority="high"
+             class="{{ $class }} w-auto object-contain" />
     @else
         <span class="grid place-items-center h-10 w-10 rounded-xl bg-brand-600 text-white font-extrabold text-lg shrink-0">ت</span>
         @if ($withName)

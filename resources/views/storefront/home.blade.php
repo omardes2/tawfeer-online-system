@@ -113,4 +113,44 @@
             </div>
         </section>
     @endif
+
+    {{--
+        بيانات منظّمة للصفحة الرئيسية — لم تكن موجودة (كانت على القوائم والمنتج فقط).
+        `WebSite` مع `SearchAction` يتيح لمحرّكات البحث عرض مربّع بحث داخل نتيجة
+        الموقع، و`Organization` يربط الاسم والشعار بالنطاق. كلاهما من بيانات
+        الموقع القائمة، بلا أي حقل مخترَع.
+    --}}
+    {{-- تُبنى هنا لا داخل كتلة الدفع (لا يراها المكوّن هناك)، وداخل كتلة php
+         لأن مفتاح السياق يُفسَّر كموجّه Blade خارجها فيخرج JSON-LD تالفًا. --}}
+    @php
+            $homeLd = [
+                '@context' => 'https://schema.org',
+                '@graph' => [
+                    [
+                        '@type' => 'WebSite',
+                        'name' => __('storefront.site_name'),
+                        'url' => route('storefront.home'),
+                        'inLanguage' => app()->getLocale(),
+                        'potentialAction' => [
+                            '@type' => 'SearchAction',
+                            'target' => [
+                                '@type' => 'EntryPoint',
+                                'urlTemplate' => route('storefront.search').'?q={search_term_string}',
+                            ],
+                            'query-input' => 'required name=search_term_string',
+                        ],
+                    ],
+                    [
+                        '@type' => 'Organization',
+                        'name' => __('storefront.site_name'),
+                        'url' => route('storefront.home'),
+                        'description' => __('storefront.tagline'),
+                    ],
+                ],
+            ];
+    @endphp
+
+    @push('structured-data')
+        <x-storefront.json-ld :data="$homeLd" />
+    @endpush
 </x-storefront.layout>

@@ -1,15 +1,20 @@
 /* ==========================================================================
    خطّ Cairo — مُستضاف محليًا (لا CDN): لا طلب لطرف ثالث ولا انتظار شبكة خارجية
-   قبل رسم النصّ. أربعة أوزان فقط بمجموعتَي المحارف العربية واللاتينية،
-   و`font-display: swap` يأتي ضمن الحزمة فيظهر النصّ فورًا بخطّ احتياطي.
+   قبل رسم النصّ. `font-display: swap` يأتي ضمن الحزمة فيظهر النصّ فورًا بخطّ
+   احتياطي. الأوزان المُعلَنة هي المستعملة فعلًا فقط (400/600/700): الوزن 500
+   لم يبقَ له استعمال واحد في المتجر، فحُذف إعلانه (المتصفّح لم يكن ينزّله أصلًا
+   ما دام غير مستعمل، لكن بقاؤه يوهم بأنه جزء من نظام التصميم).
    ========================================================================== */
 @import '@fontsource/cairo/arabic-400.css';
-@import '@fontsource/cairo/arabic-500.css';
 @import '@fontsource/cairo/arabic-600.css';
 @import '@fontsource/cairo/arabic-700.css';
 @import '@fontsource/cairo/latin-400.css';
 @import '@fontsource/cairo/latin-600.css';
 @import '@fontsource/cairo/latin-700.css';
+
+/* إعداد Tailwind خاصّ بالمتجر: يقصر مسح القوالب على قوالب المتجر وحدها.
+   الإعداد الموحّد كان يُدرج أصناف لوحة الإدارة في حزمة المتجر أيضًا. */
+@config '../../tailwind.storefront.config.js';
 
 @tailwind base;
 @tailwind components;
@@ -411,6 +416,18 @@
 
     /* شريط لاصق يحترم منطقة الأمان (زرّ الشراء أسفل صفحة المنتج) */
     .sf-safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+    /* رابط «تخطّي إلى المحتوى»: مخفيّ بصريًا حتى يصله التركيز بلوحة المفاتيح */
+    .sf-skip-link {
+        @apply sr-only;
+    }
+    .sf-skip-link:focus {
+        @apply not-sr-only fixed top-3 z-50 px-4 py-2.5 text-sm font-bold text-white;
+        inset-inline-start: .75rem;
+        background: var(--sf-primary);
+        border-radius: var(--sf-radius-sm);
+        box-shadow: var(--sf-shadow-lg);
+    }
 
     /* الهاتف بالعرض الأفقي: الترويسة تعود إلى التدفّق فلا تلتهم ثلث الشاشة.
        القاعدة هنا في طبقة utilities لأن `sticky` صنف Tailwind من الطبقة نفسها،

@@ -157,20 +157,24 @@
     </div>
 
     {{-- بيانات مهيكلة: قائمة عناصر --}}
+    {{-- تُبنى هنا لا داخل كتلة الدفع (لا يراها المكوّن هناك)، وداخل كتلة php
+         لأن مفتاح السياق يُفسَّر كموجّه Blade خارجها فيخرج JSON-LD تالفًا. --}}
+    @php
+            $listLd = [
+                '@context' => 'https://schema.org',
+                '@type' => 'ItemList',
+                'name' => $heading,
+                'numberOfItems' => $products->total(),
+                'itemListElement' => $products->getCollection()->values()->map(fn ($p, $i) => [
+                    '@type' => 'ListItem',
+                    'position' => $i + 1,
+                    'url' => route('storefront.product', $p->slug),
+                    'name' => $p->name,
+                ])->all(),
+            ];
+    @endphp
+
     @push('structured-data')
-        <script type="application/ld+json">
-        {!! json_encode([
-            '@context' => 'https://schema.org',
-            '@type' => 'ItemList',
-            'name' => $heading,
-            'numberOfItems' => $products->total(),
-            'itemListElement' => $products->getCollection()->values()->map(fn ($p, $i) => [
-                '@type' => 'ListItem',
-                'position' => $i + 1,
-                'url' => route('storefront.product', $p->slug),
-                'name' => $p->name,
-            ])->all(),
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
-        </script>
+        <x-storefront.json-ld :data="$listLd" />
     @endpush
 </x-storefront.layout>
