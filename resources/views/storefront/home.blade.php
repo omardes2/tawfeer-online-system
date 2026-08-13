@@ -4,8 +4,8 @@
     <section class="relative overflow-hidden rounded-2xl bg-brand-600 text-white
                     px-6 py-10 sm:px-10 sm:py-14 lg:py-16">
         {{-- زخرفة خفيفة: دوائر شفّافة بدل صور ثقيلة --}}
-        <span aria-hidden="true" class="absolute -top-16 -start-16 w-56 h-56 rounded-full bg-white/5"></span>
-        <span aria-hidden="true" class="absolute -bottom-24 -end-10 w-72 h-72 rounded-full bg-gold-300/10"></span>
+        {{-- زخرفة واحدة خفيفة: الأداء أهم من التزيين --}}
+        <span aria-hidden="true" class="absolute -bottom-28 -end-16 w-72 h-72 rounded-full bg-white/[.06]"></span>
 
         <div class="relative max-w-xl">
             <span class="sf-badge sf-badge-new mb-4">
@@ -106,7 +106,7 @@
             <div class="flex flex-wrap gap-2">
                 @foreach ($brands as $brand)
                     <a href="{{ route('storefront.brand', $brand->slug) }}"
-                       class="sf-card sf-card-hover px-4 py-2 text-sm font-semibold text-[color:var(--sf-text)] hover:text-brand-600 transition-colors">
+                       class="sf-card sf-card-hover inline-flex items-center min-h-10 px-4 py-2 text-sm font-semibold text-[color:var(--sf-text)] hover:text-brand-600 transition-colors">
                         {{ $brand->name }}
                     </a>
                 @endforeach

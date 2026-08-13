@@ -26,6 +26,7 @@
 <article class="sf-card sf-card-hover group flex flex-col overflow-hidden h-full" data-product="{{ $product->uuid }}">
     {{-- الصورة --}}
     <div class="relative aspect-square bg-[color:var(--sf-bg)] overflow-hidden">
+        {{-- مكرّر لرابط الاسم أدناه: يُخرَج من ترتيب التركيز ومن قارئ الشاشة معًا --}}
         <a href="{{ $url }}" class="block w-full h-full" tabindex="-1" aria-hidden="true">
             @if ($img)
                 <img src="{{ $img->url() }}" alt="{{ $img->alt ?: $product->name }}"
@@ -51,7 +52,7 @@
                   class="absolute top-2 end-2">
                 @csrf
                 <button type="submit"
-                        class="grid place-items-center w-9 h-9 rounded-full bg-white/95 backdrop-blur-sm shadow-sm
+                        class="grid place-items-center w-10 h-10 rounded-full bg-white/95 backdrop-blur-sm shadow-sm
                                transition-colors {{ $wishlisted ? 'text-[color:var(--sf-danger)]' : 'text-[color:var(--sf-text-soft)] hover:text-[color:var(--sf-danger)]' }}"
                         aria-label="{{ __('storefront.add_to_favorites') }}" title="{{ __('storefront.add_to_favorites') }}">
                     <x-storefront.icon name="heart" class="w-[18px] h-[18px]" :filled="$wishlisted" />
@@ -59,7 +60,7 @@
             </form>
         @else
             <a href="{{ route('account.login') }}"
-               class="absolute top-2 end-2 grid place-items-center w-9 h-9 rounded-full bg-white/95 backdrop-blur-sm shadow-sm
+               class="absolute top-2 end-2 grid place-items-center w-10 h-10 rounded-full bg-white/95 backdrop-blur-sm shadow-sm
                       text-[color:var(--sf-text-soft)] hover:text-[color:var(--sf-danger)] transition-colors"
                aria-label="{{ __('storefront.add_to_favorites') }}" title="{{ __('storefront.add_to_favorites') }}">
                 <x-storefront.icon name="heart" class="w-[18px] h-[18px]" />
@@ -94,7 +95,10 @@
                         max: {{ (int) floor($available) }},
                         busy: false,
                         get qty() {
-                            return $store.cart.items.find(i => i.variant_id === this.variant)?.qty ?? 0;
+                            // الواجهة تُعيد الكمية كنصّ عشري ('1.000')، فـ`qty + 1` بلا تحويل
+                            // يُنتج دمجًا نصّيًا لا جمعًا، و`qty === 1` لا يتحقّق أبدًا.
+                            const item = $store.cart.items.find(i => i.variant_id === this.variant);
+                            return item ? Math.round(Number(item.qty)) : 0;
                         },
                         async add() { this.busy = true; await $store.cart.add(this.variant, 1); this.busy = false; },
                         async set(n) {
@@ -105,8 +109,10 @@
                      }">
                     {{-- بلا كمية: زرّ الإضافة --}}
                     <button type="button" x-show="qty === 0" @click="add()" :disabled="busy"
-                            class="sf-btn-primary sf-btn-sm sf-btn-block">
-                        <x-storefront.icon name="cart" class="w-4 h-4" />
+                            class="sf-btn-primary sf-btn-block whitespace-nowrap min-h-10
+                                   !px-2 !py-2 text-[12px] sm:text-[13px] gap-1.5">
+                        {{-- الأيقونة تختفي على أضيق الشاشات كي يبقى النصّ في سطر واحد --}}
+                        <x-storefront.icon name="cart" class="w-4 h-4 hidden min-[360px]:block" />
                         {{ __('storefront.add_to_cart') }}
                     </button>
 

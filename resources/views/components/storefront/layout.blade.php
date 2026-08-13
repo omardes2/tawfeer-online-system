@@ -77,10 +77,8 @@
     @endif
 
     {{-- ══════════ الترويسة ══════════ --}}
-    <header x-data="{ menu: false }" class="bg-white sticky top-0 z-40 border-b border-[color:var(--sf-border)]">
-
-        {{-- شريط علوي: خدمات وحساب (حواسيب فقط) --}}
-        <div class="hidden md:block bg-brand-800 text-white/90 text-[13px]">
+    {{-- شريط علوي: خدمات وحساب (حواسيب فقط) — خارج المنطقة اللاصقة عمدًا --}}
+    <div class="hidden md:block bg-brand-800 text-white/90 text-[13px]">
             <div class="sf-container flex items-center justify-between h-9">
                 <div class="flex items-center gap-5">
                     <a href="{{ route('storefront.home') }}#contact" class="inline-flex items-center gap-1.5 hover:text-white transition-colors">
@@ -109,8 +107,9 @@
                     </a>
                 </div>
             </div>
-        </div>
+    </div>
 
+    <header x-data="{ menu: false }" class="bg-white sticky top-0 z-40 border-b border-[color:var(--sf-border)]">
         {{-- الترويسة الرئيسية --}}
         <div class="sf-container">
             <div class="flex items-center gap-3 h-16">
@@ -121,18 +120,24 @@
                     <x-storefront.icon name="menu" class="w-6 h-6" />
                 </button>
 
-                <x-storefront.logo />
+                {{-- على الجوّال يتوسّط الشعار بين القائمة والسلة --}}
+                <div class="md:hidden flex-1 flex justify-center">
+                    <x-storefront.logo />
+                </div>
+                <div class="hidden md:block">
+                    <x-storefront.logo />
+                </div>
 
                 {{-- البحث (حواسيب) --}}
                 <form action="{{ route('storefront.search') }}" method="GET" role="search"
-                      class="hidden md:block flex-1 max-w-2xl mx-auto">
+                      class="hidden md:block flex-1 max-w-2xl xl:max-w-4xl mx-6 lg:mx-10">
                     <label for="sf-search" class="sr-only">{{ __('storefront.search') }}</label>
                     <div class="relative">
                         <input id="sf-search" type="search" name="q" value="{{ request('q') }}"
                                placeholder="{{ __('storefront.search_placeholder_long') }}"
                                class="sf-input !rounded-full !bg-[color:var(--sf-bg)] ps-4 pe-12 !py-3">
                         <button type="submit" aria-label="{{ __('storefront.search') }}"
-                                class="absolute inset-y-1 end-1 grid place-items-center w-10 rounded-full bg-brand-600 text-white hover:bg-brand-700 transition-colors">
+                                class="absolute inset-y-0 my-auto end-1 grid place-items-center w-10 h-10 rounded-full bg-brand-600 text-white hover:bg-brand-700 transition-colors">
                             <x-storefront.icon name="search" class="w-5 h-5" />
                         </button>
                     </div>
@@ -195,14 +200,16 @@
             <div x-show="menu" x-transition.opacity @click="menu = false"
                  class="fixed inset-0 z-40 bg-[color:var(--sf-text)]/40"></div>
 
+            {{-- يفتح من جهة زرّ القائمة: `start` = اليمين في العربية.
+                 التحويلات لا تنقلب مع الاتجاه، فتُقلب يدويًا للإنجليزية. --}}
             <aside x-show="menu"
                    x-transition:enter="transition ease-out duration-200"
-                   x-transition:enter-start="translate-x-full rtl:-translate-x-full"
+                   x-transition:enter-start="translate-x-full ltr:-translate-x-full"
                    x-transition:enter-end="translate-x-0"
                    x-transition:leave="transition ease-in duration-150"
                    x-transition:leave-start="translate-x-0"
-                   x-transition:leave-end="translate-x-full rtl:-translate-x-full"
-                   class="fixed inset-y-0 end-0 z-50 w-[82%] max-w-xs bg-white flex flex-col shadow-xl">
+                   x-transition:leave-end="translate-x-full ltr:-translate-x-full"
+                   class="fixed inset-y-0 start-0 z-50 w-[82%] max-w-xs bg-white flex flex-col shadow-xl">
                 <div class="flex items-center justify-between gap-3 h-16 px-4 border-b border-[color:var(--sf-border)]">
                     <x-storefront.logo />
                     <button type="button" @click="menu = false"
@@ -275,10 +282,10 @@
             <div>
                 <span class="block font-bold text-white mb-3">{{ __('storefront.footer_shop') }}</span>
                 <ul class="space-y-2">
-                    <li><a href="{{ route('storefront.shop') }}" class="hover:text-white transition-colors">{{ __('storefront.all_products') }}</a></li>
-                    <li><a href="{{ route('storefront.categories') }}" class="hover:text-white transition-colors">{{ __('storefront.categories') }}</a></li>
-                    <li><a href="{{ route('storefront.brands') }}" class="hover:text-white transition-colors">{{ __('storefront.brands') }}</a></li>
-                    <li><a href="{{ route('storefront.shop', ['sort' => 'newest']) }}" class="hover:text-white transition-colors">{{ __('storefront.new_arrivals') }}</a></li>
+                    <li><a href="{{ route('storefront.shop') }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.all_products') }}</a></li>
+                    <li><a href="{{ route('storefront.categories') }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.categories') }}</a></li>
+                    <li><a href="{{ route('storefront.brands') }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.brands') }}</a></li>
+                    <li><a href="{{ route('storefront.shop', ['sort' => 'newest']) }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.new_arrivals') }}</a></li>
                 </ul>
             </div>
 
@@ -286,14 +293,14 @@
                 <span class="block font-bold text-white mb-3">{{ __('storefront.footer_account') }}</span>
                 <ul class="space-y-2">
                     @auth
-                        <li><a href="{{ route('account.dashboard') }}" class="hover:text-white transition-colors">{{ __('storefront.my_account') }}</a></li>
-                        <li><a href="{{ route('account.orders') }}" class="hover:text-white transition-colors">{{ __('storefront.my_orders') }}</a></li>
-                        <li><a href="{{ route('account.wishlist') }}" class="hover:text-white transition-colors">{{ __('storefront.favorites') }}</a></li>
+                        <li><a href="{{ route('account.dashboard') }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.my_account') }}</a></li>
+                        <li><a href="{{ route('account.orders') }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.my_orders') }}</a></li>
+                        <li><a href="{{ route('account.wishlist') }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.favorites') }}</a></li>
                     @else
-                        <li><a href="{{ route('account.login') }}" class="hover:text-white transition-colors">{{ __('storefront.login') }}</a></li>
-                        <li><a href="{{ route('account.register') }}" class="hover:text-white transition-colors">{{ __('storefront.register') }}</a></li>
+                        <li><a href="{{ route('account.login') }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.login') }}</a></li>
+                        <li><a href="{{ route('account.register') }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.register') }}</a></li>
                     @endauth
-                    <li><a href="{{ route('storefront.cart') }}" class="hover:text-white transition-colors">{{ __('storefront.cart') }}</a></li>
+                    <li><a href="{{ route('storefront.cart') }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.cart') }}</a></li>
                 </ul>
             </div>
 

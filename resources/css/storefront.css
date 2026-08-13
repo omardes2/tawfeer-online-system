@@ -149,7 +149,8 @@
         @apply inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5;
         border-radius: var(--sf-radius-pill);
     }
-    .sf-badge-discount { background: var(--sf-danger); @apply text-white; }
+    /* الخصم أصفر: لون الجذب في الهوية، وتباينه مع النص الداكن عالٍ. */
+    .sf-badge-discount { background: var(--sf-accent); color: var(--sf-text); }
     .sf-badge-new { background: var(--sf-accent); color: var(--sf-text); }
     .sf-badge-soft { background: var(--sf-primary-light); color: var(--sf-primary); }
     .sf-badge-success { background: #E7F6EE; color: var(--sf-success); }
@@ -158,7 +159,9 @@
     /* ---- عنوان قسم ---- */
     .sf-section-title { @apply text-lg sm:text-xl font-bold; color: var(--sf-text); }
     .sf-section-link {
-        @apply text-sm font-semibold whitespace-nowrap transition-colors;
+        /* الحشو يرفع مساحة اللمس إلى ~40px، والهامش السالب يُبقي الموضع البصري كما هو. */
+        @apply inline-flex items-center gap-1 text-sm font-semibold whitespace-nowrap
+               py-2.5 -my-2.5 px-2 -mx-2 transition-colors;
         color: var(--sf-primary);
     }
     .sf-section-link:hover { color: var(--sf-primary-dark); }
@@ -174,7 +177,8 @@
         border-radius: var(--sf-radius-sm);
     }
     .sf-qty button {
-        @apply grid place-items-center w-9 h-9 text-lg leading-none transition-colors;
+        /* 38px + حدّ 1px أعلى وأسفل = 40px، مطابقًا لزرّ «أضف للسلة» فلا يقفز الارتفاع. */
+        @apply grid place-items-center w-10 h-[38px] text-lg leading-none transition-colors;
         color: var(--sf-primary);
     }
     .sf-qty button:hover:not(:disabled) { background: var(--sf-primary-light); }

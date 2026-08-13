@@ -9,11 +9,11 @@ return [
     // تنقّل
     'home' => 'الرئيسية',
     'shop' => 'المتجر',
-    'categories' => 'الفئات',
+    'categories' => 'الأقسام',
     'brands' => 'العلامات التجارية',
     'cart' => 'السلة',
     'checkout' => 'إتمام الشراء',
-    'search' => 'بحث',
+    'search' => 'البحث',
     'search_placeholder' => 'ابحث عن منتج…',
     'language' => 'اللغة',
     'view_all' => 'عرض الكل',
