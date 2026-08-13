@@ -64,6 +64,12 @@
         --sf-bottomnav: 4rem;
     }
 
+    /* الشريط السفلي جوّالي فقط (‎md:hidden‎)؛ فوق ذلك لا مساحة محجوزة، وإلّا طفت
+       الأشرطة اللاصقة (السلة/المنتج) على فراغ بارتفاع 4rem في اللوحيّات. */
+    @media (min-width: 768px) {
+        :root { --sf-bottomnav: 0rem; }
+    }
+
     html {
         font-family: 'Cairo', 'Tajawal', ui-sans-serif, system-ui, sans-serif;
         -webkit-text-size-adjust: 100%;
@@ -149,6 +155,8 @@
         color: var(--sf-text);
     }
     .sf-input::placeholder, .sf-textarea::placeholder { color: var(--sf-text-soft); }
+    /* التكبير عموديًّا فقط: الأفقي كان يخرج المقبض خارج حدّ الحقل ويكسر الشبكة */
+    .sf-textarea { @apply resize-y; }
     .sf-input:focus, .sf-select:focus, .sf-textarea:focus {
         border-color: var(--sf-primary);
         box-shadow: 0 0 0 3px var(--sf-primary-light);

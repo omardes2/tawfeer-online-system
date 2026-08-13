@@ -135,7 +135,6 @@ return [
     'footer_help' => 'Help',
     'my_orders' => 'My orders',
 
-
     // Listing & filters (stage 3)
     'price_range' => 'Price range',
     'clear_all' => 'Clear all',
@@ -148,7 +147,6 @@ return [
     'products_count' => '{0} No products|{1} 1 product|[2,*] :count products',
     'categories_count' => '{0} No categories|{1} 1 category|[2,*] :count categories',
 
-
     // Product page (stage 4)
     'unit' => 'Unit',
     'product_images' => 'Product images',
@@ -156,6 +154,13 @@ return [
     'link_copied' => 'Link copied',
     'increase' => 'Increase quantity',
     'decrease' => 'Decrease quantity',
+
+    // Cart & checkout (stage 5)
+    'order_summary' => 'Order summary',
+    'back_to_cart' => 'Back to cart',
+    'address_placeholder' => 'City, area, street, nearest landmark…',
+    'address_hint' => 'Write the address in detail so your order arrives quickly.',
+    'cod_hint' => 'Pay the courier in cash when your order arrives.',
 
     'all_rights' => 'All rights reserved',
 ];

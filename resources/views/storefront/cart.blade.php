@@ -1,65 +1,143 @@
 <x-storefront.layout :title="__('storefront.cart')">
-    <h1 class="text-xl font-bold text-gray-900 mb-4">{{ __('storefront.cart') }}</h1>
+
+    {{--
+        إعادة تصميم بصرية فقط. كل ارتباطات Alpine واستدعاءات مخزن السلة
+        (`setQty` / `remove` / `refresh`) ومفاتيح البيانات (`variant_id`, `sku`,
+        `qty`, `unit_price`, `line_total`, `subtotal`, `count`) كما هي حرفيًا.
+    --}}
+
+    <x-storefront.page-header :title="__('storefront.cart')"
+        :breadcrumbs="[__('storefront.home') => route('storefront.home'), __('storefront.cart') => null]" />
 
     <div x-data>
-        {{-- تحميل --}}
+        {{-- تحميل: هيكل بأبعاد المحتوى الحقيقي فلا تقفز الصفحة --}}
         <template x-if="$store.cart.loading">
-            <div class="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400">{{ __('storefront.loading') }}</div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 space-y-3">
+                    <span class="sf-skeleton h-24 w-full"></span>
+                    <span class="sf-skeleton h-24 w-full"></span>
+                </div>
+                <span class="sf-skeleton h-48 w-full"></span>
+            </div>
         </template>
 
         {{-- خطأ --}}
         <template x-if="$store.cart.error && !$store.cart.loading">
-            <div class="bg-white rounded-xl border border-rose-200 p-6 text-center">
-                <p class="text-rose-600">{{ __('storefront.error') }}</p>
-                <button type="button" @click="$store.cart.refresh()" class="mt-3 text-sm text-emerald-600 hover:underline">{{ __('storefront.retry') }}</button>
+            <div class="sf-card px-6 py-10 text-center">
+                <span class="mx-auto mb-4 grid place-items-center w-14 h-14 rounded-full"
+                      style="background:#FBE9E7;color:var(--sf-danger)">
+                    <x-storefront.icon name="close" class="w-7 h-7" />
+                </span>
+                <p class="font-bold text-[color:var(--sf-text)]">{{ __('storefront.error') }}</p>
+                <button type="button" @click="$store.cart.refresh()" class="sf-btn-primary mt-4">
+                    {{ __('storefront.retry') }}
+                </button>
             </div>
         </template>
 
         {{-- فارغة --}}
         <template x-if="!$store.cart.loading && !$store.cart.error && $store.cart.count === 0">
-            <div class="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center">
-                <svg class="mx-auto h-12 w-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.3"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.4l2.1 12.3a1.5 1.5 0 0 0 1.48 1.2h9.4a1.5 1.5 0 0 0 1.47-1.17l1.6-7.03H6.1"/></svg>
-                <p class="text-gray-700 font-medium">{{ __('storefront.empty_cart') }}</p>
-                <p class="text-sm text-gray-500 mt-1">{{ __('storefront.empty_cart_hint') }}</p>
-                <a href="{{ route('storefront.shop') }}" class="inline-block mt-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-5 py-2.5">{{ __('storefront.continue_shopping') }}</a>
+            <div>
+                <x-storefront.empty-state icon="cart"
+                    :title="__('storefront.empty_cart')"
+                    :description="__('storefront.empty_cart_hint')"
+                    :action="route('storefront.shop')"
+                    :action-label="__('storefront.continue_shopping')" />
             </div>
         </template>
 
         {{-- بنود السلة --}}
         <template x-if="!$store.cart.loading && !$store.cart.error && $store.cart.count > 0">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-2 space-y-3">
+            <div class="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+                {{-- البنود --}}
+                <div class="space-y-3 min-w-0">
                     <template x-for="item in $store.cart.items" :key="item.variant_id">
-                        <div class="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
-                            <div class="h-16 w-16 rounded-lg bg-gray-100 shrink-0 flex items-center justify-center text-gray-300">
-                                <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75h16.5v16.5H3.75z"/></svg>
-                            </div>
+                        <div class="sf-card p-3 sm:p-4 flex items-start sm:items-center gap-3 sm:gap-4">
+                            <span class="grid place-items-center h-16 w-16 shrink-0 rounded-xl
+                                         bg-[color:var(--sf-bg)] text-gray-300">
+                                <x-storefront.icon name="image" class="w-8 h-8" />
+                            </span>
+
                             <div class="flex-1 min-w-0">
-                                <p class="font-medium text-gray-800 truncate" x-text="item.sku"></p>
-                                <p class="text-sm text-emerald-700 mt-0.5" x-text="`${Number(item.unit_price).toFixed(2)} {{ __('storefront.currency') }}`"></p>
+                                <p class="font-semibold text-sm text-[color:var(--sf-text)] truncate" x-text="item.sku"></p>
+                                <p class="sf-price text-sm mt-0.5"
+                                   x-text="`${Number(item.unit_price).toFixed(2)} {{ __('storefront.currency') }}`"></p>
+
+                                {{-- الجوّال: الكمية والإجمالي تحت الاسم --}}
+                                {{-- flex-wrap: عند ‎320px‎ لا يتّسع الصفّ للكمية والإجمالي معًا فينزل الإجمالي سطرًا --}}
+                                <div class="flex sm:hidden flex-wrap items-center justify-between gap-x-3 gap-y-2 mt-3">
+                                    {{-- shrink-0: بدونه تنضغط أزرار الكمية إلى ‎18px‎ على شاشة ‎320px‎ --}}
+                                    <div class="sf-qty shrink-0">
+                                        <button type="button"
+                                                @click="$store.cart.setQty(item.variant_id, Math.max(0, Number(item.qty) - 1))"
+                                                aria-label="{{ __('storefront.decrease') }}">−</button>
+                                        <output x-text="Number(item.qty)"></output>
+                                        <button type="button"
+                                                @click="$store.cart.setQty(item.variant_id, Number(item.qty) + 1)"
+                                                aria-label="{{ __('storefront.increase') }}">+</button>
+                                    </div>
+                                    <span class="font-bold tabular-nums whitespace-nowrap text-[color:var(--sf-text)]"
+                                          x-text="`${Number(item.line_total).toFixed(2)} {{ __('storefront.currency') }}`"></span>
+                                </div>
                             </div>
-                            <div class="inline-flex items-center rounded-lg border border-gray-300 overflow-hidden">
-                                <button type="button" @click="$store.cart.setQty(item.variant_id, Math.max(0, Number(item.qty) - 1))" class="px-2.5 py-1.5 text-gray-600 hover:bg-gray-50" aria-label="-">−</button>
-                                <span class="w-10 text-center text-sm" x-text="Number(item.qty)"></span>
-                                <button type="button" @click="$store.cart.setQty(item.variant_id, Number(item.qty) + 1)" class="px-2.5 py-1.5 text-gray-600 hover:bg-gray-50" aria-label="+">+</button>
+
+                            {{-- الحواسيب: الكمية والإجمالي في صفّ واحد --}}
+                            <div class="hidden sm:block">
+                                <div class="sf-qty">
+                                    <button type="button"
+                                            @click="$store.cart.setQty(item.variant_id, Math.max(0, Number(item.qty) - 1))"
+                                            aria-label="{{ __('storefront.decrease') }}">−</button>
+                                    <output x-text="Number(item.qty)"></output>
+                                    <button type="button"
+                                            @click="$store.cart.setQty(item.variant_id, Number(item.qty) + 1)"
+                                            aria-label="{{ __('storefront.increase') }}">+</button>
+                                </div>
                             </div>
-                            <div class="w-24 text-end font-semibold text-gray-800" x-text="`${Number(item.line_total).toFixed(2)} {{ __('storefront.currency') }}`"></div>
-                            <button type="button" @click="$store.cart.remove(item.variant_id)" class="text-gray-400 hover:text-rose-600 p-1" :aria-label="'{{ __('storefront.remove') }}'">
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 7.5h12M9.75 7.5V6a1.5 1.5 0 0 1 1.5-1.5h1.5A1.5 1.5 0 0 1 14.25 6v1.5m2.25 0-.6 11.1a1.5 1.5 0 0 1-1.5 1.4H9.6a1.5 1.5 0 0 1-1.5-1.4L7.5 7.5"/></svg>
+                            <span class="hidden sm:block w-24 text-end font-bold tabular-nums whitespace-nowrap text-[color:var(--sf-text)]"
+                                  x-text="`${Number(item.line_total).toFixed(2)} {{ __('storefront.currency') }}`"></span>
+
+                            <button type="button" @click="$store.cart.remove(item.variant_id)"
+                                    class="shrink-0 grid place-items-center w-10 h-10 rounded-xl text-[color:var(--sf-text-soft)]
+                                           hover:text-[color:var(--sf-danger)] transition-colors"
+                                    :aria-label="'{{ __('storefront.remove') }}'">
+                                <x-storefront.icon name="trash" class="w-5 h-5" />
                             </button>
                         </div>
                     </template>
+
+                    <a href="{{ route('storefront.shop') }}"
+                       class="sf-section-link inline-flex items-center gap-1 min-h-10 py-2">
+                        <x-storefront.icon name="chevron-right" class="w-4 h-4 ltr:rotate-180" />
+                        {{ __('storefront.continue_shopping') }}
+                    </a>
                 </div>
 
                 {{-- الملخّص --}}
-                <div class="lg:col-span-1">
-                    <div class="bg-white rounded-xl border border-gray-200 p-5 sticky top-24">
-                        <div class="flex items-center justify-between text-gray-700 mb-4">
+                <div>
+                    <div class="sf-card sf-card-pad lg:sticky lg:top-[7.5rem]">
+                        <h2 class="font-bold mb-4 text-[color:var(--sf-text)]">{{ __('storefront.order_summary') }}</h2>
+
+                        <div class="flex items-center justify-between text-sm text-[color:var(--sf-text-soft)] py-2">
                             <span>{{ __('storefront.subtotal') }}</span>
-                            <span class="font-bold" x-text="`${Number($store.cart.subtotal).toFixed(2)} {{ __('storefront.currency') }}`"></span>
+                            <span class="font-bold tabular-nums text-[color:var(--sf-text)]"
+                                  x-text="`${Number($store.cart.subtotal).toFixed(2)} {{ __('storefront.currency') }}`"></span>
                         </div>
-                        <a href="{{ route('storefront.checkout') }}" class="block text-center rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3">{{ __('storefront.proceed_to_checkout') }}</a>
-                        <a href="{{ route('storefront.shop') }}" class="block text-center mt-2 text-sm text-gray-500 hover:text-emerald-600">{{ __('storefront.continue_shopping') }}</a>
+
+                        <div class="flex items-center justify-between pt-3 mt-2 border-t border-[color:var(--sf-border)]">
+                            <span class="font-bold text-[color:var(--sf-text)]">{{ __('storefront.total') }}</span>
+                            <span class="sf-price text-xl"
+                                  x-text="`${Number($store.cart.subtotal).toFixed(2)} {{ __('storefront.currency') }}`"></span>
+                        </div>
+
+                        <a href="{{ route('storefront.checkout') }}" class="sf-btn-primary sf-btn-block sf-btn-lg mt-5">
+                            {{ __('storefront.proceed_to_checkout') }}
+                            <x-storefront.icon name="chevron-left" class="w-5 h-5 ltr:rotate-180" />
+                        </a>
+
+                        <p class="mt-3 flex items-center justify-center gap-1.5 text-xs text-[color:var(--sf-text-soft)]">
+                            <x-storefront.icon name="shield" class="w-4 h-4" />
+                            {{ __('storefront.trust_cod') }}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -67,5 +145,20 @@
 
         {{-- توصيات في السلة (Phase 6 / ADR-045) — مُتتبَّعة --}}
         <x-storefront.section :title="__('storefront.recommended_for_you')" :items="$recommendations" recoType="personalized" placement="cart" />
+    </div>
+
+    {{-- شريط الإتمام اللاصق (جوّال) — يجلس فوق شريط التنقّل لا فوقه --}}
+    <div x-data x-show="$store.cart.count > 0" x-cloak
+         class="lg:hidden fixed inset-x-0 z-30 bg-white border-t border-[color:var(--sf-border)] px-4 py-2.5
+                flex items-center gap-3 shadow-[0_-2px_12px_rgba(34,34,34,.06)]"
+         style="bottom: calc(var(--sf-bottomnav) + env(safe-area-inset-bottom, 0px))">
+        <div class="min-w-0 flex-1">
+            <span class="block text-[11px] text-[color:var(--sf-text-soft)]">{{ __('storefront.total') }}</span>
+            <span class="sf-price text-base"
+                  x-text="`${Number($store.cart.subtotal).toFixed(2)} {{ __('storefront.currency') }}`"></span>
+        </div>
+        <a href="{{ route('storefront.checkout') }}" class="sf-btn-primary shrink-0">
+            {{ __('storefront.proceed_to_checkout') }}
+        </a>
     </div>
 </x-storefront.layout>

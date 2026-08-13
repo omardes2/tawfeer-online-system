@@ -1,86 +1,170 @@
 <x-storefront.layout :title="__('storefront.checkout')">
-    <h1 class="text-xl font-bold text-gray-900 mb-4">{{ __('storefront.checkout') }}</h1>
+
+    {{--
+        ⚠️ إعادة تصميم بصرية فقط — Protected Delivery Integration — Do Not Modify.
+
+        كل ما يعتمد عليه النظام محفوظ حرفيًا كما كان:
+          • `x-data="storefrontCheckout()"` و`x-init="init()"`
+          • مفاتيح النموذج: customer_name / customer_phone / customer_email /
+            shipping_address / payment_method_code
+          • معرّفات الحقول: c-name / c-phone / c-email / c-address
+          • زرّ الدفع: name="pm" value="cod"
+          • `@submit.prevent="place()"` وحالات empty / order / error / placing
+          • دالة `storefrontCheckout()` بالكامل — لم يُغيَّر فيها حرف واحد،
+            بما فيها مسارات `/api/v1/store/checkout` وترويسات الهوية.
+        الجديد أغلفة وأصناف تصميم حولها فقط.
+    --}}
+
+    <x-storefront.page-header :title="__('storefront.checkout')"
+        :breadcrumbs="[
+            __('storefront.home') => route('storefront.home'),
+            __('storefront.cart') => route('storefront.cart'),
+            __('storefront.checkout') => null,
+        ]" />
 
     <div x-data="storefrontCheckout()" x-init="init()">
         {{-- سلة فارغة --}}
         <template x-if="empty">
-            <div class="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center">
-                <p class="text-gray-700 font-medium">{{ __('storefront.empty_cart') }}</p>
-                <a href="{{ route('storefront.shop') }}" class="inline-block mt-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-5 py-2.5">{{ __('storefront.continue_shopping') }}</a>
+            <div>
+                <x-storefront.empty-state icon="cart"
+                    :title="__('storefront.empty_cart')"
+                    :description="__('storefront.empty_cart_hint')"
+                    :action="route('storefront.shop')"
+                    :action-label="__('storefront.continue_shopping')" />
             </div>
         </template>
 
         {{-- تأكيد الطلب --}}
         <template x-if="order">
-            <div class="bg-white rounded-xl border border-emerald-200 p-10 text-center">
-                <div class="mx-auto h-14 w-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3">
-                    <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
+            <div class="sf-card px-6 py-12 text-center max-w-lg mx-auto">
+                <span class="mx-auto mb-5 grid place-items-center w-20 h-20 rounded-full"
+                      style="background:#E7F6EE;color:var(--sf-success)">
+                    <x-storefront.icon name="check-circle" class="w-11 h-11" />
+                </span>
+
+                <p class="text-xl font-extrabold text-[color:var(--sf-text)]">{{ __('storefront.order_placed') }}</p>
+
+                <div class="mt-5 rounded-xl bg-[color:var(--sf-bg)] px-5 py-4 text-start space-y-2">
+                    <div class="flex items-center justify-between gap-3 text-sm">
+                        <span class="text-[color:var(--sf-text-soft)]">{{ __('storefront.order_number') }}</span>
+                        <span class="font-mono font-bold text-[color:var(--sf-text)]" x-text="order.order_number"></span>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 text-sm">
+                        <span class="text-[color:var(--sf-text-soft)]">{{ __('storefront.total') }}</span>
+                        <span class="sf-price" x-text="`${Number(order.total).toFixed(2)} {{ __('storefront.currency') }}`"></span>
+                    </div>
                 </div>
-                <p class="text-lg font-bold text-gray-900">{{ __('storefront.order_placed') }}</p>
-                <p class="text-sm text-gray-500 mt-1">{{ __('storefront.order_number') }}: <span class="font-mono font-medium" x-text="order.order_number"></span></p>
-                <p class="text-emerald-700 font-bold mt-2" x-text="`${Number(order.total).toFixed(2)} {{ __('storefront.currency') }}`"></p>
-                <a href="{{ route('storefront.shop') }}" class="inline-block mt-5 text-sm text-emerald-600 hover:underline">{{ __('storefront.continue_shopping') }}</a>
+
+                <div class="mt-6 flex flex-col sm:flex-row gap-2 justify-center">
+                    <a href="{{ auth()->check() ? route('account.orders') : route('storefront.shop') }}" class="sf-btn-primary">
+                        {{ auth()->check() ? __('storefront.top_track') : __('storefront.continue_shopping') }}
+                    </a>
+                    <a href="{{ route('storefront.shop') }}" class="sf-btn-outline">{{ __('storefront.continue_shopping') }}</a>
+                </div>
             </div>
         </template>
 
         {{-- نموذج الإتمام --}}
         <template x-if="!empty && !order">
-            <form @submit.prevent="place()" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-2 space-y-4">
-                    <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-                        <h2 class="font-bold text-gray-900">{{ __('storefront.contact_details') }}</h2>
+            <form @submit.prevent="place()" class="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+                <div class="space-y-4 min-w-0">
+
+                    {{-- ١) بيانات التواصل --}}
+                    <section class="sf-card sf-card-pad">
+                        <h2 class="flex items-center gap-2.5 font-bold mb-4 text-[color:var(--sf-text)]">
+                            <span class="grid place-items-center w-7 h-7 rounded-full bg-brand-600 text-white text-xs font-bold shrink-0">1</span>
+                            {{ __('storefront.contact_details') }}
+                        </h2>
+
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label for="c-name" class="block text-sm font-medium text-gray-700 mb-1">{{ __('storefront.customer_name') }}</label>
-                                <input id="c-name" x-model="form.customer_name" required class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
+                                <label for="c-name" class="sf-label">{{ __('storefront.customer_name') }}</label>
+                                <input id="c-name" x-model="form.customer_name" required class="sf-input">
                             </div>
                             <div>
-                                <label for="c-phone" class="block text-sm font-medium text-gray-700 mb-1">{{ __('storefront.customer_phone') }}</label>
-                                <input id="c-phone" x-model="form.customer_phone" required inputmode="tel" class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
+                                <label for="c-phone" class="sf-label">{{ __('storefront.customer_phone') }}</label>
+                                <input id="c-phone" x-model="form.customer_phone" required inputmode="tel" class="sf-input" dir="ltr">
                             </div>
                         </div>
-                        <div>
-                            <label for="c-email" class="block text-sm font-medium text-gray-700 mb-1">{{ __('storefront.customer_email') }}</label>
-                            <input id="c-email" type="email" x-model="form.customer_email" class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
+                        <div class="mt-4">
+                            <label for="c-email" class="sf-label">{{ __('storefront.customer_email') }}</label>
+                            <input id="c-email" type="email" x-model="form.customer_email" class="sf-input" dir="ltr">
                         </div>
-                    </div>
+                    </section>
 
-                    <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-                        <h2 class="font-bold text-gray-900">{{ __('storefront.shipping_address') }}</h2>
-                        <textarea id="c-address" x-model="form.shipping_address" required rows="3" class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"></textarea>
-                    </div>
+                    {{-- ٢) عنوان الشحن --}}
+                    <section class="sf-card sf-card-pad">
+                        <h2 class="flex items-center gap-2.5 font-bold mb-4 text-[color:var(--sf-text)]">
+                            <span class="grid place-items-center w-7 h-7 rounded-full bg-brand-600 text-white text-xs font-bold shrink-0">2</span>
+                            {{ __('storefront.shipping_address') }}
+                        </h2>
+                        <label for="c-address" class="sr-only">{{ __('storefront.shipping_address') }}</label>
+                        <textarea id="c-address" x-model="form.shipping_address" required rows="3" class="sf-textarea"
+                                  placeholder="{{ __('storefront.address_placeholder') }}"></textarea>
+                        <p class="sf-hint">{{ __('storefront.address_hint') }}</p>
+                    </section>
 
-                    <div class="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-                        <h2 class="font-bold text-gray-900">{{ __('storefront.payment_method') }}</h2>
-                        <label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer">
-                            <input type="radio" name="pm" value="cod" x-model="form.payment_method_code" class="text-emerald-600 focus:ring-emerald-500">
-                            <span class="text-gray-800">{{ __('storefront.cod') }}</span>
+                    {{-- ٣) طريقة الدفع --}}
+                    <section class="sf-card sf-card-pad">
+                        <h2 class="flex items-center gap-2.5 font-bold mb-4 text-[color:var(--sf-text)]">
+                            <span class="grid place-items-center w-7 h-7 rounded-full bg-brand-600 text-white text-xs font-bold shrink-0">3</span>
+                            {{ __('storefront.payment_method') }}
+                        </h2>
+                        <label class="flex items-center gap-3 rounded-xl border-2 p-4 cursor-pointer transition-colors"
+                               :class="form.payment_method_code === 'cod'
+                                   ? 'border-brand-600 bg-brand-50'
+                                   : 'border-[color:var(--sf-border)] hover:border-brand-300'">
+                            <input type="radio" name="pm" value="cod" x-model="form.payment_method_code"
+                                   class="text-brand-600 focus:ring-brand-500 w-5 h-5">
+                            <span class="grid place-items-center w-10 h-10 rounded-xl bg-white text-brand-600 shrink-0">
+                                <x-storefront.icon name="truck" class="w-5 h-5" />
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block font-semibold text-[color:var(--sf-text)]">{{ __('storefront.cod') }}</span>
+                                <span class="block text-xs text-[color:var(--sf-text-soft)]">{{ __('storefront.cod_hint') }}</span>
+                            </span>
                         </label>
-                    </div>
+                    </section>
                 </div>
 
                 {{-- الملخّص --}}
-                <div class="lg:col-span-1">
-                    <div class="bg-white rounded-xl border border-gray-200 p-5 sticky top-24">
-                        <div class="flex items-center justify-between text-gray-700 mb-4">
+                <div>
+                    <div class="sf-card sf-card-pad lg:sticky lg:top-[7.5rem]">
+                        <h2 class="font-bold mb-4 text-[color:var(--sf-text)]">{{ __('storefront.order_summary') }}</h2>
+
+                        <div class="flex items-center justify-between text-sm text-[color:var(--sf-text-soft)] py-2">
                             <span>{{ __('storefront.subtotal') }}</span>
-                            <span class="font-bold" x-text="`${Number($store.cart.subtotal).toFixed(2)} {{ __('storefront.currency') }}`"></span>
+                            <span class="font-bold tabular-nums text-[color:var(--sf-text)]"
+                                  x-text="`${Number($store.cart.subtotal).toFixed(2)} {{ __('storefront.currency') }}`"></span>
                         </div>
+
+                        <div class="flex items-center justify-between pt-3 mt-2 border-t border-[color:var(--sf-border)]">
+                            <span class="font-bold text-[color:var(--sf-text)]">{{ __('storefront.total') }}</span>
+                            <span class="sf-price text-xl"
+                                  x-text="`${Number($store.cart.subtotal).toFixed(2)} {{ __('storefront.currency') }}`"></span>
+                        </div>
+
                         <template x-if="error">
-                            <p class="text-sm text-rose-600 mb-3" x-text="error"></p>
+                            <p class="mt-4 rounded-lg px-3 py-2 text-sm"
+                               style="background:#FBE9E7;color:var(--sf-danger)" x-text="error"></p>
                         </template>
-                        <button type="submit" :disabled="placing"
-                                class="w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold py-3">
+
+                        <button type="submit" :disabled="placing" class="sf-btn-primary sf-btn-block sf-btn-lg mt-5">
                             <span x-show="!placing">{{ __('storefront.place_order') }}</span>
                             <span x-show="placing" x-cloak>{{ __('storefront.loading') }}</span>
                         </button>
-                        <a href="{{ route('storefront.cart') }}" class="block text-center mt-2 text-sm text-gray-500 hover:text-emerald-600">{{ __('storefront.cart') }}</a>
+
+                        <a href="{{ route('storefront.cart') }}"
+                           class="flex items-center justify-center min-h-10 mt-2 text-sm font-semibold text-[color:var(--sf-text-soft)] hover:text-brand-600 transition-colors">
+                            {{ __('storefront.back_to_cart') }}
+                        </a>
                     </div>
                 </div>
             </form>
         </template>
     </div>
 
+    {{-- ⚠️ لا يُمسّ: منطق جلسة الإتمام كما هو حرفيًا --}}
     <script>
         function storefrontCheckout() {
             const API = '/api/v1/store';
@@ -123,7 +207,5 @@
     </script>
 
     {{-- توصيات في الإتمام (Phase 6 / ADR-045) --}}
-    <div class="max-w-6xl mx-auto px-4 mt-8">
-        <x-storefront.section :title="__('storefront.customers_also_bought')" :items="$recommendations" recoType="best_seller" placement="checkout" />
-    </div>
+    <x-storefront.section :title="__('storefront.customers_also_bought')" :items="$recommendations" recoType="best_seller" placement="checkout" />
 </x-storefront.layout>
