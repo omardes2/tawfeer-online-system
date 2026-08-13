@@ -28,6 +28,15 @@
                             <input type="file" name="store_favicon" accept=".png,.ico" class="text-sm" />
                         </x-admin.field>
                     </div>
+
+                    <x-admin.field :label="__('حدّ التنبيه بنقص المخزون (افتراضي)')" name="inventory_default_reorder_level">
+                        <input type="number" step="0.001" min="0" name="inventory_default_reorder_level"
+                               value="{{ old('inventory_default_reorder_level', $values['inventory_default_reorder_level'] ?? 0) }}"
+                               class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                        <p class="mt-1 text-xs text-gray-500">
+                            {{ __('يظهر الصنف في «تنبيهات النقص» عندما ينزل المتوفّر إلى هذا الحدّ أو دونه. صفر يعني تنبيه الأصناف النافدة فقط. يمكن تجاوزه لكل صنف من صفحة المنتج.') }}
+                        </p>
+                    </x-admin.field>
                 </div>
 
                 {{-- OpenAI --}}

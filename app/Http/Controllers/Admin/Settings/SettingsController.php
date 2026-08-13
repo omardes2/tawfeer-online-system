@@ -36,6 +36,7 @@ class SettingsController extends Controller
         'whatsapp_enabled' => 'whatsapp.enabled',
         'whatsapp_endpoint' => 'whatsapp.endpoint',
         'whatsapp_token' => 'whatsapp.token',
+        'inventory_default_reorder_level' => 'inventory.default_reorder_level',
         'delivery_default_fee' => 'delivery.default_fee',
         'delivery_free_threshold' => 'delivery.free_threshold',
         'delivery_cod_treasury_id' => 'delivery.cod_treasury_id',
@@ -76,6 +77,7 @@ class SettingsController extends Controller
         $validated = $request->validate([
             'store_name' => ['nullable', 'string', 'max:150'],
             'store_company_info' => ['nullable', 'string', 'max:2000'],
+            'inventory_default_reorder_level' => ['nullable', 'numeric', 'min:0'],
             'store_logo' => ['nullable', 'file', 'image', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
             'store_favicon' => ['nullable', 'file', 'mimes:png,ico', 'max:512'],
             'openai_enabled' => ['nullable', 'boolean'],

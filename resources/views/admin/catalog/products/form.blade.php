@@ -101,6 +101,22 @@
                     </div>
                 </div>
 
+                {{-- المخزون: حدّ التنبيه بالنقص --}}
+                <div class="border-t border-gray-100 pt-4 mt-2">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-3">{{ __('المخزون') }}</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <x-admin.field :label="__('حدّ التنبيه بالنقص')" name="reorder_level">
+                            <input type="number" step="0.001" min="0" name="reorder_level"
+                                   value="{{ old('reorder_level', $product->reorder_level !== null ? (float) $product->reorder_level : '') }}"
+                                   placeholder="{{ __('الافتراضي: :n', ['n' => (float) \App\Modules\Foundation\Services\Settings::get('inventory.default_reorder_level', 0)]) }}"
+                                   class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                            <p class="mt-1 text-xs text-gray-500">
+                                {{ __('يظهر الصنف في «تنبيهات النقص» عندما ينزل المتوفّر إلى هذا الحدّ أو دونه. اتركه فارغًا لاستخدام الحدّ الافتراضي من الإعدادات.') }}
+                            </p>
+                        </x-admin.field>
+                    </div>
+                </div>
+
                 {{-- الوسوم والسمات --}}
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>

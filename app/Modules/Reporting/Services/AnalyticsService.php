@@ -2,6 +2,7 @@
 
 namespace App\Modules\Reporting\Services;
 
+use App\Modules\Inventory\Services\WarehouseService;
 use App\Modules\Reporting\Support\DateRange;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -356,9 +357,10 @@ class AnalyticsService
         return DB::table('inventory_stocks')
             ->join('product_variants', 'product_variants.id', '=', 'inventory_stocks.variant_id')
             ->join('products', 'products.id', '=', 'product_variants.product_id')
-            ->whereColumn('inventory_stocks.on_hand', '<=', 'inventory_stocks.reorder_level')
+            ->whereRaw('inventory_stocks.on_hand <= '.WarehouseService::reorderLevelExpression())
             ->where('inventory_stocks.on_hand', '>', 0)
-            ->selectRaw('products.name, product_variants.sku, inventory_stocks.on_hand, inventory_stocks.reorder_level')
+            ->selectRaw('products.name, product_variants.sku, inventory_stocks.on_hand, '
+                .WarehouseService::reorderLevelExpression().' as reorder_level')
             ->orderBy('inventory_stocks.on_hand')->get();
     }
 

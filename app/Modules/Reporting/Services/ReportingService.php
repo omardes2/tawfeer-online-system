@@ -2,6 +2,7 @@
 
 namespace App\Modules\Reporting\Services;
 
+use App\Modules\Inventory\Services\WarehouseService;
 use App\Modules\Reporting\Support\DateRange;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
@@ -418,15 +419,21 @@ class ReportingService
         ];
     }
 
-    /** أصناف تحت حدّ إعادة الطلب (تنبيه نقص) — يعيد استخدام reorder_level القائم. */
+    /**
+     * أصناف تحت حدّ إعادة الطلب — بنفس سلسلة `WarehouseService` (سطر المخزون ←
+     * المتغيّر ← المنتج ← الافتراضي)، فلا يختلف رقم اللوحة عن صفحة تنبيهات النقص.
+     */
     private function lowStock(int $limit = 10): Collection
     {
+        $level = WarehouseService::reorderLevelExpression();
+
         return DB::table('inventory_stocks')
             ->join('product_variants', 'inventory_stocks.variant_id', '=', 'product_variants.id')
             ->leftJoin('products', 'product_variants.product_id', '=', 'products.id')
-            ->whereNotNull('inventory_stocks.reorder_level')
-            ->whereColumn('inventory_stocks.on_hand', '<=', 'inventory_stocks.reorder_level')
-            ->selectRaw('COALESCE(products.name, product_variants.sku) as name, inventory_stocks.on_hand, inventory_stocks.reorder_level')
+            ->whereNull('product_variants.deleted_at')
+            ->whereNull('products.deleted_at')
+            ->whereRaw('inventory_stocks.on_hand <= '.$level)
+            ->selectRaw('COALESCE(products.name, product_variants.sku) as name, inventory_stocks.on_hand, '.$level.' as reorder_level')
             ->orderBy('inventory_stocks.on_hand')->limit($limit)->get();
     }
 

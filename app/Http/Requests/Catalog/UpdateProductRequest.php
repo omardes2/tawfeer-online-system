@@ -40,6 +40,8 @@ class UpdateProductRequest extends FormRequest
             'sort_order' => ['sometimes', 'integer', 'min:0'],
             'track_inventory' => ['boolean'],
             'weight' => ['nullable', 'numeric', 'min:0'],
+            // حدّ التنبيه بالنقص؛ فارغًا يعني الرجوع للحدّ الافتراضي في الإعدادات.
+            'reorder_level' => ['nullable', 'numeric', 'min:0'],
             'retail_price' => ['nullable', 'numeric', 'min:0'],
             'promo_price' => ['nullable', 'numeric', 'min:0', 'lte:retail_price'],
             'cost_price' => ['nullable', 'numeric', 'min:0'],
