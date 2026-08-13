@@ -22,13 +22,49 @@ class DoctorImagesCommand extends Command
     public function handle(): int
     {
         $this->line('');
-        $healthy = $this->checkStorageLink();
+        $healthy = $this->checkAppUrl();
+        $healthy = $this->checkStorageLink() && $healthy;
         $healthy = $this->checkFiles() && $healthy;
 
         $this->line('');
         $this->line($healthy ? '<info>✔ لا مشكلة ظاهرة في الصور.</info>' : '<comment>راجع النقاط أعلاه.</comment>');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * `APP_URL` هو ما يُبنى عليه رابط كل صورة. إن بقي على اسم المضيف الافتراضي
+     * للاستضافة أو على localhost، فالملف موجود والرابط يشير إلى نطاق آخر —
+     * فتظهر الصورة مكسورة بينما كل شيء آخر سليم.
+     */
+    private function checkAppUrl(): bool
+    {
+        $url = (string) config('app.url');
+        $host = parse_url($url, PHP_URL_HOST) ?: $url;
+
+        $suspicious = ['localhost', '127.0.0.1', '::1'];
+        $defaultHostingSuffixes = ['.hstgr.cloud', '.cloudwaysapps.com', '.herokuapp.com', '.ondigitalocean.app'];
+
+        $looksDefault = in_array($host, $suspicious, true)
+            || collect($defaultHostingSuffixes)->contains(fn ($s) => str_ends_with($host, $s));
+
+        if ($looksDefault) {
+            $this->error('✘ APP_URL يشير إلى '.$host.' — وهو ليس نطاق الموقع.');
+            $this->line('  كل روابط الصور تُبنى عليه، فتُطلَب من نطاق آخر وتظهر مكسورة.');
+            $this->line('  الحلّ: اضبط APP_URL في .env على نطاق الموقع، ثم:  php artisan config:clear');
+
+            return false;
+        }
+
+        if (! str_starts_with($url, 'https://')) {
+            $this->warn('⚠ APP_URL ليس https — المتصفّح يحجب الصور كمحتوى مختلط على صفحة آمنة: '.$url);
+
+            return false;
+        }
+
+        $this->info('✔ APP_URL: '.$url);
+
+        return true;
     }
 
     /** وصلة public/storage — بدونها تُحفظ الصور ولا تُخدَم. */
