@@ -83,15 +83,16 @@ class ProductVariantAdminTest extends TestCase
 
         $variant = $product->variants()->optionVariants()->first();
 
-        // إعادة المزامنة بنفس التركيبة بسعر/كمية مختلفين → تحديث في المكان (لا نسخة جديدة).
+        // إعادة المزامنة بنفس التركيبة بسعر مختلف → تحديث في المكان (لا نسخة جديدة).
+        // الكمية تبقى 5: المصفوفة توزّع كمية الصنف ولا تضيف إليها، فتغييرها هنا يُرفض.
         $this->actingAs($this->admin())->post(route('admin.products.variants.sync', $product), [
-            'combos' => [['values' => [$v['S']], 'price' => 60, 'stock' => 9]],
-        ])->assertRedirect();
+            'combos' => [['values' => [$v['S']], 'price' => 60, 'stock' => 5]],
+        ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertSame(1, $product->variants()->optionVariants()->count());
         $variant->refresh();
         $this->assertEquals(60, $variant->retail_price);
-        $this->assertEqualsWithDelta(9, $this->onHand($variant->id), 0.001);
+        $this->assertEqualsWithDelta(5, $this->onHand($variant->id), 0.001);
     }
 
     public function test_sync_removes_dropped_combinations(): void
@@ -108,13 +109,37 @@ class ProductVariantAdminTest extends TestCase
         $removed = $product->variants()->optionVariants()->get()
             ->first(fn ($x) => $x->attributeValues->pluck('id')->contains($v['M']));
 
-        // مزامنة بتركيبة واحدة فقط → تُحذف الأخرى.
+        // مزامنة بتركيبة واحدة فقط → تُحذف الأخرى، وكميتها تنتقل إليها
+        // (المجموع يبقى 8 لأن المصفوفة توزيع لا إضافة).
+        $this->actingAs($this->admin())->post(route('admin.products.variants.sync', $product), [
+            'combos' => [['values' => [$v['S']], 'price' => 40, 'stock' => 8]],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame(1, $product->variants()->optionVariants()->count());
+        $this->assertSoftDeleted('product_variants', ['id' => $removed->id]);
+    }
+
+    /**
+     * المصفوفة توزّع كمية الصنف ولا تضيف إليها: مجموع كميات المتغيّرات يجب أن
+     * يساوي رصيد الصنف، وإلا رُفضت المزامنة برسالة واضحة بدل تضخيم المخزون صامتًا.
+     * (زيادة المخزون تكون بفاتورة شراء لا بتعديل المصفوفة.)
+     */
+    public function test_sync_rejects_totals_that_do_not_match_product_quantity(): void
+    {
+        [$product, $v] = $this->productWithSizes(['S']);
+
         $this->actingAs($this->admin())->post(route('admin.products.variants.sync', $product), [
             'combos' => [['values' => [$v['S']], 'price' => 40, 'stock' => 5]],
         ])->assertRedirect();
 
-        $this->assertSame(1, $product->variants()->optionVariants()->count());
-        $this->assertSoftDeleted('product_variants', ['id' => $removed->id]);
+        $variant = $product->variants()->optionVariants()->first();
+
+        // محاولة رفع الكمية من 5 إلى 20 عبر المصفوفة.
+        $this->actingAs($this->admin())->post(route('admin.products.variants.sync', $product), [
+            'combos' => [['values' => [$v['S']], 'price' => 40, 'stock' => 20]],
+        ])->assertRedirect()->assertSessionHas('error');
+
+        $this->assertEqualsWithDelta(5, $this->onHand($variant->id), 0.001, 'لم يُرفض تضخيم المخزون.');
     }
 
     public function test_sync_requires_values_per_combo(): void

@@ -5,6 +5,7 @@ namespace Tests\Feature\Admin;
 use App\Models\User;
 use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Accounting\Models\JournalEntry;
+use App\Modules\Accounting\Models\JournalLine;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Crm\Models\Customer;
@@ -70,14 +71,29 @@ class OrderForceDeleteTest extends TestCase
             ->delete(route('admin.sales.orders.force_destroy', $order))
             ->assertRedirect(route('admin.sales.orders.index'));
 
-        // الطلب محذوف (ناعم)، والمخزون عاد، وقيدا الإيراد/التكلفة حُذفا (لا عُكسا)، وسند القبض عُكس.
+        // الطلب محذوف (ناعم)، والمخزون عاد، وسند القبض عُكس.
         $this->assertSoftDeleted('orders', ['id' => $order->id]);
         $this->assertEqualsWithDelta(10, $onHand(), 0.001);
         $this->assertNull($order->fresh()->revenue_entry_id);
         $this->assertNull($order->fresh()->cogs_entry_id);
-        $this->assertNull(JournalEntry::find($revenueId), 'يُفترض حذف قيد الإيراد لا عكسه');
-        $this->assertNull(JournalEntry::find($cogsId), 'يُفترض حذف قيد التكلفة لا عكسه');
         $this->assertSame('reversed', FinancialVoucher::find($receiptId)->status);
+
+        // القيود المُرحّلة تُعكَس ولا تُحذف: يبقى الأصل في الدفتر ويُضاف له قيد عاكس،
+        // فيبقى أثر العملية مرئيًا في السجل بدل اختفائها كأنها لم تكن.
+        foreach ([$revenueId => 'الإيراد', $cogsId => 'التكلفة'] as $entryId => $label) {
+            $this->assertNotNull(JournalEntry::find($entryId), "قيد {$label} الأصلي يجب أن يبقى في الدفتر");
+            $this->assertDatabaseHas('journal_entries', [
+                'reverses_entry_id' => $entryId,
+                'status' => 'posted',
+            ]);
+        }
+
+        // والأثر المالي الصافي صفر: مجموع مدين القيدين = مجموع دائنهما.
+        $ids = JournalEntry::whereIn('id', [$revenueId, $cogsId])
+            ->orWhereIn('reverses_entry_id', [$revenueId, $cogsId])->pluck('id');
+        $lines = JournalLine::whereIn('journal_entry_id', $ids)->get();
+        $this->assertEqualsWithDelta($lines->sum('debit'), $lines->sum('credit'), 0.001,
+            'القيد وعكسه يجب أن يلغي أحدهما الآخر');
     }
 
     public function test_force_delete_forbidden_for_non_admin(): void
