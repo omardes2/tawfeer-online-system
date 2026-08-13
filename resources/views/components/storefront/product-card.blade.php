@@ -90,45 +90,8 @@
         {{-- الإضافة للسلة / تعديل الكمية --}}
         <div class="mt-auto pt-2">
             @if ($variant && $inStock)
-                <div x-data="{
-                        variant: '{{ $variant->uuid }}',
-                        max: {{ (int) floor($available) }},
-                        busy: false,
-                        get qty() {
-                            // الواجهة تُعيد الكمية كنصّ عشري ('1.000')، فـ`qty + 1` بلا تحويل
-                            // يُنتج دمجًا نصّيًا لا جمعًا، و`qty === 1` لا يتحقّق أبدًا.
-                            const item = $store.cart.items.find(i => i.variant_id === this.variant);
-                            return item ? Math.round(Number(item.qty)) : 0;
-                        },
-                        async add() { this.busy = true; await $store.cart.add(this.variant, 1); this.busy = false; },
-                        async set(n) {
-                            this.busy = true;
-                            n <= 0 ? await $store.cart.remove(this.variant) : await $store.cart.setQty(this.variant, n);
-                            this.busy = false;
-                        },
-                     }">
-                    {{-- بلا كمية: زرّ الإضافة --}}
-                    <button type="button" x-show="qty === 0" @click="add()" :disabled="busy"
-                            class="sf-btn-primary sf-btn-block whitespace-nowrap min-h-10
-                                   !px-2 !py-2 text-[12px] sm:text-[13px] gap-1.5">
-                        {{-- الأيقونة تختفي على أضيق الشاشات كي يبقى النصّ في سطر واحد --}}
-                        <x-storefront.icon name="cart" class="w-4 h-4 hidden min-[360px]:block" />
-                        {{ __('storefront.add_to_cart') }}
-                    </button>
-
-                    {{-- بعد الإضافة: محدّد الكمية --}}
-                    <div x-show="qty > 0" x-cloak class="sf-qty w-full justify-between">
-                        <button type="button" @click="set(qty - 1)" :disabled="busy"
-                                :aria-label="qty === 1 ? '{{ __('storefront.remove') }}' : '−'">
-                            <span x-show="qty > 1" aria-hidden="true">−</span>
-                            <span x-show="qty === 1" x-cloak aria-hidden="true">
-                                <x-storefront.icon name="trash" class="w-4 h-4" />
-                            </span>
-                        </button>
-                        <output x-text="qty" aria-live="polite"></output>
-                        <button type="button" @click="set(qty + 1)" :disabled="busy || qty >= max" aria-label="+">+</button>
-                    </div>
-                </div>
+                {{-- منطق السلة في مكوّن واحد يتقاسمه هذا الكرت وصفحة المنتج --}}
+                <x-storefront.add-to-cart :variant="$variant->uuid" :max="(int) floor($available)" />
             @else
                 <button type="button" disabled class="sf-btn sf-btn-sm sf-btn-block bg-[color:var(--sf-bg)] text-[color:var(--sf-text-soft)]">
                     {{ __('storefront.out_of_stock') }}

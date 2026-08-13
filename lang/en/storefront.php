@@ -148,5 +148,14 @@ return [
     'products_count' => '{0} No products|{1} 1 product|[2,*] :count products',
     'categories_count' => '{0} No categories|{1} 1 category|[2,*] :count categories',
 
+
+    // Product page (stage 4)
+    'unit' => 'Unit',
+    'product_images' => 'Product images',
+    'image_number' => 'Image :n',
+    'link_copied' => 'Link copied',
+    'increase' => 'Increase quantity',
+    'decrease' => 'Decrease quantity',
+
     'all_rights' => 'All rights reserved',
 ];
