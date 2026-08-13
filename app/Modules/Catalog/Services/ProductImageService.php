@@ -96,7 +96,7 @@ class ProductImageService
     {
         $image = $this->createGdImage($file);
         if ($image === null) {
-            return $file->store('products', 'public'); // fallback: حفظ الأصل
+            return $this->storeOriginal($file); // fallback: حفظ الأصل
         }
 
         $image = $this->downscale($image, $maxEdge);
@@ -108,10 +108,27 @@ class ProductImageService
         imagedestroy($image);
 
         if (! $ok || $binary === false || $binary === '') {
-            return $file->store('products', 'public'); // fallback
+            return $this->storeOriginal($file); // fallback
         }
 
-        Storage::disk('public')->put($path, $binary);
+        // قرص `public` مضبوط على `throw => false`، فالكتابة الفاشلة (قرص ممتلئ أو
+        // صلاحيات) تعود بـfalse بصمت. بلا هذا الفحص يُنشأ سجلّ صورة بلا ملف،
+        // فتظهر صورة مكسورة بدل رسالة خطأ مفهومة.
+        if (! Storage::disk('public')->put($path, $binary)) {
+            throw new \RuntimeException(__('تعذّر حفظ الصورة على القرص. تحقّق من المساحة وصلاحيات مجلّد storage.'));
+        }
+
+        return $path;
+    }
+
+    /** حفظ الملف كما هو مع التحقّق من نجاح الكتابة. */
+    private function storeOriginal(UploadedFile $file): string
+    {
+        $path = $file->store('products', 'public');
+
+        if ($path === false || $path === '') {
+            throw new \RuntimeException(__('تعذّر حفظ الصورة على القرص. تحقّق من المساحة وصلاحيات مجلّد storage.'));
+        }
 
         return $path;
     }

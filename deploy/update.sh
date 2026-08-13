@@ -52,6 +52,11 @@ npm run build
 log "Storage permissions"
 sudo find "${APP_PATH}/storage" "${APP_PATH}/bootstrap/cache" -type d -exec chmod 2775 {} \; || true
 
+# وصلة public/storage غير متعقَّبة في Git (وهذا صحيح)، فلا تُنشأ بالسحب. بدونها
+# تُرفع صور المنتجات وتُحفظ فعلًا لكنها لا تُخدَم على الويب فتظهر مكسورة.
+log "php artisan storage:link"
+php artisan storage:link --force
+
 log "php artisan optimize"
 php artisan optimize:clear
 php artisan optimize
