@@ -93,7 +93,9 @@
                 {{-- منطق السلة في مكوّن واحد يتقاسمه هذا الكرت وصفحة المنتج --}}
                 <x-storefront.add-to-cart :variant="$variant->uuid" :max="(int) floor($available)" />
             @else
-                <button type="button" disabled class="sf-btn sf-btn-sm sf-btn-block bg-[color:var(--sf-bg)] text-[color:var(--sf-text-soft)]">
+                {{-- min-h-10: بنفس ارتفاع زرّ «أضف إلى السلة» وإلّا تفاوتت ارتفاعات البطاقات في الشبكة --}}
+                <button type="button" disabled
+                        class="sf-btn sf-btn-sm sf-btn-block min-h-10 bg-[color:var(--sf-bg)] text-[color:var(--sf-text-soft)]">
                     {{ __('storefront.out_of_stock') }}
                 </button>
             @endif

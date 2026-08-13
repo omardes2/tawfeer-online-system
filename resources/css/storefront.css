@@ -70,6 +70,15 @@
         :root { --sf-bottomnav: 0rem; }
     }
 
+    /* ---- الهاتف بالعرض الأفقي ----
+       الشاشة لا يتجاوز ارتفاعها 360px تقريبًا، وكانت الترويسة اللاصقة وحدها
+       (ترويسة 64px + شريط بحث 55px) تلتهم ثلث الشاشة قبل أن يبدأ المحتوى.
+       الترويسة تعود إلى التدفّق فتُمرَّر بعيدًا، والشريط السفلي يقصر إلى 48px
+       مع إبقاء تسمياته. المساحة المتاحة للمحتوى ترتفع من ~٥٠٪ إلى ~٨٧٪. */
+    @media (max-width: 767px) and (max-height: 480px) and (orientation: landscape) {
+        :root { --sf-bottomnav: 3rem; }
+    }
+
     html {
         font-family: 'Cairo', 'Tajawal', ui-sans-serif, system-ui, sans-serif;
         -webkit-text-size-adjust: 100%;
@@ -78,6 +87,10 @@
     body {
         background: var(--sf-bg);
         color: var(--sf-text);
+        /* شبكة أمان: كلمة واحدة لا تنكسر (اسم مدينة طويل، SKU، رابط) كانت تدفع
+           الصفحة كلّها إلى تمرير أفقي عند 320px أو عند تكبير النصّ. لا أثر بصري
+           إلّا حين تعجز الكلمة فعلًا عن الاتّساع في سطرها. */
+        overflow-wrap: break-word;
     }
 
     /* عناوين متّسقة عبر الموقع كلّه */
@@ -252,6 +265,10 @@
     }
     .sf-bottomnav a.is-active { color: var(--sf-primary); }
     .sf-bottomnav svg { @apply w-6 h-6; }
+    @media (max-height: 480px) and (orientation: landscape) {
+        .sf-bottomnav a { @apply gap-0 py-1 text-[10px]; }
+        .sf-bottomnav svg { @apply w-5 h-5; }
+    }
 
     /* المحتوى يترك مساحة للشريط السفلي على الجوّال */
     .sf-has-bottomnav { padding-bottom: calc(var(--sf-bottomnav) + env(safe-area-inset-bottom, 0px)); }
@@ -305,6 +322,17 @@
     }
     .sf-scroll-x::-webkit-scrollbar { display: none; }
     .sf-scroll-x > * { scroll-snap-align: start; }
+
+    /* ---- قصّ الحروف العربية في النصّ المبتور ----
+       صندوق حروف Cairo العربية أطول من صندوق السطر (27px مقابل 24px عند 16px)،
+       و`truncate`/`line-clamp` تعني `overflow:hidden`، فتُقصّ ذيول «ي/ج/م/ن»
+       والنقاط تحتها — وهو ما يظهر في اسم العميل واسم المنتج على الجوّال.
+       الحشو يوسّع صندوق المحتوى، والهامش السالب يلغيه فيبقى القياس الخارجي
+       كما هو تمامًا (بلا أي إزاحة في التخطيط). */
+    .truncate, .line-clamp-1, .line-clamp-2, .line-clamp-3 {
+        padding-block: 4px;
+        margin-block: -4px;
+    }
 
     /* ════ منطقة الحساب ════ */
 
@@ -383,4 +411,11 @@
 
     /* شريط لاصق يحترم منطقة الأمان (زرّ الشراء أسفل صفحة المنتج) */
     .sf-safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+    /* الهاتف بالعرض الأفقي: الترويسة تعود إلى التدفّق فلا تلتهم ثلث الشاشة.
+       القاعدة هنا في طبقة utilities لأن `sticky` صنف Tailwind من الطبقة نفسها،
+       ووضعها في `base` كان يجعلها تخسر أمامه. */
+    @media (max-height: 480px) and (orientation: landscape) {
+        .sf-header { position: static; }
+    }
 }

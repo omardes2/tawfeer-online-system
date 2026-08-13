@@ -16,7 +16,7 @@
             @if ($source) data-reco-source="{{ $source }}" @endif
         @endif
         {{ $attributes }}>
-        <div class="flex items-end justify-between gap-4 mb-4">
+        <div class="flex items-end justify-between gap-x-4 gap-y-1 flex-wrap mb-4">
             <div class="min-w-0">
                 <h2 class="sf-section-title">{{ $title }}</h2>
                 @if ($subtitle)

@@ -6,14 +6,17 @@
 --}}
 <div class="mb-5">
     @if (! empty($breadcrumbs))
-        <nav class="mb-2 flex items-center gap-1.5 text-xs flex-wrap text-[color:var(--sf-text-soft)]"
+        {{-- الهامش السالب على الشريط يعوّض حشو الروابط فيبقى الارتفاع البصري كما هو --}}
+        <nav class="mb-2 -my-1.5 flex items-center gap-1.5 text-xs flex-wrap text-[color:var(--sf-text-soft)]"
              aria-label="{{ __('storefront.breadcrumb') }}">
             @foreach ($breadcrumbs as $label => $url)
                 @if (! $loop->first)
                     <x-storefront.icon name="chevron-left" class="w-3 h-3 opacity-50 ltr:rotate-180" />
                 @endif
                 @if ($url && ! $loop->last)
-                    <a href="{{ $url }}" class="hover:text-brand-600 transition-colors">{{ $label }}</a>
+                    {{-- روابط المسار كانت 16px فقط؛ الحشو يرفع مساحة اللمس إلى 40px --}}
+                    <a href="{{ $url }}"
+                       class="inline-flex items-center min-h-10 -mx-1.5 px-1.5 hover:text-brand-600 transition-colors">{{ $label }}</a>
                 @else
                     <span class="font-semibold text-[color:var(--sf-text)]">{{ $label }}</span>
                 @endif
@@ -29,7 +32,9 @@
             @endif
         </div>
         @if (! $slot->isEmpty())
-            <div class="flex items-center gap-2 shrink-0">{{ $slot }}</div>
+            {{-- بلا shrink-0: عند تكبير النصّ (٢٠٠٪) كان الفرز والتصفية يتجاوزان
+                 عرض الشاشة بدل أن ينزلا سطرًا --}}
+            <div class="flex items-center gap-2 flex-wrap min-w-0">{{ $slot }}</div>
         @endif
     </div>
 </div>

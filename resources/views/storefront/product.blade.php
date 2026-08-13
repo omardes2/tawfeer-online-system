@@ -77,13 +77,16 @@
     :page-event="['name' => 'ProductViewed', 'payload' => ['product' => $product->uuid, 'sku' => $product->sku]]">
 
     {{-- مسار التنقّل — مضغوط على الجوّال --}}
-    <nav class="flex items-center gap-1.5 flex-wrap text-xs text-[color:var(--sf-text-soft)] mb-4"
+    {{-- روابط المسار كانت 16px فقط؛ الحشو يرفع مساحة اللمس إلى 40px والهامش
+         السالب على الشريط يُبقي ارتفاعه البصري كما هو. --}}
+    <nav class="flex items-center gap-1.5 flex-wrap text-xs text-[color:var(--sf-text-soft)] mb-4 -my-1.5"
          aria-label="{{ __('storefront.breadcrumb') }}">
-        <a href="{{ route('storefront.home') }}" class="hover:text-brand-600 transition-colors">{{ __('storefront.home') }}</a>
+        <a href="{{ route('storefront.home') }}"
+           class="inline-flex items-center min-h-10 -mx-1.5 px-1.5 hover:text-brand-600 transition-colors">{{ __('storefront.home') }}</a>
         @if ($product->category)
             <x-storefront.icon name="chevron-left" class="w-3 h-3 opacity-50 ltr:rotate-180" />
             <a href="{{ route('storefront.category', $product->category->slug) }}"
-               class="hover:text-brand-600 transition-colors">{{ $product->category->name }}</a>
+               class="inline-flex items-center min-h-10 -mx-1.5 px-1.5 hover:text-brand-600 transition-colors">{{ $product->category->name }}</a>
         @endif
         {{-- اسم المنتج يظهر في المسار على الشاشات المتوسّطة فأكثر فقط: على الهاتف
              كان الاسم الطويل يلتهم السطر كلّه فيُخفي «الرئيسية» والقسم. --}}
@@ -99,7 +102,8 @@
         <div class="min-w-0">
             @if ($product->brand)
                 <a href="{{ route('storefront.brand', $product->brand->slug) }}"
-                   class="text-sm font-semibold text-brand-600 hover:text-brand-700 transition-colors">{{ $product->brand->name }}</a>
+                   class="inline-flex items-center min-h-10 -my-2 -mx-2 px-2 text-sm font-semibold
+                          text-brand-600 hover:text-brand-700 transition-colors">{{ $product->brand->name }}</a>
             @endif
 
             <h1 class="text-xl sm:text-2xl lg:text-3xl font-extrabold leading-snug mt-1 text-[color:var(--sf-text)]">

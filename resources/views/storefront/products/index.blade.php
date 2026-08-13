@@ -57,7 +57,7 @@
                 @if (($filters[$k] ?? '') !== '') <input type="hidden" name="{{ $k }}" value="{{ $filters[$k] }}"> @endif
             @endforeach
             <label for="sort" class="sr-only">{{ __('storefront.sort') }}</label>
-            <select id="sort" name="sort" onchange="this.form.submit()" class="sf-select !py-2.5 min-h-10">
+            <select id="sort" name="sort" onchange="this.form.submit()" class="sf-select !py-2.5 min-h-10 max-w-[12rem]">
                 @foreach ($sortOptions as $value => $label)
                     <option value="{{ $value }}" @selected($currentSort === $value)>{{ $label }}</option>
                 @endforeach
@@ -82,14 +82,14 @@
         <div class="flex items-center gap-2 flex-wrap mb-4">
             @foreach ($chips as $chip)
                 <a href="{{ route('storefront.shop', array_filter($chip['remove'], fn ($v) => $v !== null && $v !== '')) }}"
-                   class="sf-badge sf-badge-soft min-h-8 ps-3 pe-2 gap-1.5 hover:bg-brand-100 transition-colors"
+                   class="sf-badge sf-badge-soft min-h-10 ps-3.5 pe-2.5 gap-1.5 hover:bg-brand-100 transition-colors"
                    aria-label="{{ __('storefront.remove_filter', ['name' => $chip['label']]) }}">
                     {{ $chip['label'] }}
                     <x-storefront.icon name="close" class="w-3.5 h-3.5" />
                 </a>
             @endforeach
             <a href="{{ route('storefront.shop', array_filter(['q' => $q, 'sort' => $filters['sort'] ?? null])) }}"
-               class="text-xs font-semibold text-[color:var(--sf-text-soft)] hover:text-brand-600 py-2 px-1 transition-colors">
+               class="inline-flex items-center min-h-10 px-2 text-xs font-semibold text-[color:var(--sf-text-soft)] hover:text-brand-600 transition-colors">
                 {{ __('storefront.clear_all') }}
             </a>
         </div>

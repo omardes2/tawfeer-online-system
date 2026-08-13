@@ -107,7 +107,7 @@
             </div>
     </div>
 
-    <header x-data="{ menu: false }" class="bg-white sticky top-0 z-40 border-b border-[color:var(--sf-border)]">
+    <header x-data="{ menu: false }" class="sf-header bg-white sticky top-0 z-40 border-b border-[color:var(--sf-border)]">
         {{-- الترويسة الرئيسية --}}
         <div class="sf-container">
             <div class="flex items-center gap-3 h-16">

@@ -26,7 +26,7 @@
     {{-- ══════════ الأقسام ══════════ --}}
     @if ($categories->isNotEmpty())
         <section class="py-6">
-            <div class="flex items-end justify-between gap-4 mb-4">
+            <div class="flex items-end justify-between gap-x-4 gap-y-1 flex-wrap mb-4">
                 <h2 class="sf-section-title">{{ __('storefront.browse_categories') }}</h2>
                 <a href="{{ route('storefront.categories') }}" class="sf-section-link inline-flex items-center gap-1">
                     {{ __('storefront.view_all') }}
@@ -88,7 +88,7 @@
                 <span class="grid place-items-center w-11 h-11 rounded-xl bg-brand-50 text-brand-600 shrink-0">
                     <x-storefront.icon :name="$item['icon']" class="w-5 h-5" />
                 </span>
-                <span class="text-[13px] font-semibold leading-snug">{{ $item['label'] }}</span>
+                <span class="min-w-0 text-[13px] font-semibold leading-snug">{{ $item['label'] }}</span>
             </div>
         @endforeach
     </section>
@@ -96,7 +96,7 @@
     {{-- ══════════ العلامات التجارية ══════════ --}}
     @if ($brands->isNotEmpty())
         <section class="py-4">
-            <div class="flex items-end justify-between gap-4 mb-4">
+            <div class="flex items-end justify-between gap-x-4 gap-y-1 flex-wrap mb-4">
                 <h2 class="sf-section-title">{{ __('storefront.shop_by_brand') }}</h2>
                 <a href="{{ route('storefront.brands') }}" class="sf-section-link inline-flex items-center gap-1">
                     {{ __('storefront.view_all') }}
