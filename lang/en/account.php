@@ -59,7 +59,9 @@ return [
     'payment_status' => 'Payment status',
     'shipment_status' => 'Shipment status',
     'live' => 'Live',
+    'status_now' => 'Current status',
     'items' => 'Items',
+    'quantity' => 'Quantity',
 
     // Addresses
     'add_address' => 'Add address',
@@ -81,6 +83,7 @@ return [
     'no_wishlist_hint' => 'Add products you like to save them here.',
     'wishlist_added' => 'Added to wishlist.',
     'wishlist_removed' => 'Removed from wishlist.',
+    'remove_from_wishlist' => 'Remove from wishlist',
     'add_to_wishlist' => 'Add to wishlist',
     'in_wishlist' => 'In wishlist',
 

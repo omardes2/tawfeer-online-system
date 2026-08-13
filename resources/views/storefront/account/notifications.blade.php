@@ -1,38 +1,48 @@
 <x-storefront.account-layout :title="__('account.notifications')" active="notifications">
-    <div class="flex items-center justify-between mb-4">
-        <h1 class="text-xl font-bold text-gray-900">{{ __('account.notifications') }}</h1>
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h1 class="sf-section-title">{{ __('account.notifications') }}</h1>
         @if ($unreadCount > 0)
             <form method="POST" action="{{ route('account.notifications.read_all') }}">
                 @csrf
-                <button type="submit" class="text-sm text-emerald-600 hover:underline">{{ __('account.mark_all_read') }}</button>
+                <button type="submit" class="sf-section-link">{{ __('account.mark_all_read') }}</button>
             </form>
         @endif
     </div>
 
     @if ($notifications->isEmpty())
-        <div class="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center text-gray-500">
-            {{ __('account.no_notifications') }}
-        </div>
+        <x-storefront.empty-state icon="bell" :title="__('account.no_notifications')" />
     @else
-        <div class="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+        <div class="sf-card overflow-hidden divide-y divide-[color:var(--sf-border)]">
             @foreach ($notifications as $notification)
-                <div @class(['p-4 flex items-start justify-between gap-3', 'bg-emerald-50/40' => is_null($notification->read_at)])>
-                    <div class="min-w-0">
-                        <p class="font-medium text-gray-800">{{ $notification->data['title'] ?? $notification->type }}</p>
+                @php $unread = is_null($notification->read_at); @endphp
+                <div @class(['p-4 flex items-start gap-3', 'bg-brand-50/50' => $unread])>
+                    {{-- نقطة «غير مقروء» بدل تلوين البطاقة وحده: تُقرأ حتى بلا تمييز لوني --}}
+                    <span @class([
+                        'mt-2 h-2 w-2 rounded-full shrink-0',
+                        'bg-brand-600' => $unread,
+                        'bg-transparent' => ! $unread,
+                    ]) aria-hidden="true"></span>
+
+                    <div class="min-w-0 flex-1">
+                        <p @class(['text-sm text-[color:var(--sf-text)]', 'font-bold' => $unread, 'font-semibold' => ! $unread])>
+                            {{ $notification->data['title'] ?? $notification->type }}
+                        </p>
                         @if (! empty($notification->data['body']))
-                            <p class="text-sm text-gray-500 mt-0.5">{{ $notification->data['body'] }}</p>
+                            <p class="text-sm text-[color:var(--sf-text-soft)] mt-0.5">{{ $notification->data['body'] }}</p>
                         @endif
-                        <p class="text-xs text-gray-400 mt-1">{{ $notification->created_at?->diffForHumans() }}</p>
+                        <p class="text-xs text-[color:var(--sf-text-soft)] mt-1">{{ $notification->created_at?->diffForHumans() }}</p>
                     </div>
-                    @if (is_null($notification->read_at))
+
+                    @if ($unread)
                         <form method="POST" action="{{ route('account.notifications.read', $notification->id) }}" class="shrink-0">
                             @csrf
-                            <button type="submit" class="text-xs text-emerald-600 hover:underline whitespace-nowrap">{{ __('account.mark_read') }}</button>
+                            <button type="submit" class="sf-section-link">{{ __('account.mark_read') }}</button>
                         </form>
                     @endif
                 </div>
             @endforeach
         </div>
-        <div class="mt-4">{{ $notifications->links() }}</div>
+
+        <nav class="mt-6" aria-label="{{ __('storefront.pagination') }}">{{ $notifications->links('vendor.pagination.storefront') }}</nav>
     @endif
 </x-storefront.account-layout>

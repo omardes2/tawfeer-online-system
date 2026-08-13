@@ -59,7 +59,9 @@ return [
     'payment_status' => 'حالة الدفع',
     'shipment_status' => 'حالة الشحن',
     'live' => 'مباشر',
+    'status_now' => 'حالة الطلب الآن',
     'items' => 'البنود',
+    'quantity' => 'الكمية',
 
     // عناوين
     'add_address' => 'إضافة عنوان',
@@ -81,6 +83,7 @@ return [
     'no_wishlist_hint' => 'أضف منتجات تعجبك لحفظها هنا.',
     'wishlist_added' => 'أُضيف إلى المفضّلة.',
     'wishlist_removed' => 'أُزيل من المفضّلة.',
+    'remove_from_wishlist' => 'إزالة من المفضّلة',
     'add_to_wishlist' => 'أضف للمفضّلة',
     'in_wishlist' => 'في المفضّلة',
 

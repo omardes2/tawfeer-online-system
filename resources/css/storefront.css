@@ -166,6 +166,34 @@
     .sf-hint { @apply mt-1 text-xs; color: var(--sf-text-soft); }
     .sf-error { @apply mt-1 text-xs; color: var(--sf-danger); }
 
+    /* خانة اختيار داخل بطاقة قابلة للنقر: مساحة اللمس هي البطاقة كلّها لا المربّع. */
+    .sf-check {
+        @apply flex items-center gap-2.5 text-sm cursor-pointer select-none
+               min-h-10 px-3 py-2 transition-colors;
+        border: 1px solid var(--sf-border);
+        border-radius: var(--sf-radius-sm);
+        color: var(--sf-text);
+    }
+    .sf-check:hover { border-color: var(--sf-primary); }
+    .sf-check input[type=checkbox], .sf-check input[type=radio] {
+        @apply w-[18px] h-[18px] shrink-0 cursor-pointer;
+        color: var(--sf-primary);
+        border-color: var(--sf-border);
+    }
+    .sf-check input:focus { box-shadow: 0 0 0 3px var(--sf-primary-light); outline: none; }
+    /* بلا إطار: خانة ضمن نصّ جارٍ («تذكّرني»، «الشروط») */
+    .sf-check-bare { @apply border-0 px-0; }
+    .sf-check-bare:hover { border-color: transparent; }
+
+    /* ---- تنبيهات الصفحة ---- */
+    .sf-alert {
+        @apply flex items-start gap-2.5 text-sm px-4 py-3 mb-4;
+        border-radius: var(--sf-radius-sm);
+    }
+    .sf-alert svg { @apply w-5 h-5 shrink-0 mt-px; }
+    .sf-alert-success { background: #E7F6EE; color: var(--sf-success); }
+    .sf-alert-error { background: #FBE9E7; color: var(--sf-danger); }
+
     /* ---- الشارات ---- */
     .sf-badge {
         @apply inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5;
@@ -277,6 +305,64 @@
     }
     .sf-scroll-x::-webkit-scrollbar { display: none; }
     .sf-scroll-x > * { scroll-snap-align: start; }
+
+    /* ════ منطقة الحساب ════ */
+
+    /* رابط الشريط الجانبي (الحواسيب) */
+    .sf-acct-link {
+        @apply flex items-center gap-2.5 px-3 min-h-10 text-sm font-semibold transition-colors;
+        border-radius: var(--sf-radius-sm);
+        color: var(--sf-text);
+    }
+    .sf-acct-link svg { @apply w-5 h-5 shrink-0; color: var(--sf-text-soft); }
+    .sf-acct-link:hover { background: var(--sf-bg); }
+    .sf-acct-link.is-active { background: var(--sf-primary-light); color: var(--sf-primary); }
+    .sf-acct-link.is-active svg { color: var(--sf-primary); }
+    .sf-acct-link.is-danger { color: var(--sf-danger); }
+    .sf-acct-link.is-danger svg { color: var(--sf-danger); }
+    .sf-acct-link.is-danger:hover { background: #FBE9E7; }
+
+    /* تبويبات أفقية بديلة على الجوّال: ٨ روابط رأسية كانت تدفع المحتوى خارج الشاشة */
+    .sf-acct-tab {
+        @apply inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap
+               px-3.5 min-h-10 text-sm font-semibold bg-white transition-colors;
+        border: 1px solid var(--sf-border);
+        border-radius: var(--sf-radius-pill);
+        color: var(--sf-text-soft);
+    }
+    .sf-acct-tab svg { @apply w-4 h-4 shrink-0; }
+    .sf-acct-tab.is-active {
+        background: var(--sf-primary);
+        border-color: var(--sf-primary);
+        @apply text-white;
+    }
+
+    /* بطاقة رقم مختصر في لوحة الحساب */
+    .sf-stat {
+        @apply flex flex-col gap-1 p-4 bg-white transition-colors;
+        border: 1px solid var(--sf-border);
+        border-radius: var(--sf-radius);
+    }
+    .sf-stat:hover { border-color: var(--sf-primary); }
+    .sf-stat-value { @apply text-2xl font-extrabold tabular-nums leading-none; color: var(--sf-text); }
+    .sf-stat-label { @apply text-xs font-semibold; color: var(--sf-text-soft); }
+
+    /* مسار حالة الطلب: الخطّ يُرسم بحدّ العنصر لا بعنصر مطلق فلا ينزلق في RTL */
+    .sf-timeline { @apply space-y-0 list-none p-0 m-0; }
+    .sf-timeline li {
+        @apply relative pb-5;
+        padding-inline-start: 1.5rem;
+        border-inline-start: 2px solid var(--sf-border);
+    }
+    .sf-timeline li:last-child { @apply pb-0 border-transparent; }
+    .sf-timeline li::before {
+        content: '';
+        @apply absolute top-1 w-3 h-3 rounded-full bg-white;
+        inset-inline-start: -7px;
+        border: 2px solid var(--sf-border);
+    }
+    /* الأحدث أولًا: أوّل عنصر هو الحالة الحالية */
+    .sf-timeline li:first-child::before { background: var(--sf-primary); border-color: var(--sf-primary); }
 }
 
 @layer utilities {

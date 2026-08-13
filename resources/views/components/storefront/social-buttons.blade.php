@@ -4,7 +4,7 @@
     <div class="space-y-2">
         @if (in_array('google', $providers, true))
             <a href="{{ route('social.redirect', 'google') }}"
-               class="flex items-center justify-center gap-3 w-full rounded-lg border border-[#dadce0] bg-white text-[#3c4043] font-medium py-2.5 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+               class="flex items-center justify-center gap-3 w-full rounded-xl border border-[#dadce0] bg-white text-[#3c4043] font-semibold min-h-11 py-2.5 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-500"
                aria-label="{{ __('account.continue_with', ['provider' => 'Google']) }}">
                 <svg class="h-5 w-5" viewBox="0 0 48 48" aria-hidden="true">
                     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -18,7 +18,7 @@
 
         @if (in_array('facebook', $providers, true))
             <a href="{{ route('social.redirect', 'facebook') }}"
-               class="flex items-center justify-center gap-3 w-full rounded-lg bg-[#1877F2] text-white font-medium py-2.5 hover:bg-[#166fe0] focus:outline-none focus:ring-2 focus:ring-[#1877F2]"
+               class="flex items-center justify-center gap-3 w-full rounded-xl bg-[#1877F2] text-white font-semibold min-h-11 py-2.5 hover:bg-[#166fe0] focus:outline-none focus:ring-2 focus:ring-[#1877F2]"
                aria-label="{{ __('account.continue_with', ['provider' => 'Facebook']) }}">
                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.95.93-1.95 1.89v2.25h3.32l-.53 3.49h-2.79V24C19.61 23.1 24 18.1 24 12.07z"/>
@@ -29,8 +29,8 @@
     </div>
 
     <div class="flex items-center gap-3 my-5">
-        <span class="flex-1 h-px bg-gray-200"></span>
-        <span class="text-xs text-gray-400">{{ __('account.or') }}</span>
-        <span class="flex-1 h-px bg-gray-200"></span>
+        <span class="flex-1 h-px bg-[color:var(--sf-border)]"></span>
+        <span class="text-xs text-[color:var(--sf-text-soft)]">{{ __('account.or') }}</span>
+        <span class="flex-1 h-px bg-[color:var(--sf-border)]"></span>
     </div>
 @endif

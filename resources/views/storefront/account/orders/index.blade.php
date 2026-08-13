@@ -1,41 +1,66 @@
 <x-storefront.account-layout :title="__('account.my_orders')" active="orders">
-    <h1 class="text-xl font-bold text-gray-900 mb-4">{{ __('account.my_orders') }}</h1>
+    <h1 class="sf-section-title mb-4">{{ __('account.my_orders') }}</h1>
 
     @if ($orders->isEmpty())
-        <div class="bg-white rounded-xl border border-dashed border-gray-300 p-10 text-center">
-            <p class="text-gray-700 font-medium">{{ __('account.no_orders') }}</p>
-            <p class="text-sm text-gray-500 mt-1">{{ __('account.no_orders_hint') }}</p>
-            <a href="{{ route('storefront.shop') }}" class="inline-block mt-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-5 py-2.5">{{ __('storefront.shop') }}</a>
-        </div>
+        <x-storefront.empty-state icon="box"
+            :title="__('account.no_orders')"
+            :description="__('account.no_orders_hint')"
+            :action="route('storefront.shop')"
+            :action-label="__('storefront.shop')" />
     @else
-        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 text-gray-500 text-xs">
-                        <tr>
-                            <th class="text-start font-medium px-4 py-3">{{ __('account.order_number') }}</th>
-                            <th class="text-start font-medium px-4 py-3">{{ __('account.order_date') }}</th>
-                            <th class="text-start font-medium px-4 py-3">{{ __('account.order_status') }}</th>
-                            <th class="text-end font-medium px-4 py-3">{{ __('account.order_total') }}</th>
-                            <th class="px-4 py-3"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        @foreach ($orders as $order)
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-3 font-medium text-gray-800">{{ $order->number }}</td>
-                                <td class="px-4 py-3 text-gray-500">{{ $order->created_at?->format('Y-m-d') }}</td>
-                                <td class="px-4 py-3"><x-sales.status :status="$order->status" /></td>
-                                <td class="px-4 py-3 text-end font-semibold text-gray-800">{{ number_format((float) $order->total, 2) }} {{ __('storefront.currency') }}</td>
-                                <td class="px-4 py-3 text-end">
-                                    <a href="{{ route('account.orders.show', $order) }}" class="text-emerald-600 hover:underline whitespace-nowrap">{{ __('account.track_order') }}</a>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+        {{-- الجوّال: بطاقات. الجدول هنا كان يفرض تمريرًا أفقيًا على الهاتف. --}}
+        <div class="space-y-3 md:hidden">
+            @foreach ($orders as $order)
+                <a href="{{ route('account.orders.show', $order) }}"
+                   class="sf-card sf-card-hover p-4 block">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="font-bold text-sm text-[color:var(--sf-text)]">{{ $order->number }}</p>
+                            <p class="text-xs text-[color:var(--sf-text-soft)] mt-1">{{ $order->created_at?->format('Y-m-d') }}</p>
+                        </div>
+                        <x-sales.status :status="$order->status" />
+                    </div>
+                    <div class="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-[color:var(--sf-border)]">
+                        <span class="sf-price whitespace-nowrap">{{ number_format((float) $order->total, 2) }} {{ __('storefront.currency') }}</span>
+                        <span class="sf-section-link">
+                            {{ __('account.track_order') }}
+                            <x-storefront.icon name="chevron-left" class="w-4 h-4 ltr:rotate-180" />
+                        </span>
+                    </div>
+                </a>
+            @endforeach
         </div>
-        <div class="mt-4">{{ $orders->links() }}</div>
+
+        {{-- الحواسيب: جدول --}}
+        <div class="hidden md:block sf-card overflow-hidden">
+            <table class="w-full text-sm">
+                <thead class="bg-[color:var(--sf-bg)] text-[color:var(--sf-text-soft)] text-xs">
+                    <tr>
+                        <th class="text-start font-bold px-4 py-3">{{ __('account.order_number') }}</th>
+                        <th class="text-start font-bold px-4 py-3">{{ __('account.order_date') }}</th>
+                        <th class="text-start font-bold px-4 py-3">{{ __('account.order_status') }}</th>
+                        <th class="text-end font-bold px-4 py-3">{{ __('account.order_total') }}</th>
+                        <th class="px-4 py-3"><span class="sr-only">{{ __('account.track_order') }}</span></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-[color:var(--sf-border)]">
+                    @foreach ($orders as $order)
+                        <tr class="hover:bg-[color:var(--sf-bg)] transition-colors">
+                            <td class="px-4 py-3 font-bold text-[color:var(--sf-text)]">{{ $order->number }}</td>
+                            <td class="px-4 py-3 text-[color:var(--sf-text-soft)]">{{ $order->created_at?->format('Y-m-d') }}</td>
+                            <td class="px-4 py-3"><x-sales.status :status="$order->status" /></td>
+                            <td class="px-4 py-3 text-end sf-price whitespace-nowrap">{{ number_format((float) $order->total, 2) }} {{ __('storefront.currency') }}</td>
+                            <td class="px-4 py-3 text-end">
+                                <a href="{{ route('account.orders.show', $order) }}" class="sf-section-link">
+                                    {{ __('account.track_order') }}
+                                </a>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+
+        <nav class="mt-6" aria-label="{{ __('storefront.pagination') }}">{{ $orders->links('vendor.pagination.storefront') }}</nav>
     @endif
 </x-storefront.account-layout>
