@@ -46,7 +46,9 @@ final class AdminNavigation
             ]],
             ['المخزون والمشتريات', 'inventory', [
                 ['admin.inventory.stocks', 'أرصدة المخزون', 'inventory.stocks.view', 'admin.inventory.stocks'],
-                ['admin.inventory.low_stock', 'تنبيهات النقص', 'inventory.stocks.view', 'admin.inventory.low_stock'],
+                // نفس صلاحية المسار (`inventory.alerts.view`) لا صلاحية الأرصدة، وإلا
+                // ظهر الرابط لمن لا يملكه فأوصله إلى صفحة 403.
+                ['admin.inventory.low_stock', 'تنبيهات النقص', 'inventory.alerts.view', 'admin.inventory.low_stock'],
                 ['admin.purchasing.suppliers.index', 'الموردون', 'purchasing.suppliers.view', 'admin.purchasing.suppliers.*'],
                 ['admin.purchasing.invoices.index', 'فواتير الموردين', 'purchasing.invoices.view', 'admin.purchasing.invoices.*'],
                 ['admin.purchasing.returns.index', 'مرتجعات الموردين', 'purchasing.returns.view', 'admin.purchasing.returns.*'],
@@ -82,7 +84,7 @@ final class AdminNavigation
             ]],
             ['التسويق', 'sparkles', [
                 ['admin.marketing.campaigns.index', 'الحملات التسويقية', 'marketing.campaigns.view', 'admin.marketing.campaigns.*'],
-                ['admin.marketing.templates.index', 'قوالب الرسائل', 'marketing.campaigns.view', 'admin.marketing.templates.*'],
+                ['admin.marketing.templates.index', 'قوالب الرسائل', 'marketing.templates.manage', 'admin.marketing.templates.*'],
                 ['admin.recommendations.index', 'توصيات المنتجات', 'recommendations.manage', 'admin.recommendations.*'],
             ]],
             ['التقارير', 'chart', [

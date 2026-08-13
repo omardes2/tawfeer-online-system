@@ -43,7 +43,9 @@ class InventoryPermissionSeeder extends Seeder
             'inventory.counts.view', 'inventory.counts.manage', 'inventory.alerts.view', 'inventory.batch',
         ],
         'accountant' => ['inventory.stocks.view', 'inventory.movements.view', 'inventory.alerts.view'],
-        'sales' => ['inventory.stocks.view', 'inventory.reservations.view'],
+        // موظف المبيعات يرى تنبيهات النقص: يحتاج معرفة ما قارب النفاد قبل أن يَعِد
+        // عميلًا بصنف. لا يكشف ذلك بيانات جديدة — أرصدة المخزون مرئية له أصلًا.
+        'sales' => ['inventory.stocks.view', 'inventory.reservations.view', 'inventory.alerts.view'],
     ];
 
     public function run(): void

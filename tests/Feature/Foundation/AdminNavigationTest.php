@@ -87,6 +87,38 @@ class AdminNavigationTest extends TestCase
         }
     }
 
+    /**
+     * كل رابط في القائمة يفتح فعلًا لمن يراه.
+     *
+     * كانت «تنبيهات النقص» تُفحص بصلاحية الأرصدة بينما يشترط مسارها صلاحية
+     * التنبيهات، فيظهر الرابط لمن لا يملكه ثم يصطدم بـ403.
+     */
+    public function test_every_visible_link_is_actually_reachable(): void
+    {
+        foreach (['admin', 'manager', 'sales', 'accountant', 'warehouse', 'affiliate'] as $role) {
+            $this->actingAs($this->userWithRole($role));
+
+            foreach (AdminNavigation::groups() as $group) {
+                foreach ($group['items'] as $item) {
+                    $status = $this->get($item['url'])->getStatusCode();
+
+                    $this->assertNotSame(403, $status,
+                        "«{$item['label']}» ظاهر لدور {$role} لكنه محجوب: {$item['url']}");
+                    $this->assertLessThan(500, $status,
+                        "«{$item['label']}» أعطى خطأ خادم لدور {$role}: {$item['url']}");
+                }
+            }
+        }
+    }
+
+    public function test_sales_role_can_see_low_stock_alerts(): void
+    {
+        $this->actingAs($this->userWithRole('sales'));
+
+        $this->assertContains('تنبيهات النقص', $this->labels(AdminNavigation::groups()));
+        $this->get(route('admin.inventory.low_stock'))->assertOk();
+    }
+
     /** الروابط التي تتقاسم مسارًا وتفترق بمعامل لا تُضاء كلّها معًا. */
     public function test_voucher_links_sharing_a_route_highlight_separately(): void
     {
