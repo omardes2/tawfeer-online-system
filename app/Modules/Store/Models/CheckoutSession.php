@@ -3,6 +3,8 @@
 namespace App\Modules\Store\Models;
 
 use App\Models\User;
+use App\Modules\Foundation\Models\Area;
+use App\Modules\Foundation\Models\City;
 use App\Modules\Sales\Models\Order;
 use App\Support\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
@@ -20,7 +22,8 @@ class CheckoutSession extends Model
     protected $fillable = [
         'cart_id', 'user_id', 'session_token', 'status',
         'customer_name', 'customer_phone', 'customer_email',
-        'shipping_address', 'payment_method_code', 'notes', 'order_id',
+        'shipping_address', 'city_id', 'area_id',
+        'payment_method_code', 'notes', 'order_id',
     ];
 
     public function cart(): BelongsTo
@@ -36,6 +39,16 @@ class CheckoutSession extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    public function city(): BelongsTo
+    {
+        return $this->belongsTo(City::class);
+    }
+
+    public function area(): BelongsTo
+    {
+        return $this->belongsTo(Area::class);
     }
 
     /** اكتملت البيانات المطلوبة للإتمام؟ */

@@ -98,10 +98,38 @@
                             <span class="grid place-items-center w-7 h-7 rounded-full bg-brand-600 text-white text-xs font-bold shrink-0">2</span>
                             {{ __('storefront.shipping_address') }}
                         </h2>
-                        <label for="c-address" class="sr-only">{{ __('storefront.shipping_address') }}</label>
-                        <textarea id="c-address" x-model="form.shipping_address" required rows="3" class="sf-textarea"
-                                  placeholder="{{ __('storefront.address_placeholder') }}"></textarea>
-                        <p class="sf-hint">{{ __('storefront.address_hint') }}</p>
+                        {{-- المدينة والمنطقة: من مدن شركة التوصيل المسعّرة في النظام.
+                             اختيار المدينة يُرسَل للخلفية فورًا، والرسوم تعود منها. --}}
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label for="c-city" class="sf-label">{{ __('storefront.city') }}</label>
+                                <select id="c-city" x-model.number="form.city_id" @change="pickCity()" required class="sf-select">
+                                    <option value="">{{ __('storefront.choose_city') }}</option>
+                                    @foreach ($cities as $city)
+                                        <option value="{{ $city->id }}">{{ $city->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div>
+                                <label for="c-area" class="sf-label">{{ __('storefront.area') }}</label>
+                                <select id="c-area" x-model.number="form.area_id" @change="sync()"
+                                        :disabled="!form.city_id" class="sf-select">
+                                    <option value="">{{ __('storefront.choose_area') }}</option>
+                                    <template x-for="a in areasOf(form.city_id)" :key="a.id">
+                                        <option :value="a.id" x-text="a.name"></option>
+                                    </template>
+                                </select>
+                                <p class="sf-hint" x-show="!form.city_id">{{ __('storefront.choose_city_first') }}</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <label for="c-address" class="sf-label">{{ __('storefront.address_details') }}</label>
+                            <textarea id="c-address" x-model="form.shipping_address" required rows="3" class="sf-textarea"
+                                      placeholder="{{ __('storefront.address_placeholder') }}"></textarea>
+                            <p class="sf-hint">{{ __('storefront.address_hint') }}</p>
+                        </div>
                     </section>
 
                     {{-- ٣) طريقة الدفع --}}
@@ -132,16 +160,24 @@
                     <div class="sf-card sf-card-pad lg:sticky lg:top-[7.5rem]">
                         <h2 class="font-bold mb-4 text-[color:var(--sf-text)]">{{ __('storefront.order_summary') }}</h2>
 
+                        {{-- كل الأرقام من الخلفية (`totals`) — لا معادلة تسعير في الواجهة --}}
                         <div class="flex items-center justify-between text-sm text-[color:var(--sf-text-soft)] py-2">
                             <span>{{ __('storefront.subtotal') }}</span>
-                            <span class="font-bold tabular-nums text-[color:var(--sf-text)]"
-                                  x-text="`${Number($store.cart.subtotal).toFixed(2)} {{ __('storefront.currency') }}`"></span>
+                            <span class="font-bold tabular-nums whitespace-nowrap text-[color:var(--sf-text)]"
+                                  x-text="money(totals.subtotal)"></span>
+                        </div>
+
+                        <div class="flex items-center justify-between text-sm text-[color:var(--sf-text-soft)] py-2">
+                            <span>{{ __('storefront.delivery_fee') }}</span>
+                            <span x-show="!form.city_id" class="text-xs">{{ __('storefront.choose_city_for_fee') }}</span>
+                            <span x-show="form.city_id" x-cloak
+                                  class="font-bold tabular-nums whitespace-nowrap text-[color:var(--sf-text)]"
+                                  x-text="totals.delivery_fee > 0 ? money(totals.delivery_fee) : '{{ __('storefront.free') }}'"></span>
                         </div>
 
                         <div class="flex items-center justify-between pt-3 mt-2 border-t border-[color:var(--sf-border)]">
                             <span class="font-bold text-[color:var(--sf-text)]">{{ __('storefront.total') }}</span>
-                            <span class="sf-price text-xl"
-                                  x-text="`${Number($store.cart.subtotal).toFixed(2)} {{ __('storefront.currency') }}`"></span>
+                            <span class="sf-price text-xl whitespace-nowrap" x-text="money(totals.total)"></span>
                         </div>
 
                         <template x-if="error">
@@ -164,7 +200,11 @@
         </template>
     </div>
 
-    {{-- ⚠️ لا يُمسّ: منطق جلسة الإتمام كما هو حرفيًا --}}
+    {{--
+        منطق جلسة الإتمام. المسارات والترويسات وتسلسل PATCH ← place كما هي.
+        الإضافة: المدينة والمنطقة ضمن النموذج، و`sync()` تُرسل الجلسة للخلفية
+        فتعيد الرسوم والإجمالي. **لا تُحسب الرسوم هنا إطلاقًا** — تُعرَض كما وردت.
+    --}}
     <script>
         function storefrontCheckout() {
             const API = '/api/v1/store';
@@ -174,16 +214,60 @@
                 placing: false,
                 error: null,
                 order: null,
-                form: { customer_name: '', customer_phone: '', customer_email: '', shipping_address: '', payment_method_code: 'cod' },
+                areas: @js($areas),
+                totals: { subtotal: 0, delivery_fee: 0, total: 0 },
+                form: {
+                    customer_name: '', customer_phone: '', customer_email: '',
+                    shipping_address: '', city_id: '', area_id: '', payment_method_code: 'cod',
+                },
 
                 async init() {
                     try {
                         const res = await fetch(`${API}/checkout`, { method: 'POST', headers: window.StorefrontIdentity.headers() });
                         if (res.status === 422) { this.empty = true; return; }
                         if (!res.ok) throw new Error('start');
-                        this.sessionId = (await res.json()).data.id;
+                        const data = (await res.json()).data;
+                        this.sessionId = data.id;
+                        this.applyTotals(data);
                         window.StorefrontAnalytics.track('CheckoutStarted', { session: this.sessionId });
                     } catch (e) { this.error = '{{ __('storefront.error') }}'; }
+                },
+
+                money(v) {
+                    return `${Number(v || 0).toFixed(2)} {{ __('storefront.currency') }}`;
+                },
+
+                areasOf(cityId) {
+                    return cityId ? this.areas.filter(a => Number(a.city_id) === Number(cityId)) : [];
+                },
+
+                // تغيير المدينة يُبطل منطقة لم تعد تتبعها، ثم يُزامن مع الخلفية.
+                pickCity() {
+                    this.form.area_id = '';
+                    this.sync();
+                },
+
+                applyTotals(data) {
+                    if (data && data.cart) {
+                        this.totals = {
+                            subtotal: data.cart.subtotal ?? 0,
+                            delivery_fee: data.cart.delivery_fee ?? 0,
+                            total: data.cart.total ?? 0,
+                        };
+                    }
+                },
+
+                /** يحفظ الجلسة ويقرأ الرسوم المحسوبة في الخلفية. */
+                async sync() {
+                    if (!this.sessionId) return;
+                    try {
+                        const res = await fetch(`${API}/checkout/${this.sessionId}`, {
+                            method: 'PATCH',
+                            headers: window.StorefrontIdentity.headers(),
+                            body: JSON.stringify(this.form),
+                        });
+                        if (res.ok) this.applyTotals((await res.json()).data);
+                    } catch (e) { /* تجاهل — تُعاد المزامنة عند الإتمام */ }
                 },
 
                 async place() {

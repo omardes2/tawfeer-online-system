@@ -3,11 +3,13 @@
 namespace App\Modules\Store\Services;
 
 use App\Modules\Foundation\Models\Branch;
+use App\Modules\Foundation\Models\DeliveryCityRate;
 use App\Modules\Foundation\Models\PaymentMethod;
 use App\Modules\Foundation\Services\Settings;
 use App\Modules\Payment\Services\PaymentService;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Services\OrderService;
+use App\Modules\Shipping\Services\ShippingCostResolver;
 use App\Modules\Store\Events\CheckoutCompleted;
 use App\Modules\Store\Events\CheckoutStarted;
 use App\Modules\Store\Models\Cart;
@@ -27,6 +29,7 @@ class CheckoutService
         private readonly CartService $carts,
         private readonly OrderService $orders,
         private readonly PaymentService $payments,
+        private readonly ShippingCostResolver $shipping,
     ) {}
 
     /** بدء جلسة إتمام من السلة النشطة (تُعاد الجلسة المعلّقة القائمة إن وُجدت). */
@@ -63,7 +66,8 @@ class CheckoutService
         $session->fill(array_filter(
             array_intersect_key($data, array_flip([
                 'customer_name', 'customer_phone', 'customer_email',
-                'shipping_address', 'payment_method_code', 'notes',
+                'shipping_address', 'city_id', 'area_id',
+                'payment_method_code', 'notes',
             ])),
             fn ($v) => $v !== null,
         ))->save();
@@ -78,6 +82,13 @@ class CheckoutService
 
         if (! $session->isReady()) {
             throw ValidationException::withMessages(['checkout' => __('بيانات الإتمام غير مكتملة (الشحن/الدفع).')]);
+        }
+
+        // المدينة شرط **متى كانت مدن التوصيل مُعدّة**: بدونها لا رسوم صحيحة ولا
+        // حمولة صالحة لشركة التوصيل. أمّا متجر لم تُضبط فيه مدن بعد فلا يُمنع
+        // من البيع — يعود إلى الرسم الافتراضي كما كان.
+        if ($session->city_id === null && DeliveryCityRate::where('is_active', true)->exists()) {
+            throw ValidationException::withMessages(['city_id' => __('اختر المدينة لاحتساب رسوم التوصيل.')]);
         }
 
         $cart = $session->cart()->with('items.variant')->first();
@@ -128,6 +139,8 @@ class CheckoutService
             'customer_phone' => $session->customer_phone,
             'customer_email' => $session->customer_email,
             'shipping_address' => $session->shipping_address,
+            'city_id' => $session->city_id,
+            'area_id' => $session->area_id,
             'channel' => 'web',
             'notes' => $session->notes,
         ];
@@ -140,7 +153,9 @@ class CheckoutService
 
         $year = (int) now()->year;
 
-        return DB::transaction(function () use ($data, $items, $year, $cart, $method) {
+        $deliveryFee = $this->deliveryFee($session, (float) $cart->subtotal());
+
+        return DB::transaction(function () use ($data, $items, $year, $cart, $method, $deliveryFee) {
             // إنشاء الطلب ثم تأكيده وحجز مخزونه (ينعكس على المخزون — معيار قبول المرحلة 3).
             $order = $this->orders->create($data, $items, $year);
             $this->orders->confirm($order);
@@ -148,10 +163,8 @@ class CheckoutService
 
             $order->refresh();
 
-            // رسوم التوصيل من الإعدادات (Production): افتراضي 0 إن لم تُضبط — سلوك متطابق.
-            $shipping = $this->deliveryFee((float) $order->subtotal);
-            if ($shipping > 0) {
-                $this->orders->applyShippingTotal($order, $shipping);
+            if ($deliveryFee > 0) {
+                $this->orders->applyShippingTotal($order, $deliveryFee);
                 $order->refresh();
             }
 
@@ -172,20 +185,47 @@ class CheckoutService
     }
 
     /**
-     * رسوم التوصيل المطبَّقة عند الإتمام (Production) — من إعدادات النظام الديناميكية.
-     * افتراضي 0 (غير مضبوطة). مجّانية إن بلغ المجموع الفرعي عتبة الشحن المجاني.
+     * رسوم التوصيل لجلسة الإتمام — **من الخلفية دائمًا**، عبر مُحلّل التكلفة القائم
+     * (`ShippingCostResolver`) الذي يقرأ سعر المدينة من طبقة التكامل. لا تُكرَّر
+     * معادلة التسعير هنا ولا في الواجهة: هذه هي الدالة الوحيدة التي تحسبها،
+     * وتستدعيها الواجهة عبر الجلسة فتعرض ما تُرجعه الخلفية لا ما تحسبه بنفسها.
+     *
+     * الاحتياط: إن لم يوجد سعر للمدينة يُستخدم الرسم الافتراضي من الإعدادات
+     * (السلوك السابق) بدل صفر — كي لا يمرّ طلب برسوم توصيل مفقودة.
+     * وتبقى مجّانية إن بلغ المجموع الفرعي عتبة الشحن المجاني.
      */
-    private function deliveryFee(float $subtotal): float
+    public function deliveryFee(CheckoutSession $session, float $subtotal): float
     {
-        $fee = (float) Settings::get('delivery.default_fee', 0);
-        if ($fee <= 0) {
-            return 0.0;
-        }
         $threshold = Settings::get('delivery.free_threshold');
         if ($threshold !== null && $threshold !== '' && $subtotal >= (float) $threshold) {
             return 0.0;
         }
 
-        return round($fee, 2);
+        $fee = 0.0;
+
+        if ($session->city_id !== null) {
+            // (1) عرض المزوّد عبر طبقة التكامل (المبدأ 13) — يعمل حين يكون مزوّد
+            //     شحن حيّ مضبوطًا، ويبقى المتجر غير عالم بهويّته.
+            $fee = (float) $this->shipping->resolve([
+                'city_id' => $session->city_id,
+                'area_id' => $session->area_id,
+            ])->cost;
+
+            // (2) جدول أسعار المدن في اللوحة — نفس مصدر طلبات لوحة الإدارة.
+            //     ضروري لأن مُحلّل التكلفة يصمت حين يكون المزوّد `null`، فكان
+            //     طلب الويب يخرج بلا رسوم بينما الطلب اليدوي لنفس المدينة يحملها.
+            if ($fee <= 0) {
+                $fee = (float) (DeliveryCityRate::where('is_active', true)
+                    ->where('city_id', $session->city_id)
+                    ->value('delivery_fee') ?? 0);
+            }
+        }
+
+        // (3) الرسم الافتراضي من الإعدادات (السلوك السابق) — آخر احتياط.
+        if ($fee <= 0) {
+            $fee = (float) Settings::get('delivery.default_fee', 0);
+        }
+
+        return $fee > 0 ? round($fee, 2) : 0.0;
     }
 }

@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Storefront;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Foundation\Models\Area;
+use App\Modules\Foundation\Models\City;
+use App\Modules\Foundation\Models\DeliveryCityRate;
 use App\Modules\Store\Services\StorefrontService;
 use App\Support\Contracts\StorefrontRecommendationProvider;
 use Illuminate\Http\RedirectResponse;
@@ -93,9 +96,17 @@ class StorefrontController extends Controller
 
     public function checkout(): View
     {
-        // توصيات في الإتمام (Phase 6 / ADR-045): الأكثر مبيعًا (بيع تكميلي خفيف).
+        // المدن والمناطق بنفس تصفية لوحة الإدارة: المدن المسعّرة والمفعّلة فقط،
+        // فلا يختار الزبون مدينة لا سعر لها ولا ربط خارجي لدى شركة التوصيل.
+        $ratedCityIds = DeliveryCityRate::where('is_active', true)->pluck('city_id')->filter();
+
         return view('storefront.checkout', [
+            // توصيات في الإتمام (Phase 6 / ADR-045): الأكثر مبيعًا (بيع تكميلي خفيف).
             'recommendations' => $this->reco->bestSellers(8),
+            'cities' => City::whereIn('id', $ratedCityIds)->where('is_active', true)
+                ->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
+            'areas' => Area::whereIn('city_id', $ratedCityIds)->where('is_active', true)
+                ->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'city_id']),
         ]);
     }
 
