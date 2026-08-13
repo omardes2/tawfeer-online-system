@@ -1,5 +1,11 @@
 <x-storefront.layout :title="__('storefront.cart')">
 
+@php
+    // بوّابة الطلب أونلاين: عند الإطفاء يُستبدَل زرّ «المتابعة للدفع» بتنبيه،
+    // فلا يُرسَل الزبون إلى صفحة مغلقة بعد أن ملأ سلّته.
+    $ordersEnabled = \App\Http\Middleware\EnsureOnlineOrdersEnabled::enabled();
+@endphp
+
     {{--
         إعادة تصميم بصرية فقط. كل ارتباطات Alpine واستدعاءات مخزن السلة
         (`setQty` / `remove` / `refresh`) ومفاتيح البيانات (`variant_id`, `sku`,
@@ -129,15 +135,23 @@
                                   x-text="`${Number($store.cart.subtotal).toFixed(2)} {{ __('storefront.currency') }}`"></span>
                         </div>
 
-                        <a href="{{ route('storefront.checkout') }}" class="sf-btn-primary sf-btn-block sf-btn-lg mt-5">
-                            {{ __('storefront.proceed_to_checkout') }}
-                            <x-storefront.icon name="chevron-left" class="w-5 h-5 ltr:rotate-180" />
-                        </a>
+                        @if ($ordersEnabled)
+                            <a href="{{ route('storefront.checkout') }}" class="sf-btn-primary sf-btn-block sf-btn-lg mt-5">
+                                {{ __('storefront.proceed_to_checkout') }}
+                                <x-storefront.icon name="chevron-left" class="w-5 h-5 ltr:rotate-180" />
+                            </a>
 
-                        <p class="mt-3 flex items-center justify-center gap-1.5 text-xs text-[color:var(--sf-text-soft)]">
-                            <x-storefront.icon name="shield" class="w-4 h-4" />
-                            {{ __('storefront.trust_cod') }}
-                        </p>
+                            <p class="mt-3 flex items-center justify-center gap-1.5 text-xs text-[color:var(--sf-text-soft)]">
+                                <x-storefront.icon name="shield" class="w-4 h-4" />
+                                {{ __('storefront.trust_cod') }}
+                            </p>
+                        @else
+                            <div class="sf-alert sf-alert-error mt-5 mb-0">
+                                <x-storefront.icon name="close" />
+                                <span>{{ __('storefront.orders_disabled_title') }}</span>
+                            </div>
+                            <p class="mt-2 text-xs text-[color:var(--sf-text-soft)]">{{ __('storefront.orders_disabled_body') }}</p>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -148,6 +162,7 @@
     </div>
 
     {{-- شريط الإتمام اللاصق (جوّال) — يجلس فوق شريط التنقّل لا فوقه --}}
+    @if ($ordersEnabled)
     <div x-data x-show="$store.cart.count > 0" x-cloak
          class="lg:hidden fixed inset-x-0 z-30 bg-white border-t border-[color:var(--sf-border)] px-4 py-2.5
                 flex items-center gap-3 shadow-[0_-2px_12px_rgba(34,34,34,.06)]"
@@ -161,4 +176,5 @@
             {{ __('storefront.proceed_to_checkout') }}
         </a>
     </div>
+    @endif
 </x-storefront.layout>

@@ -29,6 +29,32 @@
                         </x-admin.field>
                     </div>
 
+                    {{-- بوّابة الطلب أونلاين: تُغلق صفحة إتمام الشراء وواجهتها معًا.
+                         السلة وتصفّح المنتجات يبقيان يعملان. --}}
+                    <div class="rounded-lg border border-gray-200 p-4">
+                        <label class="flex items-center gap-2 text-sm font-medium">
+                            <input type="hidden" name="store_online_orders_enabled" value="0" />
+                            <input type="checkbox" name="store_online_orders_enabled" value="1"
+                                   @checked(old('store_online_orders_enabled', $values['store_online_orders_enabled'] ?? true))
+                                   class="rounded border-gray-300 text-emerald-600" />
+                            {{ __('تفعيل الطلب أونلاين') }}
+                        </label>
+                        <p class="mt-1 text-xs text-gray-500">
+                            {{ __('عند الإطفاء تُغلق صفحة إتمام الشراء وواجهتها البرمجية معًا، ويرى الزبون صفحة تشرح التوقّف مع رقم للتواصل. السلة وتصفّح المنتجات يبقيان يعملان، والطلبات القائمة لا تتأثّر.') }}
+                        </p>
+
+                        <div class="mt-3">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('رقم التواصل عند إيقاف الطلب') }}</label>
+                            <input type="text" name="store_support_phone" dir="ltr" maxlength="30"
+                                   value="{{ old('store_support_phone', $values['store_support_phone'] ?? '') }}"
+                                   placeholder="970599123456"
+                                   class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                            <p class="mt-1 text-xs text-gray-500">
+                                {{ __('يظهر كزرَّي واتساب واتّصال في صفحة «الطلب متوقّف». اتركه فارغًا لإخفائهما.') }}
+                            </p>
+                        </div>
+                    </div>
+
                     <x-admin.field :label="__('حدّ التنبيه بنقص المخزون (افتراضي)')" name="inventory_default_reorder_level">
                         <input type="number" step="0.001" min="0" name="inventory_default_reorder_level"
                                value="{{ old('inventory_default_reorder_level', $values['inventory_default_reorder_level'] ?? 0) }}"

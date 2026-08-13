@@ -23,6 +23,8 @@ class SettingsController extends Controller
     private const FIELD_MAP = [
         'store_name' => 'store.name',
         'store_company_info' => 'store.company_info',
+        'store_online_orders_enabled' => 'store.online_orders_enabled',
+        'store_support_phone' => 'store.support_phone',
         'openai_enabled' => 'openai.enabled',
         'openai_model' => 'openai.model',
         'openai_key' => 'openai.key',
@@ -51,7 +53,7 @@ class SettingsController extends Controller
         'system_locale' => 'system.locale',
     ];
 
-    private const BOOLEANS = ['openai_enabled', 'whatsapp_enabled', 'system_maintenance'];
+    private const BOOLEANS = ['openai_enabled', 'whatsapp_enabled', 'system_maintenance', 'store_online_orders_enabled'];
 
     public function __construct(private readonly SystemSettingsService $service) {}
 
@@ -77,6 +79,8 @@ class SettingsController extends Controller
         $validated = $request->validate([
             'store_name' => ['nullable', 'string', 'max:150'],
             'store_company_info' => ['nullable', 'string', 'max:2000'],
+            'store_online_orders_enabled' => ['nullable', 'boolean'],
+            'store_support_phone' => ['nullable', 'string', 'max:30'],
             'inventory_default_reorder_level' => ['nullable', 'numeric', 'min:0'],
             'store_logo' => ['nullable', 'file', 'image', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
             'store_favicon' => ['nullable', 'file', 'mimes:png,ico', 'max:512'],

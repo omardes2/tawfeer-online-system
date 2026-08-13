@@ -383,9 +383,13 @@ Route::prefix('v1')->group(function () {
         Route::delete('cart', [CartController::class, 'clear']);
 
         // إتمام الشراء متعدّد الخطوات: بدء جلسة → تحديث بيانات → إتمام (ADR-033).
-        Route::post('checkout', [CheckoutController::class, 'start']);
-        Route::get('checkout/{session}', [CheckoutController::class, 'show']);
-        Route::match(['put', 'patch'], 'checkout/{session}', [CheckoutController::class, 'update']);
-        Route::post('checkout/{session}/place', [CheckoutController::class, 'place']);
+        // `orders.enabled`: بوّابة الطلب أونلاين. إغلاق الصفحة وحدها لا يكفي —
+        // هذه النقاط تُنادى من JavaScript مباشرة فيبقى الطلب ممكنًا بدونها.
+        Route::middleware('orders.enabled')->group(function () {
+            Route::post('checkout', [CheckoutController::class, 'start']);
+            Route::get('checkout/{session}', [CheckoutController::class, 'show']);
+            Route::match(['put', 'patch'], 'checkout/{session}', [CheckoutController::class, 'update']);
+            Route::post('checkout/{session}/place', [CheckoutController::class, 'place']);
+        });
     });
 });
