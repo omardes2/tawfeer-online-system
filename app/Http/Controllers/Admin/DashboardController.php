@@ -58,10 +58,13 @@ class DashboardController extends Controller
         $monthKpis = $this->reports->kpis($month);
 
         [$from, $to] = $month->bounds();
+        // شحنة طلبٍ محذوف لا تُعدّ — وإلا ظهرت شحنات بلا طلبات في اللوحة.
         $deliveryByStatus = DB::table('shipments')
-            ->whereBetween('created_at', [$from, $to])
-            ->selectRaw('delivery_status, COUNT(*) as c')
-            ->groupBy('delivery_status')->pluck('c', 'delivery_status');
+            ->join('orders', 'shipments.order_id', '=', 'orders.id')
+            ->whereNull('orders.deleted_at')
+            ->whereBetween('shipments.created_at', [$from, $to])
+            ->selectRaw('shipments.delivery_status, COUNT(*) as c')
+            ->groupBy('shipments.delivery_status')->pluck('c', 'delivery_status');
 
         $latestOrders = Order::query()
             ->whereNotNull('number')
@@ -79,6 +82,9 @@ class DashboardController extends Controller
             'latestOrders' => $latestOrders,
             'warehouse' => $mainWarehouse ? $this->warehouses->dashboard($mainWarehouse) : null,
             'byStatus' => Order::selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status'),
+            // لوحتا الأداء اليومي: موظفو المبيعات والمسوّقون، كلٌّ في جدوله.
+            'salesBoard' => $this->reports->earnerBoard('assigned_to', ['sales', 'sales_supervisor']),
+            'affiliateBoard' => $this->reports->earnerBoard('affiliate_id', ['affiliate']),
             'pendingCommissions' => Gate::allows('commissions.view_team')
                 ? (float) CommissionEntry::whereIn('state', ['pending', 'approved'])->sum('amount')
                 : null,

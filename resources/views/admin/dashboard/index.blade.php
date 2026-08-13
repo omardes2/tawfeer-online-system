@@ -121,7 +121,8 @@
                     @php $dmax = max(1, $deliveryByStatus->max()); @endphp
                     @foreach ($deliveryByStatus as $status => $c)
                         <div class="flex items-center gap-2 text-sm">
-                            <span class="w-32 text-gray-600 shrink-0 truncate">{{ __('delivery_status.'.$status) !== 'delivery_status.'.$status ? __('delivery_status.'.$status) : $status }}</span>
+                            {{-- مفتاح الترجمة الصحيح `delivery.status.*`؛ الخاطئ كان يعرض المفتاح الإنجليزي الخام --}}
+                            <span class="w-32 text-gray-600 shrink-0 truncate">{{ trans()->has('delivery.status.'.$status) ? __('delivery.status.'.$status) : $status }}</span>
                             <div class="flex-1 bg-gray-100 rounded-full h-2"><div class="bg-sky-500 h-2 rounded-full" style="width: {{ (int) round(($c / $dmax) * 100) }}%"></div></div>
                             <span class="w-8 text-end text-gray-600 tabular-nums">{{ $c }}</span>
                         </div>
@@ -173,6 +174,58 @@
             </tbody>
         </x-admin.table>
     </div>
+
+    {{-- أداء موظفي المبيعات والمسوّقين: اليوم / أمس / الشهر --}}
+    @can('reports.sales_summary.view')
+        @foreach ([
+            ['rows' => $salesBoard, 'title' => __('أداء موظفي المبيعات'), 'person' => __('موظف المبيعات'),
+             'empty' => __('لم يُسجَّل موظفو مبيعات بعد.')],
+            ['rows' => $affiliateBoard, 'title' => __('أداء المسوّقين'), 'person' => __('المسوّق'),
+             'empty' => __('لم يُسجَّل مسوّقون بعد.')],
+        ] as $board)
+            <div class="mt-6">
+                <x-admin.table :title="$board['title']" stack>
+                    <thead>
+                        <tr>
+                            <th>{{ $board['person'] }}</th>
+                            <th class="text-start">{{ __('طلبيات اليوم') }}</th>
+                            <th class="text-start">{{ __('مبيعات اليوم') }}</th>
+                            <th class="text-start">{{ __('مبيعات أمس') }}</th>
+                            <th class="text-start">{{ __('مبيعات الشهر') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse ($board['rows'] as $row)
+                            <tr>
+                                <td data-label="{{ $board['person'] }}" class="font-medium text-gray-800">{{ $row['name'] }}</td>
+                                <td data-label="{{ __('طلبيات اليوم') }}" class="text-start tabular-nums">{{ $row['orders_today'] }}</td>
+                                <td data-label="{{ __('مبيعات اليوم') }}" class="text-start tabular-nums font-medium {{ $row['sales_today'] > 0 ? 'text-emerald-700' : 'text-gray-400' }}">{{ number_format($row['sales_today'], 2) }}</td>
+                                <td data-label="{{ __('مبيعات أمس') }}" class="text-start tabular-nums {{ $row['sales_yesterday'] > 0 ? 'text-gray-700' : 'text-gray-400' }}">{{ number_format($row['sales_yesterday'], 2) }}</td>
+                                <td data-label="{{ __('مبيعات الشهر') }}" class="text-start tabular-nums font-semibold {{ $row['sales_month'] > 0 ? 'text-gray-900' : 'text-gray-400' }}">{{ number_format($row['sales_month'], 2) }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5" class="!p-0" data-label="">
+                                <x-admin.empty-state :title="__('dashboard.no_data')" :description="$board['empty']" />
+                            </td></tr>
+                        @endforelse
+                    </tbody>
+
+                    @if ($board['rows']->isNotEmpty())
+                        <tfoot>
+                            <tr class="bg-gray-50 font-semibold text-gray-800">
+                                <td data-label="">{{ __('الإجمالي') }}</td>
+                                <td data-label="{{ __('طلبيات اليوم') }}" class="text-start tabular-nums">{{ $board['rows']->sum('orders_today') }}</td>
+                                <td data-label="{{ __('مبيعات اليوم') }}" class="text-start tabular-nums">{{ number_format($board['rows']->sum('sales_today'), 2) }}</td>
+                                <td data-label="{{ __('مبيعات أمس') }}" class="text-start tabular-nums">{{ number_format($board['rows']->sum('sales_yesterday'), 2) }}</td>
+                                <td data-label="{{ __('مبيعات الشهر') }}" class="text-start tabular-nums">{{ number_format($board['rows']->sum('sales_month'), 2) }}</td>
+                            </tr>
+                        </tfoot>
+                    @endif
+                </x-admin.table>
+                <p class="mt-2 text-xs text-gray-400">{{ __('المبالغ بدون رسوم التوصيل — نفس الأساس الذي تُحتسب عليه العمولات وتدخل به الدفاتر.') }}</p>
+            </div>
+        @endforeach
+    @endcan
 
     {{-- Low-stock products --}}
     <div class="mt-6 admin-card admin-card-pad">

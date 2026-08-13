@@ -3,6 +3,7 @@
 namespace App\Modules\Reporting\Services;
 
 use App\Modules\Reporting\Support\DateRange;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -15,16 +16,33 @@ use Illuminate\Support\Facades\DB;
  */
 class ReportingService
 {
+    /**
+     * صافي المبيعات في SQL: الإجمالي بلا رسوم التوصيل — وهو المبلغ الذي يدخل الدفاتر
+     * وأساس احتساب العمولات. رسوم التوصيل تخصّ شركة التوصيل ولا تُعدّ إيرادًا لنا.
+     */
+    private const NET_SALES = 'orders.total - orders.shipping_total';
+
+    /**
+     * جدول الطلبات مستثنيًا المحذوف ناعمًا.
+     *
+     * الاستعلام الخام يتجاوز `SoftDeletes`، فكان الطلب المحذوف يبقى في كل التقارير
+     * رغم عكس قيوده المحاسبية — رقمان متناقضان لنفس الطلب.
+     */
+    private function ordersTable(): Builder
+    {
+        return DB::table('orders')->whereNull('orders.deleted_at');
+    }
+
     /** @return array<string, float|int> */
     public function executive(DateRange $range): array
     {
         [$from, $to] = $range->bounds();
-        $orders = DB::table('orders')->whereBetween('created_at', [$from, $to])->where('status', '!=', 'cancelled');
+        $orders = $this->ordersTable()->whereBetween('created_at', [$from, $to])->where('status', '!=', 'cancelled');
 
         return [
             'orders' => (int) (clone $orders)->count(),
-            'sales_total' => $this->money((clone $orders)->sum('total')),
-            'delivered' => (int) DB::table('orders')->whereBetween('delivered_at', [$from, $to])->count(),
+            'sales_total' => $this->money((clone $orders)->sum(DB::raw(self::NET_SALES))),
+            'delivered' => (int) $this->ordersTable()->whereBetween('delivered_at', [$from, $to])->count(),
             'commissions' => $this->money(DB::table('commission_entries')->whereBetween('created_at', [$from, $to])->where('entry_type', 'accrual')->sum('amount')),
             'returns' => (int) DB::table('return_requests')->whereBetween('created_at', [$from, $to])->count(),
             'settlements_net' => $this->money(DB::table('delivery_settlements')->whereBetween('posted_at', [$from, $to])->where('status', 'posted')->sum('computed_net')),
@@ -36,14 +54,14 @@ class ReportingService
     public function sales(DateRange $range): array
     {
         [$from, $to] = $range->bounds();
-        $base = fn () => DB::table('orders')->whereBetween('created_at', [$from, $to])->where('status', '!=', 'cancelled');
+        $base = fn () => $this->ordersTable()->whereBetween('created_at', [$from, $to])->where('status', '!=', 'cancelled');
 
         return [
-            'total' => $this->money($base()->sum('total')),
+            'total' => $this->money($base()->sum(DB::raw(self::NET_SALES))),
             'count' => (int) $base()->count(),
-            'by_status' => $base()->selectRaw('status, COUNT(*) as c, SUM(total) as t')->groupBy('status')->get(),
-            'by_channel' => $base()->selectRaw('channel, COUNT(*) as c, SUM(total) as t')->groupBy('channel')->get(),
-            'daily' => $base()->selectRaw('DATE(created_at) as d, SUM(total) as t')->groupBy('d')->orderBy('d')->get(),
+            'by_status' => $base()->selectRaw('status, COUNT(*) as c, SUM('.self::NET_SALES.') as t')->groupBy('status')->get(),
+            'by_channel' => $base()->selectRaw('channel, COUNT(*) as c, SUM('.self::NET_SALES.') as t')->groupBy('channel')->get(),
+            'daily' => $base()->selectRaw('DATE(created_at) as d, SUM('.self::NET_SALES.') as t')->groupBy('d')->orderBy('d')->get(),
         ];
     }
 
@@ -51,9 +69,9 @@ class ReportingService
     public function orders(DateRange $range): array
     {
         [$from, $to] = $range->bounds();
-        $base = fn () => DB::table('orders')->whereBetween('created_at', [$from, $to]);
+        $base = fn () => $this->ordersTable()->whereBetween('created_at', [$from, $to]);
         $count = (int) $base()->where('status', '!=', 'cancelled')->count();
-        $total = $this->money($base()->where('status', '!=', 'cancelled')->sum('total'));
+        $total = $this->money($base()->where('status', '!=', 'cancelled')->sum(DB::raw(self::NET_SALES)));
 
         return [
             'count' => $count,
@@ -105,11 +123,11 @@ class ReportingService
     {
         [$from, $to] = $range->bounds();
 
-        return DB::table('orders')
+        return $this->ordersTable()
             ->join('users', 'orders.assigned_to', '=', 'users.id')
             ->whereBetween('orders.created_at', [$from, $to])->where('orders.status', '!=', 'cancelled')
             ->whereNotNull('orders.assigned_to')
-            ->selectRaw('users.id, users.name, COUNT(*) as orders_count, SUM(orders.total) as sales_total')
+            ->selectRaw('users.id, users.name, COUNT(*) as orders_count, SUM(orders.total - orders.shipping_total) as sales_total')
             ->groupBy('users.id', 'users.name')->orderByDesc('sales_total')
             ->get()
             ->map(function ($row) use ($from, $to) {
@@ -127,11 +145,11 @@ class ReportingService
     {
         [$from, $to] = $range->bounds();
 
-        return DB::table('orders')
+        return $this->ordersTable()
             ->join('users', 'orders.affiliate_id', '=', 'users.id')
             ->whereBetween('orders.created_at', [$from, $to])->where('orders.status', '!=', 'cancelled')
             ->whereNotNull('orders.affiliate_id')
-            ->selectRaw('users.id, users.name, COUNT(*) as orders_count, SUM(orders.total) as sales_total')
+            ->selectRaw('users.id, users.name, COUNT(*) as orders_count, SUM(orders.total - orders.shipping_total) as sales_total')
             ->groupBy('users.id', 'users.name')->orderByDesc('sales_total')
             ->get()
             ->map(function ($row) use ($from, $to) {
@@ -144,6 +162,76 @@ class ReportingService
             });
     }
 
+    /**
+     * لوحة أداء المستفيدين لليوم/أمس/الشهر — جدول لموظفي المبيعات وآخر للمسوّقين.
+     *
+     * المبالغ صافية من رسوم التوصيل، أي نفس المبلغ الذي يدخل الدفاتر وتُحتسب عليه
+     * العمولة، فلا يختلف رقم اللوحة عن رقم التقرير أو كشف العمولة.
+     *
+     * أصحاب الدور يظهرون ولو بلا طلبات (أصفار) — غياب الاسم يُقرأ خطأً على أنه
+     * غياب الموظف لا غياب مبيعاته.
+     *
+     * @param  'assigned_to'|'affiliate_id'  $column  عمود ربط الطلب بصاحبه
+     * @param  array<int, string>  $roles  أدوار من يظهر ولو بلا مبيعات
+     * @return Collection<int, array{name: string, orders_today: int, sales_today: float, sales_yesterday: float, sales_month: float}>
+     */
+    public function earnerBoard(string $column, array $roles): Collection
+    {
+        $today = today();
+        $spans = [
+            'today' => [$today->copy()->startOfDay(), $today->copy()->endOfDay()],
+            'yesterday' => [$today->copy()->subDay()->startOfDay(), $today->copy()->subDay()->endOfDay()],
+            'month' => [$today->copy()->startOfMonth(), $today->copy()->endOfMonth()],
+        ];
+
+        $sums = [];
+        $bindings = [];
+        foreach ($spans as $key => [$from, $to]) {
+            $sums[] = 'SUM(CASE WHEN orders.created_at BETWEEN ? AND ? THEN '.self::NET_SALES." ELSE 0 END) as sales_{$key}";
+            $bindings[] = $from;
+            $bindings[] = $to;
+        }
+        // عدد الطلبيات لليوم — بمحاذاة عمود مبيعات اليوم.
+        $sums[] = 'SUM(CASE WHEN orders.created_at BETWEEN ? AND ? THEN 1 ELSE 0 END) as orders_today';
+        $bindings[] = $spans['today'][0];
+        $bindings[] = $spans['today'][1];
+
+        $aggregates = $this->ordersTable()
+            ->join('users', 'users.id', '=', 'orders.'.$column)
+            ->whereNotNull('orders.'.$column)
+            ->whereNotIn('orders.status', ['draft', 'new', 'cancelled'])
+            ->selectRaw('users.id, users.name, '.implode(', ', $sums), $bindings)
+            ->groupBy('users.id', 'users.name')
+            ->get()
+            ->keyBy('id');
+
+        // الاتحاد: أصحاب الدور ∪ من له طلبات فعلًا (فلا يسقط من غُيِّر دوره لاحقًا).
+        $people = DB::table('users')
+            ->whereNull('users.deleted_at')
+            ->where(fn ($q) => $q
+                ->whereIn('users.id', DB::table('model_has_roles')
+                    ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+                    ->whereIn('roles.name', $roles)->select('model_has_roles.model_id'))
+                ->orWhereIn('users.id', $aggregates->keys()->all()))
+            ->orderBy('users.name')
+            ->get(['users.id', 'users.name']);
+
+        return $people
+            ->map(function ($person) use ($aggregates) {
+                $row = $aggregates->get($person->id);
+
+                return [
+                    'name' => $person->name,
+                    'orders_today' => (int) ($row->orders_today ?? 0),
+                    'sales_today' => $this->money($row->sales_today ?? 0),
+                    'sales_yesterday' => $this->money($row->sales_yesterday ?? 0),
+                    'sales_month' => $this->money($row->sales_month ?? 0),
+                ];
+            })
+            ->sortByDesc('sales_month')
+            ->values();
+    }
+
     /** أداء المنتجات (الأعلى مبيعًا). @return Collection<int, object> */
     public function products(DateRange $range, int $limit = 20): Collection
     {
@@ -153,6 +241,7 @@ class ReportingService
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->leftJoin('product_variants', 'order_items.variant_id', '=', 'product_variants.id')
             ->leftJoin('products', 'product_variants.product_id', '=', 'products.id')
+            ->whereNull('orders.deleted_at')
             ->whereBetween('orders.created_at', [$from, $to])->where('orders.status', '!=', 'cancelled')
             ->selectRaw('product_variants.id, COALESCE(products.name, product_variants.sku) as name, SUM(order_items.qty) as qty, SUM(order_items.line_total) as revenue, SUM(order_items.returned_qty) as returned')
             ->groupBy('product_variants.id', 'products.name', 'product_variants.sku')->orderByDesc('revenue')->limit($limit)
@@ -169,7 +258,7 @@ class ReportingService
     {
         [$from, $to] = $range->bounds();
 
-        $top = DB::table('orders')->whereBetween('created_at', [$from, $to])->where('status', '!=', 'cancelled')
+        $top = $this->ordersTable()->whereBetween('created_at', [$from, $to])->where('status', '!=', 'cancelled')
             ->whereNotNull('customer_id')
             ->selectRaw('customer_id, MAX(customer_name) as name, COUNT(*) as orders_count, SUM(total) as total')
             ->groupBy('customer_id')->orderByDesc('total')->limit($limit)->get()
@@ -179,7 +268,7 @@ class ReportingService
                 return $row;
             });
 
-        $repeat = DB::table('orders')->whereBetween('created_at', [$from, $to])->where('status', '!=', 'cancelled')
+        $repeat = $this->ordersTable()->whereBetween('created_at', [$from, $to])->where('status', '!=', 'cancelled')
             ->whereNotNull('customer_id')
             ->select('customer_id')->groupBy('customer_id')->havingRaw('COUNT(*) > 1')->get()->count();
 
@@ -234,14 +323,14 @@ class ReportingService
     public function kpis(DateRange $range): array
     {
         [$from, $to] = $range->bounds();
-        $orders = fn () => DB::table('orders')->whereBetween('created_at', [$from, $to])->where('status', '!=', 'cancelled');
+        $orders = fn () => $this->ordersTable()->whereBetween('created_at', [$from, $to])->where('status', '!=', 'cancelled');
 
-        $salesTotal = $this->money($orders()->sum('total'));
+        $salesTotal = $this->money($orders()->sum(DB::raw(self::NET_SALES)));
         $ordersCount = (int) $orders()->count();
 
         // تحصيل وتسوية.
         $collected = $this->money(DB::table('delivery_settlements')->whereBetween('posted_at', [$from, $to])->where('status', 'posted')->sum('computed_cod_total'));
-        $deliveredTotal = $this->money(DB::table('orders')->whereBetween('delivered_at', [$from, $to])->sum('total'));
+        $deliveredTotal = $this->money($this->ordersTable()->whereBetween('delivered_at', [$from, $to])->sum(DB::raw(self::NET_SALES)));
         $unsettled = $this->money(max(0, $deliveredTotal - $collected));
 
         // ربح إجمالي: إجمالي السطور − (الكمية × تكلفة وقت البيع). تُعتمد لقطة السطر
@@ -249,13 +338,17 @@ class ReportingService
         $grossProfit = $this->money(DB::table('order_items')
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->leftJoin('product_variants', 'order_items.variant_id', '=', 'product_variants.id')
+            ->whereNull('orders.deleted_at')
             ->whereBetween('orders.created_at', [$from, $to])->where('orders.status', '!=', 'cancelled')
             ->selectRaw('COALESCE(SUM(order_items.line_total - (order_items.qty * COALESCE(order_items.wholesale_cost_snapshot, product_variants.average_cost, 0))), 0) as gp')
             ->value('gp'));
 
         // توصيل.
-        $shipments = (int) DB::table('shipments')->whereBetween('created_at', [$from, $to])->count();
-        $closed = (int) DB::table('shipments')->whereBetween('created_at', [$from, $to])->where('delivery_status', 'closed')->count();
+        $shipmentsBase = fn () => DB::table('shipments')
+            ->join('orders', 'shipments.order_id', '=', 'orders.id')->whereNull('orders.deleted_at')
+            ->whereBetween('shipments.created_at', [$from, $to]);
+        $shipments = (int) $shipmentsBase()->count();
+        $closed = (int) $shipmentsBase()->where('shipments.delivery_status', 'closed')->count();
         $exceptions = (int) DB::table('delivery_exceptions')->whereBetween('created_at', [$from, $to])->count();
 
         // مرتجعات.

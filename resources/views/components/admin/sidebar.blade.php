@@ -171,7 +171,8 @@
     {{-- Collapse toggle (desktop only) --}}
     {{-- الطيّ يُخفي مربّع البحث، فيُمسح نصّه معه حتى لا تبقى القائمة مُفلترة بلا سبب ظاهر --}}
     <button type="button" @click="collapsed = !collapsed; q = ''; localStorage.setItem('admin_sidebar_collapsed', collapsed)"
-            class="hidden md:grid place-items-center absolute top-20 -start-3 w-6 h-6 rounded-full bg-rail-2 border border-rail-line text-slate-300 hover:text-white shadow"
+            {{-- أسفل مربّع البحث لا بمحاذاته، وإلا تداخل الزرّان على الحافة --}}
+            class="hidden md:grid place-items-center absolute top-32 -start-3 w-6 h-6 rounded-full bg-rail-2 border border-rail-line text-slate-300 hover:text-white shadow"
             title="{{ __('طيّ/فتح القائمة') }}">
         <svg class="w-3.5 h-3.5 transition-transform" :class="{ 'rotate-180': collapsed }" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
     </button>
