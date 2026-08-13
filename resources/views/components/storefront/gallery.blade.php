@@ -1,4 +1,4 @@
-@props(['images', 'alt', 'discount' => 0])
+@props(['images', 'alt'])
 
 {{--
     معرض صور المنتج — بلا أي مكتبة سلايدر.
@@ -8,6 +8,8 @@
     التمرير الأصلي للمتصفّح، فلا JavaScript للانزلاق ولا تكلفة أداء.
 
     صورة واحدة ⇒ لا مصغّرات ولا نقاط. بلا صور ⇒ نفس البديل المعتمد في المتجر.
+    بلا شارة خصم فوق الصورة: مكانها الطبيعي بجانب السعر حيث يُتّخذ قرار الشراء،
+    وتبقى الصورة نظيفة. (بطاقة القوائم تحتفظ بشارتها — سياق مختلف.)
 --}}
 @php
     $images = collect($images)->values();
@@ -32,10 +34,6 @@
                 @endforeach
             </div>
 
-            @if ($discount > 0)
-                <span class="sf-badge sf-badge-discount absolute top-3 start-3">{{ __('storefront.off') }} {{ $discount }}%</span>
-            @endif
-
             @if ($count > 1)
                 <div class="flex items-center justify-center gap-1.5 mt-3" aria-hidden="true">
                     @foreach ($images as $idx => $image)
@@ -55,10 +53,6 @@
                          x-show="i === {{ $idx }}" @if (! $loop->first) x-cloak @endif
                          class="absolute inset-0 w-full h-full object-cover">
                 @endforeach
-
-                @if ($discount > 0)
-                    <span class="sf-badge sf-badge-discount absolute top-3 start-3">{{ __('storefront.off') }} {{ $discount }}%</span>
-                @endif
             </div>
 
             @if ($count > 1)

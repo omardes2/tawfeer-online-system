@@ -93,7 +93,7 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12">
         {{-- ══════════ المعرض ══════════ --}}
-        <x-storefront.gallery :images="$images" :alt="$displayName" :discount="$discount" />
+        <x-storefront.gallery :images="$images" :alt="$displayName" />
 
         {{-- ══════════ منطقة الشراء ══════════ --}}
         <div class="min-w-0">
@@ -273,12 +273,40 @@
         </section>
     @endif
 
-    {{-- ══════════ أقسام التوصيات (مُتتبَّعة: ظهور/نقر) ══════════ --}}
-    <x-storefront.section :title="__('storefront.frequently_bought')" :items="$frequentlyBoughtTogether" recoType="fbt" placement="product" :source="$product->id" />
-    <x-storefront.section :title="__('storefront.related')" :items="$related" recoType="related" placement="product" :source="$product->id" />
-    <x-storefront.section :title="__('storefront.cross_sell')" :items="$crossSell" recoType="cross_sell" placement="product" :source="$product->id" />
-    <x-storefront.section :title="__('storefront.upsell')" :items="$upsell" recoType="upsell" placement="product" :source="$product->id" />
-    <x-storefront.section :title="__('storefront.bundles')" :items="$bundles" recoType="complementary" placement="product" :source="$product->id" />
+    {{-- ══════════ أقسام التوصيات (مُتتبَّعة: ظهور/نقر) ══════════
+         قسمان كحدّ أقصى بدل خمسة: خمسة أقسام متتالية تُطيل الصفحة كثيرًا على
+         الهاتف وتُكرّر المنتجات نفسها. الاختيار بأولوية ثابتة مع تخطّي الفارغ،
+         وإزالة ما عُرض في القسم الأول من الثاني.
+         **بلا أي مسّ بمحرّك التوصيات**: نفس المجموعات القادمة من المتحكّم،
+         ونفس سمات التتبّع لكل قسم. --}}
+    @php
+        $recoCandidates = [
+            ['items' => $frequentlyBoughtTogether, 'title' => __('storefront.frequently_bought'), 'type' => 'fbt'],
+            ['items' => $related, 'title' => __('storefront.related'), 'type' => 'related'],
+            ['items' => $crossSell, 'title' => __('storefront.cross_sell'), 'type' => 'cross_sell'],
+            ['items' => $upsell, 'title' => __('storefront.upsell'), 'type' => 'upsell'],
+            ['items' => $bundles, 'title' => __('storefront.bundles'), 'type' => 'complementary'],
+        ];
+
+        $recoSections = [];
+        $shownIds = [];
+        foreach ($recoCandidates as $candidate) {
+            if (count($recoSections) === 2) {
+                break;
+            }
+            $items = $candidate['items']->reject(fn ($p) => in_array($p->id, $shownIds, true))->values();
+            if ($items->isEmpty()) {
+                continue;
+            }
+            $shownIds = array_merge($shownIds, $items->pluck('id')->all());
+            $recoSections[] = ['items' => $items, 'title' => $candidate['title'], 'type' => $candidate['type']];
+        }
+    @endphp
+
+    @foreach ($recoSections as $section)
+        <x-storefront.section :title="$section['title']" :items="$section['items']"
+            :reco-type="$section['type']" placement="product" :source="$product->id" />
+    @endforeach
 
     {{-- ══════════ شريط الشراء اللاصق (جوّال) ══════════
          يظهر فقط بعد أن يخرج زرّ الشراء الأصلي من الشاشة، فلا يتكرّر الزرّ مرّتين،
