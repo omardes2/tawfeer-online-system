@@ -88,17 +88,21 @@
                     <div x-show="showResults && filteredProducts.length" x-cloak
                          class="absolute z-20 mt-1 w-full max-h-64 overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
                         <template x-for="p in filteredProducts" :key="p.variant">
+                            {{-- الاسم في سطره وحده ليُقرأ كاملًا، والكود والسعر تحته --}}
                             <button type="button" @click="addProduct(p)"
-                                    class="w-full flex items-center gap-3 px-3 py-2 hover:bg-emerald-50 text-start">
+                                    class="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-emerald-50 text-start border-b border-gray-50 last:border-0">
                                 <span class="w-9 h-9 shrink-0 rounded-md bg-gray-100 overflow-hidden grid place-items-center">
                                     <template x-if="p.image"><img :src="p.image" :alt="p.name" class="w-full h-full object-cover" /></template>
                                     <template x-if="!p.image"><span class="text-gray-300 text-xs">—</span></template>
                                 </span>
                                 <span class="min-w-0 flex-1">
-                                    <span class="block text-sm text-gray-800 truncate" x-text="p.name"></span>
-                                    <span class="block text-xs text-gray-400" x-text="p.sku"></span>
+                                    <span class="block text-[13px] font-medium text-gray-800 leading-snug break-words" x-text="p.name"></span>
+                                    <span class="mt-1 flex items-center flex-wrap gap-x-2 gap-y-1">
+                                        <span class="text-[11px] text-gray-400 font-mono" x-text="p.sku"></span>
+                                        <span class="ms-auto text-sm font-semibold text-emerald-600 tabular-nums"
+                                              x-text="Number(p.price).toFixed(2) + ' {{ $sym }}'"></span>
+                                    </span>
                                 </span>
-                                <span class="text-sm tabular-nums text-gray-600" x-text="Number(p.price).toFixed(2)"></span>
                             </button>
                         </template>
                     </div>

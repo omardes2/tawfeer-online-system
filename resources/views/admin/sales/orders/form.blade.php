@@ -118,8 +118,11 @@
                          x-transition
                          class="absolute z-20 mt-1 w-full max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
                         <template x-for="p in filteredProducts" :key="p.variant">
+                            {{-- الاسم في سطره وحده ليُقرأ كاملًا (يلتفّ ولا يُقصّ)، والكمية
+                                 والسعر والكود في السطر التالي — على الجوّال كان الثلاثة
+                                 يتقاسمون السطر فيُقصّ الاسم الطويل. --}}
                             <button type="button" @click="addProduct(p)"
-                                    class="w-full flex items-center gap-3 px-3 py-2 hover:bg-emerald-50 text-start">
+                                    class="w-full flex items-start gap-3 px-3 py-2.5 hover:bg-emerald-50 text-start border-b border-gray-50 last:border-0">
                                 <span class="w-10 h-10 shrink-0 rounded-md bg-gray-100 overflow-hidden grid place-items-center">
                                     <template x-if="p.image">
                                         <img :src="p.image" :alt="p.name" class="w-full h-full object-cover" />
@@ -129,15 +132,19 @@
                                     </template>
                                 </span>
                                 <span class="min-w-0 flex-1">
-                                    <span class="flex items-center gap-2">
-                                        <span class="text-sm font-medium text-gray-800 truncate" x-text="p.name"></span>
-                                        <span class="shrink-0 text-[11px] px-1.5 py-0.5 rounded-md tabular-nums"
+                                    {{-- السطر الأول: الاسم كاملًا --}}
+                                    <span class="block text-[13px] font-medium text-gray-800 leading-snug break-words" x-text="p.name"></span>
+
+                                    {{-- السطر الثاني: الكود والمتوفّر والسعر --}}
+                                    <span class="mt-1 flex items-center flex-wrap gap-x-2 gap-y-1">
+                                        <span class="text-[11px] text-gray-400 font-mono" x-text="p.sku"></span>
+                                        <span class="text-[11px] px-1.5 py-0.5 rounded-md tabular-nums"
                                               :class="(Number(p.available) > 0) ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'"
                                               x-text="'{{ __('المتوفر') }}: ' + Number(p.available ?? 0)"></span>
+                                        <span class="ms-auto text-sm font-semibold text-emerald-600 tabular-nums"
+                                              x-text="p.price.toFixed(2) + ' {{ $sym }}'"></span>
                                     </span>
-                                    <span class="block text-xs text-gray-400" x-text="p.sku"></span>
                                 </span>
-                                <span class="text-sm font-semibold text-emerald-600 tabular-nums" x-text="p.price.toFixed(2) + ' {{ $sym }}'"></span>
                             </button>
                         </template>
                     </div>
