@@ -1,56 +1,112 @@
 <x-storefront.layout :page-event="['name' => 'HomeViewed', 'payload' => []]">
-    {{-- بطل الصفحة --}}
-    <section class="rounded-2xl bg-gradient-to-l from-emerald-600 to-emerald-500 text-white p-6 sm:p-10 mb-6">
-        <div class="max-w-2xl">
-            <h1 class="text-2xl sm:text-4xl font-bold mb-2">{{ __('storefront.site_name') }}</h1>
-            <p class="text-emerald-50 mb-5">{{ __('storefront.tagline') }}</p>
-            <a href="{{ route('storefront.shop') }}"
-               class="inline-flex items-center rounded-lg bg-white text-emerald-700 font-semibold px-5 py-2.5 hover:bg-emerald-50">
-                {{ __('storefront.shop') }}
+
+    {{-- ══════════ البطل ══════════ --}}
+    <section class="relative overflow-hidden rounded-2xl bg-brand-600 text-white
+                    px-6 py-10 sm:px-10 sm:py-14 lg:py-16">
+        {{-- زخرفة خفيفة: دوائر شفّافة بدل صور ثقيلة --}}
+        <span aria-hidden="true" class="absolute -top-16 -start-16 w-56 h-56 rounded-full bg-white/5"></span>
+        <span aria-hidden="true" class="absolute -bottom-24 -end-10 w-72 h-72 rounded-full bg-gold-300/10"></span>
+
+        <div class="relative max-w-xl">
+            <span class="sf-badge sf-badge-new mb-4">
+                <x-storefront.icon name="percent" class="w-3.5 h-3.5" />
+                {{ __('storefront.offers') }}
+            </span>
+            <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight">
+                {{ __('storefront.hero_title') }}
+            </h1>
+            <p class="mt-3 text-base sm:text-lg text-white/85">{{ __('storefront.hero_subtitle') }}</p>
+            <a href="{{ route('storefront.shop') }}" class="sf-btn-accent sf-btn-lg mt-7">
+                {{ __('storefront.shop_now') }}
+                <x-storefront.icon name="chevron-left" class="w-5 h-5 rtl:rotate-0 ltr:rotate-180" />
             </a>
         </div>
     </section>
 
-    {{-- تسوّق حسب الفئة --}}
+    {{-- ══════════ الأقسام ══════════ --}}
     @if ($categories->isNotEmpty())
-        <section class="py-4">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-bold text-gray-900">{{ __('storefront.shop_by_category') }}</h2>
-                <a href="{{ route('storefront.categories') }}" class="text-sm text-emerald-600 hover:underline">{{ __('storefront.view_all') }}</a>
+        <section class="py-6">
+            <div class="flex items-end justify-between gap-4 mb-4">
+                <h2 class="sf-section-title">{{ __('storefront.browse_categories') }}</h2>
+                <a href="{{ route('storefront.categories') }}" class="sf-section-link inline-flex items-center gap-1">
+                    {{ __('storefront.view_all') }}
+                    <x-storefront.icon name="chevron-left" class="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
+                </a>
             </div>
-            <div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+
+            {{-- جوّال: تمرير أفقي بلمسة الإصبع. حواسيب: صفّ كامل. --}}
+            <div class="sf-scroll-x sm:grid sm:grid-cols-4 lg:grid-cols-8 sm:gap-3 -mx-4 px-4 sm:mx-0 sm:px-0">
                 @foreach ($categories as $category)
-                    <a href="{{ route('storefront.category', $category->slug) }}"
-                       class="flex flex-col items-center gap-2 p-3 rounded-xl bg-white border border-gray-200 hover:border-emerald-300 hover:shadow-sm text-center">
-                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 font-bold">
-                            {{ mb_substr($category->name, 0, 1) }}
-                        </span>
-                        <span class="text-xs text-gray-700 line-clamp-1">{{ $category->name }}</span>
-                    </a>
+                    <x-storefront.category-card :category="$category" />
                 @endforeach
             </div>
         </section>
     @endif
 
-    {{-- مميّز (كتالوج) --}}
-    <x-storefront.section :title="__('storefront.featured')" :items="$featured" :view-all="route('storefront.shop')" />
+    {{-- ══════════ عروض اليوم ══════════ --}}
+    <x-storefront.section
+        :title="__('storefront.todays_offers')"
+        :items="$featured"
+        :view-all="route('storefront.shop')" />
 
-    {{-- وصل حديثًا (كتالوج) --}}
-    <x-storefront.section :title="__('storefront.new_arrivals')" :items="$newArrivals" :view-all="route('storefront.shop', ['sort' => 'newest'])" />
+    {{-- ══════════ لافتة ترويجية ══════════ --}}
+    <section class="my-4 rounded-2xl bg-gold-300 text-[color:var(--sf-text)] px-6 py-7 sm:px-9 sm:py-8
+                    flex flex-col sm:flex-row items-center justify-between gap-5 text-center sm:text-start">
+        <div class="flex items-center gap-4">
+            <span class="hidden sm:grid place-items-center w-14 h-14 rounded-2xl bg-white/60 text-brand-700 shrink-0">
+                <x-storefront.icon name="truck" class="w-7 h-7" />
+            </span>
+            <div>
+                <p class="text-lg sm:text-xl font-extrabold">{{ __('storefront.promo_title') }}</p>
+                <p class="text-sm mt-0.5 opacity-80">{{ __('storefront.promo_subtitle') }}</p>
+            </div>
+        </div>
+        <a href="{{ route('storefront.shop') }}" class="sf-btn-primary shrink-0">{{ __('storefront.shop_now') }}</a>
+    </section>
 
-    {{-- نقطة امتداد: الأكثر مبيعًا / مقترح لك (تُملأ من محرّك النمو مستقبلًا — ADR-032) --}}
+    {{-- ══════════ الأكثر مبيعًا ══════════ --}}
+    <x-storefront.section
+        :title="__('storefront.best_sellers')"
+        :items="$bestSellers"
+        :view-all="route('storefront.shop')" />
 
-    {{-- العلامات التجارية --}}
+    {{-- ══════════ وصل حديثًا ══════════ --}}
+    <x-storefront.section
+        :title="__('storefront.new_arrivals')"
+        :items="$newArrivals"
+        :view-all="route('storefront.shop', ['sort' => 'newest'])" />
+
+    {{-- ══════════ شريط الثقة ══════════ --}}
+    <section class="my-6 grid grid-cols-2 lg:grid-cols-4 gap-3" id="help">
+        @foreach ([
+            ['icon' => 'truck', 'label' => __('storefront.trust_delivery')],
+            ['icon' => 'shield', 'label' => __('storefront.trust_cod')],
+            ['icon' => 'headset', 'label' => __('storefront.trust_support')],
+            ['icon' => 'check-circle', 'label' => __('storefront.trust_quality')],
+        ] as $item)
+            <div class="sf-card flex items-center gap-3 p-4">
+                <span class="grid place-items-center w-11 h-11 rounded-xl bg-brand-50 text-brand-600 shrink-0">
+                    <x-storefront.icon :name="$item['icon']" class="w-5 h-5" />
+                </span>
+                <span class="text-[13px] font-semibold leading-snug">{{ $item['label'] }}</span>
+            </div>
+        @endforeach
+    </section>
+
+    {{-- ══════════ العلامات التجارية ══════════ --}}
     @if ($brands->isNotEmpty())
         <section class="py-4">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-lg font-bold text-gray-900">{{ __('storefront.shop_by_brand') }}</h2>
-                <a href="{{ route('storefront.brands') }}" class="text-sm text-emerald-600 hover:underline">{{ __('storefront.view_all') }}</a>
+            <div class="flex items-end justify-between gap-4 mb-4">
+                <h2 class="sf-section-title">{{ __('storefront.shop_by_brand') }}</h2>
+                <a href="{{ route('storefront.brands') }}" class="sf-section-link inline-flex items-center gap-1">
+                    {{ __('storefront.view_all') }}
+                    <x-storefront.icon name="chevron-left" class="w-4 h-4 rtl:rotate-0 ltr:rotate-180" />
+                </a>
             </div>
             <div class="flex flex-wrap gap-2">
                 @foreach ($brands as $brand)
                     <a href="{{ route('storefront.brand', $brand->slug) }}"
-                       class="px-4 py-2 rounded-full bg-white border border-gray-200 text-sm text-gray-700 hover:border-emerald-300">
+                       class="sf-card sf-card-hover px-4 py-2 text-sm font-semibold text-[color:var(--sf-text)] hover:text-brand-600 transition-colors">
                         {{ $brand->name }}
                     </a>
                 @endforeach

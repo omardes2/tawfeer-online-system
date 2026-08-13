@@ -24,8 +24,10 @@ class StorefrontController extends Controller
     public function home(): View
     {
         return view('storefront.home', [
-            'featured' => $this->reco->featured(8),
-            'newArrivals' => $this->reco->newArrivals(8),
+            'featured' => $this->reco->featured(10),
+            // «الأكثر مبيعًا» كانت موجودة في محرّك التوصيات وغير معروضة — تُعرض الآن ببيانات حقيقية.
+            'bestSellers' => $this->reco->bestSellers(10),
+            'newArrivals' => $this->reco->newArrivals(10),
             'categories' => $this->storefront->categories()->take(8),
             'brands' => $this->storefront->brands()->take(12),
         ]);

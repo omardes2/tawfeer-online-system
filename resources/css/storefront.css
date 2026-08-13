@@ -2,11 +2,224 @@
 @tailwind components;
 @tailwind utilities;
 
-/* واجهة المتجر (Phase 3.3): عربي أساسي RTL + خط Tajawal. Mobile-first. */
+/* ==========================================================================
+   نظام تصميم متجر توفير أونلاين — RTL عربي، Mobile-first.
+
+   كل لون ومسافة ونصف قطر يمرّ عبر متغيّر CSS، فتغيير الهوية مستقبلًا يقع في
+   كتلة `:root` وحدها دون تتبّع الأصناف عبر القوالب.
+   ========================================================================== */
 @layer base {
-    html {
-        font-family: 'Tajawal', ui-sans-serif, system-ui, sans-serif;
+    :root {
+        /* الهوية */
+        --sf-primary: #6B2AA8;
+        --sf-primary-dark: #4E1F73;
+        --sf-primary-light: #F4EDFA;
+        --sf-accent: #FFD23F;
+        --sf-accent-light: #FFF9E3;
+
+        /* الأسطح والنصوص */
+        --sf-bg: #F5F6FA;
+        --sf-surface: #FFFFFF;
+        --sf-text: #222222;
+        --sf-text-soft: #747474;
+        --sf-border: #EAEAEA;
+
+        /* الحالات */
+        --sf-success: #219653;
+        --sf-danger: #D92D20;
+
+        /* الشكل */
+        --sf-radius-sm: 10px;
+        --sf-radius: 14px;
+        --sf-radius-lg: 18px;
+        --sf-radius-pill: 999px;
+
+        /* ظلال خفيفة جدًا — الحدّ الرفيع يحمل الفصل، لا الظلّ */
+        --sf-shadow-sm: 0 1px 2px rgba(34, 34, 34, .04);
+        --sf-shadow: 0 2px 8px rgba(34, 34, 34, .06);
+        --sf-shadow-lg: 0 8px 24px -8px rgba(34, 34, 34, .12);
+
+        /* المسافات */
+        --sf-gap-xs: .375rem;
+        --sf-gap-sm: .625rem;
+        --sf-gap: 1rem;
+        --sf-gap-lg: 1.5rem;
+        --sf-gap-xl: 2.5rem;
+
+        /* ارتفاع شريط التنقّل السفلي — يُحجز أسفل الصفحة كي لا يغطّي المحتوى */
+        --sf-bottomnav: 4rem;
     }
+
+    html {
+        font-family: 'Cairo', 'Tajawal', ui-sans-serif, system-ui, sans-serif;
+        -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+        background: var(--sf-bg);
+        color: var(--sf-text);
+    }
+
+    /* عناوين متّسقة عبر الموقع كلّه */
+    h1, h2, h3, h4 {
+        font-weight: 700;
+        letter-spacing: -.01em;
+        text-wrap: balance;
+    }
+
+    /* حلقة تركيز واحدة واضحة لكل عنصر تفاعلي (وصول بلوحة المفاتيح) */
+    :focus-visible {
+        outline: 2px solid var(--sf-primary);
+        outline-offset: 2px;
+        border-radius: 6px;
+    }
+
+    [x-cloak] { display: none !important; }
+
+    /* من يفضّل تقليل الحركة لا يرى أي انتقال */
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+            animation-duration: .01ms !important;
+            transition-duration: .01ms !important;
+        }
+    }
+}
+
+@layer components {
+    /* ---- الحاوية ---- */
+    .sf-container { @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8; }
+
+    /* ---- الأزرار ---- */
+    .sf-btn {
+        @apply inline-flex items-center justify-center gap-2 font-semibold text-sm
+               px-5 py-2.5 transition-colors duration-150 select-none
+               disabled:opacity-50 disabled:cursor-not-allowed;
+        border-radius: var(--sf-radius-sm);
+    }
+    .sf-btn-primary { @apply sf-btn text-white; background: var(--sf-primary); }
+    .sf-btn-primary:hover:not(:disabled) { background: var(--sf-primary-dark); }
+
+    .sf-btn-accent { @apply sf-btn; background: var(--sf-accent); color: var(--sf-text); }
+    .sf-btn-accent:hover:not(:disabled) { background: #F7C01F; }
+
+    .sf-btn-outline {
+        @apply sf-btn bg-white;
+        color: var(--sf-primary);
+        border: 1px solid var(--sf-border);
+    }
+    .sf-btn-outline:hover:not(:disabled) { background: var(--sf-primary-light); border-color: var(--sf-primary); }
+
+    .sf-btn-ghost { @apply sf-btn bg-transparent; color: var(--sf-text-soft); }
+    .sf-btn-ghost:hover:not(:disabled) { background: var(--sf-primary-light); color: var(--sf-primary); }
+
+    .sf-btn-sm { @apply px-3 py-1.5 text-[13px]; }
+    .sf-btn-lg { @apply px-6 py-3 text-base; }
+    .sf-btn-block { @apply w-full; }
+
+    /* ---- الأسطح ---- */
+    .sf-card {
+        background: var(--sf-surface);
+        border: 1px solid var(--sf-border);
+        border-radius: var(--sf-radius);
+        box-shadow: var(--sf-shadow-sm);
+    }
+    .sf-card-hover { @apply transition-shadow duration-200; }
+    .sf-card-hover:hover { box-shadow: var(--sf-shadow); }
+    .sf-card-pad { @apply p-4 sm:p-5; }
+
+    /* ---- الحقول ---- */
+    .sf-input, .sf-select, .sf-textarea {
+        @apply w-full bg-white text-sm px-4 py-2.5 transition-colors;
+        border: 1px solid var(--sf-border);
+        border-radius: var(--sf-radius-sm);
+        color: var(--sf-text);
+    }
+    .sf-input::placeholder, .sf-textarea::placeholder { color: var(--sf-text-soft); }
+    .sf-input:focus, .sf-select:focus, .sf-textarea:focus {
+        border-color: var(--sf-primary);
+        box-shadow: 0 0 0 3px var(--sf-primary-light);
+        outline: none;
+    }
+    .sf-label { @apply block text-sm font-semibold mb-1.5; color: var(--sf-text); }
+    .sf-hint { @apply mt-1 text-xs; color: var(--sf-text-soft); }
+    .sf-error { @apply mt-1 text-xs; color: var(--sf-danger); }
+
+    /* ---- الشارات ---- */
+    .sf-badge {
+        @apply inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5;
+        border-radius: var(--sf-radius-pill);
+    }
+    .sf-badge-discount { background: var(--sf-danger); @apply text-white; }
+    .sf-badge-new { background: var(--sf-accent); color: var(--sf-text); }
+    .sf-badge-soft { background: var(--sf-primary-light); color: var(--sf-primary); }
+    .sf-badge-success { background: #E7F6EE; color: var(--sf-success); }
+    .sf-badge-muted { background: #F2F2F4; color: var(--sf-text-soft); }
+
+    /* ---- عنوان قسم ---- */
+    .sf-section-title { @apply text-lg sm:text-xl font-bold; color: var(--sf-text); }
+    .sf-section-link {
+        @apply text-sm font-semibold whitespace-nowrap transition-colors;
+        color: var(--sf-primary);
+    }
+    .sf-section-link:hover { color: var(--sf-primary-dark); }
+
+    /* ---- السعر ---- */
+    .sf-price { @apply font-bold tabular-nums; color: var(--sf-primary); }
+    .sf-price-old { @apply text-xs line-through tabular-nums; color: var(--sf-text-soft); }
+
+    /* ---- محدّد الكمية ---- */
+    .sf-qty {
+        @apply inline-flex items-center overflow-hidden bg-white;
+        border: 1px solid var(--sf-border);
+        border-radius: var(--sf-radius-sm);
+    }
+    .sf-qty button {
+        @apply grid place-items-center w-9 h-9 text-lg leading-none transition-colors;
+        color: var(--sf-primary);
+    }
+    .sf-qty button:hover:not(:disabled) { background: var(--sf-primary-light); }
+    .sf-qty button:disabled { color: var(--sf-text-soft); @apply cursor-not-allowed; }
+    .sf-qty output, .sf-qty input {
+        @apply w-10 text-center text-sm font-bold tabular-nums bg-transparent border-0 p-0;
+        color: var(--sf-text);
+    }
+
+    /* ---- شريط التنقّل السفلي (جوّال) ---- */
+    .sf-bottomnav {
+        @apply fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 bg-white md:hidden;
+        border-top: 1px solid var(--sf-border);
+        /* منطقة الأمان في أجهزة iPhone ذات الشريط السفلي */
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        box-shadow: 0 -2px 12px rgba(34, 34, 34, .05);
+    }
+    .sf-bottomnav a {
+        @apply flex flex-col items-center justify-center gap-1 py-2 text-[11px] font-semibold transition-colors;
+        color: var(--sf-text-soft);
+    }
+    .sf-bottomnav a.is-active { color: var(--sf-primary); }
+    .sf-bottomnav svg { @apply w-6 h-6; }
+
+    /* المحتوى يترك مساحة للشريط السفلي على الجوّال */
+    .sf-has-bottomnav { padding-bottom: calc(var(--sf-bottomnav) + env(safe-area-inset-bottom, 0px)); }
+    @media (min-width: 768px) { .sf-has-bottomnav { padding-bottom: 0; } }
+
+    /* ---- هياكل التحميل (skeleton) ---- */
+    .sf-skeleton {
+        @apply block bg-gray-200/70;
+        border-radius: var(--sf-radius-sm);
+        animation: sf-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes sf-pulse { 0%, 100% { opacity: 1 } 50% { opacity: .55 } }
+
+    /* ---- تمرير أفقي أنيق (الفئات على الجوّال) ---- */
+    .sf-scroll-x {
+        @apply flex gap-3 overflow-x-auto;
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .sf-scroll-x::-webkit-scrollbar { display: none; }
+    .sf-scroll-x > * { scroll-snap-align: start; }
 }
 
 @layer utilities {
@@ -24,4 +237,7 @@
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
+
+    /* شريط لاصق يحترم منطقة الأمان (زرّ الشراء أسفل صفحة المنتج) */
+    .sf-safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
 }

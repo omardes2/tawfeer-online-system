@@ -100,5 +100,40 @@ return [
     'loading' => 'Loading…',
     'error' => 'Something went wrong',
     'retry' => 'Retry',
+
+    // Header & navigation (redesign)
+    'top_help' => 'Help',
+    'top_contact' => 'Contact us',
+    'top_track' => 'Track order',
+    'login' => 'Sign in',
+    'register' => 'Create account',
+    'my_account' => 'My account',
+    'favorites' => 'Favorites',
+    'offers' => 'Offers',
+    'search_placeholder_long' => 'Search for a product or category…',
+    'open_menu' => 'Open menu',
+    'close_menu' => 'Close menu',
+    'add_to_favorites' => 'Add to favorites',
+
+    // Homepage
+    'hero_title' => 'Deals you cannot miss!',
+    'hero_subtitle' => 'Up to 50% off on selected items',
+    'shop_now' => 'Shop now',
+    'browse_categories' => 'Browse categories',
+    'todays_offers' => "Today's offers",
+    'promo_title' => 'Fast delivery across Palestine',
+    'promo_subtitle' => 'Order today and receive it within a few days',
+    'trust_delivery' => 'Delivery to all governorates',
+    'trust_cod' => 'Cash on delivery',
+    'trust_support' => 'Order support and follow-up',
+    'trust_quality' => 'Guaranteed products',
+
+    // Footer
+    'footer_about' => 'A Palestinian online store bringing what you need at fair prices with fast delivery.',
+    'footer_shop' => 'Shop',
+    'footer_account' => 'My account',
+    'footer_help' => 'Help',
+    'my_orders' => 'My orders',
+
     'all_rights' => 'All rights reserved',
 ];
