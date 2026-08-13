@@ -80,7 +80,7 @@ Route::middleware(['storefront.locale', EnforceMaintenanceMode::class])->group(f
     Route::get('/b/{slug}', [StorefrontController::class, 'brand'])->name('storefront.brand');
     Route::get('/p/{slug}', [StorefrontController::class, 'show'])->name('storefront.product');
     Route::get('/cart', [StorefrontController::class, 'cart'])->name('storefront.cart');
-    Route::get('/checkout', [StorefrontController::class, 'checkout'])->middleware(['orders.enabled', 'profile.complete'])->name('storefront.checkout');
+    Route::get('/checkout', [StorefrontController::class, 'checkout'])->middleware('profile.complete')->name('storefront.checkout');
     Route::get('/lang/{locale}', [StorefrontController::class, 'setLocale'])->name('storefront.locale');
 
     // تتبّع أحداث التوصيات (انطباع/نقر/تحويل) — Phase 6 / ADR-045. عام + محدود المعدّل.

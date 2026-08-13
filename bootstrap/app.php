@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Middleware\EnsureOnlineOrdersEnabled;
 use App\Http\Middleware\EnsureProfileComplete;
 use App\Http\Middleware\RequireCustomer;
 use App\Http\Middleware\ResolveStoreIdentity;
@@ -23,7 +22,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'storefront.locale' => SetStorefrontLocale::class,
             'require.customer' => RequireCustomer::class,
             'profile.complete' => EnsureProfileComplete::class,
-            'orders.enabled' => EnsureOnlineOrdersEnabled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
