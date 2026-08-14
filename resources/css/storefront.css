@@ -180,6 +180,19 @@
         box-shadow: 0 0 0 3px var(--sf-primary-light);
         outline: none;
     }
+    /*
+        تقريب iOS التلقائي: يُكبّر Safari الصفحةَ كلّها عند التركيز في أي حقل خطُّه
+        أصغر من ‎16px‎ — ثم لا يعيدها بعد الخروج منه، فيبقى المتجر مقصوصًا. ‎text-sm‎
+        هنا ‎14px‎، فيقع الشرط. الحلّ رفع الخطّ في أجهزة اللمس وحدها بدل تعطيل
+        التكبير في ‎viewport‎ (‎user-scalable=no‎) الذي يمنع الزبون من التقريب بأصابعه.
+        القيد ‎1023px‎ يُبقي الحواسيب اللمسية على قياسها.
+    */
+    @media (pointer: coarse) and (max-width: 1023px) {
+        .sf-input, .sf-select, .sf-textarea { font-size: 16px; line-height: 1.5; }
+        /* حقل الكمية يُصيّر اليوم ‎output‎ غير قابل للتركيز، والقاعدة تحسّبًا لتغيّره. */
+        .sf-qty input { font-size: 16px; }
+    }
+
     .sf-label { @apply block text-sm font-semibold mb-1.5; color: var(--sf-text); }
     .sf-hint { @apply mt-1 text-xs; color: var(--sf-text-soft); }
     .sf-error { @apply mt-1 text-xs; color: var(--sf-danger); }
