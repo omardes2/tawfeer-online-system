@@ -316,6 +316,10 @@
         }
     @endphp
 
+    {{-- التقييم وآراء الزبائن — قبل التوصيات: رأيٌ في هذا المنتج أولى من منتج آخر --}}
+    <x-storefront.reviews :product="$product" :summary="$reviewSummary" :reviews="$reviews"
+        :can-review="$canReview" :existing="$existingReview" />
+
     @foreach ($recoSections as $section)
         <x-storefront.section :title="$section['title']" :items="$section['items']"
             :reco-type="$section['type']" placement="product" :source="$product->id" />

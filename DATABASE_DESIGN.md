@@ -67,6 +67,12 @@
 ### `product_variants`
 `product_id` → products · `sku` (فريد) · `barcode` · `attributes (json)` · `cost_price` · `sale_price`
 
+### `product_reviews`
+`product_id` → products · `customer_id` → customers · `order_id` → orders (nullable) · `rating` (1..5) · `title` · `body` · `status` (pending/approved/rejected) · `moderated_by` → users · `moderated_at` · `moderation_note`
+> يكتبه الزبون في المتجر ولا يُعرض إلا بعد اعتماد إداري (`status = approved`).
+> `order_id` هو دليل الشراء: لا يُقبل تقييم إلا من صاحب طلب **مستلَم** يحوي المنتج.
+> فريد على (`product_id`, `customer_id`) — رأي واحد لكل زبون فلا يُرفع المعدّل بالتكرار.
+
 ### `units`
 `name` · `symbol` (قطعة، كرتون، كجم...)
 

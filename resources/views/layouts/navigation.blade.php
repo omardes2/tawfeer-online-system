@@ -33,6 +33,9 @@
                     @can('viewAny', \App\Modules\Catalog\Models\ProductTag::class)
                         <x-nav-link :href="route('admin.tags.index')" :active="request()->routeIs('admin.tags.*')">{{ __('الوسوم') }}</x-nav-link>
                     @endcan
+                    @can('viewAny', \App\Modules\Catalog\Models\ProductReview::class)
+                        <x-nav-link :href="route('admin.reviews.index')" :active="request()->routeIs('admin.reviews.*')">{{ __('التقييمات') }}</x-nav-link>
+                    @endcan
                     @can('inventory.stocks.view')
                         <x-nav-link :href="route('admin.inventory.warehouse')" :active="request()->routeIs('admin.inventory.*')">{{ __('warehouse.title') }}</x-nav-link>
                     @endcan

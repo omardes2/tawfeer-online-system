@@ -94,6 +94,17 @@ class Product extends Model
         return $this->hasMany(ProductVariant::class);
     }
 
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(ProductReview::class);
+    }
+
+    /** المعتمَد وحده — ما يراه زوّار المتجر. */
+    public function approvedReviews(): HasMany
+    {
+        return $this->reviews()->where('status', ProductReview::APPROVED)->latest();
+    }
+
     public function defaultVariant(): HasOne
     {
         return $this->hasOne(ProductVariant::class)->where('is_default', true);

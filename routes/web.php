@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\Catalog\CategoryController;
 use App\Http\Controllers\Admin\Catalog\ProductAttributeController;
 use App\Http\Controllers\Admin\Catalog\ProductController;
 use App\Http\Controllers\Admin\Catalog\ProductImportController;
+use App\Http\Controllers\Admin\Catalog\ProductReviewController as AdminProductReviewController;
 use App\Http\Controllers\Admin\Catalog\ProductTagController;
 use App\Http\Controllers\Admin\Catalog\ProductVariantController;
 use App\Http\Controllers\Admin\Catalog\UnitController;
@@ -61,6 +62,7 @@ use App\Http\Controllers\Storefront\Account\ProfileCompletionController;
 use App\Http\Controllers\Storefront\Account\ProfileController as AccountProfileController;
 use App\Http\Controllers\Storefront\Account\SocialAuthController;
 use App\Http\Controllers\Storefront\Account\WishlistController;
+use App\Http\Controllers\Storefront\ProductReviewController;
 use App\Http\Controllers\Storefront\RecommendationTrackingController;
 use App\Http\Controllers\Storefront\StorefrontController;
 use App\Http\Middleware\EnforceMaintenanceMode;
@@ -82,6 +84,9 @@ Route::middleware(['storefront.locale', EnforceMaintenanceMode::class])->group(f
     Route::get('/c/{slug}', [StorefrontController::class, 'category'])->name('storefront.category');
     Route::get('/b/{slug}', [StorefrontController::class, 'brand'])->name('storefront.brand');
     Route::get('/p/{slug}', [StorefrontController::class, 'show'])->name('storefront.product');
+    // تقييم منتج — يتطلّب حسابًا وشراءً مستلَمًا، ومحدود المعدّل ضدّ الإغراق.
+    Route::post('/p/{slug}/reviews', [ProductReviewController::class, 'store'])
+        ->middleware(['auth', 'throttle:10,1'])->name('storefront.product.reviews.store');
     Route::get('/cart', [StorefrontController::class, 'cart'])->name('storefront.cart');
     Route::get('/checkout', [StorefrontController::class, 'checkout'])->middleware('profile.complete')->name('storefront.checkout');
     Route::get('/lang/{locale}', [StorefrontController::class, 'setLocale'])->name('storefront.locale');
@@ -169,6 +174,12 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::resource('brands', BrandController::class)->except('show');
     Route::resource('units', UnitController::class)->except('show');
     Route::resource('tags', ProductTagController::class)->except('show');
+
+    // مراجعة تقييمات الزبائن: اعتماد/رفض/حذف — لا إنشاء ولا تحرير للنصّ.
+    Route::get('reviews', [AdminProductReviewController::class, 'index'])->name('reviews.index');
+    Route::patch('reviews/{review}/approve', [AdminProductReviewController::class, 'approve'])->name('reviews.approve');
+    Route::patch('reviews/{review}/reject', [AdminProductReviewController::class, 'reject'])->name('reviews.reject');
+    Route::delete('reviews/{review}', [AdminProductReviewController::class, 'destroy'])->name('reviews.destroy');
     Route::resource('attributes', ProductAttributeController::class)->except('show');
     Route::post('attributes/{attribute}/values', [ProductAttributeController::class, 'storeValue'])->name('attributes.values.store');
     Route::delete('attributes/{attribute}/values/{value}', [ProductAttributeController::class, 'destroyValue'])->name('attributes.values.destroy');

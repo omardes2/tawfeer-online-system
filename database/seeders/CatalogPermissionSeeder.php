@@ -16,6 +16,12 @@ class CatalogPermissionSeeder extends Seeder
 
     private array $actions = ['view', 'create', 'update', 'delete'];
 
+    /**
+     * التقييمات مورد للمراجعة لا للإنشاء: يكتبها الزبون في المتجر، وتُعتمد أو
+     * تُرفض من اللوحة. فلا `create` لها.
+     */
+    private array $reviewActions = ['view', 'update', 'delete'];
+
     public function run(): void
     {
         $all = [];
@@ -25,6 +31,12 @@ class CatalogPermissionSeeder extends Seeder
                 Permission::findOrCreate($permission, 'web');
                 $all[] = $permission;
             }
+        }
+
+        foreach ($this->reviewActions as $action) {
+            $permission = "catalog.reviews.{$action}";
+            Permission::findOrCreate($permission, 'web');
+            $all[] = $permission;
         }
 
         // المدير والمدير التنفيذي: إدارة كاملة للكتالوج.

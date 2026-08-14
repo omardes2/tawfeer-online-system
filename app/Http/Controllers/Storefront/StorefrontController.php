@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Storefront;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Crm\Models\Customer;
 use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\City;
 use App\Modules\Foundation\Models\DeliveryCityRate;
+use App\Modules\Store\Services\ReviewService;
 use App\Modules\Store\Services\StorefrontService;
 use App\Support\Contracts\StorefrontRecommendationProvider;
 use Illuminate\Http\JsonResponse;
@@ -23,6 +25,7 @@ class StorefrontController extends Controller
     public function __construct(
         private readonly StorefrontService $storefront,
         private readonly StorefrontRecommendationProvider $reco,
+        private readonly ReviewService $reviews,
     ) {}
 
     public function home(): View
@@ -90,8 +93,17 @@ class StorefrontController extends Controller
     {
         $product = $this->storefront->findProductBySlug($slug);
 
+        // التقييمات: الملخّص والآراء المعتمَدة، وحقّ الزبون الحالي في الكتابة.
+        $customer = auth()->check()
+            ? Customer::where('user_id', auth()->id())->first()
+            : null;
+
         return view('storefront.product', [
             'product' => $product,
+            'reviewSummary' => $this->reviews->summary($product),
+            'reviews' => $this->reviews->approved($product),
+            'existingReview' => $customer ? $this->reviews->existing($customer, $product) : null,
+            'canReview' => $customer !== null && $this->reviews->purchaseOrder($customer, $product) !== null,
             'related' => $this->reco->related($product, 8),
             'frequentlyBoughtTogether' => $this->reco->frequentlyBoughtTogether($product, 8),
             'crossSell' => $this->reco->crossSell($product, 8),
