@@ -123,6 +123,75 @@ const cartStore = {
 // إتاحة الترويسات لصفحات الإتمام (تُعيد استخدام نفس الهوية).
 window.StorefrontIdentity = { headers, cartToken, authToken };
 
+/*
+| اقتراحات البحث: قائمة تنسدل تحت الحقل بأسماء ما طابق الحروف المكتوبة، فيختار
+| الزبون الاسم بدل تهجئته. تحسينٌ فوق نموذج قائم — إن سقط الطلب أو عُطّل
+| جافاسكربت بقي الإرسال العادي إلى صفحة النتائج عاملًا كما هو.
+*/
+window.sfSearch = (initial = '') => ({
+    q: initial,
+    items: [],
+    open: false,
+    active: -1,      // ‎-1‎ يعني «لا اقتراح منتقى»: الإدخال يُرسل النموذج
+    timer: null,
+    seq: 0,          // ترتيب الطلبات: ردٌّ متأخّر لطلب قديم لا يدهس الأحدث
+
+    input() {
+        clearTimeout(this.timer);
+        this.active = -1;
+        if (this.q.trim().length < 2) {
+            this.items = [];
+            this.open = false;
+            return;
+        }
+        // 200ms: طلبٌ لكل ضغطة مفتاح يغرق الخادم بلا فائدة للزبون.
+        this.timer = setTimeout(() => this.fetch(), 200);
+    },
+
+    async fetch() {
+        const mine = ++this.seq;
+        try {
+            const res = await fetch(`/search/suggest?q=${encodeURIComponent(this.q.trim())}`, {
+                headers: { Accept: 'application/json' },
+            });
+            if (!res.ok) throw new Error('suggest');
+            const data = (await res.json()).data || [];
+            if (mine !== this.seq) return;
+            this.items = data;
+            this.open = data.length > 0;
+        } catch (e) {
+            if (mine !== this.seq) return;
+            this.items = [];
+            this.open = false;   // صامت: البحث نفسه ما زال يعمل
+        }
+    },
+
+    move(step) {
+        if (!this.open || this.items.length === 0) return;
+        this.active = (this.active + step + this.items.length) % this.items.length;
+    },
+
+    // الإدخال على اقتراح منتقى يفتحه؛ وبلا انتقاء يُرسل النموذج كالمعتاد.
+    enter(event) {
+        if (this.open && this.active >= 0 && this.items[this.active]) {
+            event.preventDefault();
+            window.location.href = this.items[this.active].url;
+        }
+    },
+
+    close() {
+        this.open = false;
+        this.active = -1;
+    },
+
+    clear(el) {
+        this.q = '';
+        this.items = [];
+        this.close();
+        el?.focus();
+    },
+});
+
 document.addEventListener('alpine:init', () => {
     Alpine.store('cart', cartStore);
 });

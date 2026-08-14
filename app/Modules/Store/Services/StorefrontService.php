@@ -65,6 +65,79 @@ class StorefrontService
         });
     }
 
+    /**
+     * اقتراحات البحث الفوري: ما يطابق الحروف المكتوبة من أسماء المنتجات والأقسام
+     * والعلامات، ليختار الزبون الاسم بدل تهجئته كاملًا.
+     *
+     * المطابقة نفسها المستعملة في صفحة النتائج (`applySearch`) عمدًا: اقتراحٌ
+     * لا يقود إلى نتيجة أسوأ من غياب الاقتراح. الترتيب وحده يختلف — ما يبدأ
+     * بالحروف المكتوبة يتقدّم على ما يحتويها في وسطه.
+     *
+     * حرفٌ واحد يطابق نصف الفهرس، فالحدّ الأدنى حرفان.
+     *
+     * @return array<int, array{type: string, label: string, url: string, image: string|null}>
+     */
+    public function suggest(string $term, int $limit = 6): array
+    {
+        // القصّ عند 80 حرفًا: المدخل عامّ، وسلسلة بطول ميغابايت تصير نمط LIKE
+        // يمسح الجدول. لا اسم منتج يبلغ هذا الطول أصلًا.
+        $term = mb_substr(trim($term), 0, 80);
+        if (mb_strlen($term) < 2) {
+            return [];
+        }
+
+        $like = '%'.$term.'%';
+        // بادئة أولًا: من كتب «قم» يريد «قميص» قبل «طقم قماش».
+        $prefixFirst = 'case when name like ? then 0 else 1 end';
+        $prefix = $term.'%';
+
+        $products = Product::query()->active()->visible()
+            ->where(fn (Builder $q) => $q->where('name', 'like', $like)
+                ->orWhere('name_en', 'like', $like)
+                ->orWhere('sku', 'like', $like)
+                ->orWhere('search_keywords', 'like', $like))
+            ->with('primaryImage')
+            ->orderByRaw($prefixFirst, [$prefix])
+            ->orderBy('name')
+            ->limit($limit)
+            ->get();
+
+        $categories = Category::query()->active()
+            ->where('name', 'like', $like)
+            ->orderByRaw($prefixFirst, [$prefix])
+            ->orderBy('name')
+            ->limit(3)
+            ->get(['id', 'name', 'slug']);
+
+        $brands = Brand::query()->active()
+            ->where('name', 'like', $like)
+            ->orderByRaw($prefixFirst, [$prefix])
+            ->orderBy('name')
+            ->limit(3)
+            ->get(['id', 'name', 'slug']);
+
+        return [
+            ...$products->map(fn (Product $p) => [
+                'type' => 'product',
+                'label' => $p->name,
+                'url' => route('storefront.product', $p->slug),
+                'image' => $p->primaryImage?->url(),
+            ])->all(),
+            ...$categories->map(fn (Category $c) => [
+                'type' => 'category',
+                'label' => $c->name,
+                'url' => route('storefront.category', $c->slug),
+                'image' => null,
+            ])->all(),
+            ...$brands->map(fn (Brand $b) => [
+                'type' => 'brand',
+                'label' => $b->name,
+                'url' => route('storefront.brand', $b->slug),
+                'image' => null,
+            ])->all(),
+        ];
+    }
+
     private function applySort(Builder $query, ?string $sort): void
     {
         match ($sort) {

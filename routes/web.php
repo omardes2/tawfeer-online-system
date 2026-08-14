@@ -74,6 +74,9 @@ Route::middleware(['storefront.locale', EnforceMaintenanceMode::class])->group(f
     Route::get('/', [StorefrontController::class, 'home'])->name('storefront.home');
     Route::get('/shop', [StorefrontController::class, 'index'])->name('storefront.shop');
     Route::get('/search', [StorefrontController::class, 'search'])->name('storefront.search');
+    // اقتراحات البحث الفوري — طلب لكل حرف، فمحدود المعدّل مثل بقية النقاط العامّة.
+    Route::get('/search/suggest', [StorefrontController::class, 'suggest'])
+        ->middleware('throttle:120,1')->name('storefront.search.suggest');
     Route::get('/categories', [StorefrontController::class, 'categories'])->name('storefront.categories');
     Route::get('/brands', [StorefrontController::class, 'brands'])->name('storefront.brands');
     Route::get('/c/{slug}', [StorefrontController::class, 'category'])->name('storefront.category');

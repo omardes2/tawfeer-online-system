@@ -173,6 +173,12 @@
         color: var(--sf-text);
     }
     .sf-input::placeholder, .sf-textarea::placeholder { color: var(--sf-text-soft); }
+    /*
+        زرّ المسح الأصلي في `type="search"`: يرسمه المتصفّح فوق زرّ المسح الخاص
+        بنا، فيظهر «‎×‎» مرّتين متجاورتين. المرئي هو زرّنا لأنه يُغلق قائمة
+        الاقتراحات ويعيد التركيز إلى الحقل، وزرّ المتصفّح لا يفعل.
+    */
+    .sf-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
     /* التكبير عموديًّا فقط: الأفقي كان يخرج المقبض خارج حدّ الحقل ويكسر الشبكة */
     .sf-textarea { @apply resize-y; }
     .sf-input:focus, .sf-select:focus, .sf-textarea:focus {

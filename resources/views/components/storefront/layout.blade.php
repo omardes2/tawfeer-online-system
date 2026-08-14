@@ -176,15 +176,25 @@
                 <form action="{{ route('storefront.search') }}" method="GET" role="search"
                       class="flex-1 min-w-0 md:me-6 lg:me-10">
                     <label for="sf-search" class="sr-only">{{ __('storefront.search') }}</label>
-                    <div class="relative" x-data="{ q: @js(request('q') ?? '') }">
+                    <div class="relative" x-data="sfSearch(@js(request('q') ?? ''))" @click.outside="close()">
                         <span class="md:hidden absolute inset-y-0 start-0 ps-3.5 grid place-items-center text-[color:var(--sf-text-soft)] pointer-events-none">
                             <x-storefront.icon name="search" class="w-5 h-5" />
                         </span>
                         <input id="sf-search" x-ref="sfq" type="search" name="q" x-model="q"
                                placeholder="{{ __('storefront.search_placeholder_long') }}"
+                               autocomplete="off"
+                               @input="input()"
+                               @keydown.arrow-down.prevent="move(1)"
+                               @keydown.arrow-up.prevent="move(-1)"
+                               @keydown.enter="enter($event)"
+                               @keydown.escape="close()"
+                               @focus="if (items.length) open = true"
+                               role="combobox" aria-controls="sf-suggest" aria-autocomplete="list"
+                               :aria-expanded="open ? 'true' : 'false'"
+                               :aria-activedescendant="active >= 0 ? `sf-sug-${active}` : null"
                                class="sf-input !rounded-full !bg-[color:var(--sf-bg)] ps-11 md:ps-4 pe-12 md:pe-24 md:!py-3">
                         {{-- مسح النصّ دون مغادرة الصفحة --}}
-                        <button type="button" x-show="q.length > 0" x-cloak @click="q = ''; $refs.sfq.focus()"
+                        <button type="button" x-show="q.length > 0" x-cloak @click="clear($refs.sfq)"
                                 class="absolute inset-y-0 my-auto end-1 md:end-12 grid place-items-center w-10 h-10 md:w-9 md:h-9 rounded-full
                                        text-[color:var(--sf-text-soft)] hover:text-[color:var(--sf-text)] transition-colors"
                                 aria-label="{{ __('storefront.clear_search') }}">
@@ -194,6 +204,62 @@
                                 class="hidden md:grid absolute inset-y-0 my-auto end-1 place-items-center w-10 h-10 rounded-full bg-brand-600 text-white hover:bg-brand-700 transition-colors">
                             <x-storefront.icon name="search" class="w-5 h-5" />
                         </button>
+
+                        {{--
+                            الاقتراحات: أسماء ما طابق الحروف المكتوبة. الفأرة تُبرز
+                            بـ`active` نفسه الذي تحرّكه الأسهم، فلا يضيء سطران معًا.
+                            التنقّل برابط لا بجافاسكربت: يعمل بالنقر الأوسط وبفتح
+                            تبويب جديد ويقرؤه قارئ الشاشة.
+                        --}}
+                        <ul id="sf-suggest" role="listbox" x-show="open" x-cloak
+                            aria-label="{{ __('storefront.search_suggestions') }}"
+                            class="absolute z-50 top-full mt-2 start-0 w-full md:max-w-2xl bg-white overflow-hidden
+                                   border border-[color:var(--sf-border)] rounded-2xl shadow-lg max-h-[60vh] overflow-y-auto">
+                            <template x-for="(item, i) in items" :key="item.type + item.url">
+                                <li :id="`sf-sug-${i}`" role="option"
+                                    :aria-selected="active === i ? 'true' : 'false'"
+                                    @mouseenter="active = i">
+                                    <a :href="item.url"
+                                       class="flex items-center gap-3 px-3 py-2.5 transition-colors"
+                                       :class="active === i ? 'bg-brand-50' : ''">
+                                        <span class="grid place-items-center h-10 w-10 shrink-0 overflow-hidden rounded-xl
+                                                     bg-[color:var(--sf-bg)] text-gray-300">
+                                            <template x-if="item.image">
+                                                <img :src="item.image" alt="" width="80" height="80"
+                                                     loading="lazy" decoding="async" class="w-full h-full object-cover">
+                                            </template>
+                                            {{-- بلا صورة: أيقونة تدلّ على نوع السطر بدل مربّع فارغ --}}
+                                            <template x-if="!item.image">
+                                                <span class="grid place-items-center w-full h-full">
+                                                    <span x-show="item.type === 'product'"><x-storefront.icon name="image" class="w-5 h-5" /></span>
+                                                    <span x-show="item.type === 'category'"><x-storefront.icon name="grid" class="w-5 h-5" /></span>
+                                                    <span x-show="item.type === 'brand'"><x-storefront.icon name="tag" class="w-5 h-5" /></span>
+                                                </span>
+                                            </template>
+                                        </span>
+                                        <span class="flex-1 min-w-0 text-sm font-semibold text-[color:var(--sf-text)] truncate"
+                                              x-text="item.label"></span>
+                                        {{-- نوع السطر: «قسم» يقود إلى قائمة و«منتج» إلى صفحة واحدة --}}
+                                        <span class="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full
+                                                     bg-[color:var(--sf-bg)] text-[color:var(--sf-text-soft)]"
+                                              x-text="{{ Js::from([
+                                                  'product' => __('storefront.suggest_product'),
+                                                  'category' => __('storefront.suggest_category'),
+                                                  'brand' => __('storefront.suggest_brand'),
+                                              ]) }}[item.type]"></span>
+                                    </a>
+                                </li>
+                            </template>
+
+                            {{-- مخرج إلى كل النتائج: الاقتراحات مقتطعة عمدًا --}}
+                            <li role="option" aria-selected="false"
+                                class="border-t border-[color:var(--sf-border)]">
+                                <a :href="`{{ route('storefront.search') }}?q=${encodeURIComponent(q.trim())}`"
+                                   class="block px-3 py-2.5 text-sm font-semibold text-brand-600 hover:bg-brand-50 transition-colors">
+                                    {{ __('storefront.view_all_results') }}
+                                </a>
+                            </li>
+                        </ul>
                     </div>
                 </form>
 

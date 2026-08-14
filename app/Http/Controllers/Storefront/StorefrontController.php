@@ -8,6 +8,7 @@ use App\Modules\Foundation\Models\City;
 use App\Modules\Foundation\Models\DeliveryCityRate;
 use App\Modules\Store\Services\StorefrontService;
 use App\Support\Contracts\StorefrontRecommendationProvider;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -60,6 +61,19 @@ class StorefrontController extends Controller
     public function search(Request $request): View
     {
         return $this->listing($request, __('storefront.search_results'), ['isSearch' => true]);
+    }
+
+    /**
+     * اقتراحات البحث الفوري (JSON) — تُستدعى مع كل حرف يكتبه الزبون.
+     *
+     * قراءة عامّة بلا حالة: لا جلسة ولا هوية، فالردّ قابل للتخزين المؤقّت
+     * وسقوطه لا يعطّل البحث — الإرسال العادي يبقى عاملًا بلا جافاسكربت.
+     */
+    public function suggest(Request $request): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->storefront->suggest((string) $request->query('q', '')),
+        ]);
     }
 
     public function categories(): View
