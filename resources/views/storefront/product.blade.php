@@ -201,7 +201,9 @@
                     <p class="mt-4 text-sm leading-relaxed text-[color:var(--sf-text-soft)]">{{ $shortDesc }}</p>
                 @endif
 
-                <div class="mt-6 scroll-mt-32" id="sf-buy">
+                {{-- على الجوّال يحمل الشريط اللاصق زرّ الشراء، فلا يُكرَّر هنا.
+                     «غير متوفّر» يبقى ظاهرًا في الحالتين لأنه إخبار لا زرّ. --}}
+                <div @class(['mt-6 scroll-mt-32', 'hidden lg:block' => $variant && $inStock]) id="sf-buy">
                     @if ($variant && $inStock)
                         <x-storefront.add-to-cart size="lg" :variant="$variant->uuid" :max="(int) floor($available)" />
                     @else
@@ -312,22 +314,24 @@
             :reco-type="$section['type']" placement="product" :source="$product->id" />
     @endforeach
 
-    {{-- ══════════ شريط الشراء اللاصق (جوّال) ══════════
-         يظهر فقط بعد أن يخرج زرّ الشراء الأصلي من الشاشة، فلا يتكرّر الزرّ مرّتين،
-         ويجلس فوق شريط التنقّل السفلي لا فوقه.
+    {{-- الشريط اللاصق حاضر دائمًا على الجوّال، فيُحجز ارتفاعه هنا كي لا يغطّي
+         آخر المحتوى (التوصيات) — بالإضافة إلى ما يحجزه شريط التنقّل السفلي. --}}
+    @if ($inStock || $hasOptions)
+        <div class="lg:hidden h-20" aria-hidden="true"></div>
+    @endif
 
-         المنتج البسيط: يضيف للسلة فعلًا بنفس مكوّن الزرّ الأصلي (مصدر منطق واحد)،
-         فتظهر فيه الكمية بعد الإضافة كما في الأعلى. كان رابط تمرير مكتوبًا عليه
-         «أضف إلى السلة» فلا يضيف شيئًا.
+    {{-- ══════════ شريط الشراء اللاصق (جوّال) ══════════
+         ظاهر طوال تصفّح صفحة المنتج على الجوّال — لا يظهر عند التمرير فقط. ولأنه
+         حاضر دائمًا، أُزيل زرّ الشراء المكرّر من أعلى الصفحة على الجوّال (يبقى على
+         الحواسيب حيث لا شريط لاصق). يجلس فوق شريط التنقّل السفلي لا فوقه.
+
+         المنتج البسيط: يضيف للسلة بنفس مكوّن الزرّ الأصلي (مصدر منطق واحد)،
+         ويتحوّل إلى محدّد كمية بعد الإضافة.
 
          المنتج ذو الخيارات: لا يمكن الإضافة قبل اختيار المقاس/اللون، فيبقى تمريرًا
          إلى المُنتقي — بنصّ يقول ذلك صراحةً بدل وعدٍ لا يفي به. --}}
     @if ($inStock || $hasOptions)
-        <div x-data="{ show: false }"
-             x-init="new IntersectionObserver(([e]) => show = !e.isIntersecting, { rootMargin: '-80px 0px 0px 0px' })
-                        .observe(document.getElementById('sf-buy'))"
-             x-show="show" x-cloak x-transition.opacity
-             class="lg:hidden fixed inset-x-0 z-30 bg-white border-t border-[color:var(--sf-border)] px-4 py-2.5
+        <div class="lg:hidden fixed inset-x-0 z-30 bg-white border-t border-[color:var(--sf-border)] px-4 py-2.5
                     flex items-center gap-3 shadow-[0_-2px_12px_rgba(34,34,34,.06)]"
              style="bottom: calc(var(--sf-bottomnav) + env(safe-area-inset-bottom, 0px))">
             <div class="min-w-0 flex-1">

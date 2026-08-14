@@ -17,7 +17,10 @@ use Tests\TestCase;
  *
  * كان زرّه مكتوبًا عليه «أضف إلى السلة» بينما هو رابط تمرير (`#sf-buy`) لا يضيف
  * شيئًا — والأسوأ أن هدف التمرير كان يستقرّ خلف الترويسة اللاصقة، فيبدو للزبون
- * أن الضغط لم يفعل شيئًا. هذه الاختبارات تثبّت السلوكين الصحيحين.
+ * أن الضغط لم يفعل شيئًا.
+ *
+ * والشريط الآن حاضر طوال تصفّح الصفحة على الجوّال، فأُزيل زرّ الشراء المكرّر من
+ * أعلى الصفحة هناك — ويبقى على الحواسيب حيث لا شريط لاصق.
  */
 class ProductStickyBuyBarTest extends TestCase
 {
@@ -51,8 +54,31 @@ class ProductStickyBuyBarTest extends TestCase
         // لا رابط تمرير: الزرّ العائم يضيف فعلًا.
         $this->assertStringNotContainsString('href="#sf-buy"', $html);
 
-        // زرّ الإضافة يظهر مرّتين: الأصلي في منطقة الشراء، والعائم في الشريط.
+        // زرّ الإضافة يُرسَل مرّتين: للشريط (جوّال) وللحواسيب — وكلٌّ يظهر في مقاسه.
         $this->assertSame(2, substr_count($html, '@click="add()"'));
+    }
+
+    public function test_sticky_bar_is_always_visible_not_scroll_triggered(): void
+    {
+        $product = $this->stockedProduct();
+
+        $html = $this->get(route('storefront.product', $product->slug))->assertOk()->getContent();
+
+        // كان يظهر عند التمرير فقط عبر IntersectionObserver — الآن حاضر دائمًا.
+        $this->assertStringNotContainsString('IntersectionObserver', $html);
+    }
+
+    public function test_duplicate_add_button_is_hidden_on_mobile_only(): void
+    {
+        $product = $this->stockedProduct();
+
+        $html = $this->get(route('storefront.product', $product->slug))->assertOk()->getContent();
+
+        // زرّ الشراء الأصلي يختفي على الجوّال (الشريط يحمله) ويبقى على الحواسيب.
+        $this->assertMatchesRegularExpression(
+            '/<div class="[^"]*hidden lg:block[^"]*" id="sf-buy"/',
+            $html,
+        );
     }
 
     public function test_product_with_options_scrolls_to_the_picker_with_an_honest_label(): void
@@ -81,6 +107,20 @@ class ProductStickyBuyBarTest extends TestCase
         $this->assertStringContainsString('href="#sf-buy"', $html);
         $this->assertStringContainsString(__('storefront.choose_options'), $html);
         $this->assertStringNotContainsString('>'.__('storefront.add_to_cart').'</a>', $html);
+    }
+
+    public function test_out_of_stock_notice_stays_visible_on_mobile(): void
+    {
+        // «غير متوفّر» إخبار لا زرّ، فلا يُخفى على الجوّال وإلّا اختفى سبب تعذّر الشراء.
+        $product = Product::factory()->active()->create(['visibility' => 'visible', 'retail_price' => 100]);
+
+        $html = $this->get(route('storefront.product', $product->slug))->assertOk()->getContent();
+
+        $this->assertStringContainsString('id="sf-buy"', $html);
+        $this->assertDoesNotMatchRegularExpression(
+            '/<div class="[^"]*hidden lg:block[^"]*" id="sf-buy"/',
+            $html,
+        );
     }
 
     public function test_scroll_target_clears_the_sticky_header(): void
