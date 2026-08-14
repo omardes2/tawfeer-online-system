@@ -172,7 +172,7 @@
                     </div>
 
                     {{-- الإضافة للسلة (نفس مكوّن البطاقة، والمتغيّر يتبع الاختيار) --}}
-                    <div class="mt-6" id="sf-buy">
+                    <div class="mt-6 scroll-mt-32" id="sf-buy">
                         <x-storefront.add-to-cart size="lg"
                             variant-expr="matched?.uuid ?? null"
                             max-expr="matched?.max ?? 0"
@@ -201,7 +201,7 @@
                     <p class="mt-4 text-sm leading-relaxed text-[color:var(--sf-text-soft)]">{{ $shortDesc }}</p>
                 @endif
 
-                <div class="mt-6" id="sf-buy">
+                <div class="mt-6 scroll-mt-32" id="sf-buy">
                     @if ($variant && $inStock)
                         <x-storefront.add-to-cart size="lg" :variant="$variant->uuid" :max="(int) floor($available)" />
                     @else
@@ -314,7 +314,14 @@
 
     {{-- ══════════ شريط الشراء اللاصق (جوّال) ══════════
          يظهر فقط بعد أن يخرج زرّ الشراء الأصلي من الشاشة، فلا يتكرّر الزرّ مرّتين،
-         ويجلس فوق شريط التنقّل السفلي لا فوقه. --}}
+         ويجلس فوق شريط التنقّل السفلي لا فوقه.
+
+         المنتج البسيط: يضيف للسلة فعلًا بنفس مكوّن الزرّ الأصلي (مصدر منطق واحد)،
+         فتظهر فيه الكمية بعد الإضافة كما في الأعلى. كان رابط تمرير مكتوبًا عليه
+         «أضف إلى السلة» فلا يضيف شيئًا.
+
+         المنتج ذو الخيارات: لا يمكن الإضافة قبل اختيار المقاس/اللون، فيبقى تمريرًا
+         إلى المُنتقي — بنصّ يقول ذلك صراحةً بدل وعدٍ لا يفي به. --}}
     @if ($inStock || $hasOptions)
         <div x-data="{ show: false }"
              x-init="new IntersectionObserver(([e]) => show = !e.isIntersecting, { rootMargin: '-80px 0px 0px 0px' })
@@ -327,10 +334,17 @@
                 <span class="block text-[11px] text-[color:var(--sf-text-soft)] line-clamp-1">{{ $displayName }}</span>
                 <x-storefront.price :price="$price" :regular="$onSale ? $regular : null" size="sm" />
             </div>
-            <a href="#sf-buy" class="sf-btn-primary shrink-0">
-                <x-storefront.icon name="cart" class="w-4 h-4" />
-                {{ __('storefront.add_to_cart') }}
-            </a>
+
+            @if (! $hasOptions && $variant && $inStock)
+                <div class="shrink-0 w-40">
+                    <x-storefront.add-to-cart :variant="$variant->uuid" :max="(int) floor($available)" />
+                </div>
+            @else
+                <a href="#sf-buy" class="sf-btn-primary shrink-0">
+                    <x-storefront.icon name="chevron-down" class="w-4 h-4 rotate-180" />
+                    {{ __('storefront.choose_options') }}
+                </a>
+            @endif
         </div>
     @endif
 

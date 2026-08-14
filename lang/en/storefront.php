@@ -153,6 +153,7 @@ return [
     'delivery_fee' => 'Delivery fee',
     'choose_city_for_fee' => 'Calculated after choosing a city',
     'free' => 'Free',
+    'choose_options' => 'Choose options',
     'skip_to_content' => 'Skip to content',
     'brands_count' => '{0} No brands|{1} 1 brand|[2,*] :count brands',
     'products_count' => '{0} No products|{1} 1 product|[2,*] :count products',
