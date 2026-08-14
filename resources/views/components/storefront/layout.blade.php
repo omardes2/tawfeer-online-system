@@ -17,6 +17,11 @@
     $canonicalUrl = $canonical ?: url()->current();
     $freeShip = config('storefront.promotions.free_shipping_threshold');
 
+    // الترويسة (القائمة/الشعار/السلة/البحث) تظهر على **الجوّال** في الصفحة الرئيسية
+    // وحدها؛ في الصفحات الداخلية يتكفّل الشريط السفلي بالتنقّل. أمّا الحواسيب فلا
+    // شريط سفلي فيها، فتبقى الترويسة في كل صفحة وإلّا بقيت الصفحة بلا تنقّل.
+    $isHome = request()->routeIs('storefront.home');
+
     // تنقّل رئيسي — الوجهات القائمة فقط، بلا صفحات مخترعة.
     $mainNav = [
         ['url' => route('storefront.home'), 'label' => __('storefront.home'), 'active' => request()->routeIs('storefront.home')],
@@ -141,7 +146,11 @@
             </div>
     </div>
 
-    <header x-data="{ menu: false }" class="sf-header bg-white sticky top-0 z-40 border-b border-[color:var(--sf-border)]">
+    <header x-data="{ menu: false }"
+            @class([
+                'sf-header bg-white sticky top-0 z-40 border-b border-[color:var(--sf-border)]',
+                'hidden md:block' => ! $isHome,
+            ])>
         {{-- الترويسة الرئيسية --}}
         <div class="sf-container">
             <div class="flex items-center gap-3 h-16">
