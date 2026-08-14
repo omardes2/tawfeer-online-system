@@ -5,6 +5,7 @@ namespace App\Modules\Store\Services;
 use App\Modules\Catalog\Models\Brand;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Inventory\Models\InventoryStock;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -29,7 +30,7 @@ class StorefrontService
     public function list(array $filters = []): LengthAwarePaginator
     {
         $query = Product::query()->active()->visible()
-            ->with(['primaryImage', 'defaultVariant.inventoryStocks', 'brand', 'category']);
+            ->with(['primaryImage', 'defaultVariant.inventoryStocks', 'variants.inventoryStocks', 'variants.attributeValues', 'brand', 'category']);
 
         if (! empty($filters['category'])) {
             $query->whereHas('category', fn (Builder $q) => $q->where('slug', $filters['category']));
@@ -137,23 +138,44 @@ class StorefrontService
     /**
      * التوافر عبر المستودعات (Σ on_hand − reserved). عند تمرير فرع، يُحصر بمستودعاته
      * (توافر مدرك للفرع — where applicable).
+     *
+     * يُجمَع عبر **كل متغيّرات المنتج المفعّلة** لا المتغيّر الافتراضي وحده: منتج
+     * بمقاسات يحمل مخزونه على متغيّرات المقاسات، وكان المتغيّر الافتراضي بصفر
+     * فيظهر «غير متوفّر» في القوائم رغم توفّر المقاسات فعلًا.
      */
     public function availableQty(Product $product, ?Branch $branch = null): float
     {
-        $variant = $product->defaultVariant;
-        if (! $variant) {
+        $variantIds = $this->sellableVariantIds($product);
+        if ($variantIds === []) {
             return 0.0;
-        }
-        if ($branch === null) {
-            return $this->carts->availableQty($variant);
         }
 
         $stocks = InventoryStock::query()
-            ->where('variant_id', $variant->id)
-            ->whereHas('warehouse', fn (Builder $q) => $q->where('branch_id', $branch->id))
-            ->get();
+            ->whereIn('variant_id', $variantIds)
+            ->when($branch !== null, fn (Builder $q) => $q->whereHas(
+                'warehouse', fn (Builder $w) => $w->where('branch_id', $branch->id),
+            ))
+            ->get(['on_hand', 'reserved']);
 
         return (float) $stocks->sum(fn ($s) => (float) $s->on_hand - (float) $s->reserved);
+    }
+
+    /**
+     * معرّفات المتغيّرات القابلة للبيع. تُقرأ من العلاقة المحمّلة إن وُجدت حتى لا
+     * تتحوّل قوائم المنتجات إلى استعلام لكل بطاقة (N+1).
+     *
+     * @return array<int, int>
+     */
+    private function sellableVariantIds(Product $product): array
+    {
+        if ($product->relationLoaded('variants')) {
+            $ids = $product->variants->filter(fn ($v) => $v->is_active)->pluck('id');
+        } else {
+            $ids = ProductVariant::where('product_id', $product->id)->where('is_active', true)->pluck('id');
+        }
+
+        // احتياط: منتج بلا متغيّرات مفعّلة يعود لمتغيّره الافتراضي (السلوك السابق).
+        return $ids->isNotEmpty() ? $ids->all() : array_filter([$product->defaultVariant?->id]);
     }
 
     public function inStock(Product $product, ?Branch $branch = null): bool

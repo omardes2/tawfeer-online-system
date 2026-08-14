@@ -13,6 +13,10 @@
 --}}
 @php
     $variant = $product->defaultVariant;
+    // منتج بمقاسات/ألوان: لا يُضاف من البطاقة لأن المتغيّر يتبع اختيار الزبون —
+    // والإضافة بالمتغيّر الافتراضي كانت تفشل حين يكون مخزونه على المقاسات.
+    $hasOptions = $product->relationLoaded('variants')
+        && $product->variants->contains(fn ($v) => $v->is_active && $v->attributeValues->isNotEmpty());
     $price = $sf->sellingPrice($product);
     $regular = $sf->regularPrice($product);
     $onSale = $sf->onSale($product);
@@ -90,7 +94,11 @@
 
         {{-- الإضافة للسلة / تعديل الكمية --}}
         <div class="mt-auto pt-2">
-            @if ($variant && $inStock)
+            @if ($hasOptions && $inStock)
+                <a href="{{ $url }}" class="sf-btn-outline sf-btn-sm sf-btn-block min-h-10 whitespace-nowrap">
+                    {{ __('storefront.choose_options') }}
+                </a>
+            @elseif ($variant && $inStock)
                 {{-- منطق السلة في مكوّن واحد يتقاسمه هذا الكرت وصفحة المنتج --}}
                 <x-storefront.add-to-cart :variant="$variant->uuid" :max="(int) floor($available)" />
             @else
