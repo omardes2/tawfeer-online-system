@@ -17,7 +17,7 @@
     $canonicalUrl = $canonical ?: url()->current();
     $freeShip = config('storefront.promotions.free_shipping_threshold');
 
-    // الترويسة (القائمة/الشعار/السلة/البحث) تظهر على **الجوّال** في الصفحة الرئيسية
+    // الترويسة (القائمة/البحث/السلة) تظهر على **الجوّال** في الصفحة الرئيسية
     // وحدها؛ في الصفحات الداخلية يتكفّل الشريط السفلي بالتنقّل. أمّا الحواسيب فلا
     // شريط سفلي فيها، فتبقى الترويسة في كل صفحة وإلّا بقيت الصفحة بلا تنقّل.
     $isHome = request()->routeIs('storefront.home');
@@ -161,31 +161,37 @@
                     <x-storefront.icon name="menu" class="w-6 h-6" />
                 </button>
 
-                {{-- على الجوّال يتوسّط الشعار بين القائمة والسلة --}}
-                <div class="md:hidden flex-1 flex justify-center">
-                    <x-storefront.logo />
-                </div>
-                <div class="hidden md:block">
-                    <x-storefront.logo />
-                </div>
+                {{--
+                    البحث في مكان الشعار: نموذج واحد لكل المقاسات بدل نموذجَي
+                    حاسوب/جوّال، فالسطر الثاني الذي كان يحمل بحث الجوّال زال
+                    وقصرت الترويسة من ~‎122px‎ إلى ‎64px‎.
 
-                {{-- البحث (حواسيب) --}}
+                    الفرق بين المقاسين شكلٌ فقط: على الجوّال أيقونة عدسة في
+                    المقدّمة وإدخال المفتاح يُرسل، وعلى الحاسوب زرّ إرسال دائري
+                    بلون الهوية في النهاية. الوجهة والاسم `q` واحدة.
+
+                    بلا حدّ أقصى للعرض: مكان الشعار صار فراغًا، وتقييد الحقل
+                    يترك ثقبًا في وسط الصفّ. `sf-container` يكبحه عند ‎1280px‎.
+                --}}
                 <form action="{{ route('storefront.search') }}" method="GET" role="search"
-                      class="hidden md:block flex-1 max-w-2xl xl:max-w-4xl mx-6 lg:mx-10">
+                      class="flex-1 min-w-0 md:me-6 lg:me-10">
                     <label for="sf-search" class="sr-only">{{ __('storefront.search') }}</label>
                     <div class="relative" x-data="{ q: @js(request('q') ?? '') }">
+                        <span class="md:hidden absolute inset-y-0 start-0 ps-3.5 grid place-items-center text-[color:var(--sf-text-soft)] pointer-events-none">
+                            <x-storefront.icon name="search" class="w-5 h-5" />
+                        </span>
                         <input id="sf-search" x-ref="sfq" type="search" name="q" x-model="q"
                                placeholder="{{ __('storefront.search_placeholder_long') }}"
-                               class="sf-input !rounded-full !bg-[color:var(--sf-bg)] ps-4 pe-24 !py-3">
+                               class="sf-input !rounded-full !bg-[color:var(--sf-bg)] ps-11 md:ps-4 pe-12 md:pe-24 md:!py-3">
                         {{-- مسح النصّ دون مغادرة الصفحة --}}
                         <button type="button" x-show="q.length > 0" x-cloak @click="q = ''; $refs.sfq.focus()"
-                                class="absolute inset-y-0 my-auto end-12 grid place-items-center w-9 h-9 rounded-full
+                                class="absolute inset-y-0 my-auto end-1 md:end-12 grid place-items-center w-10 h-10 md:w-9 md:h-9 rounded-full
                                        text-[color:var(--sf-text-soft)] hover:text-[color:var(--sf-text)] transition-colors"
                                 aria-label="{{ __('storefront.clear_search') }}">
-                            <x-storefront.icon name="close" class="w-4 h-4" />
+                            <x-storefront.icon name="close" class="w-5 h-5 md:w-4 md:h-4" />
                         </button>
                         <button type="submit" aria-label="{{ __('storefront.search') }}"
-                                class="absolute inset-y-0 my-auto end-1 grid place-items-center w-10 h-10 rounded-full bg-brand-600 text-white hover:bg-brand-700 transition-colors">
+                                class="hidden md:grid absolute inset-y-0 my-auto end-1 place-items-center w-10 h-10 rounded-full bg-brand-600 text-white hover:bg-brand-700 transition-colors">
                             <x-storefront.icon name="search" class="w-5 h-5" />
                         </button>
                     </div>
@@ -215,25 +221,6 @@
                     </a>
                 </div>
             </div>
-
-            {{-- البحث (جوّال) — بعرض الشاشة تحت الترويسة --}}
-            <form action="{{ route('storefront.search') }}" method="GET" role="search" class="md:hidden pb-3">
-                <label for="sf-search-m" class="sr-only">{{ __('storefront.search') }}</label>
-                <div class="relative" x-data="{ q: @js(request('q') ?? '') }">
-                    <span class="absolute inset-y-0 start-0 ps-3.5 grid place-items-center text-[color:var(--sf-text-soft)] pointer-events-none">
-                        <x-storefront.icon name="search" class="w-5 h-5" />
-                    </span>
-                    <input id="sf-search-m" x-ref="sfqm" type="search" name="q" x-model="q"
-                           placeholder="{{ __('storefront.search_placeholder_long') }}"
-                           class="sf-input !rounded-full !bg-[color:var(--sf-bg)] ps-11 pe-12">
-                    <button type="button" x-show="q.length > 0" x-cloak @click="q = ''; $refs.sfqm.focus()"
-                            class="absolute inset-y-0 my-auto end-1 grid place-items-center w-10 h-10 rounded-full
-                                   text-[color:var(--sf-text-soft)]"
-                            aria-label="{{ __('storefront.clear_search') }}">
-                        <x-storefront.icon name="close" class="w-5 h-5" />
-                    </button>
-                </div>
-            </form>
 
             {{-- تنقّل رئيسي (حواسيب) --}}
             <nav class="hidden md:flex items-center gap-1 h-12 -mb-px" aria-label="{{ __('storefront.menu') }}">

@@ -8,7 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * ظهور الترويسة (القائمة/الشعار/السلة/البحث) حسب الصفحة والشاشة.
+ * ظهور الترويسة (القائمة/البحث/السلة) حسب الصفحة والشاشة.
  *
  * على **الجوّال** تظهر في الصفحة الرئيسية وحدها؛ في الصفحات الداخلية يتكفّل
  * الشريط السفلي بالتنقّل. وعلى **الحواسيب** تبقى في كل صفحة — لا شريط سفلي
@@ -65,6 +65,33 @@ class HeaderVisibilityTest extends TestCase
         $this->get(route('storefront.shop'))
             ->assertOk()
             ->assertSee('sf-bottomnav', false);
+    }
+
+    public function test_the_header_holds_one_search_box_in_the_logos_place(): void
+    {
+        $html = $this->get(route('storefront.home'))->assertOk()->getContent();
+        $header = substr($html, strpos($html, '<header'), strpos($html, '</header>') - strpos($html, '<header'));
+
+        // كان نموذجان — واحد للحاسوب وآخر للجوّال في سطر ثانٍ. صارا واحدًا،
+        // فمعرّفان متطابقان أو حقلان معًا يعنيان عودة الازدواج.
+        $this->assertSame(1, substr_count($header, 'type="search"'));
+        $this->assertSame(1, substr_count($header, 'id="sf-search"'));
+        $this->assertStringNotContainsString('sf-search-m', $header);
+    }
+
+    public function test_the_logo_left_the_header_but_not_the_drawer(): void
+    {
+        $html = $this->get(route('storefront.home'))->assertOk()->getContent();
+        $header = substr($html, strpos($html, '<header'), strpos($html, '</header>') - strpos($html, '<header'));
+
+        // درج القائمة يقع داخل وسم الترويسة، فيُفصل قبل العدّ.
+        $toolbar = substr($header, 0, strpos($header, '<aside') ?: strlen($header));
+        $drawer = substr($header, strpos($header, '<aside') ?: 0);
+
+        $mark = 'aria-label="'.__('storefront.site_name').'"';
+        $this->assertStringNotContainsString($mark, $toolbar, 'الشعار ما زال في شريط الترويسة.');
+        // حذفه من الدرج أيضًا يترك القائمةَ بلا رابط إلى الرئيسية.
+        $this->assertStringContainsString($mark, $drawer, 'الشعار غادر درج القائمة أيضًا.');
     }
 
     public function test_inner_pages_still_offer_a_way_home(): void
