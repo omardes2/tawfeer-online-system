@@ -56,17 +56,24 @@
         ];
     })->values();
 
-    // المفضّلة: الحالة الحقيقية من الخدمة القائمة (لا حالة محلّية).
-    $wishCustomer = auth()->check() ? \App\Modules\Crm\Models\Customer::where('user_id', auth()->id())->first() : null;
-    $inWishlist = $wishCustomer && app(\App\Modules\Store\Services\WishlistService::class)->has($wishCustomer, $product);
+    // بحذف زرّ المفضّلة سقط استعلاما العميل والمفضّلة اللذان كانا يُنفَّذان
+    // في كل عرض لصفحة منتج لمستخدم مسجَّل.
 
     // صفوف المعلومات — ما هو موجود فعلًا فقط، بلا صفوف فارغة.
+    //
+    // رمز المنتج والفئة والوحدة حُذفت: بيانات داخلية لا تُعين الزبون على قرار
+    // الشراء، وكانت تحتلّ أبرز مساحة تحت السعر. مكانها الآن ضمانات الشراء.
+    // العلامة التجارية باقية — تُغيّر القرار فعلًا.
     $infoRows = array_filter([
-        __('storefront.sku') => $product->sku,
         __('storefront.brand') => $product->brand?->name,
-        __('storefront.category') => $product->category?->name,
-        __('storefront.unit') => $product->unit?->name,
     ]);
+
+    // ضمانات الشراء: ثلاث بطاقات ثابتة تُطمئن قبل الإضافة إلى السلة.
+    $assurances = [
+        ['icon' => 'truck', 'title' => __('storefront.assure_delivery_title'), 'note' => __('storefront.assure_delivery_note')],
+        ['icon' => 'shield', 'title' => __('storefront.assure_warranty_title'), 'note' => __('storefront.assure_warranty_note')],
+        ['icon' => 'cash', 'title' => __('storefront.assure_cod_title'), 'note' => __('storefront.assure_cod_note')],
+    ];
 @endphp
 
 <x-storefront.layout
@@ -110,7 +117,11 @@
                 {{ $displayName }}
             </h1>
 
-            <p class="mt-1.5 text-xs text-[color:var(--sf-text-soft)] font-mono">{{ __('storefront.sku') }}: {{ $product->sku }}</p>
+            {{--
+                رمز المنتج محذوف من العرض. كان يظهر هنا وفي جدول المعلومات معًا،
+                وهو مرجع داخلي لا يقرأه الزبون. ما زال في حمولة حدث الصفحة
+                (`ProductViewed`) وفي بنود السلة والطلب — لم يُمسّ أي عقد برمجي.
+            --}}
 
             @if ($hasOptions)
                 {{-- منتج بخيارات: السعر والتوفّر والإضافة تتبع المتغيّر المختار --}}
@@ -215,33 +226,28 @@
                 </div>
             @endif
 
-            {{-- المفضّلة والمشاركة --}}
-            <div class="mt-4 flex items-center gap-2 flex-wrap">
-                @if ($wishCustomer)
-                    <form method="POST" action="{{ route('account.wishlist.toggle', $product) }}">
-                        @csrf
-                        <button type="submit" class="sf-btn-outline min-h-10 {{ $inWishlist ? '!text-[color:var(--sf-danger)] !border-[color:var(--sf-danger)]' : '' }}">
-                            <x-storefront.icon name="heart" class="w-4 h-4" :filled="$inWishlist" />
-                            {{ $inWishlist ? __('account.in_wishlist') : __('account.add_to_wishlist') }}
-                        </button>
-                    </form>
-                @elseif (! auth()->check())
-                    <a href="{{ route('account.login') }}" class="sf-btn-outline min-h-10">
-                        <x-storefront.icon name="heart" class="w-4 h-4" />
-                        {{ __('account.add_to_wishlist') }}
-                    </a>
-                @endif
+            {{--
+                ضمانات الشراء مكان «أضف للمفضّلة/مشاركة».
 
-                <button type="button" x-data="{ shared: false }"
-                        @click="navigator.share
-                            ? navigator.share({ title: @js($displayName), url: window.location.href })
-                            : (navigator.clipboard.writeText(window.location.href), shared = true, setTimeout(() => shared = false, 1500))"
-                        class="sf-btn-outline min-h-10">
-                    <x-storefront.icon name="share" class="w-4 h-4" />
-                    <span x-show="!shared">{{ __('storefront.share') }}</span>
-                    <span x-show="shared" x-cloak>{{ __('storefront.link_copied') }}</span>
-                </button>
-            </div>
+                المفضّلة ما زالت متاحة من بطاقة المنتج في القوائم ومن صفحة
+                «المفضّلة» في الحساب — الزرّ هنا وحده هو ما حُذف.
+            --}}
+            <ul class="mt-5 pt-5 border-t border-[color:var(--sf-border)] grid grid-cols-3 gap-2 sm:gap-3">
+                @foreach ($assurances as $item)
+                    <li class="flex flex-col items-center text-center gap-2">
+                        <span class="grid place-items-center w-12 h-12 rounded-full bg-brand-50 text-brand-600 shrink-0">
+                            <x-storefront.icon :name="$item['icon']" class="w-6 h-6" />
+                        </span>
+                        {{-- ‎11px‎ على الجوّال: ثلاثة أعمدة عند ‎320px‎ تترك ~‎96px‎ للعمود --}}
+                        <span class="text-[11px] sm:text-xs font-bold leading-snug text-[color:var(--sf-text)]">
+                            {{ $item['title'] }}
+                        </span>
+                        <span class="text-[10px] sm:text-[11px] leading-snug text-[color:var(--sf-text-soft)]">
+                            {{ $item['note'] }}
+                        </span>
+                    </li>
+                @endforeach
+            </ul>
 
             {{-- معلومات المنتج — الموجود فعلًا فقط --}}
             @if ($infoRows !== [])
