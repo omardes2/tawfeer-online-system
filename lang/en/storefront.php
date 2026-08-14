@@ -79,7 +79,7 @@ return [
     'total' => 'Total',
     'remove' => 'Remove',
     'continue_shopping' => 'Continue shopping',
-    'proceed_to_checkout' => 'Proceed to checkout',
+    'proceed_to_checkout' => 'Confirm order',
     'back_to_shop' => 'Back to shop',
     'contact_details' => 'Contact details',
     'shipping_address' => 'Shipping address',

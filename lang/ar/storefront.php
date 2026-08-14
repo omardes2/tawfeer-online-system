@@ -79,7 +79,7 @@ return [
     'total' => 'الإجمالي',
     'remove' => 'إزالة',
     'continue_shopping' => 'مواصلة التسوّق',
-    'proceed_to_checkout' => 'المتابعة للدفع',
+    'proceed_to_checkout' => 'تأكيد الطلب',
     'back_to_shop' => 'العودة للمتجر',
     'contact_details' => 'بيانات التواصل',
     'shipping_address' => 'عنوان الشحن',

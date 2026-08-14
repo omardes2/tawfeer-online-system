@@ -53,13 +53,27 @@
                 <div class="space-y-3 min-w-0">
                     <template x-for="item in $store.cart.items" :key="item.variant_id">
                         <div class="sf-card p-3 sm:p-4 flex items-start sm:items-center gap-3 sm:gap-4">
-                            <span class="grid place-items-center h-16 w-16 shrink-0 rounded-xl
+                            {{-- صورة المنتج الحقيقية، وبديل رمادي حين لا توجد صورة --}}
+                            <span class="grid place-items-center h-16 w-16 shrink-0 overflow-hidden rounded-xl
                                          bg-[color:var(--sf-bg)] text-gray-300">
-                                <x-storefront.icon name="image" class="w-8 h-8" />
+                                <template x-if="item.image">
+                                    <img :src="item.image" :alt="item.name || item.sku"
+                                         width="128" height="128" loading="lazy" decoding="async"
+                                         class="w-full h-full object-cover">
+                                </template>
+                                <template x-if="!item.image">
+                                    <span class="grid place-items-center w-full h-full">
+                                        <x-storefront.icon name="image" class="w-8 h-8" />
+                                    </span>
+                                </template>
                             </span>
 
                             <div class="flex-1 min-w-0">
-                                <p class="font-semibold text-sm text-[color:var(--sf-text)] truncate" x-text="item.sku"></p>
+                                {{-- الاسم لا الرمز: كان الزبون يرى «P-W9DEMWZL» مكان اسم المنتج --}}
+                                <p class="font-semibold text-sm text-[color:var(--sf-text)] line-clamp-2"
+                                   x-text="item.name || item.sku"></p>
+                                <p x-show="item.options" x-cloak
+                                   class="text-xs text-[color:var(--sf-text-soft)] mt-0.5" x-text="item.options"></p>
                                 <p class="sf-price text-sm mt-0.5"
                                    x-text="`${Number(item.unit_price).toFixed(2)} {{ __('storefront.currency') }}`"></p>
 
