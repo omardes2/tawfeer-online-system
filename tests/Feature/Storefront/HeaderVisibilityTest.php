@@ -79,19 +79,52 @@ class HeaderVisibilityTest extends TestCase
         $this->assertStringNotContainsString('sf-search-m', $header);
     }
 
-    public function test_the_logo_left_the_header_but_not_the_drawer(): void
+    public function test_the_logo_shows_on_mobile_only_and_stays_in_the_drawer(): void
     {
-        $html = $this->get(route('storefront.home'))->assertOk()->getContent();
-        $header = substr($html, strpos($html, '<header'), strpos($html, '</header>') - strpos($html, '<header'));
-
-        // درج القائمة يقع داخل وسم الترويسة، فيُفصل قبل العدّ.
-        $toolbar = substr($header, 0, strpos($header, '<aside') ?: strlen($header));
-        $drawer = substr($header, strpos($header, '<aside') ?: 0);
+        [$toolbar, $drawer] = $this->headerParts();
 
         $mark = 'aria-label="'.__('storefront.site_name').'"';
-        $this->assertStringNotContainsString($mark, $toolbar, 'الشعار ما زال في شريط الترويسة.');
-        // حذفه من الدرج أيضًا يترك القائمةَ بلا رابط إلى الرئيسية.
-        $this->assertStringContainsString($mark, $drawer, 'الشعار غادر درج القائمة أيضًا.');
+        $this->assertStringContainsString($mark, $toolbar, 'الشعار غادر شريط الترويسة.');
+        // على الحواسيب لا شعار: البحث يملأ مكانه والقائمة الأفقية تحمل «الرئيسية».
+        $this->assertMatchesRegularExpression(
+            '/md:hidden[^>]*>\s*<a[^>]*'.preg_quote($mark, '/').'/s',
+            $toolbar,
+            'الشعار يظهر على الحواسيب أيضًا — يُفترض أن يكون جوّالًا فقط.'
+        );
+        // حذفه من الدرج يترك القائمةَ بلا رابط إلى الرئيسية.
+        $this->assertStringContainsString($mark, $drawer, 'الشعار غادر درج القائمة.');
+    }
+
+    public function test_the_cart_leaves_the_mobile_top_bar_but_stays_reachable(): void
+    {
+        [$toolbar] = $this->headerParts();
+
+        $at = strpos($toolbar, 'aria-label="'.__('storefront.cart').'"');
+        $this->assertNotFalse($at, 'رابط السلة اختفى من الترويسة تمامًا.');
+
+        // `hidden md:grid` يخفيه على الجوّال ويعيده على الحواسيب.
+        $anchor = substr($toolbar, strrpos(substr($toolbar, 0, $at), '<a '));
+        $this->assertStringContainsString('hidden md:grid', substr($anchor, 0, strpos($anchor, '>')));
+
+        // الإخفاء مقبول فقط لأن الشريط السفلي يحمل السلة بشارتها.
+        $this->get(route('storefront.home'))->assertOk()->assertSee('sf-bottomnav', false);
+    }
+
+    /**
+     * الترويسة مقسومة: شريط علوي ثم درج القائمة (`<aside>` داخل الوسم نفسه).
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function headerParts(): array
+    {
+        $html = $this->get(route('storefront.home'))->assertOk()->getContent();
+        $start = strpos($html, '<header');
+        $header = substr($html, $start, strpos($html, '</header>') - $start);
+
+        $split = strpos($header, '<aside');
+        $this->assertNotFalse($split, 'درج القائمة غير موجود في الترويسة.');
+
+        return [substr($header, 0, $split), substr($header, $split)];
     }
 
     public function test_inner_pages_still_offer_a_way_home(): void

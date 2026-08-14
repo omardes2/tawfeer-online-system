@@ -17,7 +17,7 @@
     $canonicalUrl = $canonical ?: url()->current();
     $freeShip = config('storefront.promotions.free_shipping_threshold');
 
-    // الترويسة (القائمة/البحث/السلة) تظهر على **الجوّال** في الصفحة الرئيسية
+    // الترويسة (الشعار/البحث/القائمة) تظهر على **الجوّال** في الصفحة الرئيسية
     // وحدها؛ في الصفحات الداخلية يتكفّل الشريط السفلي بالتنقّل. أمّا الحواسيب فلا
     // شريط سفلي فيها، فتبقى الترويسة في كل صفحة وإلّا بقيت الصفحة بلا تنقّل.
     $isHome = request()->routeIs('storefront.home');
@@ -154,24 +154,26 @@
         {{-- الترويسة الرئيسية --}}
         <div class="sf-container">
             <div class="flex items-center gap-3 h-16">
-                {{-- جوّال: زرّ القائمة --}}
-                <button type="button" @click="menu = true"
-                        class="md:hidden grid place-items-center w-10 h-10 -ms-2 rounded-xl text-[color:var(--sf-text)] hover:bg-brand-50 transition-colors"
-                        aria-label="{{ __('storefront.open_menu') }}">
-                    <x-storefront.icon name="menu" class="w-6 h-6" />
-                </button>
+                {{--
+                    الشعار (جوّال فقط) في مبتدأ الصفّ قبل البحث. على الحواسيب
+                    يبقى محذوفًا والبحث يملأ مكانه — التنقّل السفلي غائب هناك
+                    والقائمة الأفقية تحمل «الرئيسية».
+                --}}
+                <div class="md:hidden shrink-0">
+                    <x-storefront.logo class="h-8 max-w-[110px]" :with-name="false" />
+                </div>
 
                 {{--
-                    البحث في مكان الشعار: نموذج واحد لكل المقاسات بدل نموذجَي
-                    حاسوب/جوّال، فالسطر الثاني الذي كان يحمل بحث الجوّال زال
-                    وقصرت الترويسة من ~‎122px‎ إلى ‎64px‎.
+                    نموذج بحث واحد لكل المقاسات بدل نموذجَي حاسوب/جوّال، فالسطر
+                    الثاني الذي كان يحمل بحث الجوّال زال وقصرت الترويسة من
+                    ~‎122px‎ إلى ‎64px‎.
 
                     الفرق بين المقاسين شكلٌ فقط: على الجوّال أيقونة عدسة في
                     المقدّمة وإدخال المفتاح يُرسل، وعلى الحاسوب زرّ إرسال دائري
                     بلون الهوية في النهاية. الوجهة والاسم `q` واحدة.
 
-                    بلا حدّ أقصى للعرض: مكان الشعار صار فراغًا، وتقييد الحقل
-                    يترك ثقبًا في وسط الصفّ. `sf-container` يكبحه عند ‎1280px‎.
+                    بلا حدّ أقصى للعرض: على الحواسيب لا شعار، وتقييد الحقل يترك
+                    ثقبًا مكانه في وسط الصفّ. `sf-container` يكبحه عند ‎1280px‎.
                 --}}
                 <form action="{{ route('storefront.search') }}" method="GET" role="search"
                       class="flex-1 min-w-0 md:me-6 lg:me-10">
@@ -277,14 +279,26 @@
                         <x-storefront.icon name="user" class="w-6 h-6" />
                     </a>
 
+                    {{--
+                        السلة على الحواسيب وحدها: الشريط السفلي على الجوّال يحمل
+                        «السلة» بالشارة نفسها، فوجودها هنا تكرارٌ يزاحم البحث على
+                        عرضٍ ضيّق. لا يضيع وصول — الشريط السفلي حاضر في كل صفحة.
+                    --}}
                     <a href="{{ route('storefront.cart') }}"
-                       class="relative grid place-items-center w-10 h-10 rounded-xl text-[color:var(--sf-text)] hover:bg-brand-50 hover:text-brand-600 transition-colors"
+                       class="relative hidden md:grid place-items-center w-10 h-10 rounded-xl text-[color:var(--sf-text)] hover:bg-brand-50 hover:text-brand-600 transition-colors"
                        aria-label="{{ __('storefront.cart') }}" title="{{ __('storefront.cart') }}">
                         <x-storefront.icon name="cart" class="w-6 h-6" />
                         <span x-data x-show="$store.cart.count > 0" x-text="$store.cart.count" x-cloak
                               class="absolute top-0.5 end-0.5 min-w-[18px] h-[18px] px-1 grid place-items-center
                                      rounded-full bg-[color:var(--sf-danger)] text-white text-[10px] font-bold"></span>
                     </a>
+
+                    {{-- زرّ القائمة (جوّال): انتقل إلى منتهى الصفّ حيث كانت السلة --}}
+                    <button type="button" @click="menu = true"
+                            class="md:hidden grid place-items-center w-10 h-10 -me-2 rounded-xl text-[color:var(--sf-text)] hover:bg-brand-50 transition-colors"
+                            aria-label="{{ __('storefront.open_menu') }}">
+                        <x-storefront.icon name="menu" class="w-6 h-6" />
+                    </button>
                 </div>
             </div>
 
