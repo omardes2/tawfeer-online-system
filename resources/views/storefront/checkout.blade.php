@@ -1,18 +1,17 @@
 <x-storefront.layout :title="__('storefront.checkout')">
 
     {{--
-        ⚠️ إعادة تصميم بصرية فقط — Protected Delivery Integration — Do Not Modify.
+        ⚠️ Protected Delivery Integration — Do Not Modify.
 
-        كل ما يعتمد عليه النظام محفوظ حرفيًا كما كان:
-          • `x-data="storefrontCheckout()"` و`x-init="init()"`
-          • مفاتيح النموذج: customer_name / customer_phone / customer_email /
-            shipping_address / payment_method_code
-          • معرّفات الحقول: c-name / c-phone / c-email / c-address
-          • زرّ الدفع: name="pm" value="cod"
-          • `@submit.prevent="place()"` وحالات empty / order / error / placing
-          • دالة `storefrontCheckout()` بالكامل — لم يُغيَّر فيها حرف واحد،
-            بما فيها مسارات `/api/v1/store/checkout` وترويسات الهوية.
-        الجديد أغلفة وأصناف تصميم حولها فقط.
+        محفوظ كما هو: `x-data="storefrontCheckout()"` و`x-init="init()"`، ومفاتيح
+        النموذج (customer_name / customer_phone / shipping_address / city_id /
+        area_id / payment_method_code)، ومعرّفات الحقول (c-name / c-phone /
+        c-city / c-area / c-address)، وزرّ الدفع `name="pm" value="cod"`،
+        و`@submit.prevent="place()"` وحالات empty / order / error / placing،
+        ومسارات `/api/v1/store/checkout` وترويسات الهوية.
+
+        البريد الإلكتروني حُذف من النموذج بطلب المالك — الحقل نفسه ما زال في
+        الخلفية (`customer_email` اختياري) فتبقى طلبات لوحة الإدارة قادرة عليه.
     --}}
 
     <x-storefront.page-header :title="__('storefront.checkout')"
@@ -76,6 +75,7 @@
                             {{ __('storefront.contact_details') }}
                         </h2>
 
+                        {{-- البريد الإلكتروني محذوف بطلب المالك: الطلب يُتابَع بالجوّال. --}}
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label for="c-name" class="sf-label">{{ __('storefront.customer_name') }}</label>
@@ -85,10 +85,6 @@
                                 <label for="c-phone" class="sf-label">{{ __('storefront.customer_phone') }}</label>
                                 <input id="c-phone" x-model="form.customer_phone" required inputmode="tel" class="sf-input" dir="ltr">
                             </div>
-                        </div>
-                        <div class="mt-4">
-                            <label for="c-email" class="sf-label">{{ __('storefront.customer_email') }}</label>
-                            <input id="c-email" type="email" x-model="form.customer_email" class="sf-input" dir="ltr">
                         </div>
                     </section>
 
@@ -217,7 +213,7 @@
                 areas: @js($areas),
                 totals: { subtotal: 0, delivery_fee: 0, total: 0 },
                 form: {
-                    customer_name: '', customer_phone: '', customer_email: '',
+                    customer_name: '', customer_phone: '',
                     shipping_address: '', city_id: '', area_id: '', payment_method_code: 'cod',
                 },
 

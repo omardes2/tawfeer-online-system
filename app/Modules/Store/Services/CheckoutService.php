@@ -63,14 +63,21 @@ class CheckoutService
     {
         $this->assertPending($session);
 
-        $session->fill(array_filter(
-            array_intersect_key($data, array_flip([
-                'customer_name', 'customer_phone', 'customer_email',
-                'shipping_address', 'city_id', 'area_id',
-                'payment_method_code', 'notes',
-            ])),
-            fn ($v) => $v !== null,
-        ))->save();
+        $fields = array_intersect_key($data, array_flip([
+            'customer_name', 'customer_phone', 'customer_email',
+            'shipping_address', 'city_id', 'area_id',
+            'payment_method_code', 'notes',
+        ]));
+
+        // «لا منطقة» تصل من القائمة نصًّا فارغًا لا null، فتُسنَد إلى مفتاح أجنبي.
+        // تُطبَّع هنا لا في الواجهة: الخلفية هي التي تضمن سلامة البيانات.
+        foreach (['city_id', 'area_id'] as $key) {
+            if (array_key_exists($key, $fields) && $fields[$key] === '') {
+                $fields[$key] = null;
+            }
+        }
+
+        $session->fill(array_filter($fields, fn ($v) => $v !== null))->save();
 
         return $session->refresh();
     }
