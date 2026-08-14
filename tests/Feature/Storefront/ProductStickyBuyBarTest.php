@@ -75,13 +75,54 @@ class ProductStickyBuyBarTest extends TestCase
         $html = $this->get(route('storefront.product', $product->slug))->assertOk()->getContent();
 
         // زرّ الشراء الأصلي يختفي على الجوّال (الشريط يحمله) ويبقى على الحواسيب.
-        $this->assertMatchesRegularExpression(
+        $this->assertStringContainsString('hidden lg:inline-flex', $html);
+    }
+
+    public function test_quantity_control_stays_below_the_product_on_mobile(): void
+    {
+        $product = $this->stockedProduct();
+
+        $html = $this->get(route('storefront.product', $product->slug))->assertOk()->getContent();
+
+        // محدّد الكمية ليس تكرارًا لزرّ الإضافة بل تحكّم بما في السلة، فلا يُخفى:
+        // الكتلة نفسها بلا `hidden`، والإخفاء مقصور على زرّ «أضف» وحده.
+        $this->assertDoesNotMatchRegularExpression(
             '/<div class="[^"]*hidden lg:block[^"]*" id="sf-buy"/',
             $html,
         );
+        $this->assertStringContainsString('id="sf-buy"', $html);
     }
 
-    public function test_product_with_options_scrolls_to_the_picker_with_an_honest_label(): void
+    public function test_add_to_cart_raises_a_toast(): void
+    {
+        $product = $this->stockedProduct();
+
+        $html = $this->get(route('storefront.product', $product->slug))->assertOk()->getContent();
+
+        // التنبيه يُطلَق من مخزن السلة، ونصّه يصل من ملفّات اللغة لا من JS.
+        $this->assertStringContainsString('storefront:toast', $html);
+        $this->assertStringContainsString(__('storefront.added_to_cart'), $html);
+        $this->assertStringContainsString(__('storefront.view_cart'), $html);
+    }
+
+    public function test_sticky_bar_hides_the_base_price_for_products_with_options(): void
+    {
+        $product = $this->optionsProduct();
+
+        $html = $this->get(route('storefront.product', $product->slug))->assertOk()->getContent();
+
+        // سعر المنتج ذي الخيارات يتبع المقاس المختار؛ عرض سعر أساسي في الشريط
+        // كان يناقض ما يظهر أعلى الصفحة بعد الاختيار. (`sf-price` يبقى للسعر
+        // الرئيسي أعلى الصفحة، فيُفحص أنه لم يُكرَّر داخل الشريط.)
+        $this->assertStringContainsString('<div data-buybar', $html);
+        $this->assertStringContainsString(__('storefront.choose_options'), $html);
+
+        $bar = substr($html, strpos($html, '<div data-buybar'));
+        $bar = substr($bar, 0, strpos($bar, '</div>') + 6);
+        $this->assertStringNotContainsString('sf-price', $bar);
+    }
+
+    private function optionsProduct(): Product
     {
         $product = $this->stockedProduct();
 
@@ -101,7 +142,14 @@ class ProductStickyBuyBarTest extends TestCase
             app(InventoryService::class)->receive($variant->fresh(), $this->warehouse, 5, 50);
         }
 
-        $html = $this->get(route('storefront.product', $product->fresh()->slug))->assertOk()->getContent();
+        return $product->fresh();
+    }
+
+    public function test_product_with_options_scrolls_to_the_picker_with_an_honest_label(): void
+    {
+        $product = $this->optionsProduct();
+
+        $html = $this->get(route('storefront.product', $product->slug))->assertOk()->getContent();
 
         // لا يُمكن الإضافة قبل اختيار المقاس، فالنصّ يقول ذلك بدل وعدٍ لا يفي به.
         $this->assertStringContainsString('href="#sf-buy"', $html);

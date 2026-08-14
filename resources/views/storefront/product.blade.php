@@ -201,11 +201,12 @@
                     <p class="mt-4 text-sm leading-relaxed text-[color:var(--sf-text-soft)]">{{ $shortDesc }}</p>
                 @endif
 
-                {{-- على الجوّال يحمل الشريط اللاصق زرّ الشراء، فلا يُكرَّر هنا.
-                     «غير متوفّر» يبقى ظاهرًا في الحالتين لأنه إخبار لا زرّ. --}}
-                <div @class(['mt-6 scroll-mt-32', 'hidden lg:block' => $variant && $inStock]) id="sf-buy">
+                {{-- زرّ «أضف» وحده يُخفى على الجوّال (الشريط اللاصق يحمله)، بينما محدّد
+                     الكمية يبقى ظاهرًا تحت المنتج لأنه تحكّم بما في السلة لا تكرار. --}}
+                <div class="mt-6 scroll-mt-32" id="sf-buy">
                     @if ($variant && $inStock)
-                        <x-storefront.add-to-cart size="lg" :variant="$variant->uuid" :max="(int) floor($available)" />
+                        <x-storefront.add-to-cart size="lg" :variant="$variant->uuid"
+                            :max="(int) floor($available)" :hide-add-on-mobile="true" />
                     @else
                         <button type="button" disabled class="sf-btn sf-btn-lg sf-btn-block bg-[color:var(--sf-bg)] text-[color:var(--sf-text-soft)]">
                             {{ __('storefront.out_of_stock') }}
@@ -331,12 +332,16 @@
          المنتج ذو الخيارات: لا يمكن الإضافة قبل اختيار المقاس/اللون، فيبقى تمريرًا
          إلى المُنتقي — بنصّ يقول ذلك صراحةً بدل وعدٍ لا يفي به. --}}
     @if ($inStock || $hasOptions)
-        <div class="lg:hidden fixed inset-x-0 z-30 bg-white border-t border-[color:var(--sf-border)] px-4 py-2.5
+        <div data-buybar class="lg:hidden fixed inset-x-0 z-30 bg-white border-t border-[color:var(--sf-border)] px-4 py-2.5
                     flex items-center gap-3 shadow-[0_-2px_12px_rgba(34,34,34,.06)]"
              style="bottom: calc(var(--sf-bottomnav) + env(safe-area-inset-bottom, 0px))">
             <div class="min-w-0 flex-1">
-                <span class="block text-[11px] text-[color:var(--sf-text-soft)] line-clamp-1">{{ $displayName }}</span>
-                <x-storefront.price :price="$price" :regular="$onSale ? $regular : null" size="sm" />
+                <span class="block text-sm font-semibold text-[color:var(--sf-text)] line-clamp-1">{{ $displayName }}</span>
+                {{-- السعر يُعرَض للمنتج البسيط فقط: سعر المنتج ذي الخيارات يتبع المقاس/اللون
+                     المختار، فعرض سعر أساسي هنا يناقض ما تراه في أعلى الصفحة. --}}
+                @unless ($hasOptions)
+                    <x-storefront.price :price="$price" :regular="$onSale ? $regular : null" size="sm" />
+                @endunless
             </div>
 
             @if (! $hasOptions && $variant && $inStock)

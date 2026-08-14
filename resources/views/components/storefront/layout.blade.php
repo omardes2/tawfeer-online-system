@@ -62,6 +62,14 @@
     {{-- Structured data (JSON-LD) — pages push here --}}
     @stack('structured-data')
 
+    {{-- نصوص يحتاجها JS (مخزن السلة يُطلق التنبيه) — تبقى الترجمة في ملفّات اللغة --}}
+    <script>
+        window.SF_I18N = @js([
+            'added_to_cart' => __('storefront.added_to_cart'),
+            'add_failed' => __('storefront.add_failed'),
+        ]);
+    </script>
+
     {{-- الخطّ مُستضاف محليًا داخل حزمة CSS — لا طلب لطرف ثالث --}}
     @vite(['resources/css/storefront.css', 'resources/js/storefront.js'])
 
@@ -357,6 +365,8 @@
             </div>
         </div>
     </footer>
+
+    <x-storefront.toast />
 
     <x-storefront.bottom-nav />
 </body>

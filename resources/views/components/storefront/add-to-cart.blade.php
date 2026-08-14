@@ -7,6 +7,9 @@
     'maxExpr' => null,
     'size' => 'sm',
     'enabledExpr' => 'true',
+    // صفحة المنتج على الجوّال: زرّ «أضف» يحمله الشريط اللاصق، فلا يُكرَّر هنا —
+    // لكن محدّد الكمية يبقى ظاهرًا لأنه ليس تكرارًا بل تحكّم بما في السلة.
+    'hideAddOnMobile' => false,
 ])
 
 {{--
@@ -48,6 +51,7 @@
                 'sf-btn-primary sf-btn-block whitespace-nowrap',
                 'min-h-10 !px-2 !py-2 text-[12px] sm:text-[13px] gap-1.5' => ! $big,
                 'sf-btn-lg' => $big,
+                'hidden lg:inline-flex' => $hideAddOnMobile,
             ])>
         <x-storefront.icon name="cart" :class="$big ? 'w-5 h-5' : 'w-4 h-4 hidden min-[360px]:block'" />
         {{ __('storefront.add_to_cart') }}

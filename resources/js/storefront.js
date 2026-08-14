@@ -7,6 +7,13 @@ import Alpine from 'alpinejs';
 
 const API = '/api/v1/store';
 
+// ---- تنبيه عابر (toast): يُطلَق من مخزن السلة لا من زرّ بعينه، فيظهر لأي
+// إضافة في الموقع (الشريط العائم، بطاقة المنتج، صفحة التفاصيل) بلا تكرار كود ----
+function toast(message, kind = 'success') {
+    window.dispatchEvent(new CustomEvent('storefront:toast', { detail: { message, kind } }));
+}
+window.StorefrontToast = toast;
+
 // ---- نقطة امتداد التحليلات (بلا مزوّد): تُطلق أحداث نافذة يشترك بها مستقبلًا ----
 const Analytics = {
     track(event, payload = {}) {
@@ -83,9 +90,11 @@ const cartStore = {
             if (!res.ok) throw new Error('add');
             this.apply((await res.json()).data);
             Analytics.track('ProductAddedToCart', { variant: variantUuid, qty });
+            toast(window.SF_I18N?.added_to_cart);
             return true;
         } catch (e) {
             this.error = true;
+            toast(window.SF_I18N?.add_failed, 'error');
             return false;
         }
     },
