@@ -40,6 +40,8 @@ class Order extends Model
         'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'total', 'amount_paid',
         'notes', 'cancel_reason',
         'confirmed_at', 'reserved_at', 'shipped_at', 'delivered_at', 'cancelled_at', 'settled_at',
+        // اعتماد المدير — يُغلق الإلغاء في وجه مُدخِل الطلب (مستقلّ عن التأكيد الداخلي).
+        'approved_at', 'approved_by',
         'return_received_at', 'revenue_entry_id', 'cogs_entry_id', 'created_by',
     ];
 
@@ -52,6 +54,7 @@ class Order extends Model
         'total' => 'decimal:2',
         'amount_paid' => 'decimal:2',
         'confirmed_at' => 'datetime',
+        'approved_at' => 'datetime',
         'reserved_at' => 'datetime',
         'shipped_at' => 'datetime',
         'delivered_at' => 'datetime',

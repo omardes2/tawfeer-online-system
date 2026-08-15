@@ -101,9 +101,33 @@ class OrderPolicy
             return false;
         }
 
-        return $this->awaitingConfirmation($m)
-            || $this->awaitingPickup($m)
-            || $user->can('sales.orders.confirm');
+        // من يملك التأكيد يُلغي دائمًا — الإلغاء لا يُلغى من النظام، ينتقل إليه.
+        if ($user->can('sales.orders.confirm')) {
+            return true;
+        }
+
+        // اعتماد المدير يُغلق النافذة ولو كان الطرد ما زال بانتظار الاستلام:
+        // هو مراجعةٌ صريحة قال فيها «هذا الطلب ماضٍ»، فلا يُنقض من تحته.
+        if ($m->approved_at !== null) {
+            return false;
+        }
+
+        return $this->awaitingConfirmation($m) || $this->awaitingPickup($m);
+    }
+
+    /**
+     * اعتماد المدير («تأكيد»).
+     *
+     * متاح ما دام للطلب نافذةٌ مفتوحة يُغلقها: مسوّدةٌ لم تُؤكَّد بعد، أو طردٌ
+     * بانتظار الاستلام. بعد أن يستلمه المندوب لا شيء يُغلَق — الإلغاء صار
+     * محصورًا بالمدير أصلًا.
+     */
+    public function approve(User $user, Order $m): bool
+    {
+        return $user->can('sales.orders.confirm')
+            && $m->approved_at === null
+            && ! in_array($m->status, ['cancelled', 'delivered', 'returned'], true)
+            && ($this->awaitingConfirmation($m) || $this->awaitingPickup($m));
     }
 
     /** لم يُؤكَّد بعد: الحالتان الوحيدتان اللتان يقبلهما `OrderService::confirm`. */

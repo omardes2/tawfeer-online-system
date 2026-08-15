@@ -406,11 +406,14 @@ class OrderController extends Controller
     }
 
     /**
-     * تأكيد الطلبات المحدَّدة دفعةً واحدة.
+     * «تأكيد»: اعتماد المدير للطلبات المحدَّدة دفعةً واحدة.
      *
-     * لا منطق تأكيد أو إرسال جديد هنا: يمرّ كل طلب بنفس مسار الزرّ المفرد
-     * (`OrderService::confirm` ثم `OrderDeliveryDispatcher::dispatch`) — تكامل
-     * التوصيل لا يُمَسّ، والسلوك واحد سواء أكّدتَ طلبًا أو عشرين.
+     * الاعتماد قرارُ مراجعة يُغلق الإلغاء في وجه مُدخِل الطلب. وهو غير التأكيد
+     * الداخلي (`confirmed_at`) الذي يُرحّل الطلب ويرسله لشركة التوصيل: الطلب
+     * الذي طردُه «بانتظار الاستلام» مؤكَّدٌ سلفًا، وما ينقصه الاعتماد وحده.
+     * أمّا المسوّدة فتُؤكَّد وتُرسَل أولًا بنفس مسار الزرّ المفرد.
+     *
+     * تكامل التوصيل لا يُمَسّ، والاعتماد لا يُرسَل للمزوّد ولا يدخل أي حمولة.
      *
      * بلا معاملة جامعة عمدًا: التأكيد يُرسل لطرف خارجي، وتراجعُ معاملةٍ بعد
      * إرسال شحنة يترك النظام يخالف الواقع. كل طلب يقف بنفسه، والتقرير يذكر
@@ -429,30 +432,35 @@ class OrderController extends Controller
         $skipped = 0;
         $pendingDispatch = 0;
 
-        foreach (Order::whereIn('id', $ids)->get() as $order) {
-            if ($request->user()->cannot('confirm', $order)) {
+        foreach (Order::with('latestShipment')->whereIn('id', $ids)->get() as $order) {
+            if ($request->user()->cannot('approve', $order)) {
                 $skipped++;
 
                 continue;
             }
 
-            try {
-                $this->service->confirm($order);
-            } catch (ValidationException $e) {
-                // طلب غير قابل للتأكيد (مؤكَّد سلفًا أو ملغى): يُتخطّى ولا يوقف الدفعة.
-                $skipped++;
+            // مسوّدة لم تُرسَل بعد: تُؤكَّد وتُرسَل أولًا بنفس مسار الزرّ المفرد.
+            // وطلبٌ طردُه بانتظار الاستلام مؤكَّدٌ سلفًا، فلا يُعاد تأكيده.
+            if ($order->confirmed_at === null && in_array($order->status, ['draft', 'new'], true)) {
+                try {
+                    $this->service->confirm($order);
+                } catch (ValidationException $e) {
+                    $skipped++;
 
-                continue;
-            }
+                    continue;
+                }
 
-            $confirmed++;
-
-            if ($this->needsDelivery($order)) {
-                $result = $dispatcher->dispatch($order);
-                if (($result['status'] ?? null) !== 'created') {
-                    $pendingDispatch++;
+                if ($this->needsDelivery($order)) {
+                    $result = $dispatcher->dispatch($order);
+                    if (($result['status'] ?? null) !== 'created') {
+                        $pendingDispatch++;
+                    }
                 }
             }
+
+            // الاعتماد نفسه: يُغلق الإلغاء في وجه مُدخِل الطلب.
+            $order->update(['approved_at' => now(), 'approved_by' => $request->user()->id]);
+            $confirmed++;
         }
 
         if ($confirmed === 0) {

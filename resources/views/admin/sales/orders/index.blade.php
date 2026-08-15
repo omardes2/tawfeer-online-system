@@ -161,13 +161,14 @@
                     @if ($canBulk)
                         @php
                             // الصفّ قابل للتحديد إن صلح لأحد إجراءَي الجملة عند هذا
-                            // المستخدم: حذفٌ (ملغى وشحنته ملغاة) أو تأكيدٌ (لم يُؤكَّد بعد).
+                            // المستخدم: حذفٌ (ملغى وشحنته ملغاة) أو اعتمادٌ («تأكيد»).
                             $deletable = $canBulkDelete && \App\Http\Controllers\Admin\Sales\OrderController::isDeletable($o);
-                            $confirmable = $canBulkConfirm && $o->confirmed_at === null && in_array($o->status, ['draft', 'new'], true);
-                            $selectable = $deletable || $confirmable;
+                            $approvable = $canBulkConfirm && auth()->user()->can('approve', $o);
+                            $selectable = $deletable || $approvable;
                             $why = match (true) {
                                 $selectable => '',
-                                $canBulkConfirm && ! $canBulkDelete => __('هذا الطلب مؤكَّد سلفًا'),
+                                $o->approved_at !== null => __('هذا الطلب معتمَد سلفًا'),
+                                $canBulkConfirm && ! $canBulkDelete => __('التأكيد متاح للطلبات التي طردُها بانتظار الاستلام'),
                                 $canBulkDelete && ! $canBulkConfirm => __('لا يمكن حذف هذا الطلب (يجب أن يكون ملغى وشحنته ملغاة)'),
                                 default => __('لا إجراء جماعي متاح لهذا الطلب'),
                             };
@@ -241,6 +242,14 @@
                                     <span class="inline-flex items-center gap-1 text-[11px] text-emerald-600">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
                                         {{ __('استُلم في المستودع') }}
+                                    </span>
+                                @endif
+                                {{-- اعتماد المدير: يشرح للبائع لماذا اختفى زرّ الإلغاء --}}
+                                @if ($o->approved_at)
+                                    <span class="inline-flex items-center gap-1 text-[11px] text-emerald-600"
+                                          title="{{ __('اعتمده المدير — لا يمكن لموظف المبيعات إلغاؤه') }}">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                        {{ __('معتمَد') }}
                                     </span>
                                 @endif
                             </div>
