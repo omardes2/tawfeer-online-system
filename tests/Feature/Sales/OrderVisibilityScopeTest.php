@@ -96,6 +96,24 @@ class OrderVisibilityScopeTest extends TestCase
             ->assertDontSee('زبونة موظفة المبيعات', false);
     }
 
+    public function test_a_custom_role_holding_view_own_is_restricted(): void
+    {
+        // دورٌ مخصَّص أُنشئ من صفحة الأدوار باسم غير معروف للكود: «عرض الخاص»
+        // وحده يكفي لتقييده، فلا يعتمد الأمان على قائمة أسماء أدوار.
+        $role = Role::findOrCreate('marketer_v2', 'web');
+        $role->givePermissionTo('sales.orders.view_own', 'sales.orders.view');
+
+        $custom = User::factory()->create(['branch_id' => Branch::default()->id]);
+        $custom->assignRole($role);
+        Order::factory()->create(['created_by' => $custom->id, 'customer_name' => 'زبون الدور المخصَّص']);
+
+        $this->actingAs($custom->fresh())
+            ->get(route('admin.sales.orders.index'))
+            ->assertOk()
+            ->assertSee('زبون الدور المخصَّص', false)
+            ->assertDontSee('زبونة موظفة المبيعات', false);
+    }
+
     public function test_a_marketer_cannot_open_another_persons_order_by_url(): void
     {
         // القائمة وحدها ليست حارسًا: الرابط المباشر مسارٌ ثانٍ.

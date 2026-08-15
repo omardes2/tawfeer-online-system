@@ -85,6 +85,13 @@ class User extends Authenticatable
             return false;
         }
 
+        // «عرض الخاص» علامةُ قيدٍ لا قدرةً إضافية: من يحمله مقيَّدٌ ولو حمل معه
+        // «العرض الكامل». وهذا يلتقط أيّ دورٍ مخصَّص أُنشئ من صفحة الأدوار بغير
+        // الأسماء المعروفة أدناه.
+        if ($this->can('sales.orders.view_own')) {
+            return true;
+        }
+
         if ($this->hasAnyRole(self::OWN_ORDERS_ONLY_ROLES)) {
             return true;
         }
