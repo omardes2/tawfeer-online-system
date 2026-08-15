@@ -93,10 +93,25 @@ class CustomerController extends Controller
             ->latest('voucher_date')->latest('id')->paginate(15, ['*'], 'receipts_page');
 
         $statement = $this->buildStatement($customer);
-        // الرصيد/الإجماليات من كشف الحساب نفسه ليتطابق آخر رصيد مع البطاقة.
-        $sales = round($statement->sum('debit'), 2);
-        $received = round($statement->sum('credit'), 2);
-        $balance = round($sales - $received, 2);
+
+        /*
+            الإجماليات صافيةً بعد عكس القيود.
+
+            كانت كل حركة دائنة تُحسب «مقبوضات»، وقيدُ عكسِ فاتورةٍ محذوفة دائنٌ
+            على ذمّة العميل — فتظهر ٧٠ مقبوضات لعميلٍ لم يدفع شيئًا، وفاتورتُه
+            أصلًا محذوفة. والمبيعات كانت تُحسب بالمثل فتبقى قائمةً بعد حذفها.
+
+            القيد العاكس يحمل `reverses_entry_id`، فيُطرح من الجانب الذي عكسه:
+            عكسُ مبيعةٍ يُنقص المبيعات، وعكسُ سندِ قبضٍ يُنقص المقبوضات.
+        */
+        $normal = $statement->where('is_reversal', false);
+        $reversals = $statement->where('is_reversal', true);
+
+        $sales = round($normal->sum('debit') - $reversals->sum('credit'), 2);
+        $received = round($normal->sum('credit') - $reversals->sum('debit'), 2);
+
+        // الرصيد من الحركات كلّها كما هي — آخر رصيد في الكشف يطابق البطاقة.
+        $balance = round($statement->sum('debit') - $statement->sum('credit'), 2);
 
         return view('admin.crm.customers.show', compact(
             'customer', 'orders', 'receipts', 'statement', 'sales', 'received', 'balance',
@@ -120,7 +135,7 @@ class CustomerController extends Controller
 
         return $account->lines()
             ->whereHas('entry', fn ($q) => $q->where('status', 'posted'))
-            ->with('entry:id,number,entry_date,description')
+            ->with('entry:id,number,entry_date,description,reverses_entry_id')
             ->get()
             ->sortBy(fn ($l) => [optional($l->entry)->entry_date?->format('Y-m-d'), $l->id])
             ->values()
@@ -135,6 +150,8 @@ class CustomerController extends Controller
                     'desc' => $line->entry?->description,
                     'debit' => $debit,
                     'credit' => $credit,
+                    // قيدٌ عاكس لقيدٍ آخر — يُطرح من إجماليه لا يُضاف إلى مقابله.
+                    'is_reversal' => $line->entry?->reverses_entry_id !== null,
                     'balance' => round($running, 2),
                 ];
             });
