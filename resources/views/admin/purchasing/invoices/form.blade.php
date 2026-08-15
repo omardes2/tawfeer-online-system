@@ -180,7 +180,7 @@
                                                 <option value="">{{ __('— صنف حرّ (وصف) —') }}</option>
                                                 @foreach ($variants as $v)
                                                     {{-- المقاس/اللون في الاسم: بلا ذلك تتشابه مقاسات المنتج الواحد --}}
-                                                    <option value="{{ $v->id }}">{{ $v->product?->name }}@if ($v->attributeValues->isNotEmpty()) — {{ $v->optionLabel() }}@endif</option>
+                                                    <option value="{{ $v->id }}">{{ $v->product?->name }}@if ($v->attributeValues->isNotEmpty()) — {{ $v->optionLabel() }}@elseif ($legacyVariantIds->has($v->id)) — {{ __('صنف مجرَّد ⚠ اختر مقاسًا') }}@endif</option>
                                                 @endforeach
                                             </select>
                                             <input type="text" :name="`items[${i}][description]`" x-model="row.description" placeholder="{{ __('وصف (اختياري)') }}" class="mt-1 w-full rounded-md border-gray-200 py-1.5 text-xs focus:border-emerald-500 focus:ring-emerald-500" />

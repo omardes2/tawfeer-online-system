@@ -94,10 +94,18 @@ class PurchaseInvoiceController extends Controller
             $rows = [self::EMPTY_ROW];
         }
 
-        $variants = $this->purchasableVariants();
+        $variants = $this->purchasableVariants($invoice);
+
+        // أصنافٌ مجرَّدة لمنتجات ذات مقاسات، ما زالت الفاتورة تشير إليها. تُميَّز
+        // في القائمة لأنها اختيارٌ خاطئ قديم لا خيارٌ صالح.
+        $productsWithOptions = ProductVariant::whereHas('attributeValues')->pluck('product_id')->unique()->flip();
+        $legacyIds = $variants
+            ->filter(fn (ProductVariant $v) => $v->attributeValues->isEmpty() && $productsWithOptions->has($v->product_id))
+            ->pluck('id')->flip();
 
         return [
             'invoice' => $invoice,
+            'legacyVariantIds' => $legacyIds,
             'editing' => (bool) $invoice,
             'initialRows' => $rows,
             'suppliers' => Supplier::where('is_active', true)->orderBy('name')->get(),
@@ -130,9 +138,13 @@ class PurchaseInvoiceController extends Controller
      * ويُعرض المقاس/اللون في الاسم بدل الاكتفاء بالـSKU: «مشد — L» تُقرأ، و
      * «مشد — P-J01TDU0G» لا تُقرأ.
      *
+     * ويبقى المجرَّد ظاهرًا إن كانت **الفاتورة المفتوحة** تشير إليه أصلًا: إخفاؤه
+     * يُفقد السطرَ اختيارَه فيبدو «صنفًا حرًّا»، ويُمحى ارتباطه بالصنف عند الحفظ.
+     * يُعرض ليُرى ويُصحَّح، والتحقّق يمنع حفظه كما هو.
+     *
      * @return Collection<int, ProductVariant>
      */
-    private function purchasableVariants()
+    private function purchasableVariants(?PurchaseInvoice $invoice = null)
     {
         $variants = ProductVariant::with(['product:id,name,cbm', 'attributeValues'])
             ->orderBy('product_id')->orderBy('id')->get();
@@ -141,8 +153,12 @@ class PurchaseInvoiceController extends Controller
             ->filter(fn (ProductVariant $v) => $v->attributeValues->isNotEmpty())
             ->pluck('product_id')->unique()->flip();
 
+        $referenced = $invoice ? $invoice->items->pluck('variant_id')->filter()->flip() : collect();
+
         return $variants
-            ->reject(fn (ProductVariant $v) => $v->attributeValues->isEmpty() && $productsWithOptions->has($v->product_id))
+            ->reject(fn (ProductVariant $v) => $v->attributeValues->isEmpty()
+                && $productsWithOptions->has($v->product_id)
+                && ! $referenced->has($v->id))
             ->values();
     }
 

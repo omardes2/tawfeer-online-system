@@ -12,6 +12,7 @@ use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Inventory\Models\InventoryStock;
 use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Purchasing\Models\Supplier;
+use App\Modules\Purchasing\Services\PurchaseInvoiceService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -153,6 +154,29 @@ class VariableProductStockTest extends TestCase
         $response->assertSee('value="'.$this->sizes['L']->id.'"', false);
         // والحامل الفارغ لا يظهر أصلًا.
         $response->assertDontSee('value="'.$this->placeholder->id.'"', false);
+    }
+
+    public function test_editing_an_old_invoice_keeps_its_placeholder_visible(): void
+    {
+        // إخفاؤه من قائمة فاتورةٍ تشير إليه يُفقد السطرَ اختيارَه فيبدو «صنفًا
+        // حرًّا»، ويُمحى ارتباطه بالصنف عند الحفظ. يُعرض ليُرى ويُصحَّح.
+        $supplier = Supplier::factory()->create();
+        $invoice = app(PurchaseInvoiceService::class)->create(
+            ['supplier_id' => $supplier->id, 'invoice_date' => now()->toDateString()],
+            [['variant_id' => $this->placeholder->id, 'qty' => 100, 'unit_cost' => 35]],
+        );
+
+        $this->get(route('admin.purchasing.invoices.edit', $invoice))
+            ->assertOk()
+            ->assertSee('value="'.$this->placeholder->id.'"', false)
+            ->assertSee(__('صنف مجرَّد ⚠ اختر مقاسًا'), false);
+    }
+
+    public function test_a_new_invoice_still_hides_the_placeholder(): void
+    {
+        $this->get(route('admin.purchasing.invoices.create'))
+            ->assertOk()
+            ->assertDontSee('value="'.$this->placeholder->id.'"', false);
     }
 
     public function test_a_simple_product_stays_selectable(): void
