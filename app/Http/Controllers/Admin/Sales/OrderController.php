@@ -96,7 +96,9 @@ class OrderController extends Controller
         }
 
         return view('admin.sales.orders.index', [
-            'orders' => $query->paginate(20)->withQueryString(),
+            // خمسون في الصفحة: المتابعة اليومية تقع على آخر الطلبات، وعشرون
+            // كانت تدفع المشغّل إلى التنقّل بين الصفحات في عملٍ روتيني.
+            'orders' => $query->paginate(50)->withQueryString(),
             // الحالة الداخلية لم تعد تُعرض في القائمة (المتابعة على حالة شركة التوصيل)،
             // لكن الفلترة بها تبقى مدعومة عبر ?status= للروابط المحفوظة والتقارير.
             'activeStatus' => $status,
