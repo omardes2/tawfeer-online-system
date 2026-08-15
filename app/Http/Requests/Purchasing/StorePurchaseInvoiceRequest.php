@@ -4,6 +4,7 @@ namespace App\Http\Requests\Purchasing;
 
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StorePurchaseInvoiceRequest extends FormRequest
 {
@@ -18,6 +19,8 @@ class StorePurchaseInvoiceRequest extends FormRequest
             'supplier_id' => ['required', 'integer', 'exists:suppliers,id'],
             'purchase_order_id' => ['nullable', 'integer', 'exists:purchase_orders,id'],
             'goods_receipt_id' => ['nullable', 'integer', 'exists:goods_receipts,id'],
+            'import_shipment_id' => ['nullable', 'integer', 'exists:import_shipments,id'],
+            'kind' => ['nullable', Rule::in(['goods', 'expenses'])],
             'supplier_reference' => ['nullable', 'string', 'max:80'],
             'invoice_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
@@ -59,6 +62,12 @@ class StorePurchaseInvoiceRequest extends FormRequest
             // بصمت. إمّا عملة أجنبية بسعري صرف، وإمّا فاتورة محلية بلا صرف.
             if ($currency === $base && (float) $this->input('fx_rate_to_usd', 0) > 0) {
                 $v->errors()->add('fx_rate_to_usd', __('أسعار الصرف تُملأ للفاتورة بعملة أجنبية فقط — غيّر عملة الفاتورة أو اترك الحقول فارغة.'));
+            }
+
+            // فاتورة المصاريف تُقيَّد على الحساب الوسيط، وبلا شحنة لا يُعرف أيّ
+            // تقديرٍ تُطفئ — فيصير الحساب رقمًا مجمَّعًا لا يُغلق أبدًا.
+            if ($this->input('kind') === 'expenses' && empty($this->input('import_shipment_id'))) {
+                $v->errors()->add('import_shipment_id', __('اختر الشحنة التي تخصّها فاتورة المصاريف.'));
             }
         });
     }

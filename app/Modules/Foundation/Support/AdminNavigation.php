@@ -51,6 +51,7 @@ final class AdminNavigation
                 ['admin.inventory.low_stock', 'تنبيهات النقص', 'inventory.alerts.view', 'admin.inventory.low_stock'],
                 ['admin.purchasing.suppliers.index', 'الموردون', 'purchasing.suppliers.view', 'admin.purchasing.suppliers.*'],
                 ['admin.purchasing.invoices.index', 'فواتير الموردين', 'purchasing.invoices.view', 'admin.purchasing.invoices.*'],
+                ['admin.purchasing.shipments.index', 'شحنات الاستيراد', 'purchasing.shipments.view', 'admin.purchasing.shipments.*'],
                 ['admin.purchasing.returns.index', 'مرتجعات الموردين', 'purchasing.returns.view', 'admin.purchasing.returns.*'],
             ]],
             ['العملاء', 'users', [

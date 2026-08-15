@@ -29,6 +29,7 @@ use App\Http\Controllers\Admin\Marketing\CampaignController as AdminCampaignCont
 use App\Http\Controllers\Admin\Marketing\CampaignTemplateController as AdminCampaignTemplateController;
 use App\Http\Controllers\Admin\Payment\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\Purchasing\GoodsReceiptController as AdminGoodsReceiptController;
+use App\Http\Controllers\Admin\Purchasing\ImportShipmentController;
 use App\Http\Controllers\Admin\Purchasing\PurchaseInvoiceController;
 use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController as AdminPurchaseOrderController;
 use App\Http\Controllers\Admin\Purchasing\SupplierController as AdminSupplierController;
@@ -251,6 +252,13 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::resource('returns', AdminSupplierReturnController::class)->only(['index', 'create', 'store', 'show']);
         Route::post('returns/{return}/approve', [AdminSupplierReturnController::class, 'approve'])->name('returns.approve');
         Route::post('returns/{return}/post', [AdminSupplierReturnController::class, 'post'])->name('returns.post');
+
+        // شحنات الاستيراد (الكونتينرات) — وعاء تكلفة الشحنة وإغلاق فرق التقدير
+        Route::resource('shipments', ImportShipmentController::class)
+            ->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy'])
+            ->parameters(['shipments' => 'shipment']);
+        Route::post('shipments/{shipment}/close', [ImportShipmentController::class, 'close'])->name('shipments.close');
+        Route::post('shipments/{shipment}/reopen', [ImportShipmentController::class, 'reopen'])->name('shipments.reopen');
 
         // فواتير الموردين/الشراء (REQUIREMENTS §2.5)
         Route::resource('invoices', PurchaseInvoiceController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);

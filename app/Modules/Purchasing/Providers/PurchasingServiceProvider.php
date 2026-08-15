@@ -3,10 +3,12 @@
 namespace App\Modules\Purchasing\Providers;
 
 use App\Modules\Purchasing\Models\GoodsReceipt;
+use App\Modules\Purchasing\Models\ImportShipment;
 use App\Modules\Purchasing\Models\PurchaseOrder;
 use App\Modules\Purchasing\Models\Supplier;
 use App\Modules\Purchasing\Models\SupplierReturn;
 use App\Modules\Purchasing\Policies\GoodsReceiptPolicy;
+use App\Modules\Purchasing\Policies\ImportShipmentPolicy;
 use App\Modules\Purchasing\Policies\PurchaseOrderPolicy;
 use App\Modules\Purchasing\Policies\SupplierPolicy;
 use App\Modules\Purchasing\Policies\SupplierReturnPolicy;
@@ -21,5 +23,6 @@ class PurchasingServiceProvider extends ServiceProvider
         Gate::policy(PurchaseOrder::class, PurchaseOrderPolicy::class);
         Gate::policy(GoodsReceipt::class, GoodsReceiptPolicy::class);
         Gate::policy(SupplierReturn::class, SupplierReturnPolicy::class);
+        Gate::policy(ImportShipment::class, ImportShipmentPolicy::class);
     }
 }

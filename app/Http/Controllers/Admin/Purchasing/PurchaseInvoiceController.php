@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Purchasing\StorePurchaseInvoiceRequest;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Purchasing\Models\ImportShipment;
 use App\Modules\Purchasing\Models\PurchaseInvoice;
 use App\Modules\Purchasing\Models\Supplier;
 use App\Modules\Purchasing\Services\PurchaseInvoiceService;
@@ -107,6 +108,12 @@ class PurchaseInvoiceController extends Controller
             ])->all(),
             'baseCurrency' => strtoupper((string) config('app.currency', 'ILS')),
             'currencies' => self::CURRENCIES,
+            // الشحنات المفتوحة فقط + شحنة الفاتورة الحالية ولو أُغلقت (حتى لا
+            // يفقد التعديلُ ارتباطًا قائمًا).
+            'shipments' => ImportShipment::query()
+                ->where('status', 'open')
+                ->when($invoice?->import_shipment_id, fn ($q, $id) => $q->orWhere('id', $id))
+                ->orderByDesc('id')->get(),
         ];
     }
 
@@ -175,7 +182,7 @@ class PurchaseInvoiceController extends Controller
         $this->authorize('purchasing.invoices.view');
 
         return view('admin.purchasing.invoices.show', [
-            'invoice' => $invoice->load(['items.variant.product', 'supplier', 'journalEntry']),
+            'invoice' => $invoice->load(['items.variant.product', 'supplier', 'journalEntry', 'importShipment']),
             'treasuries' => Treasury::where('is_active', true)->orderBy('name')->get(),
             'currencies' => self::CURRENCIES,
         ]);

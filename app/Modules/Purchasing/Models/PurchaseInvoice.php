@@ -25,8 +25,14 @@ class PurchaseInvoice extends Model
         'posted' => ['reversed'],
     ];
 
+    /** فاتورة بضاعة (تُدخل مخزونًا) أو فاتورة مصاريف شحنة (تُطفئ الحساب الوسيط). */
+    public const KIND_GOODS = 'goods';
+
+    public const KIND_EXPENSES = 'expenses';
+
     protected $fillable = [
         'uuid', 'number', 'supplier_id', 'purchase_order_id', 'goods_receipt_id',
+        'import_shipment_id', 'kind',
         'supplier_reference', 'invoice_date', 'due_date', 'status', 'payment_status',
         'subtotal', 'tax_amount', 'total', 'amount_paid', 'currency', 'notes',
         'fx_rate_to_usd', 'usd_rate', 'commission_rate', 'cbm_rate_usd',
@@ -66,6 +72,20 @@ class PurchaseInvoice extends Model
     public function goodsReceipt(): BelongsTo
     {
         return $this->belongsTo(GoodsReceipt::class);
+    }
+
+    public function importShipment(): BelongsTo
+    {
+        return $this->belongsTo(ImportShipment::class, 'import_shipment_id');
+    }
+
+    /**
+     * فاتورة مصاريف شحنة: تُقيَّد على الحساب الوسيط لا على المخزون، ولا تُدخل
+     * بضاعة. هي التي تُطفئ ما حمّلته فاتورةُ البضاعة من تقدير.
+     */
+    public function isExpenseInvoice(): bool
+    {
+        return $this->kind === self::KIND_EXPENSES;
     }
 
     public function items(): HasMany

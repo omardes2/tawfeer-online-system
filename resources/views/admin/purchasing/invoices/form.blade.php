@@ -12,6 +12,8 @@
             'usd_rate' => (float) old('usd_rate', $editing ? (float) $invoice->usd_rate : 0),
             'commission_rate' => (float) old('commission_rate', $editing ? (float) $invoice->commission_rate : 0),
             'cbm_rate_usd' => (float) old('cbm_rate_usd', $editing ? (float) $invoice->cbm_rate_usd : 0),
+            'kind' => old('kind', $editing ? $invoice->kind : 'goods'),
+            'import_shipment_id' => (string) old('import_shipment_id', $editing ? $invoice->import_shipment_id : ''),
         ];
     @endphp
 
@@ -41,8 +43,37 @@
         </x-admin.form-section>
 
         {{--
-            الاستيراد: عملة المورد وسعرا الصرف ونسبتا العمولة والشحن. تُترك فارغة
-            في الفاتورة المحلية فتبقى الحسابات كما كانت تمامًا (الحاسبة معطّلة).
+            الشحنة ونوع الفاتورة: فاتورة البضاعة تُحمّل الحساب الوسيط بتقديرها،
+            وفاتورة المصاريف — التي تصل بعدها بأشهر — تُطفئه بالفعلي. ربطُهما
+            بالشحنة نفسها هو ما يجعل الرصيد قابلًا للإغلاق لاحقًا.
+        --}}
+        <x-admin.form-section :title="__('الشحنة ونوع الفاتورة')" :cols="2">
+            <x-admin.field :label="__('نوع الفاتورة')" name="kind">
+                <select name="kind" x-model="head.kind" class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
+                    <option value="goods">{{ __('بضاعة — تدخل المخزون') }}</option>
+                    <option value="expenses">{{ __('مصاريف شحنة — شحن بحري/جمارك/عمولة مكتب') }}</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500" x-show="isExpense()" x-cloak>
+                    {{ __('تُقيَّد على «مصاريف استيراد مستحقة» ولا تُدخل بضاعة. البنود وصفٌ ومبلغ.') }}
+                </p>
+            </x-admin.field>
+
+            <x-admin.field :label="__('الشحنة / الكونتينر')" name="import_shipment_id">
+                <select name="import_shipment_id" x-model="head.import_shipment_id" class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
+                    <option value="">{{ __('— بلا شحنة —') }}</option>
+                    @foreach ($shipments as $sh)
+                        <option value="{{ $sh->id }}">{{ $sh->number }}{{ $sh->reference ? ' — '.$sh->reference : '' }}</option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-rose-600" x-show="isExpense() && !head.import_shipment_id" x-cloak>
+                    {{ __('فاتورة المصاريف تحتاج شحنة — بغيرها لا يُعرف أيّ تقدير تُطفئ.') }}
+                </p>
+            </x-admin.field>
+        </x-admin.form-section>
+
+        {{--
+            العملة وسعرا الصرف. تُترك فارغة في الفاتورة المحلية فتبقى الحسابات
+            كما كانت تمامًا (الحاسبة معطّلة).
         --}}
         <x-admin.form-section :title="__('العملة والاستيراد')" :cols="2">
             <x-admin.field :label="__('عملة فاتورة المورد')" name="currency">
@@ -69,15 +100,20 @@
                            class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
                     <p class="mt-1 text-xs text-gray-500">{{ __('كم :c يساوي 1 $ — مثال: 3.65', ['c' => $currencies[$baseCurrency] ?? $baseCurrency]) }}</p>
                 </x-admin.field>
-                <x-admin.field :label="__('عمولة المشتريات %')" name="commission_rate">
-                    <input type="number" step="0.001" min="0" max="100" name="commission_rate" x-model.number="head.commission_rate"
-                           class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
-                </x-admin.field>
-                <x-admin.field :label="__('تكلفة المتر المكعّب (CBM) بالدولار')" name="cbm_rate_usd">
-                    <input type="number" step="0.0001" min="0" name="cbm_rate_usd" x-model.number="head.cbm_rate_usd"
-                           class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
-                    <p class="mt-1 text-xs text-gray-500">{{ __('يُوزَّع الشحن البحري على الأصناف بحسب حجم كل صنف.') }}</p>
-                </x-admin.field>
+                {{-- العمولة والشحن يُحمَّلان على البضاعة لا على فاتورة الشحن نفسها --}}
+                <template x-if="!isExpense()">
+                    <x-admin.field :label="__('عمولة المشتريات %')" name="commission_rate">
+                        <input type="number" step="0.001" min="0" max="100" name="commission_rate" x-model.number="head.commission_rate"
+                               class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                    </x-admin.field>
+                </template>
+                <template x-if="!isExpense()">
+                    <x-admin.field :label="__('تكلفة المتر المكعّب (CBM) بالدولار')" name="cbm_rate_usd">
+                        <input type="number" step="0.0001" min="0" name="cbm_rate_usd" x-model.number="head.cbm_rate_usd"
+                               class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                        <p class="mt-1 text-xs text-gray-500">{{ __('يُوزَّع الشحن البحري على الأصناف بحسب حجم كل صنف.') }}</p>
+                    </x-admin.field>
+                </template>
             </div>
         </x-admin.form-section>
 
@@ -91,12 +127,12 @@
                             <th class="w-28" x-show="isImport()" x-cloak>
                                 {{ __('السعر') }} <span x-text="symbol(head.currency)"></span>
                             </th>
-                            <th class="w-24" x-show="isImport()" x-cloak>{{ __('CBM/وحدة') }}</th>
+                            <th class="w-24" x-show="isImport() && !isExpense()" x-cloak>{{ __('CBM/وحدة') }}</th>
                             <th class="w-28">
                                 <span x-show="!isImport()">{{ __('تكلفة الوحدة') }}</span>
                                 <span x-show="isImport()" x-cloak>{{ __('السعر الحقيقي') }}</span>
                             </th>
-                            <th class="w-32" x-show="isImport()" x-cloak>{{ __('التكلفة الشاملة') }}</th>
+                            <th class="w-32" x-show="isImport() && !isExpense()" x-cloak>{{ __('التكلفة الشاملة') }}</th>
                             <th class="w-20">{{ __('ضريبة %') }}</th>
                             <th class="w-28 text-start">{{ __('الإجمالي') }}</th>
                             <th class="w-10"></th>
@@ -140,7 +176,7 @@
                                     <input type="number" step="0.0001" min="0" :name="`items[${i}][unit_price_foreign]`" x-model.number="row.unit_price_foreign"
                                            class="w-full rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
                                 </td>
-                                <td x-show="isImport()" x-cloak>
+                                <td x-show="isImport() && !isExpense()" x-cloak>
                                     <input type="number" step="0.0001" min="0" :name="`items[${i}][cbm_per_unit]`" x-model.number="row.cbm_per_unit"
                                            class="w-full rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
                                 </td>
@@ -158,7 +194,7 @@
                                 </td>
 
                                 {{-- التكلفة الشاملة: تحسبها الآلة، وتعديلها يدويًا يُثبّتها --}}
-                                <td x-show="isImport()" x-cloak>
+                                <td x-show="isImport() && !isExpense()" x-cloak>
                                     <input type="number" step="0.0001" min="0" :name="`items[${i}][landed_unit_cost]`"
                                            :value="row.landed_is_manual ? row.landed_unit_cost : landedUnitCost(row).toFixed(4)"
                                            @input="row.landed_is_manual = true; row.landed_unit_cost = $event.target.value"
@@ -187,7 +223,7 @@
             </div>
 
             {{-- لوحة الاستيراد: الذمّة بالعملات الثلاث، وقيمة المخزون، والفرق بينهما --}}
-            <div x-show="isImport()" x-cloak class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+            <div x-show="isImport() && !isExpense()" x-cloak class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
                 <h4 class="text-sm font-semibold text-emerald-900 mb-3">{{ __('ملخّص الاستيراد') }}</h4>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                     <div>
@@ -265,6 +301,9 @@
                     addRow() { this.rows.push({ ...EMPTY_ROW }); },
                     symbol(code) { return this.currencies[code] || code; },
 
+                    /** فاتورة مصاريف شحنة: تحويلُ عملة فقط، بلا عمولة ولا شحن. */
+                    isExpense() { return this.head.kind === 'expenses'; },
+
                     /** الحاسبة عاملة بعملة أجنبية وسعري صرف موجبين — وإلا فاتورة محلية. */
                     isImport() {
                         return this.head.currency !== this.base
@@ -285,6 +324,7 @@
                     unitCostBase(r) { return this.unitPriceUsd(r) * (Number(this.head.usd_rate) || 0); },
                     landedUnitCost(r) {
                         const usd = this.unitPriceUsd(r);
+                        if (this.isExpense()) return usd * (Number(this.head.usd_rate) || 0);
                         const commission = usd * (Number(this.head.commission_rate) || 0) / 100;
                         const freight = Math.max(Number(r.cbm_per_unit) || 0, 0) * (Number(this.head.cbm_rate_usd) || 0);
                         return (usd + commission + freight) * (Number(this.head.usd_rate) || 0);

@@ -50,6 +50,15 @@
                     <div><p class="text-gray-500">{{ __('مرجع المورد') }}</p><p class="font-medium text-gray-800">{{ $invoice->supplier_reference ?? '—' }}</p></div>
                     <div><p class="text-gray-500">{{ __('الحالة') }}</p><x-admin.badge :tone="$statusTone[$invoice->status] ?? 'gray'" :label="__($statusLabel[$invoice->status] ?? $invoice->status)" /></div>
                     <div><p class="text-gray-500">{{ __('الدفع') }}</p><x-admin.badge :tone="$payTone[$invoice->payment_status] ?? 'gray'" :label="__($payLabel[$invoice->payment_status] ?? $invoice->payment_status)" /></div>
+                    @if ($invoice->importShipment)
+                        <div>
+                            <p class="text-gray-500">{{ __('الشحنة') }}</p>
+                            <a href="{{ route('admin.purchasing.shipments.show', $invoice->importShipment) }}" class="font-mono text-emerald-600 hover:underline">{{ $invoice->importShipment->number }}</a>
+                        </div>
+                    @endif
+                    @if ($invoice->isExpenseInvoice())
+                        <div><p class="text-gray-500">{{ __('نوع الفاتورة') }}</p><x-admin.badge tone="blue" :label="__('مصاريف شحنة')" /></div>
+                    @endif
                     @if ($invoice->journalEntry)
                         <div><p class="text-gray-500">{{ __('القيد') }}</p><a href="{{ route('admin.accounting.journal.show', $invoice->journalEntry) }}" class="font-mono text-emerald-600 hover:underline">{{ $invoice->journalEntry->number }}</a></div>
                     @endif

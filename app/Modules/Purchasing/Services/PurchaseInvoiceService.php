@@ -64,7 +64,8 @@ class PurchaseInvoiceService
     {
         return DB::transaction(function () use ($data, $items) {
             $date = Carbon::parse($data['invoice_date'] ?? now()->toDateString());
-            $totals = $this->prepareItems($items, ImportCostCalculator::fromArray($data));
+            $kind = $this->resolveKind($data);
+            $totals = $this->prepareItems($items, $this->calculatorFor($data, $kind), $kind);
             $subtotal = $totals['subtotal'];
             $tax = $totals['tax'];
 
@@ -73,6 +74,8 @@ class PurchaseInvoiceService
                 'supplier_id' => $data['supplier_id'],
                 'purchase_order_id' => $data['purchase_order_id'] ?? null,
                 'goods_receipt_id' => $data['goods_receipt_id'] ?? null,
+                'import_shipment_id' => $data['import_shipment_id'] ?? null,
+                'kind' => $kind,
                 'supplier_reference' => $data['supplier_reference'] ?? null,
                 'invoice_date' => $date->toDateString(),
                 'due_date' => $data['due_date'] ?? null,
@@ -83,7 +86,7 @@ class PurchaseInvoiceService
                 'total' => round($subtotal + $tax, 2),
                 'currency' => $data['currency'] ?? config('app.currency', 'ILS'),
                 'notes' => $data['notes'] ?? null,
-                ...$this->importAttributes($data, $totals),
+                ...$this->importAttributes($data, $totals, $kind),
             ]);
 
             $invoice->items()->createMany($totals['items']);
@@ -131,13 +134,16 @@ class PurchaseInvoiceService
         return DB::transaction(function () use ($invoice, $data, $items) {
             $this->reverseStock($invoice);            // 1) سحب البضاعة المُدخَلة سابقًا.
 
-            $totals = $this->prepareItems($items, ImportCostCalculator::fromArray($data));
+            $kind = $this->resolveKind($data, $invoice);
+            $totals = $this->prepareItems($items, $this->calculatorFor($data, $kind), $kind);
             $subtotal = $totals['subtotal'];
             $tax = $totals['tax'];
             $date = Carbon::parse($data['invoice_date'] ?? $invoice->invoice_date);
 
             $invoice->update([
                 'supplier_id' => $data['supplier_id'] ?? $invoice->supplier_id,
+                'import_shipment_id' => $data['import_shipment_id'] ?? null,
+                'kind' => $kind,
                 'supplier_reference' => $data['supplier_reference'] ?? null,
                 'invoice_date' => $date->toDateString(),
                 'due_date' => $data['due_date'] ?? null,
@@ -145,7 +151,7 @@ class PurchaseInvoiceService
                 'tax_amount' => $tax,
                 'total' => round($subtotal + $tax, 2),
                 'notes' => $data['notes'] ?? null,
-                ...$this->importAttributes($data, $totals),
+                ...$this->importAttributes($data, $totals, $kind),
             ]);
             $invoice->items()->delete();
             $invoice->items()->createMany($totals['items']);
@@ -230,6 +236,19 @@ class PurchaseInvoiceService
     private function postingLines(PurchaseInvoice $invoice): array
     {
         $cfg = config('accounting.purchasing');
+
+        // فاتورة مصاريف الشحنة تُدين الحساب الوسيط لا المخزون: هي الفاتورة التي
+        // **تُطفئ** ما حمّلته فاتورةُ البضاعة من تقدير، ولا تُدخل بضاعة جديدة.
+        if ($invoice->isExpenseInvoice()) {
+            $lines = [['account_code' => $cfg['import_accrual_account'], 'debit' => (float) $invoice->subtotal, 'credit' => 0]];
+            if ((float) $invoice->tax_amount > 0) {
+                $lines[] = ['account_code' => $cfg['tax_account'], 'debit' => (float) $invoice->tax_amount, 'credit' => 0];
+            }
+            $lines[] = ['account_code' => $this->payableAccountCode($invoice), 'debit' => 0, 'credit' => (float) $invoice->total];
+
+            return $lines;
+        }
+
         $inventoryValue = $invoice->isImport() ? (float) $invoice->landed_subtotal : (float) $invoice->subtotal;
 
         $lines = [['account_code' => $cfg['inventory_account'], 'debit' => $inventoryValue, 'credit' => 0]];
@@ -256,6 +275,9 @@ class PurchaseInvoiceService
     /** إدخال بضاعة الفاتورة للمخزون (المستودع الافتراضي) — يُستخدم عند الترحيل والتعديل. */
     private function applyStock(PurchaseInvoice $invoice): void
     {
+        if ($invoice->isExpenseInvoice()) {
+            return; // مصاريف لا بضاعة.
+        }
         if ($invoice->goods_receipt_id !== null) {
             return; // دخلت عبر إذن استلام مستقل.
         }
@@ -285,7 +307,7 @@ class PurchaseInvoiceService
      */
     private function reverseStock(PurchaseInvoice $invoice): void
     {
-        if ($invoice->goods_receipt_id !== null) {
+        if ($invoice->isExpenseInvoice() || $invoice->goods_receipt_id !== null) {
             return;
         }
         $warehouse = $this->defaultWarehouse();
@@ -336,13 +358,16 @@ class PurchaseInvoiceService
         }
 
         return DB::transaction(function () use ($invoice, $data, $items) {
-            $totals = $this->prepareItems($items, ImportCostCalculator::fromArray($data));
+            $kind = $this->resolveKind($data, $invoice);
+            $totals = $this->prepareItems($items, $this->calculatorFor($data, $kind), $kind);
             $subtotal = $totals['subtotal'];
             $tax = $totals['tax'];
             $date = Carbon::parse($data['invoice_date'] ?? $invoice->invoice_date);
 
             $invoice->update([
                 'supplier_id' => $data['supplier_id'] ?? $invoice->supplier_id,
+                'import_shipment_id' => $data['import_shipment_id'] ?? null,
+                'kind' => $kind,
                 'supplier_reference' => $data['supplier_reference'] ?? null,
                 'invoice_date' => $date->toDateString(),
                 'due_date' => $data['due_date'] ?? null,
@@ -350,7 +375,7 @@ class PurchaseInvoiceService
                 'tax_amount' => $tax,
                 'total' => round($subtotal + $tax, 2),
                 'notes' => $data['notes'] ?? null,
-                ...$this->importAttributes($data, $totals),
+                ...$this->importAttributes($data, $totals, $kind),
             ]);
 
             $invoice->items()->delete();
@@ -373,8 +398,10 @@ class PurchaseInvoiceService
      * @param  array<int, array<string, mixed>>  $items
      * @return array{items: array<int, array<string, mixed>>, subtotal: float, tax: float, foreign_subtotal: float, landed_subtotal: float, total_cbm: float}
      */
-    private function prepareItems(array $items, ImportCostCalculator $calc): array
+    private function prepareItems(array $items, ImportCostCalculator $calc, string $kind = PurchaseInvoice::KIND_GOODS): array
     {
+        $isExpense = $kind === PurchaseInvoice::KIND_EXPENSES;
+
         $subtotal = 0.0;
         $tax = 0.0;
         $foreignSubtotal = 0.0;
@@ -389,7 +416,8 @@ class PurchaseInvoiceService
 
             if ($calc->isActive()) {
                 $foreign = (float) ($it['unit_price_foreign'] ?? 0);
-                $cbm = $this->resolveCbm($it);
+                // بند المصاريف بلا حجم: هو التكلفة نفسها لا صنفٌ تُوزَّع عليه.
+                $cbm = $isExpense ? 0.0 : $this->resolveCbm($it);
                 $cost = $calc->unitCostBase($foreign);
                 $landed = $manual
                     ? round((float) ($it['landed_unit_cost'] ?? 0), ImportCostCalculator::UNIT_SCALE)
@@ -413,11 +441,12 @@ class PurchaseInvoiceService
             $totalCbm += $qty * $cbm;
 
             $prepared[] = [
-                'variant_id' => $it['variant_id'] ?? null,
+                // فاتورة المصاريف لا تحمل أصنافًا ولا تُنشئ منتجات — بنودها وصفٌ ومبلغ.
+                'variant_id' => $isExpense ? null : ($it['variant_id'] ?? null),
                 'description' => $it['description'] ?? null,
                 // الصنف الجديد: يُحفظ اسمه/سعره ويُنشأ المنتج عند الترحيل فقط (لا في المسودّة).
-                'new_product_name' => $it['new_product_name'] ?? null,
-                'new_product_sell_price' => isset($it['new_product_sell_price']) ? (float) $it['new_product_sell_price'] : null,
+                'new_product_name' => $isExpense ? null : ($it['new_product_name'] ?? null),
+                'new_product_sell_price' => ! $isExpense && isset($it['new_product_sell_price']) ? (float) $it['new_product_sell_price'] : null,
                 'qty' => $qty,
                 'unit_price_foreign' => $foreign,
                 'cbm_per_unit' => $cbm,
@@ -439,6 +468,40 @@ class PurchaseInvoiceService
             'landed_subtotal' => round($landedSubtotal, 2),
             'total_cbm' => round($totalCbm, 4),
         ];
+    }
+
+    /**
+     * نوع الفاتورة. فاتورة المصاريف لا تكون إلا على شحنة — بغيرها لا يُعرف أيّ
+     * تقديرٍ تُطفئ، فتُعامَل فاتورةَ بضاعة عاديّة بدل تحميل الحساب الوسيط بلا مرجع.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function resolveKind(array $data, ?PurchaseInvoice $current = null): string
+    {
+        $kind = $data['kind'] ?? $current?->kind ?? PurchaseInvoice::KIND_GOODS;
+        if ($kind !== PurchaseInvoice::KIND_EXPENSES) {
+            return PurchaseInvoice::KIND_GOODS;
+        }
+
+        return empty($data['import_shipment_id'])
+            ? PurchaseInvoice::KIND_GOODS
+            : PurchaseInvoice::KIND_EXPENSES;
+    }
+
+    /**
+     * حاسبة الفاتورة. بنود المصاريف تُحوَّل بالصرف فقط: العمولة والشحن يُحمَّلان
+     * على البضاعة لا على فاتورة الشحن نفسها — وإلا حُمّلا مرّتين.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function calculatorFor(array $data, string $kind): ImportCostCalculator
+    {
+        if ($kind === PurchaseInvoice::KIND_EXPENSES) {
+            $data['commission_rate'] = 0;
+            $data['cbm_rate_usd'] = 0;
+        }
+
+        return ImportCostCalculator::fromArray($data);
     }
 
     /**
@@ -469,16 +532,18 @@ class PurchaseInvoiceService
      * @param  array{foreign_subtotal: float, landed_subtotal: float, total_cbm: float}  $totals
      * @return array<string, mixed>
      */
-    private function importAttributes(array $data, array $totals): array
+    private function importAttributes(array $data, array $totals, string $kind = PurchaseInvoice::KIND_GOODS): array
     {
         $fx = (float) ($data['fx_rate_to_usd'] ?? 0);
         $usd = (float) ($data['usd_rate'] ?? 0);
+        $isExpense = $kind === PurchaseInvoice::KIND_EXPENSES;
 
         return [
             'fx_rate_to_usd' => $fx > 0 ? $fx : null,
             'usd_rate' => $usd > 0 ? $usd : null,
-            'commission_rate' => (float) ($data['commission_rate'] ?? 0),
-            'cbm_rate_usd' => (float) ($data['cbm_rate_usd'] ?? 0),
+            // تُصفَّر على فاتورة المصاريف مطابقةً لما استُخدم فعلًا في الحساب.
+            'commission_rate' => $isExpense ? 0 : (float) ($data['commission_rate'] ?? 0),
+            'cbm_rate_usd' => $isExpense ? 0 : (float) ($data['cbm_rate_usd'] ?? 0),
             'foreign_subtotal' => $totals['foreign_subtotal'],
             'landed_subtotal' => $totals['landed_subtotal'],
             'total_cbm' => $totals['total_cbm'],
