@@ -14,6 +14,9 @@ class SalesPermissionSeeder extends Seeder
     private array $permissions = [
         'sales.orders.view', 'sales.orders.view_own', 'sales.orders.create', 'sales.orders.update', 'sales.orders.delete',
         'sales.orders.confirm', 'sales.orders.reserve', 'sales.orders.ship', 'sales.orders.deliver', 'sales.orders.cancel',
+        // البيع المباشر: نقطة بيع كاملة (تحصيل فوري وخصم مخزون). صلاحية مستقلّة
+        // عن الإنشاء العادي فلا يفتحها منحُ صلاحية أخرى بالمصادفة.
+        'sales.orders.create_direct',
     ];
 
     private array $grants = [
@@ -24,7 +27,8 @@ class SalesPermissionSeeder extends Seeder
             'sales.orders.view_own', 'sales.orders.create', 'sales.orders.update',
             'sales.orders.reserve', 'sales.orders.cancel',
         ],
-        // المسوّق: ينشئ ويرى ويلغي طلباته هو فقط.
+        // المسوّق: ينشئ ويرى ويلغي طلباته هو فقط. لا بيع مباشر — لا يحصّل نقدًا
+        // ولا يخصم مخزونًا؛ عمله جلب الطلبات لا تشغيل نقطة بيع.
         'affiliate' => [
             'sales.orders.view_own', 'sales.orders.create', 'sales.orders.cancel',
         ],

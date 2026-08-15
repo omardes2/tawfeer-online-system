@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Sales;
 
+use App\Modules\Sales\Models\Order;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -9,9 +10,13 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class StoreDirectSaleRequest extends FormRequest
 {
+    /**
+     * الصلاحية تُفحص هنا لا في المتحكّم وحده: `authorize()` يسبق التحقّق، فيُردّ
+     * غيرُ المخوَّل قبل أن تُنفَّذ قواعد `exists:` واستعلاماتها على قاعدة البيانات.
+     */
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('createDirect', Order::class) ?? false;
     }
 
     public function rules(): array
