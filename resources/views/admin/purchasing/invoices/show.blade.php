@@ -75,7 +75,7 @@
                         <div><p class="text-gray-500">{{ __('سعر الدولار') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->usd_rate, 6), '0'), '.') }}</p></div>
                         <div><p class="text-gray-500">{{ __('عمولة المشتريات') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->commission_rate, 3), '0'), '.') }}%</p></div>
                         <div><p class="text-gray-500">{{ __('تكلفة المتر المكعّب') }}</p><p class="font-medium tabular-nums text-gray-800">{{ number_format($invoice->cbm_rate_usd, 2) }} $</p></div>
-                        <div><p class="text-gray-500">{{ __('إجمالي الحجم') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->total_cbm, 4), '0'), '.') }} CBM</p></div>
+                        <div><p class="text-gray-500">{{ __('إجمالي الحجم') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->total_cbm, 6), '0'), '.') }} CBM</p></div>
                         <div><p class="text-gray-500">{{ __('ذمّة المورد') }} ({{ $sym }})</p><p class="font-medium tabular-nums text-gray-800">{{ number_format($invoice->foreign_subtotal, 2) }}</p></div>
                         <div><p class="text-gray-500">{{ __('ذمّة المورد') }} ($)</p><p class="font-medium tabular-nums text-gray-800">{{ number_format((float) $invoice->usd_rate > 0 ? (float) $invoice->subtotal / (float) $invoice->usd_rate : 0, 2) }}</p></div>
                     </div>
@@ -106,7 +106,7 @@
                             <td class="tabular-nums">{{ rtrim(rtrim(number_format($it->qty, 3), '0'), '.') }}</td>
                             @if ($invoice->isImport())
                                 <td class="tabular-nums">{{ number_format($it->unit_price_foreign, 2) }}</td>
-                                <td class="tabular-nums text-gray-500">{{ rtrim(rtrim(number_format($it->cbm_per_unit, 4), '0'), '.') }}</td>
+                                <td class="tabular-nums text-gray-500">{{ rtrim(rtrim(number_format($it->cbm_per_unit, 6), '0'), '.') }}</td>
                             @endif
                             <td class="tabular-nums">{{ number_format($it->unit_cost, 2) }}</td>
                             @if ($invoice->isImport())

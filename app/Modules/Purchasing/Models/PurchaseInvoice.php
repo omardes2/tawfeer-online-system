@@ -54,7 +54,7 @@ class PurchaseInvoice extends Model
         'cbm_rate_usd' => 'decimal:4',
         'foreign_subtotal' => 'decimal:2',
         'landed_subtotal' => 'decimal:2',
-        'total_cbm' => 'decimal:4',
+        'total_cbm' => 'decimal:6',
         'approved_at' => 'datetime',
         'posted_at' => 'datetime',
     ];

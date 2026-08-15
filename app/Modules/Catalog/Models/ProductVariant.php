@@ -37,7 +37,7 @@ class ProductVariant extends Model
         'min_price' => 'decimal:2',
         'promo_price' => 'decimal:2',
         'weight' => 'decimal:3',
-        'cbm' => 'decimal:4',
+        'cbm' => 'decimal:6',
         'reorder_level' => 'decimal:3',
         'is_default' => 'boolean',
         'is_active' => 'boolean',

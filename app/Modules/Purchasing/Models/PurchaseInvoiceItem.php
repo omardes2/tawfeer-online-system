@@ -19,7 +19,7 @@ class PurchaseInvoiceItem extends Model
     protected $casts = [
         'qty' => 'decimal:3',
         'unit_price_foreign' => 'decimal:4',
-        'cbm_per_unit' => 'decimal:4',
+        'cbm_per_unit' => 'decimal:6',
         'unit_cost' => 'decimal:4',
         'landed_unit_cost' => 'decimal:4',
         'landed_line_total' => 'decimal:2',

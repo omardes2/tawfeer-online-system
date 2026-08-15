@@ -50,7 +50,7 @@ class Product extends Model
         'promo_price' => 'decimal:2',
         'target_margin' => 'decimal:4',
         'weight' => 'decimal:3',
-        'cbm' => 'decimal:4',
+        'cbm' => 'decimal:6',
         'reorder_level' => 'decimal:3',
         'promo_starts_at' => 'datetime',
         'promo_ends_at' => 'datetime',

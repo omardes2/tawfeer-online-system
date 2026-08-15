@@ -187,7 +187,7 @@
                                            class="w-full rounded-md border-gray-300 px-2 py-2 text-[15px] tabular-nums text-center focus:border-emerald-500 focus:ring-emerald-500" />
                                 </td>
                                 <td class="align-top" x-show="isImport() && !isExpense()" x-cloak>
-                                    <input type="number" step="0.0001" min="0" :name="`items[${i}][cbm_per_unit]`" x-model.number="row.cbm_per_unit"
+                                    <input type="number" step="any" min="0" :name="`items[${i}][cbm_per_unit]`" x-model.number="row.cbm_per_unit"
                                            class="w-full rounded-md border-gray-300 px-2 py-2 text-[15px] tabular-nums text-center focus:border-emerald-500 focus:ring-emerald-500" />
                                 </td>
 

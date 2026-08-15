@@ -29,6 +29,13 @@ use Illuminate\Validation\ValidationException;
  */
 class PurchaseInvoiceService
 {
+    /**
+     * منازل الحجم — ستٌّ لا أربع: قطعةٌ حجمها 0.00531 م³ تُقرَّب بأربعٍ إلى
+     * 0.0053، فينحرف نصيبُها من الشحن البحري ويتراكم الخطأ على آلاف القطع.
+     * ستّ منازل = دقّة السنتيمتر المكعّب الواحد.
+     */
+    public const CBM_SCALE = 6;
+
     public function __construct(
         private readonly AccountingService $accounting,
         private readonly VoucherService $vouchers,
@@ -479,7 +486,7 @@ class PurchaseInvoiceService
             'tax' => round($tax, 2),
             'foreign_subtotal' => round($foreignSubtotal, 2),
             'landed_subtotal' => round($landedSubtotal, 2),
-            'total_cbm' => round($totalCbm, 4),
+            'total_cbm' => round($totalCbm, self::CBM_SCALE),
         ];
     }
 
@@ -526,7 +533,7 @@ class PurchaseInvoiceService
     private function resolveCbm(array $item): float
     {
         if (isset($item['cbm_per_unit']) && $item['cbm_per_unit'] !== '' && (float) $item['cbm_per_unit'] > 0) {
-            return round((float) $item['cbm_per_unit'], 4);
+            return round((float) $item['cbm_per_unit'], self::CBM_SCALE);
         }
         if (empty($item['variant_id'])) {
             return 0.0;
@@ -534,7 +541,7 @@ class PurchaseInvoiceService
 
         $variant = ProductVariant::with('product:id,cbm')->find($item['variant_id']);
 
-        return round((float) ($variant?->cbm ?? $variant?->product?->cbm ?? 0), 4);
+        return round((float) ($variant?->cbm ?? $variant?->product?->cbm ?? 0), self::CBM_SCALE);
     }
 
     /**

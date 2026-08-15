@@ -157,6 +157,46 @@ class ImportInvoiceCostingTest extends TestCase
         $this->assertEqualsWithDelta(0.05, (float) $item->cbm_per_unit, 0.0001);
     }
 
+    public function test_a_tiny_volume_keeps_six_decimals(): void
+    {
+        // القطع الصغيرة أحجامها كسورٌ طويلة (0.00531 م³). بأربع منازل تُقرَّب إلى
+        // 0.0053 فينحرف نصيبُها من الشحن — وهو خطأٌ يتراكم على آلاف القطع.
+        $item = $this->importInvoice(['qty' => 1008, 'cbm_per_unit' => 0.00531])->items->first();
+
+        $this->assertEqualsWithDelta(0.00531, (float) $item->cbm_per_unit, 0.0000005);
+        // نصيب الشحن = 0.00531 × 180 × 3.65 ولو قُرِّب لَنقص.
+        $this->assertEqualsWithDelta(
+            0.00531 * 180 * 3.65,
+            (float) $item->landed_unit_cost - (float) $item->unit_cost - (45 / 7.15 * 0.05 * 3.65),
+            0.01,
+        );
+    }
+
+    public function test_an_eight_decimal_volume_rounds_to_six_not_four(): void
+    {
+        $item = $this->importInvoice(['cbm_per_unit' => 0.00111111])->items->first();
+
+        $this->assertEqualsWithDelta(0.001111, (float) $item->cbm_per_unit, 0.0000005);
+    }
+
+    public function test_the_product_card_keeps_a_tiny_volume(): void
+    {
+        $this->variant->update(['cbm' => 0.002619]);
+
+        $this->assertEqualsWithDelta(0.002619, (float) $this->variant->fresh()->cbm, 0.0000005);
+
+        $item = $this->importInvoice(['cbm_per_unit' => 0])->items->first();
+        $this->assertEqualsWithDelta(0.002619, (float) $item->cbm_per_unit, 0.0000005);
+    }
+
+    public function test_the_volume_field_accepts_any_decimal_step(): void
+    {
+        // `step=0.0001` كان يجعل المتصفّح يرفض 0.00531 قبل أن تصل الخادم أصلًا.
+        $this->get(route('admin.purchasing.invoices.create'))
+            ->assertOk()
+            ->assertSee('step="any"', false);
+    }
+
     public function test_a_volume_written_on_the_line_beats_the_card(): void
     {
         $this->variant->update(['cbm' => 0.035]);
