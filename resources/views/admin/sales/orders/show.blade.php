@@ -84,13 +84,13 @@
                         <form method="POST" action="{{ route('admin.sales.orders.reserve', $order) }}">@csrf<button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('حجز المخزون') }}</button></form>
                     @endcan
                 @endif
-                {{-- إعادة إرسال لشركة التوصيل يدويًا: تظهر فقط لطلب توصيل مؤكّد لم يظهر له رقم تتبّع بعد. --}}
-                @if (empty($order->tracking_number) && $order->channel !== 'pos' && $order->city_id && config('shipping.provider', 'null') !== 'null'
-                    && ! in_array($order->status, ['draft', 'new', 'cancelled', 'delivered', 'returned']))
-                    @can('confirm', $order)
-                        <form method="POST" action="{{ route('admin.sales.orders.resend_shipment', $order) }}">@csrf<button class="px-4 py-2 bg-amber-500 text-white text-sm rounded-md hover:bg-amber-600">{{ __('إرسال لشركة التوصيل') }}</button></form>
-                    @endcan
-                @endif
+                {{--
+                    زرّ «إرسال لشركة التوصيل» اليدوي محذوف بطلب المالك.
+
+                    الإرسال التلقائي باقٍ كما هو ولم يُمَسّ: يقع لحظة التأكيد،
+                    وإن تعذّر تلتقطه المكنسة المجدولة (shipping:dispatch-pending)
+                    فتعيد المحاولة كل دقيقة حتى ينجح — فلا حاجة لتدخّل يدوي.
+                --}}
                 @if ($order->status === 'stock_reserved')
                     @can('ship', $order)
                         <form method="POST" action="{{ route('admin.sales.orders.prepare', $order) }}">@csrf<button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('بدء التجهيز') }}</button></form>
@@ -106,11 +106,13 @@
                         <form method="POST" action="{{ route('admin.sales.orders.ship', $order) }}" onsubmit="return confirm('{{ __('شحن الطلب وخصم المخزون؟') }}')">@csrf<button class="px-4 py-2 bg-violet-600 text-white text-sm rounded-md hover:bg-violet-700">{{ __('شحن') }}</button></form>
                     @endcan
                 @endif
-                @if ($order->status === 'shipped')
-                    @can('deliver', $order)
-                        <form method="POST" action="{{ route('admin.sales.orders.deliver', $order) }}">@csrf<button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('تسليم') }}</button></form>
-                    @endcan
-                @endif
+                {{--
+                    زرّ «تسليم» اليدوي محذوف بطلب المالك.
+
+                    التسليم يتبع حالة الطرد لدى شركة التوصيل لا ضغطةَ زرّ في
+                    اللوحة، فتعليمه يدويًّا يخالف الواقع. المسار والصلاحية
+                    باقيان للاستخدام البرمجي.
+                --}}
                 @if (! in_array($order->status, ['cancelled', 'delivered', 'returned']) && $order->channel !== 'pos')
                     @can('cancel', $order)
                         <button type="button" @click="cancelling = true" x-show="!cancelling" class="px-4 py-2 bg-rose-100 text-rose-700 text-sm rounded-md hover:bg-rose-200">{{ __('إلغاء الطلب') }}</button>
