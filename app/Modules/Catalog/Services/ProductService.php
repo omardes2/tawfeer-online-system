@@ -91,7 +91,8 @@ class ProductService
      */
     private function syncVariantPrices(Product $product, array $data): void
     {
-        $priceData = array_intersect_key($data, array_flip(['retail_price', 'promo_price', 'cost_price', 'wholesale_price']));
+        // الحجم (CBM) يُزامَن معها: توزيع الشحن البحري يقرأ حجم المتغيّر أولًا.
+        $priceData = array_intersect_key($data, array_flip(['retail_price', 'promo_price', 'cost_price', 'wholesale_price', 'cbm']));
         if ($priceData === []) {
             return;
         }

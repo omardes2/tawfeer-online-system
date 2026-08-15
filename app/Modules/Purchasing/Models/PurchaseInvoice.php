@@ -29,6 +29,8 @@ class PurchaseInvoice extends Model
         'uuid', 'number', 'supplier_id', 'purchase_order_id', 'goods_receipt_id',
         'supplier_reference', 'invoice_date', 'due_date', 'status', 'payment_status',
         'subtotal', 'tax_amount', 'total', 'amount_paid', 'currency', 'notes',
+        'fx_rate_to_usd', 'usd_rate', 'commission_rate', 'cbm_rate_usd',
+        'foreign_subtotal', 'landed_subtotal', 'total_cbm',
         'journal_entry_id', 'reversal_entry_id',
         'created_by', 'approved_by', 'posted_by', 'approved_at', 'posted_at',
     ];
@@ -40,6 +42,13 @@ class PurchaseInvoice extends Model
         'tax_amount' => 'decimal:2',
         'total' => 'decimal:2',
         'amount_paid' => 'decimal:2',
+        'fx_rate_to_usd' => 'decimal:6',
+        'usd_rate' => 'decimal:6',
+        'commission_rate' => 'decimal:3',
+        'cbm_rate_usd' => 'decimal:4',
+        'foreign_subtotal' => 'decimal:2',
+        'landed_subtotal' => 'decimal:2',
+        'total_cbm' => 'decimal:4',
         'approved_at' => 'datetime',
         'posted_at' => 'datetime',
     ];
@@ -93,5 +102,21 @@ class PurchaseInvoice extends Model
     public function balanceDue(): float
     {
         return round((float) $this->total - (float) $this->amount_paid, 2);
+    }
+
+    /** فاتورة استيراد: مُدخَلة بعملة أجنبية بسعري صرف، فتُحسب لها تكلفة شاملة. */
+    public function isImport(): bool
+    {
+        return (float) $this->fx_rate_to_usd > 0 && (float) $this->usd_rate > 0;
+    }
+
+    /**
+     * الفرق بين قيمة المخزون (التكلفة الشاملة) وذمّة المورد (السعر الحقيقي) — أي
+     * المصاريف المحمّلة على البضاعة ولم تصل فواتيرها بعد. يُقيَّد في حساب وسيط
+     * ابتداءً من المرحلة ٢؛ هنا يُعرض فقط.
+     */
+    public function importDifference(): float
+    {
+        return round((float) $this->landed_subtotal - (float) $this->subtotal, 2);
     }
 }

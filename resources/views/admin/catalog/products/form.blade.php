@@ -114,6 +114,17 @@
                                 {{ __('يظهر الصنف في «تنبيهات النقص» عندما ينزل المتوفّر إلى هذا الحدّ أو دونه. اتركه فارغًا لاستخدام الحدّ الافتراضي من الإعدادات.') }}
                             </p>
                         </x-admin.field>
+
+                        {{-- حجم الوحدة: عليه يُوزَّع الشحن البحري في فواتير الاستيراد --}}
+                        <x-admin.field :label="__('الحجم (CBM) للوحدة')" name="cbm">
+                            <input type="number" step="0.0001" min="0" name="cbm"
+                                   value="{{ old('cbm', $product->cbm !== null ? (float) $product->cbm : '') }}"
+                                   placeholder="{{ __('مثال: 0.012') }}"
+                                   class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                            <p class="mt-1 text-xs text-gray-500">
+                                {{ __('حجم القطعة الواحدة بالمتر المكعّب. يُستخدم في فاتورة الاستيراد لتوزيع الشحن البحري على الأصناف، ويبقى قابلًا للتعديل داخل كل فاتورة.') }}
+                            </p>
+                        </x-admin.field>
                     </div>
                 </div>
 

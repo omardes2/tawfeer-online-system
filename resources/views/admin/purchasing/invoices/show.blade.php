@@ -56,14 +56,58 @@
                 </div>
             </div>
 
+            @if ($invoice->isImport())
+                @php $sym = $currencies[$invoice->currency] ?? $invoice->currency; @endphp
+                <div class="admin-card admin-card-pad">
+                    <h3 class="text-sm font-semibold text-gray-800 mb-3">{{ __('بيانات الاستيراد') }}</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div><p class="text-gray-500">{{ __('عملة الفاتورة') }}</p><p class="font-medium text-gray-800">{{ $invoice->currency }} ({{ $sym }})</p></div>
+                        <div><p class="text-gray-500">{{ __('الصرف مقابل الدولار') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->fx_rate_to_usd, 6), '0'), '.') }}</p></div>
+                        <div><p class="text-gray-500">{{ __('سعر الدولار') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->usd_rate, 6), '0'), '.') }}</p></div>
+                        <div><p class="text-gray-500">{{ __('عمولة المشتريات') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->commission_rate, 3), '0'), '.') }}%</p></div>
+                        <div><p class="text-gray-500">{{ __('تكلفة المتر المكعّب') }}</p><p class="font-medium tabular-nums text-gray-800">{{ number_format($invoice->cbm_rate_usd, 2) }} $</p></div>
+                        <div><p class="text-gray-500">{{ __('إجمالي الحجم') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->total_cbm, 4), '0'), '.') }} CBM</p></div>
+                        <div><p class="text-gray-500">{{ __('ذمّة المورد') }} ({{ $sym }})</p><p class="font-medium tabular-nums text-gray-800">{{ number_format($invoice->foreign_subtotal, 2) }}</p></div>
+                        <div><p class="text-gray-500">{{ __('ذمّة المورد') }} ($)</p><p class="font-medium tabular-nums text-gray-800">{{ number_format((float) $invoice->usd_rate > 0 ? (float) $invoice->subtotal / (float) $invoice->usd_rate : 0, 2) }}</p></div>
+                    </div>
+                </div>
+            @endif
+
             <x-admin.table :title="__('البنود')">
-                <thead><tr><th>{{ __('الصنف') }}</th><th>{{ __('الكمية') }}</th><th>{{ __('التكلفة') }}</th><th>{{ __('ضريبة') }}</th><th class="text-start">{{ __('الإجمالي') }}</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>{{ __('الصنف') }}</th>
+                        <th>{{ __('الكمية') }}</th>
+                        @if ($invoice->isImport())
+                            <th>{{ __('السعر') }} {{ $currencies[$invoice->currency] ?? $invoice->currency }}</th>
+                            <th>CBM</th>
+                        @endif
+                        <th>{{ $invoice->isImport() ? __('السعر الحقيقي') : __('التكلفة') }}</th>
+                        @if ($invoice->isImport())
+                            <th>{{ __('التكلفة الشاملة') }}</th>
+                        @endif
+                        <th>{{ __('ضريبة') }}</th>
+                        <th class="text-start">{{ __('الإجمالي') }}</th>
+                    </tr>
+                </thead>
                 <tbody>
                     @foreach ($invoice->items as $it)
                         <tr>
                             <td class="text-gray-800">{{ $it->variant?->product?->name ?? $it->description ?? $it->variant?->sku ?? '—' }}</td>
                             <td class="tabular-nums">{{ rtrim(rtrim(number_format($it->qty, 3), '0'), '.') }}</td>
+                            @if ($invoice->isImport())
+                                <td class="tabular-nums">{{ number_format($it->unit_price_foreign, 2) }}</td>
+                                <td class="tabular-nums text-gray-500">{{ rtrim(rtrim(number_format($it->cbm_per_unit, 4), '0'), '.') }}</td>
+                            @endif
                             <td class="tabular-nums">{{ number_format($it->unit_cost, 2) }}</td>
+                            @if ($invoice->isImport())
+                                <td class="tabular-nums font-medium text-emerald-700">
+                                    {{ number_format($it->landed_unit_cost, 2) }}
+                                    @if ($it->landed_is_manual)
+                                        <span class="text-[11px] text-amber-600">{{ __('(يدوي)') }}</span>
+                                    @endif
+                                </td>
+                            @endif
                             <td class="tabular-nums text-gray-400">{{ number_format($it->tax_amount, 2) }}</td>
                             <td class="text-start font-medium tabular-nums">{{ number_format($it->line_total, 2) }}</td>
                         </tr>
@@ -81,6 +125,18 @@
                 <div class="flex justify-between text-emerald-600"><span>{{ __('المدفوع') }}</span><span class="tabular-nums">{{ number_format($invoice->amount_paid, 2) }}</span></div>
                 <div class="flex justify-between font-semibold {{ $invoice->balanceDue() > 0 ? 'text-rose-600' : 'text-gray-400' }}"><span>{{ __('المتبقّي') }}</span><span class="tabular-nums">{{ number_format($invoice->balanceDue(), 2) }}</span></div>
             </div>
+
+            @if ($invoice->isImport())
+                <div class="admin-card admin-card-pad space-y-2 text-sm border-s-4 border-s-emerald-400">
+                    <h3 class="font-semibold text-gray-800">{{ __('التكلفة الشاملة') }}</h3>
+                    <div class="flex justify-between"><span class="text-gray-500">{{ __('قيمة المخزون') }}</span><span class="font-bold tabular-nums text-emerald-700">{{ number_format($invoice->landed_subtotal, 2) }}</span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">{{ __('ذمّة المورد') }}</span><span class="tabular-nums">{{ number_format($invoice->subtotal, 2) }}</span></div>
+                    <div class="flex justify-between border-t border-gray-100 pt-2"><span class="text-gray-500">{{ __('مصاريف محمّلة') }}</span><span class="font-bold tabular-nums text-amber-700">{{ number_format($invoice->importDifference(), 2) }}</span></div>
+                    <p class="text-xs text-gray-500 pt-1">
+                        {{ __('الترحيل المحاسبي الحالي بذمّة المورد. تحميل المخزون بالتكلفة الشاملة وقيد الفرق في «مصاريف استيراد مستحقة» يأتيان في المرحلة التالية.') }}
+                    </p>
+                </div>
+            @endif
 
             @if ($invoice->status === 'posted' && $invoice->balanceDue() > 0)
                 @can('purchasing.invoices.pay')

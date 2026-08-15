@@ -39,6 +39,8 @@ class StoreProductRequest extends FormRequest
             'sort_order' => ['integer', 'min:0'],
             'track_inventory' => ['boolean'],
             'weight' => ['nullable', 'numeric', 'min:0'],
+            // حجم الوحدة بالمتر المكعّب — أساس توزيع الشحن البحري في فواتير الاستيراد.
+            'cbm' => ['nullable', 'numeric', 'min:0', 'max:10000'],
             // حدّ التنبيه بالنقص؛ فارغًا يعني الرجوع للحدّ الافتراضي في الإعدادات.
             'reorder_level' => ['nullable', 'numeric', 'min:0'],
             // الأسعار (تُزامَن مع المتغيّر الافتراضي — تظهر في الموقع والطلبات).

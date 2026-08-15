@@ -62,10 +62,13 @@
 `parent_id` → categories (شجري) · `name` · `slug` · `is_active`
 
 ### `products`
-`category_id` → categories · `name` · `slug` · `sku` · `description` · `type` (simple/variable) · `is_active`
+`category_id` → categories · `name` · `slug` · `sku` · `description` · `type` (simple/variable) · `is_active` · `weight` · `cbm`
 
 ### `product_variants`
-`product_id` → products · `sku` (فريد) · `barcode` · `attributes (json)` · `cost_price` · `sale_price`
+`product_id` → products · `sku` (فريد) · `barcode` · `attributes (json)` · `cost_price` · `sale_price` · `weight` · `cbm`
+
+> `cbm` حجم الوحدة بالمتر المكعّب — أساس توزيع الشحن البحري على الأصناف في فواتير
+> الاستيراد. يُقرأ حجم المتغيّر أولًا ثم حجم المنتج، ويُزامَن الحقلان للمتغيّر الافتراضي.
 
 ### `product_reviews`
 `product_id` → products · `customer_id` → customers · `order_id` → orders (nullable) · `rating` (1..5) · `title` · `body` · `status` (pending/approved/rejected) · `moderated_by` → users · `moderated_at` · `moderation_note`
@@ -129,6 +132,30 @@
 
 ### `supplier_invoices`
 `supplier_id` · `purchase_order_id` · `invoice_number` · `amount` · `due_date` · `status`
+
+### `purchase_invoices` — حقول الاستيراد
+`currency` (عملة المورد) · `fx_rate_to_usd` (كم وحدة من عملة الفاتورة = 1 $) ·
+`usd_rate` (كم من العملة الأساسية = 1 $) · `commission_rate` (٪ عمولة المشتريات) ·
+`cbm_rate_usd` (تكلفة المتر المكعّب بالدولار) · `foreign_subtotal` · `landed_subtotal` · `total_cbm`
+
+### `purchase_invoice_items` — حقول الاستيراد
+`unit_price_foreign` (سعر الوحدة بعملة المورد) · `cbm_per_unit` · `unit_cost` (السعر
+الحقيقي بالعملة الأساسية — ذمّة المورد) · `landed_unit_cost` (التكلفة الشاملة) ·
+`landed_line_total` · `landed_is_manual`
+
+> **سعران لكل بند.** السعر الحقيقي هو ما يُذمّ للمورد؛ التكلفة الشاملة تُضيف عليه
+> نصيبه من عمولة المشتريات ومن الشحن البحري (حسب حجمه). المعادلة في
+> `ImportCostCalculator` وحده، وتُعاد في الخلفية عند كل حفظ.
+>
+> تُترك أسعار الصرف `null` في الفاتورة المحلية — وحالتُها الصريحة أسلمُ من صفرٍ
+> يُقسَم عليه — فتبقى الحسابات كما كانت (`unit_cost` كما يُكتب، والتكلفة الشاملة تساويه).
+>
+> `unit_cost` و`landed_unit_cost` بأربع منازل: التحويل يُنتج كسورًا طويلة
+> (45 ¥ ⇒ 22.9720 ₪) ومنزلتان تُضيّعان فروقًا تتراكم على مئات القطع. المبالغ
+> الإجمالية تبقى بمنزلتين.
+>
+> **حدّ المرحلة ١:** الترحيل المحاسبي بالسعر الحقيقي كما هو. تحميل المخزون
+> بالتكلفة الشاملة وقيد الفرق في «مصاريف استيراد مستحقة» يأتيان في المرحلة ٢.
 
 ---
 

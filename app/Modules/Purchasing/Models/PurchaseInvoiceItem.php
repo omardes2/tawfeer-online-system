@@ -11,12 +11,19 @@ class PurchaseInvoiceItem extends Model
     protected $fillable = [
         'purchase_invoice_id', 'variant_id', 'description',
         'new_product_name', 'new_product_sell_price',
-        'qty', 'unit_cost', 'tax_rate', 'tax_amount', 'line_total',
+        'qty', 'unit_price_foreign', 'cbm_per_unit',
+        'unit_cost', 'landed_unit_cost', 'landed_line_total', 'landed_is_manual',
+        'tax_rate', 'tax_amount', 'line_total',
     ];
 
     protected $casts = [
         'qty' => 'decimal:3',
-        'unit_cost' => 'decimal:2',
+        'unit_price_foreign' => 'decimal:4',
+        'cbm_per_unit' => 'decimal:4',
+        'unit_cost' => 'decimal:4',
+        'landed_unit_cost' => 'decimal:4',
+        'landed_line_total' => 'decimal:2',
+        'landed_is_manual' => 'boolean',
         'tax_rate' => 'decimal:2',
         'tax_amount' => 'decimal:2',
         'line_total' => 'decimal:2',

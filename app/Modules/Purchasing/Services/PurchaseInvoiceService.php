@@ -64,7 +64,9 @@ class PurchaseInvoiceService
     {
         return DB::transaction(function () use ($data, $items) {
             $date = Carbon::parse($data['invoice_date'] ?? now()->toDateString());
-            [$prepared, $subtotal, $tax] = $this->prepareItems($items);
+            $totals = $this->prepareItems($items, ImportCostCalculator::fromArray($data));
+            $subtotal = $totals['subtotal'];
+            $tax = $totals['tax'];
 
             $invoice = PurchaseInvoice::create([
                 'number' => NumberGenerator::next('purchase_invoices', 'number', 'PINV', (int) $date->year),
@@ -81,9 +83,10 @@ class PurchaseInvoiceService
                 'total' => round($subtotal + $tax, 2),
                 'currency' => $data['currency'] ?? config('app.currency', 'ILS'),
                 'notes' => $data['notes'] ?? null,
+                ...$this->importAttributes($data, $totals),
             ]);
 
-            $invoice->items()->createMany($prepared);
+            $invoice->items()->createMany($totals['items']);
 
             return $invoice->load('items');
         });
@@ -128,7 +131,9 @@ class PurchaseInvoiceService
         return DB::transaction(function () use ($invoice, $data, $items) {
             $this->reverseStock($invoice);            // 1) سحب البضاعة المُدخَلة سابقًا.
 
-            [$prepared, $subtotal, $tax] = $this->prepareItems($items);
+            $totals = $this->prepareItems($items, ImportCostCalculator::fromArray($data));
+            $subtotal = $totals['subtotal'];
+            $tax = $totals['tax'];
             $date = Carbon::parse($data['invoice_date'] ?? $invoice->invoice_date);
 
             $invoice->update([
@@ -140,9 +145,10 @@ class PurchaseInvoiceService
                 'tax_amount' => $tax,
                 'total' => round($subtotal + $tax, 2),
                 'notes' => $data['notes'] ?? null,
+                ...$this->importAttributes($data, $totals),
             ]);
             $invoice->items()->delete();
-            $invoice->items()->createMany($prepared);
+            $invoice->items()->createMany($totals['items']);
             $invoice->load('items');
 
             // 2) إنشاء متغيّرات الأصناف الجديدة ثم إدخال البضاعة بالكميات/التكاليف الجديدة.
@@ -293,7 +299,9 @@ class PurchaseInvoiceService
         }
 
         return DB::transaction(function () use ($invoice, $data, $items) {
-            [$prepared, $subtotal, $tax] = $this->prepareItems($items);
+            $totals = $this->prepareItems($items, ImportCostCalculator::fromArray($data));
+            $subtotal = $totals['subtotal'];
+            $tax = $totals['tax'];
             $date = Carbon::parse($data['invoice_date'] ?? $invoice->invoice_date);
 
             $invoice->update([
@@ -305,34 +313,68 @@ class PurchaseInvoiceService
                 'tax_amount' => $tax,
                 'total' => round($subtotal + $tax, 2),
                 'notes' => $data['notes'] ?? null,
+                ...$this->importAttributes($data, $totals),
             ]);
 
             $invoice->items()->delete();
-            $invoice->items()->createMany($prepared);
+            $invoice->items()->createMany($totals['items']);
 
             return $invoice->load('items');
         });
     }
 
     /**
-     * تجهيز بنود الفاتورة وحساب الإجماليات (الإجمالي الفرعي والضريبة).
+     * تجهيز بنود الفاتورة وحساب الإجماليات.
+     *
+     * في فاتورة الاستيراد يُدخِل المستخدم سعر الوحدة بعملة المورد، فتُشتقّ منه
+     * الخلفيةُ قيمتين: **السعر الحقيقي** بالعملة الأساسية (ذمّة المورد) و**التكلفة
+     * الشاملة** (السعر + العمولة + الشحن حسب الحجم). حسابُ الواجهة لا يُصدَّق —
+     * يُعاد هنا — إلا عمود التكلفة إن علّمه المستخدم يدويًا فيُؤخذ كما كتبه.
+     *
+     * في الفاتورة المحلية (بلا أسعار صرف) تبقى المعادلة كما كانت: التكلفة كما تُكتب.
      *
      * @param  array<int, array<string, mixed>>  $items
-     * @return array{0: array<int, array<string, mixed>>, 1: float, 2: float}
+     * @return array{items: array<int, array<string, mixed>>, subtotal: float, tax: float, foreign_subtotal: float, landed_subtotal: float, total_cbm: float}
      */
-    private function prepareItems(array $items): array
+    private function prepareItems(array $items, ImportCostCalculator $calc): array
     {
         $subtotal = 0.0;
         $tax = 0.0;
+        $foreignSubtotal = 0.0;
+        $landedSubtotal = 0.0;
+        $totalCbm = 0.0;
         $prepared = [];
+
         foreach ($items as $it) {
             $qty = (float) ($it['qty'] ?? 1);
-            $cost = (float) ($it['unit_cost'] ?? 0);
             $rate = (float) ($it['tax_rate'] ?? 0);
+            $manual = (bool) ($it['landed_is_manual'] ?? false);
+
+            if ($calc->isActive()) {
+                $foreign = (float) ($it['unit_price_foreign'] ?? 0);
+                $cbm = $this->resolveCbm($it);
+                $cost = $calc->unitCostBase($foreign);
+                $landed = $manual
+                    ? round((float) ($it['landed_unit_cost'] ?? 0), ImportCostCalculator::UNIT_SCALE)
+                    : $calc->landedUnitCostBase($foreign, $cbm);
+            } else {
+                $foreign = 0.0;
+                $cbm = 0.0;
+                $manual = false;
+                $cost = round((float) ($it['unit_cost'] ?? 0), ImportCostCalculator::UNIT_SCALE);
+                $landed = $cost; // بلا مصاريف استيراد: التكلفة الشاملة هي السعر نفسه.
+            }
+
             $line = round($qty * $cost, 2);
+            $landedLine = round($qty * $landed, 2);
             $lineTax = round($line * $rate / 100, 2);
+
             $subtotal += $line;
             $tax += $lineTax;
+            $landedSubtotal += $landedLine;
+            $foreignSubtotal += round($qty * $foreign, 2);
+            $totalCbm += $qty * $cbm;
+
             $prepared[] = [
                 'variant_id' => $it['variant_id'] ?? null,
                 'description' => $it['description'] ?? null,
@@ -340,14 +382,70 @@ class PurchaseInvoiceService
                 'new_product_name' => $it['new_product_name'] ?? null,
                 'new_product_sell_price' => isset($it['new_product_sell_price']) ? (float) $it['new_product_sell_price'] : null,
                 'qty' => $qty,
+                'unit_price_foreign' => $foreign,
+                'cbm_per_unit' => $cbm,
                 'unit_cost' => $cost,
+                'landed_unit_cost' => $landed,
+                'landed_line_total' => $landedLine,
+                'landed_is_manual' => $manual,
                 'tax_rate' => $rate,
                 'tax_amount' => $lineTax,
                 'line_total' => $line,
             ];
         }
 
-        return [$prepared, round($subtotal, 2), round($tax, 2)];
+        return [
+            'items' => $prepared,
+            'subtotal' => round($subtotal, 2),
+            'tax' => round($tax, 2),
+            'foreign_subtotal' => round($foreignSubtotal, 2),
+            'landed_subtotal' => round($landedSubtotal, 2),
+            'total_cbm' => round($totalCbm, 4),
+        ];
+    }
+
+    /**
+     * حجم الوحدة: ما كُتب في البند، وإلا حجم المتغيّر، وإلا حجم المنتج. فيكفي أن
+     * يُسجَّل الحجم مرة واحدة في كرت الصنف ويبقى قابلًا للتخصيص لهذه الشحنة.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private function resolveCbm(array $item): float
+    {
+        if (isset($item['cbm_per_unit']) && $item['cbm_per_unit'] !== '' && (float) $item['cbm_per_unit'] > 0) {
+            return round((float) $item['cbm_per_unit'], 4);
+        }
+        if (empty($item['variant_id'])) {
+            return 0.0;
+        }
+
+        $variant = ProductVariant::with('product:id,cbm')->find($item['variant_id']);
+
+        return round((float) ($variant?->cbm ?? $variant?->product?->cbm ?? 0), 4);
+    }
+
+    /**
+     * رأس بيانات الاستيراد كما يُحفظ على الفاتورة. أسعار الصرف تُحفظ null لا صفرًا:
+     * «فاتورة محلية» حالةٌ صريحة لا رقمٌ صفريّ يُقسَم عليه لاحقًا.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array{foreign_subtotal: float, landed_subtotal: float, total_cbm: float}  $totals
+     * @return array<string, mixed>
+     */
+    private function importAttributes(array $data, array $totals): array
+    {
+        $fx = (float) ($data['fx_rate_to_usd'] ?? 0);
+        $usd = (float) ($data['usd_rate'] ?? 0);
+
+        return [
+            'fx_rate_to_usd' => $fx > 0 ? $fx : null,
+            'usd_rate' => $usd > 0 ? $usd : null,
+            'commission_rate' => (float) ($data['commission_rate'] ?? 0),
+            'cbm_rate_usd' => (float) ($data['cbm_rate_usd'] ?? 0),
+            'foreign_subtotal' => $totals['foreign_subtotal'],
+            'landed_subtotal' => $totals['landed_subtotal'],
+            'total_cbm' => $totals['total_cbm'],
+        ];
     }
 
     /** ينشئ منتجًا/متغيّرًا من بند «صنف جديد» — يُستدعى عند الترحيل فقط. */

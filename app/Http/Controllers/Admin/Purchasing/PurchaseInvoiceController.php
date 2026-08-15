@@ -21,6 +21,15 @@ class PurchaseInvoiceController extends Controller
 {
     private const STATUSES = ['draft', 'approved', 'posted', 'cancelled', 'reversed'];
 
+    /** عملات الشراء المتاحة ورموزها — الأساسية أولًا. */
+    public const CURRENCIES = ['ILS' => '₪', 'USD' => '$', 'CNY' => '¥', 'EUR' => '€'];
+
+    private const EMPTY_ROW = [
+        'is_new' => false, 'variant_id' => '', 'new_name' => '', 'sell_price' => 0,
+        'description' => '', 'qty' => 1, 'unit_cost' => 0, 'tax_rate' => 0,
+        'unit_price_foreign' => 0, 'cbm_per_unit' => 0, 'landed_unit_cost' => 0, 'landed_is_manual' => false,
+    ];
+
     public function __construct(
         private readonly PurchaseInvoiceService $service,
     ) {}
@@ -73,18 +82,31 @@ class PurchaseInvoiceController extends Controller
                 'qty' => (float) $it->qty,
                 'unit_cost' => (float) $it->unit_cost,
                 'tax_rate' => (float) $it->tax_rate,
+                'unit_price_foreign' => (float) $it->unit_price_foreign,
+                'cbm_per_unit' => (float) $it->cbm_per_unit,
+                'landed_unit_cost' => (float) $it->landed_unit_cost,
+                'landed_is_manual' => (bool) $it->landed_is_manual,
             ])->values()->all()
             : [];
         if (empty($rows)) {
-            $rows = [['is_new' => false, 'variant_id' => '', 'new_name' => '', 'sell_price' => 0, 'description' => '', 'qty' => 1, 'unit_cost' => 0, 'tax_rate' => 0]];
+            $rows = [self::EMPTY_ROW];
         }
+
+        $variants = ProductVariant::with('product:id,name,cbm')->orderBy('id')->get();
 
         return [
             'invoice' => $invoice,
             'editing' => (bool) $invoice,
             'initialRows' => $rows,
             'suppliers' => Supplier::where('is_active', true)->orderBy('name')->get(),
-            'variants' => ProductVariant::with('product:id,name')->orderBy('id')->get(),
+            'variants' => $variants,
+            // حجم كل متغيّر بالمتر المكعّب — تملأ به الواجهة خانة الـCBM فور اختيار
+            // الصنف، فلا يُعاد إدخال ما هو مسجَّل في كرت الصنف.
+            'variantCbm' => $variants->mapWithKeys(fn (ProductVariant $v) => [
+                (string) $v->id => (float) ($v->cbm ?? $v->product?->cbm ?? 0),
+            ])->all(),
+            'baseCurrency' => strtoupper((string) config('app.currency', 'ILS')),
+            'currencies' => self::CURRENCIES,
         ];
     }
 
@@ -155,6 +177,7 @@ class PurchaseInvoiceController extends Controller
         return view('admin.purchasing.invoices.show', [
             'invoice' => $invoice->load(['items.variant.product', 'supplier', 'journalEntry']),
             'treasuries' => Treasury::where('is_active', true)->orderBy('name')->get(),
+            'currencies' => self::CURRENCIES,
         ]);
     }
 
