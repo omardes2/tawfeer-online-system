@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Inventory\IssueStockRequest;
 use App\Http\Requests\Inventory\ReceiveStockRequest;
 use App\Http\Requests\Inventory\TransferStockRequest;
+use App\Http\Requests\Inventory\UpdateProductQuantitiesRequest;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
@@ -20,6 +21,8 @@ use App\Modules\Inventory\Services\ReservationService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class InventoryController extends Controller
@@ -102,10 +105,105 @@ class InventoryController extends Controller
     {
         $this->authorize('update', $product);
 
+        $warehouses = Warehouse::orderByDesc('is_default')->orderBy('name')->get(['id', 'name']);
+        $warehouse = $warehouses->firstWhere('id', (int) request('warehouse_id')) ?? $warehouses->first();
+
         return view('admin.inventory.product-edit', [
             'product' => $product,
             'categories' => Category::orderBy('name')->get(['id', 'name']),
+            'warehouses' => $warehouses,
+            'currentWarehouse' => $warehouse,
+            // المخزون يُحفظ لكل متغيّر على حدة، فالتعديل صفٌّ لكل متغيّر لا خانة واحدة.
+            'variantRows' => $this->variantRows($product, $warehouse),
         ]);
+    }
+
+    /**
+     * صفوف تعديل الكمية: متغيّرات الصنف المفعّلة وكمية كلٍّ منها في المستودع.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function variantRows(Product $product, ?Warehouse $warehouse)
+    {
+        if ($warehouse === null) {
+            return collect();
+        }
+
+        $variants = $product->variants()->where('is_active', true)
+            ->with('attributeValues:id,value,label')->orderBy('id')->get();
+
+        $onHand = InventoryStock::where('warehouse_id', $warehouse->id)
+            ->whereIn('variant_id', $variants->pluck('id'))
+            ->pluck('on_hand', 'variant_id');
+
+        return $variants->map(fn (ProductVariant $v) => [
+            'id' => $v->id,
+            'sku' => $v->sku,
+            // اسم الخيارات (لون/مقاس) إن وُجدت، وإلا الصنف نفسه بلا خيارات.
+            'options' => $v->attributeValues->map(fn ($a) => $a->label ?: $a->value)->filter()->implode(' - '),
+            'on_hand' => (float) ($onHand[$v->id] ?? 0),
+        ]);
+    }
+
+    /**
+     * تعديل كميات الصنف يدويًّا من كرت الصنف.
+     *
+     * لا كتابة مباشرة على الرصيد: يُحسب الفرق ويُسجَّل **حركة تسوية**
+     * (`adjustment_in`/`adjustment_out`) بسبب — فيبقى أثرٌ يُسأل عنه لاحقًا،
+     * ويبقى الرصيد نتيجةَ حركات لا رقمًا مكتوبًا.
+     *
+     * وبلا تكلفة عمدًا: التسوية بلا تكلفة لا تعيد حساب متوسط التكلفة
+     * (`InventoryService::record`)، فلا ينحرف أساس التكلفة بتصحيحِ عدد.
+     */
+    public function updateQuantities(UpdateProductQuantitiesRequest $request, Product $product): RedirectResponse
+    {
+        $warehouse = Warehouse::findOrFail($request->validated('warehouse_id'));
+        $reason = $request->validated('reason') ?: __('تعديل يدوي من كرت الصنف');
+
+        $allowed = $product->variants()->where('is_active', true)->pluck('id');
+        $changed = 0;
+
+        try {
+            DB::transaction(function () use ($request, $warehouse, $reason, $allowed, &$changed) {
+                foreach ($request->validated('quantities') as $variantId => $target) {
+                    // الخانة الفارغة = «لا تغيير»، لا صفر.
+                    if ($target === null || $target === '') {
+                        continue;
+                    }
+                    if (! $allowed->contains((int) $variantId)) {
+                        continue;   // متغيّر لا يخصّ هذا الصنف — يُتجاهل بصمت.
+                    }
+
+                    $variant = ProductVariant::findOrFail((int) $variantId);
+                    $current = (float) (InventoryStock::where('variant_id', $variant->id)
+                        ->where('warehouse_id', $warehouse->id)->value('on_hand') ?? 0);
+
+                    $diff = round((float) $target - $current, 3);
+                    if (abs($diff) < 1e-9) {
+                        continue;
+                    }
+
+                    $opts = ['reason' => $reason, 'note' => __('من كرت الصنف')];
+                    $diff > 0
+                        ? $this->inventory->adjustIn($variant, $warehouse, $diff, null, $opts)
+                        : $this->inventory->adjustOut($variant, $warehouse, abs($diff), $opts);
+
+                    $changed++;
+                }
+            });
+        } catch (ValidationException $e) {
+            // أشهرها: خفضٌ يجعل المتاح سالبًا (كمية محجوزة لطلبات قائمة).
+            return back()->withErrors($e->errors())->withInput();
+        }
+
+        if ($changed === 0) {
+            return back()->with('warning', __('لم تتغيّر أي كمية.'));
+        }
+
+        return back()->with('success', trans_choice(
+            '{1}عُدِّلت كمية متغيّر واحد.|{2}عُدِّلت كميتا متغيّرين.|[3,*]عُدِّلت كميات :count متغيّرات.',
+            $changed, ['count' => $changed],
+        ));
     }
 
     public function updateProduct(Request $request, Product $product): RedirectResponse

@@ -205,6 +205,8 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('products/{product}', [InventoryController::class, 'showProduct'])->name('products.show');
         Route::get('products/{product}/edit', [InventoryController::class, 'editProduct'])->name('products.edit')->middleware('can:catalog.products.update');
         Route::put('products/{product}', [InventoryController::class, 'updateProduct'])->name('products.update')->middleware('can:catalog.products.update');
+        // تعديل الكميات من كرت الصنف — صلاحية مخزنية لا صلاحية تحرير منتج.
+        Route::put('products/{product}/quantities', [InventoryController::class, 'updateQuantities'])->name('products.quantities');
         Route::get('movements', [InventoryController::class, 'movements'])->name('movements');
         Route::get('reservations', [InventoryController::class, 'reservations'])->name('reservations');
         Route::post('reservations/{reservation}/release', [InventoryController::class, 'releaseReservation'])->name('reservations.release');

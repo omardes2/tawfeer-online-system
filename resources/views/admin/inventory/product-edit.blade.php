@@ -54,5 +54,87 @@
                 <button type="submit" class="btn-primary">{{ __('حفظ') }}</button>
             </div>
         </form>
+
+        {{--
+            تعديل الكميات — نموذج منفصل عن الأسعار عمدًا: تغييرُ رصيدٍ حركةٌ
+            مخزنية لها سبب وأثر، لا حقلٌ يُحفظ مع اسم الصنف.
+
+            صفٌّ لكل متغيّر لأن المخزون يُحفظ لكل متغيّر في كل مستودع على حدة.
+        --}}
+        @can('inventory.operations.receive')
+            <form method="POST" action="{{ route('admin.inventory.products.quantities', $product) }}"
+                  class="bg-white shadow-sm sm:rounded-lg p-6 space-y-5">
+                @csrf @method('PUT')
+
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900">{{ __('الكميات') }}</h3>
+                        <p class="text-sm text-gray-400">
+                            {{ __('اكتب الكمية الجديدة؛ يسجّل النظام الفرق كحركة تسوية. اترك الخانة فارغة لتُبقيها كما هي.') }}
+                        </p>
+                    </div>
+
+                    @if ($warehouses->count() > 1)
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">{{ __('المستودع') }}</label>
+                            <select name="warehouse_id" class="rounded-lg border-gray-300 text-sm"
+                                    onchange="window.location = '{{ route('admin.inventory.products.edit', $product) }}?warehouse_id=' + this.value">
+                                @foreach ($warehouses as $wh)
+                                    <option value="{{ $wh->id }}" @selected($currentWarehouse?->id === $wh->id)>{{ $wh->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @else
+                        <input type="hidden" name="warehouse_id" value="{{ $currentWarehouse?->id }}" />
+                    @endif
+                </div>
+
+                @if ($variantRows->isEmpty())
+                    <p class="text-sm text-gray-500">{{ __('لا متغيّرات مفعّلة لهذا الصنف.') }}</p>
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="text-gray-500 border-b">
+                                <tr>
+                                    <th class="py-2 px-3 font-medium text-start">{{ __('المتغيّر') }}</th>
+                                    <th class="py-2 px-3 font-medium text-start">{{ __('الكمية الحالية') }}</th>
+                                    <th class="py-2 px-3 font-medium text-start">{{ __('الكمية الجديدة') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                @foreach ($variantRows as $row)
+                                    <tr>
+                                        <td class="py-2 px-3">
+                                            <span class="text-gray-800">{{ $row['options'] ?: $product->name }}</span>
+                                            <span class="block text-xs text-gray-400 font-mono">{{ $row['sku'] }}</span>
+                                        </td>
+                                        <td class="py-2 px-3 tabular-nums font-bold text-gray-900">
+                                            {{ rtrim(rtrim(number_format($row['on_hand'], 3), '0'), '.') }}
+                                        </td>
+                                        <td class="py-2 px-3">
+                                            <input type="number" step="0.001" min="0"
+                                                   name="quantities[{{ $row['id'] }}]"
+                                                   value="{{ old('quantities.'.$row['id']) }}"
+                                                   placeholder="{{ __('بلا تغيير') }}"
+                                                   class="w-32 rounded-md border-gray-300 text-sm" />
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <x-admin.field :label="__('سبب التعديل')" name="reason">
+                        <input type="text" name="reason" value="{{ old('reason') }}" maxlength="255"
+                               placeholder="{{ __('جرد، تلف، تصحيح إدخال…') }}"
+                               class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                    </x-admin.field>
+
+                    <div class="flex items-center justify-end">
+                        <button type="submit" class="btn-primary">{{ __('حفظ الكميات') }}</button>
+                    </div>
+                @endif
+            </form>
+        @endcan
     </div>
 </x-app-layout>
