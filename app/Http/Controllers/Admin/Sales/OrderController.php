@@ -307,7 +307,7 @@ class OrderController extends Controller
         $this->authorize('view', $order);
 
         return view('admin.sales.orders.invoice', [
-            'order' => $order->load(['city', 'area', 'items.variant.product', 'customer', 'latestShipment']),
+            'order' => $order->load(['city', 'area', 'items.variant.product', 'items.variant.attributeValues', 'customer', 'latestShipment']),
             // خزائن التحصيل (نقدية/بنكية) لنافذة الدفع الجزئي/الكامل — مربوطة بحساب GL فقط.
             'treasuries' => Treasury::query()
                 ->where('is_active', true)->whereNotNull('gl_account_id')

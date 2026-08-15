@@ -58,6 +58,7 @@
         table.items thead th.num, table.items tbody td.num { text-align: start; }
         table.items tbody td { padding: 11px 12px; font-size: 13.5px; border-bottom: 1px solid #eef0f2; vertical-align: top; }
         table.items tbody tr:nth-child(even) td { background: #fbfbfc; }
+        table.items td.prod .opts { display: block; margin-top: 2px; font-size: 12px; color: #6b7280; }
         .prod { font-weight: 600; color: #111827; }
         .desc { color: #4b5563; }
         .accent { color: #2563eb; }
@@ -135,7 +136,13 @@
             <tbody>
                 @foreach ($order->items as $item)
                     <tr>
-                        <td class="prod">{{ $item->variant?->product?->name ?? $item->variant?->name ?? $item->variant?->sku ?? __('صنف') }}</td>
+                        <td class="prod">
+                            {{ $item->variant?->product?->name ?? $item->variant?->name ?? $item->variant?->sku ?? __('صنف') }}
+                            {{-- اللون/المقاس: بند «قميص» بلا خياراته لا يكفي مَن يجهّزه --}}
+                            @if ($opts = $item->optionsLabel())
+                                <span class="opts">{{ $opts }}</span>
+                            @endif
+                        </td>
                         <td class="desc accent">{{ $item->variant?->sku ?: '—' }}</td>
                         <td class="num">{{ rtrim(rtrim(number_format((float) $item->qty, 2), '0'), '.') }}</td>
                         <td class="num">{{ $money($item->unit_price) }}</td>

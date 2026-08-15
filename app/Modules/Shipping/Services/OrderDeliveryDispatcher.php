@@ -92,15 +92,27 @@ class OrderDeliveryDispatcher
      */
     private function buildPayload(Order $order, ?int $providerId): array
     {
-        $order->loadMissing('items.variant.product', 'creator.deliveryBusiness');
+        // `attributeValues`: خيارات المتغيّر (لون/مقاس) تدخل وصف الأصناف.
+        $order->loadMissing('items.variant.product', 'items.variant.attributeValues', 'creator.deliveryBusiness');
 
         // البزنس الذي تُدخَل الشحنة تحته = بزنس مُنشئ الطلب (إن رُبط)، وإلا الافتراضي من الإعدادات.
         $business = $order->creator?->deliveryBusiness;
 
         $qty = (int) max(1, (int) round($order->items->sum(fn ($i) => (float) $i->qty)));
         $description = $order->items
-            // الكمية بين نجمتين بطلب صريح من مالك النظام: «شواية متنقلة *2*».
-            ->map(fn ($i) => trim(($i->variant?->product?->name ?? '').' *'.rtrim(rtrim((string) $i->qty, '0'), '.').'*'))
+            // بطلب صريح من مالك النظام: الخيارات ثم الكمية، كلٌّ بين نجمتين —
+            // «شواية متنقلة *2*»، و«قميص قطني *أحمر - L* *2*» لصنفٍ بخيارات.
+            // الخيارات تُذكر لأن مَن يجهّز الطرد ومَن يسلّمه لا يميّزان مقاسًا
+            // من مقاس باسم المنتج وحده.
+            ->map(function ($i) {
+                $options = $i->optionsLabel();
+
+                return trim(
+                    ($i->variant?->product?->name ?? '')
+                    .($options !== '' ? ' *'.$options.'*' : '')
+                    .' *'.rtrim(rtrim((string) $i->qty, '0'), '.').'*'
+                );
+            })
             ->filter()->implode(' , ');
 
         // الدفع عند الاستلام هو النمط الافتراضي (يُلغى إن كان الطلب مدفوعًا مسبقًا).

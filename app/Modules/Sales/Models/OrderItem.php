@@ -43,4 +43,22 @@ class OrderItem extends Model
     {
         return $this->belongsTo(ProductVariant::class, 'variant_id');
     }
+
+    /**
+     * خيارات المتغيّر (لون/مقاس) كنصّ واحد، أو `''` لصنفٍ بلا خيارات.
+     *
+     * موضعٌ واحد تقرأ منه الفاتورةُ وحمولةُ الشحنة معًا: بند «قميص» بلا لونه
+     * ولا مقاسه لا يكفي مَن يجهّزه في المستودع ولا مَن يسلّمه للزبون، وتكرار
+     * التنسيق في الموضعين يجعلهما يفترقان بأول تعديل.
+     */
+    public function optionsLabel(): string
+    {
+        $values = $this->variant?->attributeValues;
+
+        if ($values === null) {
+            return '';
+        }
+
+        return $values->map(fn ($v) => $v->label ?: $v->value)->filter()->implode(' - ');
+    }
 }
