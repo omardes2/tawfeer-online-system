@@ -89,6 +89,11 @@ class OrderPolicy
      * زبون — لا أثر له. بعد التأكيد يكون قد رُحِّل محاسبيًّا وأُرسل لشركة
      * التوصيل، فإلغاؤه يعكس قيودًا ومخزونًا ويُلغي شحنة قائمة؛ قرارٌ يخصّ من
      * يملك التأكيد نفسه لا من أدخل الطلب.
+     *
+     * غير أن الحدّ الفعلي هو **واقع الطرد** لا حالة الطلب عندنا: ما دام الطرد
+     * «بانتظار الاستلام» لدى أوبتيموس فلم يتحرّك شيء بعد، وإلغاؤه تصحيحٌ نظيف
+     * يقع عندنا وعند شركة التوصيل معًا. وحين يستلمه المندوب يصير في الطريق
+     * فعلًا، فينتقل القرار إلى من يملك التأكيد.
      */
     public function cancel(User $user, Order $m): bool
     {
@@ -96,7 +101,9 @@ class OrderPolicy
             return false;
         }
 
-        return $this->awaitingConfirmation($m) || $user->can('sales.orders.confirm');
+        return $this->awaitingConfirmation($m)
+            || $this->awaitingPickup($m)
+            || $user->can('sales.orders.confirm');
     }
 
     /** لم يُؤكَّد بعد: الحالتان الوحيدتان اللتان يقبلهما `OrderService::confirm`. */
@@ -104,4 +111,21 @@ class OrderPolicy
     {
         return $m->confirmed_at === null && in_array($m->status, ['draft', 'new'], true);
     }
+
+    /**
+     * الطرد ما زال «بانتظار الاستلام» لدى أوبتيموس.
+     *
+     * القيم مكرَّرة من `OpostStatus::LABELS` عمدًا لا مقروءةً من تسميتها
+     * العربية: ربطُ صلاحيةٍ بنصٍّ معروض يجعل تعديل كلمة في الواجهة يفتح الإلغاء
+     * أو يغلقه صامتًا. اختبارٌ يحرس تطابق القائمتين.
+     */
+    private function awaitingPickup(Order $m): bool
+    {
+        $status = strtolower(trim((string) $m->latestShipment?->provider_status));
+
+        return in_array($status, self::AWAITING_PICKUP_STATUSES, true);
+    }
+
+    /** @var list<string> */
+    public const AWAITING_PICKUP_STATUSES = ['submit', 'submitted'];
 }
