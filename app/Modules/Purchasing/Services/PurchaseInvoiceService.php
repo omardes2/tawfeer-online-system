@@ -197,6 +197,19 @@ class PurchaseInvoiceService
                     $v, __('حذف فاتورة مشتريات :n', ['n' => $invoice->number]),
                 ));
 
+            // قيود فروق الصرف ليست سندات، فلا تلتقطها الحلقة أعلاه — ولو تُركت
+            // بقيت على المورد ذمّةٌ وهمية بمقدار الفرق.
+            JournalEntry::where('source', 'purchase_invoice_fx')
+                ->where('reference_id', $invoice->id)
+                ->get()
+                ->each(function (JournalEntry $entry) use ($invoice) {
+                    if ($entry->isPosted() && ! $entry->isReversed()) {
+                        $this->accounting->reverse($entry, [
+                            'description' => __('عكس فرق صرف فاتورة :n (حذف)', ['n' => $invoice->number]),
+                        ]);
+                    }
+                });
+
             $invoice->update(['amount_paid' => 0, 'payment_status' => 'unpaid']);
 
             if ($invoice->status === 'posted') {
@@ -674,21 +687,9 @@ class PurchaseInvoiceService
             throw ValidationException::withMessages(['amount' => __('المبلغ يجب أن يكون بين 0 والمتبقّي (:due).', ['due' => number_format($due, 2)])]);
         }
 
-        // نُخصم من حساب المورد الفرعي نفسه المستخدَم في الترحيل (يبقى رصيده صحيحًا).
-        $payable = Account::where('code', $this->payableAccountCode($invoice))->firstOrFail();
-
-        return DB::transaction(function () use ($invoice, $treasuryId, $amount, $date, $payable) {
-            $voucher = $this->vouchers->create('payment', [
-                'treasury_id' => $treasuryId,
-                'amount' => $amount,
-                'counter_account_id' => $payable->id,
-                'supplier_id' => $invoice->supplier_id,
-                'reference' => $invoice->number,
-                'description' => __('دفعة فاتورة شراء :n', ['n' => $invoice->number]),
-                'voucher_date' => $date ?? now()->toDateString(),
-            ]);
-            $this->vouchers->approve($voucher);
-            $this->vouchers->post($voucher);
+        return DB::transaction(function () use ($invoice, $treasuryId, $amount, $date) {
+            // نُخصم من حساب المورد الفرعي نفسه المستخدَم في الترحيل (يبقى رصيده صحيحًا).
+            $this->recordPayment($invoice, $treasuryId, $amount, $date);
 
             $paid = round((float) $invoice->amount_paid + $amount, 2);
             $invoice->update([
@@ -698,6 +699,111 @@ class PurchaseInvoiceService
 
             return $invoice;
         });
+    }
+
+    /**
+     * سداد فاتورة استيراد بمبلغٍ بالدولار وسعرِ صرفِ يومِ الدفع.
+     *
+     * الدَّين قُيّد على المورد بسعر يوم الفاتورة، ويُدفع اليوم بسعر آخر. فيخرج من
+     * الخزينة `usd × سعر اليوم` بينما يُطفأ من ذمّة المورد `usd × سعر الفاتورة` —
+     * والفارق ليس دَينًا باقيًا بل **فرقُ صرف** يُسجَّل نتيجةً، وإلا بقيت على
+     * المورد قروشٌ لا يعرفها ولا تُسدَّد أبدًا.
+     *
+     * سند الصرف يحمل المبلغ النقدي كما هو (فرصيدُ الخزينة يبقى صحيحًا)، ويُقيَّد
+     * الفرقُ في قيدٍ مستقلّ يُصفّر ذمّة المورد بالضبط.
+     */
+    public function payForeign(
+        PurchaseInvoice $invoice,
+        int $treasuryId,
+        float $foreignAmount,
+        float $paymentRate,
+        ?string $date = null,
+    ): PurchaseInvoice {
+        if (! $invoice->isImport()) {
+            throw ValidationException::withMessages([
+                'amount' => __('السداد بالعملة الأجنبية للفواتير المستوردة فقط.'),
+            ]);
+        }
+        if ($paymentRate <= 0) {
+            throw ValidationException::withMessages(['payment_rate' => __('أدخل سعر صرف يوم الدفع.')]);
+        }
+
+        $invoiceRate = (float) $invoice->usd_rate;
+        $relieved = round($foreignAmount * $invoiceRate, 2);  // ما يُطفأ من ذمّة المورد
+        $cash = round($foreignAmount * $paymentRate, 2);      // ما يخرج من الخزينة
+        $difference = round($cash - $relieved, 2);            // موجب = خسارة صرف
+
+        $due = $invoice->balanceDue();
+        if ($foreignAmount <= 0 || $relieved > $due + 0.01) {
+            throw ValidationException::withMessages([
+                'amount' => __('المبلغ يتجاوز المتبقّي (:due).', ['due' => number_format($due, 2)]),
+            ]);
+        }
+
+        return DB::transaction(function () use ($invoice, $treasuryId, $cash, $relieved, $difference, $date) {
+            $this->recordPayment($invoice, $treasuryId, $cash, $date);
+
+            if (abs($difference) >= 0.01) {
+                $this->postFxDifference($invoice, $difference, $date);
+            }
+
+            // المُسدَّد يُقاس بما أُطفئ من الذمّة لا بما خرج من الخزينة — وإلا لم
+            // يصل المتبقّي إلى الصفر أبدًا.
+            $paid = round((float) $invoice->amount_paid + $relieved, 2);
+            $invoice->update([
+                'amount_paid' => $paid,
+                'payment_status' => $paid + 0.01 >= (float) $invoice->total ? 'paid' : 'partial',
+            ]);
+
+            return $invoice;
+        });
+    }
+
+    /** سند صرف مُرحّل: مدين ذمم المورد / دائن الخزنة. */
+    private function recordPayment(PurchaseInvoice $invoice, int $treasuryId, float $amount, ?string $date): void
+    {
+        $payable = Account::where('code', $this->payableAccountCode($invoice))->firstOrFail();
+
+        $voucher = $this->vouchers->create('payment', [
+            'treasury_id' => $treasuryId,
+            'amount' => $amount,
+            'counter_account_id' => $payable->id,
+            'supplier_id' => $invoice->supplier_id,
+            'reference' => $invoice->number,
+            'description' => __('دفعة فاتورة شراء :n', ['n' => $invoice->number]),
+            'voucher_date' => $date ?? now()->toDateString(),
+        ]);
+        $this->vouchers->approve($voucher);
+        $this->vouchers->post($voucher);
+    }
+
+    /**
+     * قيد فرق الصرف. موجب = دفعنا شواكلَ أكثر ممّا قُيّد ⇒ خسارة (مدين الفروق /
+     * دائن ذمم المورد، فتُصفَّر الذمّة). سالب = العكس.
+     */
+    private function postFxDifference(PurchaseInvoice $invoice, float $difference, ?string $date): void
+    {
+        $amount = abs($difference);
+        $payableCode = $this->payableAccountCode($invoice);
+        $fxCode = config('accounting.purchasing.fx_difference_account');
+
+        $lines = $difference > 0
+            ? [
+                ['account_code' => $fxCode, 'debit' => $amount, 'credit' => 0],
+                ['account_code' => $payableCode, 'debit' => 0, 'credit' => $amount],
+            ]
+            : [
+                ['account_code' => $payableCode, 'debit' => $amount, 'credit' => 0],
+                ['account_code' => $fxCode, 'debit' => 0, 'credit' => $amount],
+            ];
+
+        $this->accounting->postEntry([
+            'entry_date' => $date ?? now()->toDateString(),
+            'description' => __('فرق صرف دفعة فاتورة :n', ['n' => $invoice->number]),
+            'source' => 'purchase_invoice_fx',
+            'reference_type' => 'purchase_invoice',
+            'reference_id' => $invoice->id,
+        ], $lines);
     }
 
     /** عكس ترحيل الفاتورة (لا حذف). يُمنع إن سُدّد منها شيء. */

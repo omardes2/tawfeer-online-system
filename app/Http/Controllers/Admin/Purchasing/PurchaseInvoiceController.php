@@ -210,7 +210,20 @@ class PurchaseInvoiceController extends Controller
             'treasury_id' => ['required', 'integer', 'exists:treasuries,id'],
             'amount' => ['required', 'numeric', 'gt:0'],
             'voucher_date' => ['nullable', 'date'],
+            // سعر صرف يوم الدفع — بوجوده يُقرأ «المبلغ» بالدولار ويُحسب فرق الصرف.
+            'payment_rate' => ['nullable', 'numeric', 'gt:0'],
         ]);
+
+        $rate = isset($data['payment_rate']) ? (float) $data['payment_rate'] : null;
+
+        if ($rate !== null && $invoice->isImport()) {
+            return $this->guard(
+                fn () => $this->service->payForeign(
+                    $invoice, (int) $data['treasury_id'], (float) $data['amount'], $rate, $data['voucher_date'] ?? null,
+                ),
+                __('سُجّلت الدفعة وقُيّد فرق الصرف.'),
+            );
+        }
 
         return $this->guard(
             fn () => $this->service->pay($invoice, (int) $data['treasury_id'], (float) $data['amount'], $data['voucher_date'] ?? null),

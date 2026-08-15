@@ -133,6 +133,12 @@
                 <div class="flex justify-between text-base font-bold text-gray-900 border-t border-gray-100 pt-2"><span>{{ __('الإجمالي') }}</span><span class="tabular-nums">{{ number_format($invoice->total, 2) }}</span></div>
                 <div class="flex justify-between text-emerald-600"><span>{{ __('المدفوع') }}</span><span class="tabular-nums">{{ number_format($invoice->amount_paid, 2) }}</span></div>
                 <div class="flex justify-between font-semibold {{ $invoice->balanceDue() > 0 ? 'text-rose-600' : 'text-gray-400' }}"><span>{{ __('المتبقّي') }}</span><span class="tabular-nums">{{ number_format($invoice->balanceDue(), 2) }}</span></div>
+                @if ($invoice->isImport() && (float) $invoice->usd_rate > 0)
+                    <div class="flex justify-between text-xs text-gray-400">
+                        <span>{{ __('المتبقّي بالدولار (بسعر يوم الفاتورة)') }}</span>
+                        <span class="tabular-nums">{{ number_format($invoice->balanceDue() / (float) $invoice->usd_rate, 2) }} $</span>
+                    </div>
+                @endif
             </div>
 
             @if ($invoice->isImport())
@@ -149,8 +155,31 @@
 
             @if ($invoice->status === 'posted' && $invoice->balanceDue() > 0)
                 @can('purchasing.invoices.pay')
-                    <div class="admin-card admin-card-pad">
+                    @php
+                        // الدَّين بالدولار: قيمتُه يوم الفاتورة مقسومةً على سعر ذلك اليوم.
+                        $dueUsd = $invoice->isImport() && (float) $invoice->usd_rate > 0
+                            ? round($invoice->balanceDue() / (float) $invoice->usd_rate, 2) : 0;
+                    @endphp
+
+                    <div class="admin-card admin-card-pad"
+                         x-data="{
+                            foreign: {{ $invoice->isImport() ? 'true' : 'false' }},
+                            usd: {{ $dueUsd }},
+                            rate: {{ (float) $invoice->usd_rate ?: 0 }},
+                            invoiceRate: {{ (float) $invoice->usd_rate ?: 0 }},
+                            cash() { return (Number(this.usd) || 0) * (Number(this.rate) || 0); },
+                            relieved() { return (Number(this.usd) || 0) * this.invoiceRate; },
+                            diff() { return this.cash() - this.relieved(); },
+                         }">
                         <h3 class="font-semibold text-gray-800 mb-3">{{ __('تسجيل دفعة') }}</h3>
+
+                        @if ($invoice->isImport())
+                            <label class="flex items-center gap-2 text-sm text-gray-700 mb-3 cursor-pointer">
+                                <input type="checkbox" x-model="foreign" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                                {{ __('الدفع بمبلغ بالدولار وسعر صرف اليوم') }}
+                            </label>
+                        @endif
+
                         <form method="POST" action="{{ route('admin.purchasing.invoices.pay', $invoice) }}" class="space-y-3">
                             @csrf
                             <x-admin.field :label="__('من الخزنة/البنك')" name="treasury_id" required>
@@ -160,9 +189,46 @@
                                     @endforeach
                                 </select>
                             </x-admin.field>
-                            <x-admin.field :label="__('المبلغ')" name="amount" required>
-                                <input type="number" step="0.01" min="0.01" max="{{ $invoice->balanceDue() }}" name="amount" value="{{ $invoice->balanceDue() }}" required class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
-                            </x-admin.field>
+
+                            @if ($invoice->isImport())
+                                {{--
+                                    بالعملة الأجنبية: يُدخل المبلغ بالدولار وسعرُ اليوم، فيخرج
+                                    من الخزينة `usd × سعر اليوم` ويُطفأ من ذمّة المورد
+                                    `usd × سعر الفاتورة`، والفارق فرقُ صرف.
+                                --}}
+                                <template x-if="foreign">
+                                    <div class="space-y-3">
+                                        <x-admin.field :label="__('المبلغ بالدولار')" name="amount" required>
+                                            <input type="number" step="0.01" min="0.01" name="amount" x-model.number="usd" required
+                                                   class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                                            <p class="mt-1 text-xs text-gray-500">{{ __('المتبقّي: :n $', ['n' => number_format($dueUsd, 2)]) }}</p>
+                                        </x-admin.field>
+
+                                        <x-admin.field :label="__('سعر الدولار اليوم')" name="payment_rate" required>
+                                            <input type="number" step="0.000001" min="0.000001" name="payment_rate" x-model.number="rate" required
+                                                   class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                                            <p class="mt-1 text-xs text-gray-500">{{ __('سعر يوم الفاتورة: :n', ['n' => rtrim(rtrim(number_format((float) $invoice->usd_rate, 6), '0'), '.')]) }}</p>
+                                        </x-admin.field>
+
+                                        <div class="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-1.5 text-sm">
+                                            <div class="flex justify-between"><span class="text-gray-500">{{ __('يخرج من الخزينة') }}</span><span class="font-semibold tabular-nums" x-text="cash().toFixed(2)"></span></div>
+                                            <div class="flex justify-between"><span class="text-gray-500">{{ __('يُطفأ من ذمّة المورد') }}</span><span class="tabular-nums" x-text="relieved().toFixed(2)"></span></div>
+                                            <div class="flex justify-between border-t border-gray-200 pt-1.5">
+                                                <span class="text-gray-500" x-text="diff() >= 0 ? '{{ __('خسارة صرف') }}' : '{{ __('ربح صرف') }}'"></span>
+                                                <span class="font-semibold tabular-nums" :class="Math.abs(diff()) < 0.01 ? 'text-gray-400' : (diff() > 0 ? 'text-rose-600' : 'text-emerald-700')"
+                                                      x-text="Math.abs(diff()).toFixed(2)"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            @endif
+
+                            <template x-if="!foreign">
+                                <x-admin.field :label="__('المبلغ')" name="amount" required>
+                                    <input type="number" step="0.01" min="0.01" max="{{ $invoice->balanceDue() }}" name="amount" value="{{ $invoice->balanceDue() }}" required class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                                </x-admin.field>
+                            </template>
+
                             <button type="submit" class="btn-primary w-full">{{ __('دفع') }}</button>
                         </form>
                     </div>

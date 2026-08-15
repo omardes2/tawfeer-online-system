@@ -33,6 +33,7 @@ return [
         'tax_account' => env('ACC_INPUT_TAX_ACCOUNT', '1250'),       // ضريبة المدخلات (أصل قابل للاسترداد)
         'import_accrual_account' => env('ACC_IMPORT_ACCRUAL', '2110'),   // مصاريف استيراد مستحقة (خصم)
         'import_variance_account' => env('ACC_IMPORT_VARIANCE', '5050'), // فروق تقدير تكاليف الاستيراد (مصروف)
+        'fx_difference_account' => env('ACC_FX_DIFFERENCE', '5060'),     // فروق أسعار الصرف (مصروف)
     ],
 
     /*
