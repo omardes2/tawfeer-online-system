@@ -6,6 +6,8 @@
     <x-admin.flash />
 
     @php
+        // ثلاث عملات تجتمع في هذه الشاشة، فرمزُ كل رقم جزءٌ من معناه.
+        $baseSymbol = \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪');
         $head = [
             'currency' => old('currency', $editing ? $invoice->currency : $baseCurrency),
             'fx_rate_to_usd' => (float) old('fx_rate_to_usd', $editing ? (float) $invoice->fx_rate_to_usd : 0),
@@ -239,8 +241,8 @@
             <div class="flex items-center justify-between mt-3">
                 <button type="button" @click="addRow()" class="btn-secondary btn-sm">+ {{ __('إضافة بند') }}</button>
                 <div class="text-sm text-gray-600 space-y-0.5 text-start">
-                    <div>{{ __('الإجمالي الفرعي') }}: <span class="font-medium tabular-nums" x-text="subtotal().toFixed(2)"></span></div>
-                    <div>{{ __('الضريبة') }}: <span class="font-medium tabular-nums" x-text="tax().toFixed(2)"></span></div>
+                    <div>{{ __('الإجمالي الفرعي') }}: <span class="font-medium tabular-nums" x-text="subtotal().toFixed(2)"></span> <span class="text-xs text-gray-400">{{ $baseSymbol }}</span></div>
+                    <div>{{ __('الضريبة') }}: <span class="font-medium tabular-nums" x-text="tax().toFixed(2)"></span> <span class="text-xs text-gray-400">{{ $baseSymbol }}</span></div>
                     <div class="text-base font-bold text-gray-900">{{ __('الإجمالي') }}: <span class="tabular-nums" x-text="total().toFixed(2)"></span> {{ \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪') }}</div>
                 </div>
             </div>
@@ -251,15 +253,15 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                     <div>
                         <p class="text-gray-500 text-xs">{{ __('ذمّة المورد') }} <span x-text="symbol(head.currency)"></span></p>
-                        <p class="font-semibold tabular-nums text-gray-800" x-text="foreignSubtotal().toFixed(2)"></p>
+                        <p class="font-semibold tabular-nums text-gray-800"><span x-text="foreignSubtotal().toFixed(2)"></span><span class="ms-1 text-xs font-normal text-gray-400" x-text="symbol(head.currency)"></span></p>
                     </div>
                     <div>
                         <p class="text-gray-500 text-xs">{{ __('ذمّة المورد') }} $</p>
-                        <p class="font-semibold tabular-nums text-gray-800" x-text="toUsd(subtotal()).toFixed(2)"></p>
+                        <p class="font-semibold tabular-nums text-gray-800"><span x-text="toUsd(subtotal()).toFixed(2)"></span><span class="ms-1 text-xs font-normal text-gray-400">$</span></p>
                     </div>
                     <div>
                         <p class="text-gray-500 text-xs">{{ __('ذمّة المورد') }} {{ $currencies[$baseCurrency] ?? $baseCurrency }}</p>
-                        <p class="font-semibold tabular-nums text-gray-800" x-text="subtotal().toFixed(2)"></p>
+                        <p class="font-semibold tabular-nums text-gray-800"><span x-text="subtotal().toFixed(2)"></span><span class="ms-1 text-xs font-normal text-gray-400">{{ $baseSymbol }}</span></p>
                     </div>
                     <div>
                         <p class="text-gray-500 text-xs">{{ __('إجمالي الحجم') }} CBM</p>
@@ -269,11 +271,11 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mt-3 pt-3 border-t border-emerald-200">
                     <div>
                         <p class="text-gray-500 text-xs">{{ __('قيمة المخزون (شاملة)') }}</p>
-                        <p class="font-bold tabular-nums text-emerald-800" x-text="landedSubtotal().toFixed(2)"></p>
+                        <p class="font-bold tabular-nums text-emerald-800"><span x-text="landedSubtotal().toFixed(2)"></span><span class="ms-1 text-xs font-normal text-gray-400">{{ $baseSymbol }}</span></p>
                     </div>
                     <div>
                         <p class="text-gray-500 text-xs">{{ __('مصاريف استيراد مستحقة') }}</p>
-                        <p class="font-bold tabular-nums text-amber-700" x-text="importDifference().toFixed(2)"></p>
+                        <p class="font-bold tabular-nums text-amber-700"><span x-text="importDifference().toFixed(2)"></span><span class="ms-1 text-xs font-normal text-gray-400">{{ $baseSymbol }}</span></p>
                     </div>
                     <div>
                         <p class="text-gray-500 text-xs">{{ __('شحن بحري مقدَّر') }} $</p>

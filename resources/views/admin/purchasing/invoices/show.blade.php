@@ -4,6 +4,11 @@
         $statusLabel = ['draft' => 'مسودّة', 'approved' => 'معتمدة', 'posted' => 'مُرحّلة', 'cancelled' => 'ملغاة', 'reversed' => 'معكوسة'];
         $payTone = ['paid' => 'green', 'partial' => 'amber', 'unpaid' => 'red'];
         $payLabel = ['paid' => 'مدفوعة', 'partial' => 'جزئية', 'unpaid' => 'غير مدفوعة'];
+
+        // ثلاث عملات تجتمع في هذه الشاشة (عملة المورد والدولار والعملة الأساسية)،
+        // فرمزُ كل رقم جزءٌ من معناه لا زينة.
+        $base = \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪');
+        $sym = $currencies[$invoice->currency] ?? $invoice->currency;
     @endphp
 
     <x-admin.header
@@ -66,23 +71,23 @@
             </div>
 
             @if ($invoice->isImport())
-                @php $sym = $currencies[$invoice->currency] ?? $invoice->currency; @endphp
                 <div class="admin-card admin-card-pad">
                     <h3 class="text-sm font-semibold text-gray-800 mb-3">{{ __('بيانات الاستيراد') }}</h3>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div><p class="text-gray-500">{{ __('عملة الفاتورة') }}</p><p class="font-medium text-gray-800">{{ $invoice->currency }} ({{ $sym }})</p></div>
-                        <div><p class="text-gray-500">{{ __('الصرف مقابل الدولار') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->fx_rate_to_usd, 6), '0'), '.') }}</p></div>
-                        <div><p class="text-gray-500">{{ __('سعر الدولار') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->usd_rate, 6), '0'), '.') }}</p></div>
-                        <div><p class="text-gray-500">{{ __('عمولة المشتريات') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->commission_rate, 3), '0'), '.') }}%</p></div>
-                        <div><p class="text-gray-500">{{ __('تكلفة المتر المكعّب') }}</p><p class="font-medium tabular-nums text-gray-800">{{ number_format($invoice->cbm_rate_usd, 2) }} $</p></div>
-                        <div><p class="text-gray-500">{{ __('إجمالي الحجم') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->total_cbm, 6), '0'), '.') }} CBM</p></div>
-                        <div><p class="text-gray-500">{{ __('ذمّة المورد') }} ({{ $sym }})</p><p class="font-medium tabular-nums text-gray-800">{{ number_format($invoice->foreign_subtotal, 2) }}</p></div>
-                        <div><p class="text-gray-500">{{ __('ذمّة المورد') }} ($)</p><p class="font-medium tabular-nums text-gray-800">{{ number_format((float) $invoice->usd_rate > 0 ? (float) $invoice->subtotal / (float) $invoice->usd_rate : 0, 2) }}</p></div>
+                        {{-- سعرا الصرف نسبتان لا مبلغان: تُقرأ وحدتُهما «كم عملة مقابل دولار». --}}
+                        <div><p class="text-gray-500">{{ __('الصرف مقابل الدولار') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->fx_rate_to_usd, 6), '0'), '.') }} <span class="text-xs font-normal text-gray-400">{{ $sym }}/$</span></p></div>
+                        <div><p class="text-gray-500">{{ __('سعر الدولار') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->usd_rate, 6), '0'), '.') }} <span class="text-xs font-normal text-gray-400">{{ $base }}/$</span></p></div>
+                        <div><p class="text-gray-500">{{ __('عمولة المشتريات') }}</p><p class="font-medium tabular-nums text-gray-800">{{ rtrim(rtrim(number_format($invoice->commission_rate, 3), '0'), '.') }}<span class="ms-1 text-xs font-normal text-gray-400">%</span></p></div>
+                        <div><p class="text-gray-500">{{ __('تكلفة المتر المكعّب') }}</p><x-admin.money :value="$invoice->cbm_rate_usd" symbol="$" class="block font-medium text-gray-800" /></div>
+                        <div><p class="text-gray-500">{{ __('إجمالي الحجم') }}</p><x-admin.money :value="$invoice->total_cbm" symbol="CBM" :decimals="6" trim class="block font-medium text-gray-800" /></div>
+                        <div><p class="text-gray-500">{{ __('ذمّة المورد بعملة الفاتورة') }}</p><x-admin.money :value="$invoice->foreign_subtotal" :symbol="$sym" class="block font-medium text-gray-800" /></div>
+                        <div><p class="text-gray-500">{{ __('ذمّة المورد بالدولار') }}</p><x-admin.money :value="(float) $invoice->usd_rate > 0 ? (float) $invoice->subtotal / (float) $invoice->usd_rate : 0" symbol="$" class="block font-medium text-gray-800" /></div>
                     </div>
                 </div>
             @endif
 
-            <x-admin.table :title="__('البنود')">
+            <x-admin.table :title="__('البنود')" dense>
                 <thead>
                     <tr>
                         <th>{{ __('الصنف') }}</th>
@@ -105,20 +110,20 @@
                             <td class="text-gray-800">{{ $it->variant?->product?->name ?? $it->description ?? $it->variant?->sku ?? '—' }}</td>
                             <td class="tabular-nums">{{ rtrim(rtrim(number_format($it->qty, 3), '0'), '.') }}</td>
                             @if ($invoice->isImport())
-                                <td class="tabular-nums">{{ number_format($it->unit_price_foreign, 2) }}</td>
-                                <td class="tabular-nums text-gray-500">{{ rtrim(rtrim(number_format($it->cbm_per_unit, 6), '0'), '.') }}</td>
+                                <td><x-admin.money :value="$it->unit_price_foreign" :symbol="$sym" /></td>
+                                <td><x-admin.money :value="$it->cbm_per_unit" symbol="m³" :decimals="6" trim class="text-gray-500" /></td>
                             @endif
-                            <td class="tabular-nums">{{ number_format($it->unit_cost, 2) }}</td>
+                            <td><x-admin.money :value="$it->unit_cost" :symbol="$base" /></td>
                             @if ($invoice->isImport())
-                                <td class="tabular-nums font-medium text-emerald-700">
-                                    {{ number_format($it->landed_unit_cost, 2) }}
+                                <td>
+                                    <x-admin.money :value="$it->landed_unit_cost" :symbol="$base" class="font-medium text-emerald-700" />
                                     @if ($it->landed_is_manual)
                                         <span class="text-[11px] text-amber-600">{{ __('(يدوي)') }}</span>
                                     @endif
                                 </td>
                             @endif
-                            <td class="tabular-nums text-gray-400">{{ number_format($it->tax_amount, 2) }}</td>
-                            <td class="text-start font-medium tabular-nums">{{ number_format($it->line_total, 2) }}</td>
+                            <td><x-admin.money :value="$it->tax_amount" :symbol="$base" class="text-gray-400" /></td>
+                            <td class="text-start"><x-admin.money :value="$it->line_total" :symbol="$base" class="font-medium" /></td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -128,15 +133,15 @@
         {{-- الملخّص المالي + الدفع --}}
         <div class="space-y-6">
             <div class="admin-card admin-card-pad space-y-2 text-sm">
-                <div class="flex justify-between"><span class="text-gray-500">{{ __('الإجمالي الفرعي') }}</span><span class="tabular-nums">{{ number_format($invoice->subtotal, 2) }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-500">{{ __('الضريبة') }}</span><span class="tabular-nums">{{ number_format($invoice->tax_amount, 2) }}</span></div>
-                <div class="flex justify-between text-base font-bold text-gray-900 border-t border-gray-100 pt-2"><span>{{ __('الإجمالي') }}</span><span class="tabular-nums">{{ number_format($invoice->total, 2) }}</span></div>
-                <div class="flex justify-between text-emerald-600"><span>{{ __('المدفوع') }}</span><span class="tabular-nums">{{ number_format($invoice->amount_paid, 2) }}</span></div>
-                <div class="flex justify-between font-semibold {{ $invoice->balanceDue() > 0 ? 'text-rose-600' : 'text-gray-400' }}"><span>{{ __('المتبقّي') }}</span><span class="tabular-nums">{{ number_format($invoice->balanceDue(), 2) }}</span></div>
+                <div class="flex justify-between"><span class="text-gray-500">{{ __('الإجمالي الفرعي') }}</span><x-admin.money :value="$invoice->subtotal" /></div>
+                <div class="flex justify-between"><span class="text-gray-500">{{ __('الضريبة') }}</span><x-admin.money :value="$invoice->tax_amount" /></div>
+                <div class="flex justify-between text-base font-bold text-gray-900 border-t border-gray-100 pt-2"><span>{{ __('الإجمالي') }}</span><x-admin.money :value="$invoice->total" /></div>
+                <div class="flex justify-between text-emerald-600"><span>{{ __('المدفوع') }}</span><x-admin.money :value="$invoice->amount_paid" /></div>
+                <div class="flex justify-between font-semibold {{ $invoice->balanceDue() > 0 ? 'text-rose-600' : 'text-gray-400' }}"><span>{{ __('المتبقّي') }}</span><x-admin.money :value="$invoice->balanceDue()" /></div>
                 @if ($invoice->isImport() && (float) $invoice->usd_rate > 0)
                     <div class="flex justify-between text-xs text-gray-400">
                         <span>{{ __('المتبقّي بالدولار (بسعر يوم الفاتورة)') }}</span>
-                        <span class="tabular-nums">{{ number_format($invoice->balanceDue() / (float) $invoice->usd_rate, 2) }} $</span>
+                        <x-admin.money :value="$invoice->balanceDue() / (float) $invoice->usd_rate" symbol="$" />
                     </div>
                 @endif
             </div>
@@ -144,9 +149,9 @@
             @if ($invoice->isImport())
                 <div class="admin-card admin-card-pad space-y-2 text-sm border-s-4 border-s-emerald-400">
                     <h3 class="font-semibold text-gray-800">{{ __('التكلفة الشاملة') }}</h3>
-                    <div class="flex justify-between"><span class="text-gray-500">{{ __('قيمة المخزون') }}</span><span class="font-bold tabular-nums text-emerald-700">{{ number_format($invoice->landed_subtotal, 2) }}</span></div>
-                    <div class="flex justify-between"><span class="text-gray-500">{{ __('ذمّة المورد') }}</span><span class="tabular-nums">{{ number_format($invoice->subtotal, 2) }}</span></div>
-                    <div class="flex justify-between border-t border-gray-100 pt-2"><span class="text-gray-500">{{ __('مصاريف استيراد مستحقة') }}</span><span class="font-bold tabular-nums text-amber-700">{{ number_format($invoice->importDifference(), 2) }}</span></div>
+                    <div class="flex justify-between"><span class="text-gray-500">{{ __('قيمة المخزون') }}</span><x-admin.money :value="$invoice->landed_subtotal" class="font-bold text-emerald-700" /></div>
+                    <div class="flex justify-between"><span class="text-gray-500">{{ __('ذمّة المورد') }}</span><x-admin.money :value="$invoice->subtotal" /></div>
+                    <div class="flex justify-between border-t border-gray-100 pt-2"><span class="text-gray-500">{{ __('مصاريف استيراد مستحقة') }}</span><x-admin.money :value="$invoice->importDifference()" class="font-bold text-amber-700" /></div>
                     <p class="text-xs text-gray-500 pt-1">
                         {{ __('دخلت البضاعة المخزونَ بتكلفتها الشاملة، وذمّة المورد بسعرها الحقيقي، والفرق التزامٌ في حساب «مصاريف استيراد مستحقة» يُطفأ عند وصول فاتورة الشحن والمصاريف.') }}
                     </p>
@@ -199,24 +204,31 @@
                                 <template x-if="foreign">
                                     <div class="space-y-3">
                                         <x-admin.field :label="__('المبلغ بالدولار')" name="amount" required>
-                                            <input type="number" step="0.01" min="0.01" name="amount" x-model.number="usd" required
-                                                   class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                                            <div class="relative">
+                                                <input type="number" step="0.01" min="0.01" name="amount" x-model.number="usd" required
+                                                       class="w-full rounded-lg border-gray-300 pe-9 focus:border-emerald-500 focus:ring-emerald-500" />
+                                                <span class="absolute inset-y-0 end-0 flex items-center px-3 text-sm text-gray-400">$</span>
+                                            </div>
                                             <p class="mt-1 text-xs text-gray-500">{{ __('المتبقّي: :n $', ['n' => number_format($dueUsd, 2)]) }}</p>
                                         </x-admin.field>
 
                                         <x-admin.field :label="__('سعر الدولار اليوم')" name="payment_rate" required>
-                                            <input type="number" step="0.000001" min="0.000001" name="payment_rate" x-model.number="rate" required
-                                                   class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                                            <div class="relative">
+                                                <input type="number" step="0.000001" min="0.000001" name="payment_rate" x-model.number="rate" required
+                                                       class="w-full rounded-lg border-gray-300 pe-14 focus:border-emerald-500 focus:ring-emerald-500" />
+                                                <span class="absolute inset-y-0 end-0 flex items-center px-3 text-sm text-gray-400">{{ $base }}/$</span>
+                                            </div>
                                             <p class="mt-1 text-xs text-gray-500">{{ __('سعر يوم الفاتورة: :n', ['n' => rtrim(rtrim(number_format((float) $invoice->usd_rate, 6), '0'), '.')]) }}</p>
                                         </x-admin.field>
 
                                         <div class="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-1.5 text-sm">
-                                            <div class="flex justify-between"><span class="text-gray-500">{{ __('يخرج من الخزينة') }}</span><span class="font-semibold tabular-nums" x-text="cash().toFixed(2)"></span></div>
-                                            <div class="flex justify-between"><span class="text-gray-500">{{ __('يُطفأ من ذمّة المورد') }}</span><span class="tabular-nums" x-text="relieved().toFixed(2)"></span></div>
+                                            <div class="flex justify-between"><span class="text-gray-500">{{ __('يخرج من الخزينة') }}</span><span class="font-semibold tabular-nums whitespace-nowrap"><span x-text="cash().toFixed(2)"></span><span class="ms-1 text-xs font-normal text-gray-400">{{ $base }}</span></span></div>
+                                            <div class="flex justify-between"><span class="text-gray-500">{{ __('يُطفأ من ذمّة المورد') }}</span><span class="tabular-nums whitespace-nowrap"><span x-text="relieved().toFixed(2)"></span><span class="ms-1 text-xs font-normal text-gray-400">{{ $base }}</span></span></div>
                                             <div class="flex justify-between border-t border-gray-200 pt-1.5">
                                                 <span class="text-gray-500" x-text="diff() >= 0 ? '{{ __('خسارة صرف') }}' : '{{ __('ربح صرف') }}'"></span>
-                                                <span class="font-semibold tabular-nums" :class="Math.abs(diff()) < 0.01 ? 'text-gray-400' : (diff() > 0 ? 'text-rose-600' : 'text-emerald-700')"
-                                                      x-text="Math.abs(diff()).toFixed(2)"></span>
+                                                <span class="font-semibold tabular-nums whitespace-nowrap" :class="Math.abs(diff()) < 0.01 ? 'text-gray-400' : (diff() > 0 ? 'text-rose-600' : 'text-emerald-700')">
+                                                    <span x-text="Math.abs(diff()).toFixed(2)"></span><span class="ms-1 text-xs font-normal text-gray-400">{{ $base }}</span>
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -225,7 +237,11 @@
 
                             <template x-if="!foreign">
                                 <x-admin.field :label="__('المبلغ')" name="amount" required>
-                                    <input type="number" step="0.01" min="0.01" max="{{ $invoice->balanceDue() }}" name="amount" value="{{ $invoice->balanceDue() }}" required class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                                    <div class="relative">
+                                        <input type="number" step="0.01" min="0.01" max="{{ $invoice->balanceDue() }}" name="amount" value="{{ $invoice->balanceDue() }}" required
+                                               class="w-full rounded-lg border-gray-300 pe-9 focus:border-emerald-500 focus:ring-emerald-500" />
+                                        <span class="absolute inset-y-0 end-0 flex items-center px-3 text-sm text-gray-400">{{ $base }}</span>
+                                    </div>
                                 </x-admin.field>
                             </template>
 

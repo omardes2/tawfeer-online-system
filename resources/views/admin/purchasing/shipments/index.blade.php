@@ -16,7 +16,7 @@
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <x-admin.stat-card :label="__('شحنات مفتوحة')" :value="number_format($openCount)" tone="amber" />
         <x-admin.stat-card :label="__('شحنات مُغلقة')" :value="number_format($closedCount)" tone="green" />
-        <x-admin.stat-card :label="__('رصيد معلّق (مصاريف لم تصل فواتيرها)')" :value="number_format($openAccrued, 2)" tone="blue" />
+        <x-admin.stat-card :label="__('رصيد معلّق (مصاريف لم تصل فواتيرها)')" :value="$openAccrued" money tone="blue" />
     </div>
 
     <div class="flex flex-wrap items-center gap-2 mb-4">
@@ -48,7 +48,7 @@
                     <td class="tabular-nums text-gray-500">{{ $s->invoices_count }}</td>
                     <td><x-admin.badge :tone="$s->isOpen() ? 'amber' : 'green'" :label="$s->isOpen() ? __('مفتوحة') : __('مُغلقة')" /></td>
                     <td class="text-start tabular-nums {{ $s->isOpen() ? 'text-gray-300' : 'font-medium text-gray-800' }}">
-                        {{ $s->isOpen() ? '—' : number_format($s->variance_amount, 2) }}
+                        @if ($s->isOpen()) — @else <x-admin.money :value="$s->variance_amount" /> @endif
                     </td>
                 </tr>
             @empty

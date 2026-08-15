@@ -72,7 +72,7 @@
                             <td class="text-gray-700">{{ $inv->supplier?->name ?? '—' }}</td>
                             <td class="text-gray-500">{{ $inv->invoice_date?->format('Y-m-d') }}</td>
                             <td><x-admin.badge :tone="$statusTone[$inv->status] ?? 'gray'" :label="__($statusLabel[$inv->status] ?? $inv->status)" /></td>
-                            <td class="text-start tabular-nums font-medium">{{ number_format($inv->subtotal, 2) }}</td>
+                            <td class="text-start"><x-admin.money :value="$inv->subtotal" class="font-medium" /></td>
                         </tr>
                     @empty
                         <tr><td colspan="6" class="py-10">
@@ -90,16 +90,16 @@
                 <h3 class="font-semibold text-gray-800 mb-1">{{ __('الحساب الوسيط') }}</h3>
                 <div class="flex justify-between">
                     <span class="text-gray-500">{{ __('التقدير المحمّل على البضاعة') }}</span>
-                    <span class="tabular-nums font-medium">{{ number_format($summary['accrued'], 2) }}</span>
+                    <x-admin.money :value="$summary['accrued']" class="font-medium" />
                 </div>
                 <div class="flex justify-between">
                     <span class="text-gray-500">{{ __('الفواتير الفعلية') }}</span>
-                    <span class="tabular-nums font-medium">{{ number_format($summary['actual'], 2) }}</span>
+                    <x-admin.money :value="$summary['actual']" class="font-medium" />
                 </div>
                 <div class="flex justify-between border-t border-gray-100 pt-2 text-base">
                     <span class="font-semibold text-gray-700">{{ __('الفرق') }}</span>
                     <span class="font-bold tabular-nums {{ abs($variance) < 0.01 ? 'text-gray-400' : ($variance > 0 ? 'text-emerald-700' : 'text-rose-600') }}">
-                        {{ number_format($variance, 2) }} {{ $currency }}
+                        {{ number_format($variance, 2) }}<span class="ms-1 text-xs font-normal text-gray-400">{{ $currency }}</span>
                     </span>
                 </div>
                 <p class="text-xs {{ $summary['over_tolerance'] ? 'text-amber-700 font-medium' : 'text-gray-400' }}">
@@ -118,8 +118,8 @@
 
             <div class="admin-card admin-card-pad space-y-2 text-sm">
                 <h3 class="font-semibold text-gray-800 mb-1">{{ __('البضاعة') }}</h3>
-                <div class="flex justify-between"><span class="text-gray-500">{{ __('قيمة المخزون (شاملة)') }}</span><span class="tabular-nums">{{ number_format($summary['goods_value'], 2) }}</span></div>
-                <div class="flex justify-between"><span class="text-gray-500">{{ __('ذمّة المورد') }}</span><span class="tabular-nums">{{ number_format($summary['supplier_value'], 2) }}</span></div>
+                <div class="flex justify-between"><span class="text-gray-500">{{ __('قيمة المخزون (شاملة)') }}</span><x-admin.money :value="$summary['goods_value']" /></div>
+                <div class="flex justify-between"><span class="text-gray-500">{{ __('ذمّة المورد') }}</span><x-admin.money :value="$summary['supplier_value']" /></div>
                 <div class="flex justify-between"><span class="text-gray-500">{{ __('الكمية المستلمة') }}</span><span class="tabular-nums">{{ rtrim(rtrim(number_format($summary['received_qty'], 3), '0'), '.') }}</span></div>
                 <div class="flex justify-between"><span class="text-gray-500">{{ __('المُباع تقديريًا') }}</span><span class="tabular-nums">{{ $summary['sold_ratio'] }}%</span></div>
                 <p class="text-xs text-gray-400 pt-1">

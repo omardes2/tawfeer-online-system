@@ -3,11 +3,12 @@
     the `toolbar` slot), horizontal scroll on small screens, consistent header/
     row styling (via .admin-table). Put <thead>/<tbody> in the default slot.
 
-    Props: title(optional), stack(bool) — على الجوّال يتحوّل الجدول إلى بطاقات بدل
+    Props: title(optional), dense(bool — حشو أفقي مُخفَّض لجداول الأرقام الكثيرة
+           الأعمدة، تفاديًا للسحب الأفقي)، stack(bool) — على الجوّال يتحوّل الجدول إلى بطاقات بدل
            السحب الأفقي؛ يتطلّب `data-label` على خلايا الصف لتظهر عناوين الحقول.
     Slots: toolbar (filters row), default (the table), footer (pagination).
 --}}
-@props(['title' => null, 'stack' => false])
+@props(['title' => null, 'stack' => false, 'dense' => false])
 
 <div class="admin-card overflow-hidden">
     @if ($title || isset($toolbar))
@@ -18,7 +19,7 @@
     @endif
 
     <div @class(['overflow-x-auto' => ! $stack, 'md:overflow-x-auto' => $stack])>
-        <table @class(['admin-table', 'admin-table-stack' => $stack])>
+        <table @class(['admin-table', 'admin-table-stack' => $stack, 'admin-table--dense' => $dense])>
             {{ $slot }}
         </table>
     </div>

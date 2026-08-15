@@ -59,8 +59,8 @@
                     <td class="font-mono text-xs text-gray-800">{{ $inv->number }}</td>
                     <td class="font-medium text-gray-800">{{ $inv->supplier?->name }}</td>
                     <td class="text-gray-500 whitespace-nowrap">{{ $inv->invoice_date?->format('Y-m-d') }}</td>
-                    <td class="text-start font-medium tabular-nums whitespace-nowrap">{{ number_format($inv->total, 2) }}</td>
-                    <td class="text-start tabular-nums whitespace-nowrap {{ $inv->balanceDue() > 0 ? 'text-rose-600' : 'text-gray-400' }}">{{ number_format($inv->balanceDue(), 2) }}</td>
+                    <td class="text-start"><x-admin.money :value="$inv->total" class="font-medium" /></td>
+                    <td class="text-start"><x-admin.money :value="$inv->balanceDue()" :class="$inv->balanceDue() > 0 ? 'text-rose-600' : 'text-gray-400'" /></td>
                     <td><x-admin.badge :tone="$statusTone[$inv->status] ?? 'gray'" :label="__($labels[$inv->status] ?? $inv->status)" /></td>
                     <td><x-admin.badge :tone="$payTone[$inv->payment_status] ?? 'gray'" :label="__($payLabel[$inv->payment_status] ?? $inv->payment_status)" /></td>
                     <td class="text-end whitespace-nowrap">
