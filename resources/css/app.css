@@ -50,6 +50,18 @@
     .admin-table .num, .num { @apply tabular-nums; }
 
     /**
+     * جدول إدخال مكثّف (بنود الفواتير): الحشو الأفقي يُخفَّض لصالح عرض الحقول
+     * نفسها — في جدول قراءةٍ يُريح الحشوُ العينَ، وفي جدول إدخالٍ يسرق المساحة
+     * من الخانة التي يُكتب فيها الرقم.
+     */
+    .admin-table--dense thead th { @apply px-2 py-2.5; }
+    .admin-table--dense tbody td { @apply px-2 py-2.5; }
+    /* أسهم الزيادة/النقصان تقتطع من عرض الخانة ولا تُستخدَم في الإدخال السريع. */
+    .admin-table--dense input[type='number'] { appearance: textfield; -moz-appearance: textfield; }
+    .admin-table--dense input[type='number']::-webkit-outer-spin-button,
+    .admin-table--dense input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+    /**
      * جدول يتحوّل بطاقات على الجوّال.
      *
      * الجدول العريض على الهاتف يعني سحبًا أفقيًا وقراءة صعبة، وموظفو المبيعات

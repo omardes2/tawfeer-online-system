@@ -118,67 +118,77 @@
         </x-admin.form-section>
 
         <x-admin.form-section :title="__('البنود')">
+            {{--
+                جدول الأرقام: عمود الصنف مقيَّد بعرض ثابت حتى لا يبتلع المساحة،
+                وأعمدة الأرقام أوسع لأن الأرقام هي ما يُقرأ ويُدقَّق هنا. الحشو
+                مُخفَّض عن الجداول الأخرى (px-2) لصالح عرض الحقول نفسها، والجدول
+                `table-fixed` فلا يتغيّر ترتيب الأعمدة بطول محتواها.
+            --}}
             <div class="overflow-x-auto -mx-1">
-                <table class="admin-table">
+                <table class="admin-table admin-table--dense table-fixed w-full min-w-[1080px]">
                     <thead>
                         <tr>
-                            <th>{{ __('الصنف / الوصف') }}</th>
-                            <th class="w-24">{{ __('الكمية') }}</th>
-                            <th class="w-28" x-show="isImport()" x-cloak>
+                            <th class="w-[240px]">{{ __('الصنف / الوصف') }}</th>
+                            <th class="w-[110px] text-center">{{ __('الكمية') }}</th>
+                            <th class="w-[126px] text-center" x-show="isImport()" x-cloak>
                                 {{ __('السعر') }} <span x-text="symbol(head.currency)"></span>
                             </th>
-                            <th class="w-24" x-show="isImport() && !isExpense()" x-cloak>{{ __('CBM/وحدة') }}</th>
-                            <th class="w-28">
+                            <th class="w-[116px] text-center" x-show="isImport() && !isExpense()" x-cloak>{{ __('CBM/وحدة') }}</th>
+                            <th class="w-[136px] text-center">
                                 <span x-show="!isImport()">{{ __('تكلفة الوحدة') }}</span>
                                 <span x-show="isImport()" x-cloak>{{ __('السعر الحقيقي') }}</span>
                             </th>
-                            <th class="w-32" x-show="isImport() && !isExpense()" x-cloak>{{ __('التكلفة الشاملة') }}</th>
-                            <th class="w-20">{{ __('ضريبة %') }}</th>
-                            <th class="w-28 text-start">{{ __('الإجمالي') }}</th>
-                            <th class="w-10"></th>
+                            <th class="w-[148px] text-center" x-show="isImport() && !isExpense()" x-cloak>{{ __('التكلفة الشاملة') }}</th>
+                            <th class="w-[92px] text-center">{{ __('ضريبة %') }}</th>
+                            <th class="w-[130px] text-center">{{ __('الإجمالي') }}</th>
+                            <th class="w-[44px]"></th>
                         </tr>
                     </thead>
                     <tbody>
                         <template x-for="(row, i) in rows" :key="i">
                             <tr>
-                                <td>
-                                    <label class="flex items-center gap-1.5 text-xs text-emerald-700 mb-1 cursor-pointer">
-                                        <input type="checkbox" x-model="row.is_new" @change="row.is_new ? (row.variant_id = '') : (row.new_name = '', row.sell_price = 0)" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
-                                        {{ __('هذا منتج جديد سجله في المخزن') }}
+                                <td class="align-top">
+                                    <label class="flex items-start gap-1.5 text-[11px] leading-tight text-emerald-700 mb-1.5 cursor-pointer">
+                                        <input type="checkbox" x-model="row.is_new" @change="row.is_new ? (row.variant_id = '') : (row.new_name = '', row.sell_price = 0)" class="mt-px rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 shrink-0" />
+                                        {{ __('منتج جديد — سجّله في المخزن') }}
                                     </label>
 
                                     {{-- صنف موجود --}}
                                     <template x-if="!row.is_new">
                                         <div>
-                                            <select :name="`items[${i}][variant_id]`" x-model="row.variant_id" @change="fillCbm(row)" class="w-full rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                            <select :name="`items[${i}][variant_id]`" x-model="row.variant_id" @change="fillCbm(row)" class="w-full rounded-md border-gray-300 py-2 text-sm truncate focus:border-emerald-500 focus:ring-emerald-500">
                                                 <option value="">{{ __('— صنف حرّ (وصف) —') }}</option>
                                                 @foreach ($variants as $v)
                                                     <option value="{{ $v->id }}">{{ $v->product?->name }} — {{ $v->sku }}</option>
                                                 @endforeach
                                             </select>
-                                            <input type="text" :name="`items[${i}][description]`" x-model="row.description" placeholder="{{ __('وصف (اختياري)') }}" class="mt-1 w-full rounded-md border-gray-200 text-xs focus:border-emerald-500 focus:ring-emerald-500" />
+                                            <input type="text" :name="`items[${i}][description]`" x-model="row.description" placeholder="{{ __('وصف (اختياري)') }}" class="mt-1 w-full rounded-md border-gray-200 py-1.5 text-xs focus:border-emerald-500 focus:ring-emerald-500" />
                                         </div>
                                     </template>
 
                                     {{-- صنف جديد يُعرَّف من الفاتورة --}}
                                     <template x-if="row.is_new">
-                                        <div class="grid grid-cols-2 gap-1.5">
-                                            <input type="text" :name="`items[${i}][new_name]`" x-model="row.new_name" placeholder="{{ __('اسم المنتج الجديد') }}" class="col-span-2 w-full rounded-md border-emerald-300 bg-emerald-50/40 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
-                                            <input type="number" step="0.01" min="0" :name="`items[${i}][sell_price]`" x-model.number="row.sell_price" placeholder="{{ __('سعر البيع') }}" class="w-full rounded-md border-emerald-300 bg-emerald-50/40 text-xs focus:border-emerald-500 focus:ring-emerald-500" />
-                                            <span class="text-[11px] text-gray-500 self-center">{{ __('تُنشأ بطاقة صنف تلقائيًا') }}</span>
+                                        <div class="space-y-1">
+                                            <input type="text" :name="`items[${i}][new_name]`" x-model="row.new_name" placeholder="{{ __('اسم المنتج الجديد') }}" class="w-full rounded-md border-emerald-300 bg-emerald-50/40 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+                                            <input type="number" step="0.01" min="0" :name="`items[${i}][sell_price]`" x-model.number="row.sell_price" placeholder="{{ __('سعر البيع') }}" class="w-full rounded-md border-emerald-300 bg-emerald-50/40 py-1.5 text-xs tabular-nums text-center focus:border-emerald-500 focus:ring-emerald-500" />
+                                            <span class="block text-[11px] leading-tight text-gray-500">{{ __('تُنشأ بطاقة صنف تلقائيًا') }}</span>
                                         </div>
                                     </template>
                                 </td>
-                                <td><input type="number" step="0.001" min="0.001" :name="`items[${i}][qty]`" x-model.number="row.qty" class="w-full rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" /></td>
+
+                                <td class="align-top">
+                                    <input type="number" step="0.001" min="0.001" :name="`items[${i}][qty]`" x-model.number="row.qty"
+                                           class="w-full rounded-md border-gray-300 px-2 py-2 text-[15px] tabular-nums text-center focus:border-emerald-500 focus:ring-emerald-500" />
+                                </td>
 
                                 {{-- سعر الوحدة بعملة المورد وحجمها — مدخلات الاستيراد --}}
-                                <td x-show="isImport()" x-cloak>
+                                <td class="align-top" x-show="isImport()" x-cloak>
                                     <input type="number" step="0.0001" min="0" :name="`items[${i}][unit_price_foreign]`" x-model.number="row.unit_price_foreign"
-                                           class="w-full rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+                                           class="w-full rounded-md border-gray-300 px-2 py-2 text-[15px] tabular-nums text-center focus:border-emerald-500 focus:ring-emerald-500" />
                                 </td>
-                                <td x-show="isImport() && !isExpense()" x-cloak>
+                                <td class="align-top" x-show="isImport() && !isExpense()" x-cloak>
                                     <input type="number" step="0.0001" min="0" :name="`items[${i}][cbm_per_unit]`" x-model.number="row.cbm_per_unit"
-                                           class="w-full rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+                                           class="w-full rounded-md border-gray-300 px-2 py-2 text-[15px] tabular-nums text-center focus:border-emerald-500 focus:ring-emerald-500" />
                                 </td>
 
                                 {{--
@@ -186,28 +196,41 @@
                                     الاستيراد. يبقى الحقل مُرسَلًا في الحالتين — والخلفية
                                     تُعيد حسابه فلا يُعتمد على قيمة الواجهة.
                                 --}}
-                                <td>
+                                <td class="align-top">
                                     <input type="number" step="0.0001" min="0" :name="`items[${i}][unit_cost]`"
                                            :value="isImport() ? unitCostBase(row).toFixed(4) : row.unit_cost"
                                            @input="row.unit_cost = $event.target.value" :readonly="isImport()"
-                                           class="w-full rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500 read-only:bg-gray-50 read-only:text-gray-500" />
+                                           class="w-full rounded-md border-gray-300 px-2 py-2 text-[15px] tabular-nums text-center focus:border-emerald-500 focus:ring-emerald-500 read-only:bg-gray-50 read-only:text-gray-500" />
                                 </td>
 
                                 {{-- التكلفة الشاملة: تحسبها الآلة، وتعديلها يدويًا يُثبّتها --}}
-                                <td x-show="isImport() && !isExpense()" x-cloak>
+                                <td class="align-top" x-show="isImport() && !isExpense()" x-cloak>
                                     <input type="number" step="0.0001" min="0" :name="`items[${i}][landed_unit_cost]`"
                                            :value="row.landed_is_manual ? row.landed_unit_cost : landedUnitCost(row).toFixed(4)"
                                            @input="row.landed_is_manual = true; row.landed_unit_cost = $event.target.value"
-                                           class="w-full rounded-md text-sm focus:ring-emerald-500"
+                                           class="w-full rounded-md px-2 py-2 text-[15px] font-medium tabular-nums text-center focus:ring-emerald-500"
                                            :class="row.landed_is_manual ? 'border-amber-400 bg-amber-50/60 focus:border-amber-500' : 'border-emerald-300 bg-emerald-50/40 focus:border-emerald-500'" />
                                     <input type="hidden" :name="`items[${i}][landed_is_manual]`" :value="row.landed_is_manual ? 1 : 0" />
                                     <button type="button" x-show="row.landed_is_manual" @click="row.landed_is_manual = false"
-                                            class="mt-0.5 text-[11px] text-amber-700 hover:underline">{{ __('يدوي — عُد للحساب الآلي') }}</button>
+                                            class="mt-1 block w-full text-center text-[11px] leading-tight text-amber-700 hover:underline">{{ __('يدوي — عُد للحساب الآلي') }}</button>
                                 </td>
 
-                                <td><input type="number" step="0.01" min="0" max="100" :name="`items[${i}][tax_rate]`" x-model.number="row.tax_rate" class="w-full rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" /></td>
-                                <td class="text-start tabular-nums text-sm" x-text="lineTotal(row).toFixed(2)"></td>
-                                <td><button type="button" @click="rows.splice(i,1)" x-show="rows.length > 1" class="text-rose-500 hover:text-rose-700">&times;</button></td>
+                                <td class="align-top">
+                                    <input type="number" step="0.01" min="0" max="100" :name="`items[${i}][tax_rate]`" x-model.number="row.tax_rate"
+                                           class="w-full rounded-md border-gray-300 px-2 py-2 text-[15px] tabular-nums text-center focus:border-emerald-500 focus:ring-emerald-500" />
+                                </td>
+
+                                {{-- الإجمالي محسوب لا مُدخَل: يُعرض بخلفية هادئة ليُقرأ لا ليُنقر --}}
+                                <td class="align-top">
+                                    <div class="rounded-md bg-gray-50 border border-gray-200 px-2 py-2 text-[15px] font-semibold tabular-nums text-center text-gray-800"
+                                         x-text="lineTotal(row).toFixed(2)"></div>
+                                </td>
+
+                                <td class="align-top text-center">
+                                    <button type="button" @click="rows.splice(i,1)" x-show="rows.length > 1"
+                                            :title="'{{ __('حذف البند') }}'"
+                                            class="mt-1.5 grid place-items-center w-7 h-7 mx-auto rounded-md text-rose-500 hover:bg-rose-50 hover:text-rose-700">&times;</button>
+                                </td>
                             </tr>
                         </template>
                     </tbody>
