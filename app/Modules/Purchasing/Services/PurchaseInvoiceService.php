@@ -216,15 +216,39 @@ class PurchaseInvoiceService
         });
     }
 
-    /** سطور قيد الشراء: مدين المخزون [+ ضريبة] / دائن ذمم المورد. */
+    /**
+     * سطور قيد الشراء: مدين المخزون [+ ضريبة] / دائن ذمم المورد.
+     *
+     * في فاتورة الاستيراد يُدان المخزون بالتكلفة **الشاملة** لا بسعر المورد —
+     * فتدخل البضاعة بقيمتها الحقيقية من أول يوم بلا انتظارِ فاتورة الشحن —
+     * بينما تبقى ذمّة المورد بسعرها الحقيقي. الفرق يُقيَّد في «مصاريف استيراد
+     * مستحقة»: التزامٌ حقيقي لشركة الشحن/المكتب لم تصل فاتورته بعد.
+     *
+     * وإن كتب المستخدم تكلفةً أقلّ من سعر المورد انقلب الفرق مدينًا — والاتجاه
+     * يُشتقّ من الإشارة لا يُفترض.
+     */
     private function postingLines(PurchaseInvoice $invoice): array
     {
         $cfg = config('accounting.purchasing');
-        $lines = [['account_code' => $cfg['inventory_account'], 'debit' => (float) $invoice->subtotal, 'credit' => 0]];
+        $inventoryValue = $invoice->isImport() ? (float) $invoice->landed_subtotal : (float) $invoice->subtotal;
+
+        $lines = [['account_code' => $cfg['inventory_account'], 'debit' => $inventoryValue, 'credit' => 0]];
         if ((float) $invoice->tax_amount > 0) {
             $lines[] = ['account_code' => $cfg['tax_account'], 'debit' => (float) $invoice->tax_amount, 'credit' => 0];
         }
         $lines[] = ['account_code' => $this->payableAccountCode($invoice), 'debit' => 0, 'credit' => (float) $invoice->total];
+
+        // السطر لا يُضاف إلا بفرق فعلي: القيد يرفض سطرًا صفريًا، والتكلفةُ
+        // المطابقة لسعر المورد لا تُنشئ التزامًا.
+        $difference = $invoice->isImport() ? $invoice->importDifference() : 0.0;
+        if (abs($difference) >= 0.01) {
+            $lines[] = [
+                'account_code' => $cfg['import_accrual_account'],
+                'debit' => $difference < 0 ? abs($difference) : 0,
+                'credit' => $difference > 0 ? $difference : 0,
+                'description' => __('مصاريف محمّلة على بضاعة فاتورة :n', ['n' => $invoice->number]),
+            ];
+        }
 
         return $lines;
     }
@@ -245,7 +269,9 @@ class PurchaseInvoiceService
             if (! $variant) {
                 continue;
             }
-            $this->inventory->receive($variant, $warehouse, (float) $item->qty, (float) $item->unit_cost, [
+            // البضاعة تدخل بتكلفتها **الشاملة** — وهي ما يُحتسب عليه متوسط التكلفة
+            // وربحُ ما يُباع لاحقًا. (تساوي سعر المورد في الفاتورة المحلية.)
+            $this->inventory->receive($variant, $warehouse, (float) $item->qty, $this->stockUnitCost($item), [
                 'reference_type' => PurchaseInvoice::class,
                 'reference_id' => $invoice->id,
                 'reason' => 'purchase_invoice:'.$invoice->number,
@@ -278,6 +304,17 @@ class PurchaseInvoiceService
                 'reason' => 'purchase_invoice_revert:'.$invoice->number,
             ]);
         }
+    }
+
+    /**
+     * تكلفة الوحدة المعتمدة للمخزون وبطاقة الصنف: التكلفة الشاملة إن حُسبت، وإلا
+     * سعر الفاتورة. الاحتياط يحمي فواتير سابقة رُحّلت قبل وجود عمود التكلفة.
+     */
+    private function stockUnitCost(PurchaseInvoiceItem $item): float
+    {
+        $landed = (float) $item->landed_unit_cost;
+
+        return $landed > 0 ? $landed : (float) $item->unit_cost;
     }
 
     private function defaultWarehouse(): ?Warehouse
@@ -448,10 +485,17 @@ class PurchaseInvoiceService
         ];
     }
 
-    /** ينشئ منتجًا/متغيّرًا من بند «صنف جديد» — يُستدعى عند الترحيل فقط. */
+    /**
+     * ينشئ منتجًا/متغيّرًا من بند «صنف جديد» — يُستدعى عند الترحيل فقط.
+     *
+     * سعر التكلفة في البطاقة هو التكلفة الشاملة نفسها التي دخل بها المخزون، وحجمُ
+     * الوحدة يُحفظ من البند فلا يُعاد قياسه في الشحنة القادمة.
+     */
     private function createProductVariant(PurchaseInvoiceItem $item): ProductVariant
     {
-        $sell = $item->new_product_sell_price !== null ? (float) $item->new_product_sell_price : (float) $item->unit_cost;
+        $cost = $this->stockUnitCost($item);
+        $sell = $item->new_product_sell_price !== null ? (float) $item->new_product_sell_price : $cost;
+        $cbm = (float) $item->cbm_per_unit > 0 ? (float) $item->cbm_per_unit : null;
 
         $product = $this->products->create([
             'name' => $item->new_product_name,
@@ -460,11 +504,12 @@ class PurchaseInvoiceService
             'unit_id' => $this->defaultUnitId(),
             'status' => 'active',
             'retail_price' => $sell,
-            'cost_price' => (float) $item->unit_cost,
+            'cost_price' => $cost,
+            'cbm' => $cbm,
         ]);
 
         $variant = $product->defaultVariant()->firstOrFail();
-        $variant->update(['retail_price' => $sell, 'cost_price' => (float) $item->unit_cost]);
+        $variant->update(['retail_price' => $sell, 'cost_price' => $cost, 'cbm' => $cbm]);
 
         return $variant;
     }

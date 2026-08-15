@@ -213,7 +213,7 @@
                         <p class="font-bold tabular-nums text-emerald-800" x-text="landedSubtotal().toFixed(2)"></p>
                     </div>
                     <div>
-                        <p class="text-gray-500 text-xs">{{ __('مصاريف محمّلة على البضاعة') }}</p>
+                        <p class="text-gray-500 text-xs">{{ __('مصاريف استيراد مستحقة') }}</p>
                         <p class="font-bold tabular-nums text-amber-700" x-text="importDifference().toFixed(2)"></p>
                     </div>
                     <div>
@@ -226,7 +226,7 @@
                     </div>
                 </div>
                 <p class="mt-3 text-xs text-gray-500">
-                    {{ __('تُرحَّل الفاتورة بذمّة المورد كما هي. عمود «التكلفة الشاملة» يُحفظ على البنود ويصبح قيمة المخزون في المرحلة التالية.') }}
+                    {{ __('عند الحفظ: يُدان المخزون بالتكلفة الشاملة، وتُدان ذمّة المورد بسعرها الحقيقي، ويُقيَّد الفرق في «مصاريف استيراد مستحقة» حتى تصل فاتورة الشحن والمصاريف.') }}
                 </p>
             </div>
             @error('items')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror

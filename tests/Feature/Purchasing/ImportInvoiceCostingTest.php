@@ -197,9 +197,10 @@ class ImportInvoiceCostingTest extends TestCase
         $this->assertEqualsWithDelta(50, (float) $invoice->items->first()->unit_cost, 0.0001);
     }
 
-    public function test_the_journal_still_posts_the_supplier_price_not_the_landed_cost(): void
+    public function test_the_saved_costs_are_the_ones_the_journal_uses(): void
     {
-        // حدّ المرحلة ١: المحاسبة كما هي. المخزون يُدين بذمّة المورد، والفرق لم يُقيَّد بعد.
+        // الرقمان المحفوظان هنا هما اللذان يُرحَّلان — وتفاصيل القيد في
+        // ImportInvoicePostingTest. المقصود هنا: لا انفصال بين المحفوظ والمُرحَّل.
         $accounting = app(AccountingService::class);
         $inventoryCode = config('accounting.purchasing.inventory_account');
         $before = $accounting->accountBalance(Account::where('code', $inventoryCode)->firstOrFail());
@@ -212,8 +213,7 @@ class ImportInvoiceCostingTest extends TestCase
         $after = $accounting->accountBalance(Account::where('code', $inventoryCode)->firstOrFail());
 
         $this->assertSame('posted', $invoice->status);
-        $this->assertEqualsWithDelta((float) $invoice->subtotal, $after - $before, 0.02);
-        $this->assertNotEqualsWithDelta((float) $invoice->landed_subtotal, $after - $before, 0.02);
+        $this->assertEqualsWithDelta((float) $invoice->landed_subtotal, $after - $before, 0.02);
     }
 
     public function test_editing_an_invoice_recomputes_both_costs(): void
@@ -247,7 +247,7 @@ class ImportInvoiceCostingTest extends TestCase
         $this->get(route('admin.purchasing.invoices.show', $invoice))
             ->assertOk()
             ->assertSee(__('بيانات الاستيراد'), false)
-            ->assertSee(__('مصاريف محمّلة'), false);
+            ->assertSee(__('مصاريف استيراد مستحقة'), false);
     }
 
     public function test_exchange_rates_are_refused_on_a_base_currency_invoice(): void

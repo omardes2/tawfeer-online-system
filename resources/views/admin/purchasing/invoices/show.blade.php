@@ -131,9 +131,9 @@
                     <h3 class="font-semibold text-gray-800">{{ __('التكلفة الشاملة') }}</h3>
                     <div class="flex justify-between"><span class="text-gray-500">{{ __('قيمة المخزون') }}</span><span class="font-bold tabular-nums text-emerald-700">{{ number_format($invoice->landed_subtotal, 2) }}</span></div>
                     <div class="flex justify-between"><span class="text-gray-500">{{ __('ذمّة المورد') }}</span><span class="tabular-nums">{{ number_format($invoice->subtotal, 2) }}</span></div>
-                    <div class="flex justify-between border-t border-gray-100 pt-2"><span class="text-gray-500">{{ __('مصاريف محمّلة') }}</span><span class="font-bold tabular-nums text-amber-700">{{ number_format($invoice->importDifference(), 2) }}</span></div>
+                    <div class="flex justify-between border-t border-gray-100 pt-2"><span class="text-gray-500">{{ __('مصاريف استيراد مستحقة') }}</span><span class="font-bold tabular-nums text-amber-700">{{ number_format($invoice->importDifference(), 2) }}</span></div>
                     <p class="text-xs text-gray-500 pt-1">
-                        {{ __('الترحيل المحاسبي الحالي بذمّة المورد. تحميل المخزون بالتكلفة الشاملة وقيد الفرق في «مصاريف استيراد مستحقة» يأتيان في المرحلة التالية.') }}
+                        {{ __('دخلت البضاعة المخزونَ بتكلفتها الشاملة، وذمّة المورد بسعرها الحقيقي، والفرق التزامٌ في حساب «مصاريف استيراد مستحقة» يُطفأ عند وصول فاتورة الشحن والمصاريف.') }}
                     </p>
                 </div>
             @endif
