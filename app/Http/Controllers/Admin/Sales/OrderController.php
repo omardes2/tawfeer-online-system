@@ -406,6 +406,72 @@ class OrderController extends Controller
     }
 
     /**
+     * تأكيد الطلبات المحدَّدة دفعةً واحدة.
+     *
+     * لا منطق تأكيد أو إرسال جديد هنا: يمرّ كل طلب بنفس مسار الزرّ المفرد
+     * (`OrderService::confirm` ثم `OrderDeliveryDispatcher::dispatch`) — تكامل
+     * التوصيل لا يُمَسّ، والسلوك واحد سواء أكّدتَ طلبًا أو عشرين.
+     *
+     * بلا معاملة جامعة عمدًا: التأكيد يُرسل لطرف خارجي، وتراجعُ معاملةٍ بعد
+     * إرسال شحنة يترك النظام يخالف الواقع. كل طلب يقف بنفسه، والتقرير يذكر
+     * كم نجح وكم تعذّر.
+     */
+    public function bulkConfirm(Request $request, OrderDeliveryDispatcher $dispatcher): RedirectResponse
+    {
+        abort_unless($request->user()?->can('sales.orders.confirm'), 403);
+
+        $ids = collect($request->input('ids', []))->filter()->map(fn ($v) => (int) $v)->all();
+        if ($ids === []) {
+            return back()->with('error', __('لم تُحدَّد أي طلبات للتأكيد.'));
+        }
+
+        $confirmed = 0;
+        $skipped = 0;
+        $pendingDispatch = 0;
+
+        foreach (Order::whereIn('id', $ids)->get() as $order) {
+            if ($request->user()->cannot('confirm', $order)) {
+                $skipped++;
+
+                continue;
+            }
+
+            try {
+                $this->service->confirm($order);
+            } catch (ValidationException $e) {
+                // طلب غير قابل للتأكيد (مؤكَّد سلفًا أو ملغى): يُتخطّى ولا يوقف الدفعة.
+                $skipped++;
+
+                continue;
+            }
+
+            $confirmed++;
+
+            if ($this->needsDelivery($order)) {
+                $result = $dispatcher->dispatch($order);
+                if (($result['status'] ?? null) !== 'created') {
+                    $pendingDispatch++;
+                }
+            }
+        }
+
+        if ($confirmed === 0) {
+            return back()->with('error', __('لم يُؤكَّد أي طلب من المحدَّد.'));
+        }
+
+        $message = __('تم تأكيد :count طلبًا.', ['count' => $confirmed]);
+        if ($skipped > 0) {
+            $message .= ' '.__('وتُخطّي :count لتعذّر تأكيده.', ['count' => $skipped]);
+        }
+        if ($pendingDispatch > 0) {
+            // نفس ضمان الزرّ المفرد: المكنسة المجدولة تعيد المحاولة حتى ينجح الإرسال.
+            $message .= ' '.__('و:count منها سيُعاد إرساله لشركة التوصيل تلقائيًا خلال دقيقة.', ['count' => $pendingDispatch]);
+        }
+
+        return back()->with($pendingDispatch > 0 ? 'warning' : 'success', $message);
+    }
+
+    /**
      * إعادة إرسال الطلب لشركة التوصيل يدويًا — للطلبات التي لم يظهر لها رقم تتبّع بعد.
      * idempotent (الحارس داخل الـDispatcher يمنع التكرار)، ومتاح فقط لطلبات التوصيل.
      */

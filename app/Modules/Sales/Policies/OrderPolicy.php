@@ -82,8 +82,26 @@ class OrderPolicy
         return $user->can('sales.orders.deliver');
     }
 
+    /**
+     * الإلغاء يخرج من يد منشئ الطلب لحظة تأكيده.
+     *
+     * قبل التأكيد الطلب مسوّدة عند مُدخِله، وإلغاؤه تصحيحُ خطأ إدخال أو تراجعُ
+     * زبون — لا أثر له. بعد التأكيد يكون قد رُحِّل محاسبيًّا وأُرسل لشركة
+     * التوصيل، فإلغاؤه يعكس قيودًا ومخزونًا ويُلغي شحنة قائمة؛ قرارٌ يخصّ من
+     * يملك التأكيد نفسه لا من أدخل الطلب.
+     */
     public function cancel(User $user, Order $m): bool
     {
-        return $user->can('sales.orders.cancel');
+        if (! $user->can('sales.orders.cancel')) {
+            return false;
+        }
+
+        return $this->awaitingConfirmation($m) || $user->can('sales.orders.confirm');
+    }
+
+    /** لم يُؤكَّد بعد: الحالتان الوحيدتان اللتان يقبلهما `OrderService::confirm`. */
+    private function awaitingConfirmation(Order $m): bool
+    {
+        return $m->confirmed_at === null && in_array($m->status, ['draft', 'new'], true);
     }
 }

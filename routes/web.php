@@ -277,6 +277,9 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('orders/{order}/receive-return', [AdminOrderController::class, 'receiveReturn'])->name('orders.receive_return');
         Route::post('orders/{order}/settle', [AdminOrderController::class, 'settle'])->name('orders.settle');
         Route::delete('orders/bulk', [AdminOrderController::class, 'bulkDestroy'])->name('orders.bulk_destroy');
+        // تأكيد جماعي — قبل «orders/{order}/…» لا يلزم (المقطع الثاني ثابت)، لكنه
+        // يبقى مع بقيّة إجراءات الجملة للوضوح.
+        Route::post('orders/bulk-confirm', [AdminOrderController::class, 'bulkConfirm'])->name('orders.bulk_confirm');
         Route::delete('orders/{order}/force', [AdminOrderController::class, 'forceDestroy'])->name('orders.force_destroy');
         Route::delete('orders/{order}', [AdminOrderController::class, 'destroy'])->name('orders.destroy');
     });

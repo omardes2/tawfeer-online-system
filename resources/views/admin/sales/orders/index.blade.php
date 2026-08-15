@@ -20,9 +20,42 @@
     {{-- فلاتر: نوع البيع + حالة أوبتيموس + حالة الدفع. الحالة الداخلية غير معروضة
          (المتابعة التشغيلية تعتمد حالة شركة التوصيل وحدها — قرار إداري). --}}
     @php
+        // إجراءات الجملة: الحذف و/أو التأكيد. عمود التحديد يظهر لمن يملك أحدهما.
+        $canBulkDelete = auth()->user()?->can('sales.orders.delete') ?? false;
+        $canBulkConfirm = auth()->user()?->can('sales.orders.confirm') ?? false;
+        $canBulk = $canBulkDelete || $canBulkConfirm;
+
         $selectCls = 'rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500 min-w-[10rem]';
         $hasFilter = ($activeStatus ?? null) || ($activeDeliveryStatus ?? null) || ($activePaymentStatus ?? null) || ($activeSearch ?? null) || ($activeSaleType ?? null);
     @endphp
+
+    {{--
+        نطاق Alpine واحد يضمّ صفّ البحث والجدول معًا: زرّ «تأكيد» يقف بجانب
+        البحث كما طُلب، وعدّاده يقرأ التحديد من صناديق الجدول أسفله.
+    --}}
+    <div x-data="{
+            count: 0,
+            recount() { this.count = document.querySelectorAll('input[data-row-check]:checked').length; },
+            toggleAll(e) { document.querySelectorAll('input[data-row-check]:not(:disabled)').forEach(c => c.checked = e.target.checked); this.recount(); },
+            /*
+                صندوق تحديد واحد يخدم إجراءين، والسمة `form=` تربطه بنموذج واحد
+                فقط — فتُنسَخ المعرّفات إلى النموذج المقصود لحظة الإرسال.
+            */
+            submitBulk(formId, message) {
+                if (this.count === 0 || ! window.confirm(message)) return;
+                const form = document.getElementById(formId);
+                form.querySelectorAll('input[data-bulk-id]').forEach(n => n.remove());
+                document.querySelectorAll('input[data-row-check]:checked').forEach(c => {
+                    const hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.name = 'ids[]';
+                    hidden.value = c.value;
+                    hidden.setAttribute('data-bulk-id', '');
+                    form.appendChild(hidden);
+                });
+                form.submit();
+            }
+         }">
 
     {{-- البحث + الفلاتر في صفٍّ واحد (البحث بجانب الفلاتر) --}}
     <form method="GET" action="{{ route('admin.sales.orders.index') }}" class="flex flex-wrap items-end gap-3 mb-5">
@@ -36,6 +69,17 @@
                        class="w-full h-full ps-9 pe-3 rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
             </div>
             <button type="submit" class="btn-secondary btn-sm shrink-0">{{ __('بحث') }}</button>
+
+            {{-- «تأكيد» بجانب البحث: يعمل على المحدَّد، فيُعطَّل بلا تحديد بدل
+                 أن يختفي — فيبقى المدير عالمًا بوجوده وبأنه ينتظر تحديدًا. --}}
+            @can('sales.orders.confirm')
+                <button type="button" class="btn-primary btn-sm shrink-0"
+                        @click="submitBulk('orders-bulk-confirm', '{{ __('تأكيد الطلبات المحدَّدة وإرسالها لشركة التوصيل؟ لا يمكن التراجع عن الإرسال.') }}')"
+                        :disabled="count === 0" :class="count === 0 && 'opacity-50 cursor-not-allowed'"
+                        :title="count === 0 ? '{{ __('حدِّد طلبات أولًا') }}' : ''">
+                    {{ __('تأكيد') }} <span x-show="count > 0" x-cloak>(<span x-text="count"></span>)</span>
+                </button>
+            @endcan
         </div>
 
         <div>
@@ -68,22 +112,22 @@
         @endif
     </form>
 
-    {{-- نموذج الحذف الجماعي (فارغ؛ صناديق التحديد تنضمّ إليه عبر السمة form=) --}}
+    {{-- نماذج الجملة: فارغة، وتُملأ بالمعرّفات المحدَّدة لحظة الإرسال --}}
     @can('sales.orders.delete')
-        <form id="orders-bulk-delete" method="POST" action="{{ route('admin.sales.orders.bulk_destroy') }}"
-              onsubmit="return confirm('{{ __('حذف الطلبات المحدَّدة نهائيًا؟') }}')">
+        <form id="orders-bulk-delete" method="POST" action="{{ route('admin.sales.orders.bulk_destroy') }}">
             @csrf @method('DELETE')
         </form>
     @endcan
+    @can('sales.orders.confirm')
+        <form id="orders-bulk-confirm" method="POST" action="{{ route('admin.sales.orders.bulk_confirm') }}">
+            @csrf
+        </form>
+    @endcan
 
-    <div x-data="{
-            count: 0,
-            recount() { this.count = document.querySelectorAll('input[data-row-check]:checked').length; },
-            toggleAll(e) { document.querySelectorAll('input[data-row-check]:not(:disabled)').forEach(c => c.checked = e.target.checked); this.recount(); }
-         }">
         @can('sales.orders.delete')
             <div class="flex items-center justify-end mb-3" x-show="count > 0" x-cloak>
-                <button type="submit" form="orders-bulk-delete" class="btn-danger btn-sm">
+                <button type="button" class="btn-danger btn-sm"
+                        @click="submitBulk('orders-bulk-delete', '{{ __('حذف الطلبات المحدَّدة نهائيًا؟') }}')">
                     {{ __('حذف المحدَّد') }} (<span x-text="count"></span>)
                 </button>
             </div>
@@ -92,12 +136,15 @@
     <x-admin.table stack>
         <thead>
             <tr>
-                @can('sales.orders.delete')
+                @if ($canBulk)
                     <th class="w-8">
+                        {{-- تحديد كل الطلبيات القابلة للإجراء في الصفحة --}}
                         <input type="checkbox" x-on:change="toggleAll($event)"
+                               aria-label="{{ __('تحديد كل الطلبيات') }}"
+                               title="{{ __('تحديد كل الطلبيات') }}"
                                class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
                     </th>
-                @endcan
+                @endif
                 <th>{{ __('رقم التتبّع') }}</th>
                 <th>{{ __('التاريخ والوقت') }}</th>
                 <th>{{ __('اسم المستلم') }}</th>
@@ -111,18 +158,28 @@
         <tbody>
             @forelse ($orders as $o)
                 <tr>
-                    @can('sales.orders.delete')
+                    @if ($canBulk)
                         @php
-                            $deletable = \App\Http\Controllers\Admin\Sales\OrderController::isDeletable($o);
+                            // الصفّ قابل للتحديد إن صلح لأحد إجراءَي الجملة عند هذا
+                            // المستخدم: حذفٌ (ملغى وشحنته ملغاة) أو تأكيدٌ (لم يُؤكَّد بعد).
+                            $deletable = $canBulkDelete && \App\Http\Controllers\Admin\Sales\OrderController::isDeletable($o);
+                            $confirmable = $canBulkConfirm && $o->confirmed_at === null && in_array($o->status, ['draft', 'new'], true);
+                            $selectable = $deletable || $confirmable;
+                            $why = match (true) {
+                                $selectable => '',
+                                $canBulkConfirm && ! $canBulkDelete => __('هذا الطلب مؤكَّد سلفًا'),
+                                $canBulkDelete && ! $canBulkConfirm => __('لا يمكن حذف هذا الطلب (يجب أن يكون ملغى وشحنته ملغاة)'),
+                                default => __('لا إجراء جماعي متاح لهذا الطلب'),
+                            };
                         @endphp
                         <td class="w-8" data-label="{{ __('تحديد') }}">
-                            <input type="checkbox" name="ids[]" value="{{ $o->id }}" form="orders-bulk-delete"
+                            <input type="checkbox" value="{{ $o->id }}"
                                    data-row-check x-on:change="recount()"
-                                   @disabled(! $deletable)
-                                   title="{{ $deletable ? '' : __('لا يمكن حذف هذا الطلب (يجب أن يكون ملغى وشحنته ملغاة)') }}"
+                                   @disabled(! $selectable)
+                                   title="{{ $why }}"
                                    class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-30 disabled:cursor-not-allowed" />
                         </td>
-                    @endcan
+                    @endif
                     <td class="font-mono text-xs" data-label="{{ __('رقم التتبّع') }}">
                         {{-- رقم التتبّع/الطلب رابطٌ لصفحة التفاصيل (بديلًا عن زر «عرض») --}}
                         <a href="{{ route('admin.sales.orders.show', $o) }}" class="group inline-flex flex-col hover:underline">
@@ -277,7 +334,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="{{ auth()->user()?->can('sales.orders.delete') ? 10 : 9 }}" class="!p-0" data-label="">
+                <tr><td colspan="{{ $canBulk ? 10 : 9 }}" class="!p-0" data-label="">
                     <x-admin.empty-state
                         :title="__('لا توجد طلبات')"
                         :description="($activeStatus ?? null) ? __('لا توجد طلبات بهذه الحالة.') : __('ابدأ بإنشاء أول طلب بيع.')"
