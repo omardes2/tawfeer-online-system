@@ -59,23 +59,19 @@ class ProductVariantController extends Controller
     }
 
     /**
-     * «العدد الأصلي» للصنف: كمية المتغيّر الافتراضي إن كانت موجودة (لم تُوزَّع بعد)،
-     * وإلا مجموع كميات متغيّراته الحالية. هكذا تبقى المصفوفة توزيعًا لا إضافة.
+     * «العدد الأصلي» للصنف: **مجموع رصيد كل متغيّراته** — الافتراضي والمقاسات معًا.
+     * فالمصفوفة توزّع كامل ما يملكه الصنف ولا تضيف إليه.
+     *
+     * الجمع يصحّ في الحالات الثلاث: قبل التوزيع (الرصيد كلّه على الافتراضي)، وبعده
+     * (الافتراضي صفر)، وفي الحالة التي تجمعهما — حين تُدخل فاتورةُ شراء بضاعةً على
+     * المتغيّر الافتراضي لصنفٍ وُزِّعت مقاساته سابقًا. وقصْرُ الحساب على أحد الطرفين
+     * كان يُخفي رصيد الطرف الآخر فيتعذّر حفظ المصفوفة أصلًا.
      */
     private function originalQuantity(Product $product): float
     {
         $warehouseId = $this->warehouseId();
         if ($warehouseId === null) {
             return 0.0;
-        }
-
-        $default = $product->variants()->whereDoesntHave('attributeValues')->first();
-        $defaultQty = $default
-            ? (float) InventoryStock::where('variant_id', $default->id)->where('warehouse_id', $warehouseId)->value('on_hand')
-            : 0.0;
-
-        if ($defaultQty > 0) {
-            return round($defaultQty, 3);
         }
 
         return round((float) InventoryStock::whereIn('variant_id', $product->variants()->pluck('id'))

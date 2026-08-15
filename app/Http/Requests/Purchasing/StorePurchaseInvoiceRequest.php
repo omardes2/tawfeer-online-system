@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Purchasing;
 
+use App\Modules\Catalog\Models\ProductVariant;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -69,7 +70,37 @@ class StorePurchaseInvoiceRequest extends FormRequest
             if ($this->input('kind') === 'expenses' && empty($this->input('import_shipment_id'))) {
                 $v->errors()->add('import_shipment_id', __('اختر الشحنة التي تخصّها فاتورة المصاريف.'));
             }
+
+            $this->rejectPlaceholderVariants($v);
         });
+    }
+
+    /**
+     * يمنع إدخال بضاعة على المتغيّر الافتراضي المجرّد لمنتجٍ له مقاسات/ألوان.
+     *
+     * ذلك المتغيّر حاملٌ فارغ لا صنفٌ يُباع: الرصيد الداخل عليه لا ينتمي لأيّ
+     * مقاس، فلا يظهر للزبون ولا يُحجَز في طلب، ويُفسد توزيعَ المصفوفة لاحقًا.
+     * القائمة تُخفيه أصلًا، وهذا حارسُ المسارات الأخرى (نموذج قديم، طلب مباشر).
+     */
+    private function rejectPlaceholderVariants(Validator $v): void
+    {
+        $ids = collect($this->input('items', []))->pluck('variant_id')->filter()->unique();
+        if ($ids->isEmpty()) {
+            return;
+        }
+
+        $variants = ProductVariant::with('attributeValues')->whereIn('id', $ids)->get();
+        $placeholders = $variants->filter(fn (ProductVariant $variant) => $variant->attributeValues->isEmpty()
+            && ProductVariant::where('product_id', $variant->product_id)->whereHas('attributeValues')->exists());
+
+        foreach ($placeholders as $variant) {
+            $index = collect($this->input('items', []))
+                ->search(fn ($item) => (int) ($item['variant_id'] ?? 0) === (int) $variant->id);
+
+            $v->errors()->add("items.{$index}.variant_id", __(
+                'هذا الصنف له مقاسات/ألوان — اختر المقاس المحدَّد بدل الصنف المجرَّد، وإلا دخلت البضاعة رصيدًا لا ينتمي لأيّ مقاس.',
+            ));
+        }
     }
 
     /** @return array<string, string> */

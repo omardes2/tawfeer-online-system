@@ -161,7 +161,8 @@
                                             <select :name="`items[${i}][variant_id]`" x-model="row.variant_id" @change="fillCbm(row)" class="w-full rounded-md border-gray-300 py-2 text-sm truncate focus:border-emerald-500 focus:ring-emerald-500">
                                                 <option value="">{{ __('— صنف حرّ (وصف) —') }}</option>
                                                 @foreach ($variants as $v)
-                                                    <option value="{{ $v->id }}">{{ $v->product?->name }} — {{ $v->sku }}</option>
+                                                    {{-- المقاس/اللون في الاسم: بلا ذلك تتشابه مقاسات المنتج الواحد --}}
+                                                    <option value="{{ $v->id }}">{{ $v->product?->name }}@if ($v->attributeValues->isNotEmpty()) — {{ $v->optionLabel() }}@endif</option>
                                                 @endforeach
                                             </select>
                                             <input type="text" :name="`items[${i}][description]`" x-model="row.description" placeholder="{{ __('وصف (اختياري)') }}" class="mt-1 w-full rounded-md border-gray-200 py-1.5 text-xs focus:border-emerald-500 focus:ring-emerald-500" />

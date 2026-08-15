@@ -12,6 +12,7 @@ use App\Modules\Purchasing\Models\Supplier;
 use App\Modules\Purchasing\Services\PurchaseInvoiceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -93,7 +94,7 @@ class PurchaseInvoiceController extends Controller
             $rows = [self::EMPTY_ROW];
         }
 
-        $variants = ProductVariant::with('product:id,name,cbm')->orderBy('id')->get();
+        $variants = $this->purchasableVariants();
 
         return [
             'invoice' => $invoice,
@@ -115,6 +116,33 @@ class PurchaseInvoiceController extends Controller
                 ->when($invoice?->import_shipment_id, fn ($q, $id) => $q->orWhere('id', $id))
                 ->orderByDesc('id')->get(),
         ];
+    }
+
+    /**
+     * الأصناف القابلة للشراء.
+     *
+     * **يُستبعَد المتغيّر الافتراضي المجرّد لمنتجٍ له مقاسات/ألوان**: ليس صنفًا
+     * يُباع بل حاملٌ فارغ، وإدخال بضاعة عليه يترك رصيدًا لا ينتمي إلى أيّ مقاس —
+     * لا يظهر للزبون ولا يُحجَز في طلب. وكان يظهر في القائمة باسم المنتج نفسه
+     * فيتعذّر تمييزه عن مقاساته.
+     *
+     * ويُعرض المقاس/اللون في الاسم بدل الاكتفاء بالـSKU: «مشد — L» تُقرأ، و
+     * «مشد — P-J01TDU0G» لا تُقرأ.
+     *
+     * @return Collection<int, ProductVariant>
+     */
+    private function purchasableVariants()
+    {
+        $variants = ProductVariant::with(['product:id,name,cbm', 'attributeValues'])
+            ->orderBy('product_id')->orderBy('id')->get();
+
+        $productsWithOptions = $variants
+            ->filter(fn (ProductVariant $v) => $v->attributeValues->isNotEmpty())
+            ->pluck('product_id')->unique()->flip();
+
+        return $variants
+            ->reject(fn (ProductVariant $v) => $v->attributeValues->isEmpty() && $productsWithOptions->has($v->product_id))
+            ->values();
     }
 
     /** الحفظ = إنشاء + ترحيل محاسبي فوري (بلا مسودّة/اعتماد منفصلين — قرار إداري). */

@@ -217,12 +217,15 @@ class ProductController extends Controller
                     ->pluck('on_hand', 'variant_id')->all()
                 : [];
 
+            // العدد الأصلي = مجموع رصيد كل المتغيّرات (الافتراضي + المقاسات). يطابق
+            // ما تتحقّق منه ProductVariantController::originalQuantity، فلا يعرض
+            // النموذج رقمًا ويرفض الحفظُ بآخر.
             $defaultVariant = $product->variants->first(fn ($v) => $v->attributeValues->isEmpty());
             $defaultQty = $warehouse && $defaultVariant
                 ? (float) InventoryStock::where('warehouse_id', $warehouse->id)
                     ->where('variant_id', $defaultVariant->id)->value('on_hand')
                 : 0.0;
-            $originalQty = $defaultQty > 0 ? $defaultQty : array_sum($stock);
+            $originalQty = $defaultQty + array_sum($stock);
 
             $attributes = ProductAttribute::where('is_active', true)
                 ->with(['values' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order')->orderBy('id')])
