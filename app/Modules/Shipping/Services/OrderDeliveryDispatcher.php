@@ -99,7 +99,8 @@ class OrderDeliveryDispatcher
 
         $qty = (int) max(1, (int) round($order->items->sum(fn ($i) => (float) $i->qty)));
         $description = $order->items
-            ->map(fn ($i) => trim(($i->variant?->product?->name ?? '').' ×'.rtrim(rtrim((string) $i->qty, '0'), '.')))
+            // الكمية بين نجمتين بطلب صريح من مالك النظام: «شواية متنقلة *2*».
+            ->map(fn ($i) => trim(($i->variant?->product?->name ?? '').' *'.rtrim(rtrim((string) $i->qty, '0'), '.').'*'))
             ->filter()->implode(' , ');
 
         // الدفع عند الاستلام هو النمط الافتراضي (يُلغى إن كان الطلب مدفوعًا مسبقًا).
