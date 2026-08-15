@@ -109,6 +109,7 @@ class PurchaseInvoiceController extends Controller
             ])->all(),
             'baseCurrency' => strtoupper((string) config('app.currency', 'ILS')),
             'currencies' => self::CURRENCIES,
+            'stockShortages' => [],
             // الشحنات المفتوحة فقط + شحنة الفاتورة الحالية ولو أُغلقت (حتى لا
             // يفقد التعديلُ ارتباطًا قائمًا).
             'shipments' => ImportShipment::query()
@@ -167,7 +168,12 @@ class PurchaseInvoiceController extends Controller
         // المُرحّلة قابلة للتعديل ما لم يُسدَّد منها شيء (يُعكس أثر المخزون ويُحدَّث القيد).
         abort_unless($this->isEditable($invoice), 403, __('لا يمكن تعديل فاتورة بهذه الحالة.'));
 
-        return view('admin.purchasing.invoices.form', $this->formViewData($invoice->load('items.variant.product')));
+        // تحذير قبل الملء لا بعد الحفظ: بضاعة الفاتورة تُسحب أولًا عند التعديل،
+        // فإن بِيعت أو نُقلت لن يمرّ الحفظ مهما أُتقن النموذج.
+        // المفتاح المُعاد تعريفه أولًا: `+` يُبقي قيمة الطرف الأيسر عند التكرار.
+        return view('admin.purchasing.invoices.form', [
+            'stockShortages' => $this->service->stockShortages($invoice),
+        ] + $this->formViewData($invoice->load('items.variant.product')));
     }
 
     public function update(StorePurchaseInvoiceRequest $request, PurchaseInvoice $invoice): RedirectResponse

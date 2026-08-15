@@ -5,6 +5,24 @@
 
     <x-admin.flash />
 
+    {{--
+        تحذير قبل الملء: تعديل فاتورة مُرحّلة يسحب بضاعتها أولًا ثم يُدخلها
+        بالأرقام الجديدة. فإن بِيعت أو وُزِّعت لن يمرّ الحفظ مهما أُتقن النموذج.
+    --}}
+    @if (! empty($stockShortages))
+        <x-admin.alert tone="red" :title="__('لا يمكن حفظ التعديل على هذه الفاتورة')" class="mb-6">
+            <p class="mb-2">{{ __('بضاعة هذه البنود لم تعد متاحة في المستودع لتُسحب:') }}</p>
+            <ul class="list-disc list-inside space-y-0.5">
+                @foreach ($stockShortages as $shortage)
+                    <li class="tabular-nums">{{ $shortage }}</li>
+                @endforeach
+            </ul>
+            <p class="mt-2">
+                {{ __('بِيعت الكمية أو نُقلت أو وُزِّعت على مقاسات أخرى. أعِد الكمية للمستودع أولًا، أو اعكس الفاتورة بدل تعديلها.') }}
+            </p>
+        </x-admin.alert>
+    @endif
+
     @php
         // ثلاث عملات تجتمع في هذه الشاشة، فرمزُ كل رقم جزءٌ من معناه.
         $baseSymbol = \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪');

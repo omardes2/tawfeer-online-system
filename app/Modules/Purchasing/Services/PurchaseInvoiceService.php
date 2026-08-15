@@ -13,6 +13,7 @@ use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Catalog\Models\Unit;
 use App\Modules\Catalog\Services\ProductService;
 use App\Modules\Foundation\Models\Warehouse;
+use App\Modules\Inventory\Models\InventoryStock;
 use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Purchasing\Models\PurchaseInvoice;
 use App\Modules\Purchasing\Models\PurchaseInvoiceItem;
@@ -335,6 +336,8 @@ class PurchaseInvoiceService
             return;
         }
 
+        $this->assertStockReturnable($invoice, $warehouse);
+
         foreach ($invoice->items as $item) {
             $variant = $item->variant_id ? ProductVariant::find($item->variant_id) : null;
             if (! $variant || (float) $item->qty <= 0) {
@@ -346,6 +349,81 @@ class PurchaseInvoiceService
                 'reason' => 'purchase_invoice_revert:'.$invoice->number,
             ]);
         }
+    }
+
+    /**
+     * يتحقّق أن بضاعة الفاتورة ما زالت في المستودع قبل سحبها.
+     *
+     * تعديلُ فاتورة مُرحّلة يسحب بضاعتها أولًا ثم يُدخلها بالأرقام الجديدة. فإن
+     * بِيعت الكمية أو نُقلت أو وُزِّعت على مقاسات أخرى، لم يعد هناك ما يُسحب —
+     * ومحرّك المخزون يرفض بحقّ، لكن برسالةٍ عامّة لا تقول أيّ صنفٍ ولا كم ينقص،
+     * فيقف المستخدم أمام حائط. هذا الفحص يسبقه ليقول الاسم والرقم والمخرج.
+     *
+     * يُفحص كل البنود قبل الرمي، فيرى المستخدم كل النواقص دفعةً واحدة بدل
+     * اكتشافها واحدًا تلو الآخر.
+     */
+    private function assertStockReturnable(PurchaseInvoice $invoice, Warehouse $warehouse): void
+    {
+        $shortages = $this->stockShortages($invoice, $warehouse);
+
+        if ($shortages === []) {
+            return;
+        }
+
+        throw ValidationException::withMessages(['items' => __(
+            'لا يمكن تعديل الفاتورة: بضاعتها لم تعد متاحة في المستودع (:wh) — :list. '
+            .'بِيعت الكمية أو نُقلت أو وُزِّعت على مقاسات أخرى. '
+            .'أعِد الكمية للمستودع أولًا، أو اعكس الفاتورة بدل تعديلها.',
+            ['wh' => $warehouse->name, 'list' => implode(' · ', $shortages)],
+        )]);
+    }
+
+    /**
+     * البنود التي لم تعد بضاعتها متاحة للسحب، موصوفةً بالاسم والرقمين.
+     *
+     * تُستدعى أيضًا عند **فتح** صفحة التعديل: أن يعرف المستخدم قبل ملء النموذج
+     * خيرٌ من أن يصطدم بعد الحفظ.
+     *
+     * @return array<int, string>
+     */
+    public function stockShortages(PurchaseInvoice $invoice, ?Warehouse $warehouse = null): array
+    {
+        $warehouse ??= $this->defaultWarehouse();
+
+        // فاتورة المصاريف لا بضاعة لها، والمستلمة بإذن مستقلّ لا تسحب هنا،
+        // والمستودع الذي يسمح بالسالب لا يمانع السحب.
+        if ($warehouse === null || $warehouse->allow_negative
+            || $invoice->isExpenseInvoice() || $invoice->goods_receipt_id !== null || ! $invoice->isPosted()) {
+            return [];
+        }
+
+        $shortages = [];
+
+        foreach ($invoice->items as $item) {
+            $qty = (float) $item->qty;
+            $variant = $item->variant_id ? ProductVariant::with(['product:id,name', 'attributeValues'])->find($item->variant_id) : null;
+            if (! $variant || $qty <= 0) {
+                continue;
+            }
+
+            $stock = InventoryStock::where('variant_id', $variant->id)
+                ->where('warehouse_id', $warehouse->id)->first();
+            $available = round((float) ($stock?->on_hand ?? 0) - (float) ($stock?->reserved ?? 0), 3);
+
+            if ($available + 1e-9 < $qty) {
+                $name = $variant->product?->name ?: $variant->sku;
+                if ($variant->attributeValues->isNotEmpty()) {
+                    $name .= ' — '.$variant->optionLabel();
+                }
+                $shortages[] = __(':name (المطلوب سحبه :need، المتاح :have)', [
+                    'name' => $name,
+                    'need' => rtrim(rtrim(number_format($qty, 3), '0'), '.'),
+                    'have' => rtrim(rtrim(number_format($available, 3), '0'), '.'),
+                ]);
+            }
+        }
+
+        return $shortages;
     }
 
     /**
