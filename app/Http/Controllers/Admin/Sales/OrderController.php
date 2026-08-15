@@ -787,15 +787,17 @@ class OrderController extends Controller
     }
 
     /**
-     * أساس استعلام الطلبات المرئية للمستخدم: من يملك «العرض الكامل» يرى الجميع، وإلا فأصحاب
-     * «عرض الخاص» (موظف مبيعات/مسوّق) يرون طلباتهم فقط (أنشأوها أو أُسنِدت إليهم أو مسوّقهم).
+     * أساس استعلام الطلبات المرئية للمستخدم: الإدارة ترى الجميع، وموظف المبيعات
+     * والمسوّق يريان طلباتهما فقط (أنشآها أو أُسنِدت إليهما أو هما مسوّقها).
+     *
+     * القيد من الدور لا من غياب الصلاحية — انظر `User::restrictedToOwnOrders`.
      */
     private function visibleOrders(Request $request): Builder
     {
         $query = Order::query();
         $user = $request->user();
 
-        if ($user !== null && ! $user->can('sales.orders.view')) {
+        if ($user !== null && $user->restrictedToOwnOrders()) {
             $query->where(function ($w) use ($user) {
                 $w->where('created_by', $user->id)
                     ->orWhere('assigned_to', $user->id)

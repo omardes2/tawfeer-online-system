@@ -62,4 +62,33 @@ class User extends Authenticatable
     {
         return $this->hasMany(SocialIdentity::class);
     }
+
+    /** أدوارٌ ترى كل الطلبات بحكم عملها — الإدارة وحدها. */
+    public const FULL_ORDER_VIEW_ROLES = ['admin', 'manager'];
+
+    /** أدوارٌ لا ترى إلا طلباتها هي — مهما مُنحت من صلاحيات. */
+    public const OWN_ORDERS_ONLY_ROLES = ['sales', 'affiliate'];
+
+    /**
+     * هل يُقصَر هذا المستخدم على طلباته هو؟
+     *
+     * المسوّق وموظف المبيعات مقيَّدان **بحكم دورهما** لا بغياب صلاحية «العرض
+     * الكامل». الاعتماد على الغياب وحده أمانٌ هشّ: أيّ منحٍ عارض للصلاحية —
+     * تعديل دور، أو زارع، أو منح على مستوى المستخدم — يفتح للمسوّق طلبات
+     * زملائه وأسماء عملائهم وأرقام هواتفهم بصمت.
+     *
+     * والدور الإداري يسبق القيد، فمديرٌ يحمل صفة مسوّق يبقى يرى الجميع.
+     */
+    public function restrictedToOwnOrders(): bool
+    {
+        if ($this->hasAnyRole(self::FULL_ORDER_VIEW_ROLES)) {
+            return false;
+        }
+
+        if ($this->hasAnyRole(self::OWN_ORDERS_ONLY_ROLES)) {
+            return true;
+        }
+
+        return ! $this->can('sales.orders.view');
+    }
 }

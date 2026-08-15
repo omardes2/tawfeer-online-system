@@ -13,8 +13,17 @@ class OrderPolicy
         return $user->can('sales.orders.view') || $user->can('sales.orders.view_own');
     }
 
+    /**
+     * فتح طلبٍ بعينه. القائمة وحدها لا تكفي حارسًا: بلا هذا الشرط يفتح المسوّق
+     * طلب زميله بتغيير المعرّف في الرابط. والقاعدة واحدة في الموضعين — انظر
+     * `User::restrictedToOwnOrders`.
+     */
     public function view(User $user, Order $m): bool
     {
+        if ($user->restrictedToOwnOrders()) {
+            return $user->can('sales.orders.view_own') && $this->owns($user, $m);
+        }
+
         return $user->can('sales.orders.view')
             || ($user->can('sales.orders.view_own') && $this->owns($user, $m));
     }
