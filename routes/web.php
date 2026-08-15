@@ -188,6 +188,8 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     // الاستيراد قبل الـresource كي لا تبتلع products/{product} المسار «products/import».
     Route::get('products/import', [ProductImportController::class, 'form'])->name('products.import');
     Route::post('products/import', [ProductImportController::class, 'upload'])->name('products.import.upload');
+    // كذلك «products/bulk»: قبل الـresource وإلّا ابتلعه products/{product}.
+    Route::delete('products/bulk', [ProductController::class, 'bulkDestroy'])->name('products.bulk-destroy');
     Route::resource('products', ProductController::class)->except('show');
     Route::post('products/{product}/toggle-visibility', [ProductController::class, 'toggleVisibility'])->name('products.toggle-visibility');
     Route::post('products/{product}/images', [ProductController::class, 'storeImage'])->name('products.images.store');

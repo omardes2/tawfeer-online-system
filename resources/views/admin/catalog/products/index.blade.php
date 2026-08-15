@@ -12,19 +12,21 @@
 
     @php $sym = \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪'); @endphp
 
-    {{-- فلاتر: بحث + حالة + ترتيب --}}
+    {{-- فلاتر: بحث + الظهور على الموقع + ترتيب --}}
     <form method="GET" action="{{ route('admin.products.index') }}" class="flex flex-wrap items-end gap-3 mb-5">
         <div class="flex-1 min-w-[16rem]">
             <label class="block text-xs text-gray-500 mb-1">{{ __('بحث عن صنف') }}</label>
             <input type="text" name="search" value="{{ request('search') }}" placeholder="{{ __('الاسم أو SKU…') }}"
                    class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
         </div>
+        {{-- الظهور على الموقع بدل حالة التحرير: السؤال العملي هو «ما الذي يراه
+             الزبون؟»، وهو العمود نفسه الذي يُبدّل من الجدول أدناه. --}}
         <div>
-            <label class="block text-xs text-gray-500 mb-1">{{ __('الحالة') }}</label>
-            <select name="status" onchange="this.form.submit()" class="rounded-lg border-gray-300 text-sm min-w-[9rem] focus:border-emerald-500 focus:ring-emerald-500">
-                <option value="">{{ __('كل الحالات') }}</option>
-                @foreach (['active' => 'مفعّل', 'draft' => 'مسودّة', 'archived' => 'مؤرشف'] as $val => $lbl)
-                    <option value="{{ $val }}" @selected(request('status') === $val)>{{ __($lbl) }}</option>
+            <label class="block text-xs text-gray-500 mb-1">{{ __('الظهور على الموقع') }}</label>
+            <select name="visibility" onchange="this.form.submit()" class="rounded-lg border-gray-300 text-sm min-w-[10rem] focus:border-emerald-500 focus:ring-emerald-500">
+                <option value="">{{ __('الكل') }}</option>
+                @foreach (['visible' => 'ظاهرة على الموقع', 'hidden' => 'مخفية'] as $val => $lbl)
+                    <option value="{{ $val }}" @selected(request('visibility') === $val)>{{ __($lbl) }}</option>
                 @endforeach
             </select>
         </div>
@@ -39,16 +41,84 @@
             </select>
         </div>
         <button type="submit" class="btn-secondary btn-sm">{{ __('تطبيق') }}</button>
-        @if (request()->hasAny(['search', 'status', 'sort']))
+        @if (request()->hasAny(['search', 'visibility', 'sort']))
             <a href="{{ route('admin.products.index') }}" class="btn-secondary btn-sm">{{ __('مسح') }}</a>
         @endif
     </form>
 
-    <div x-data="{ all: false }">
+    @php $pageIds = $products->pluck('id')->map(fn ($i) => (string) $i)->all(); @endphp
+
+    {{--
+        التحديد والحذف الجماعي.
+
+        `selected` مصفوفة معرّفات نصّية (قيم صناديق الاختيار نصوص دائمًا).
+        صندوق الرأس يعكس حالة الصفحة الحالية لا الكتالوج كلّه — التحديد لا
+        يتجاوز الصفحة المعروضة، والعدّاد يقول ذلك صراحةً.
+    --}}
+    <div x-data="{
+        selected: [],
+        pageIds: @js($pageIds),
+        confirming: false,
+        get allOnPage() { return this.pageIds.length > 0 && this.pageIds.every(id => this.selected.includes(id)) },
+        toggleAll(checked) {
+            this.selected = checked
+                ? [...new Set([...this.selected, ...this.pageIds])]
+                : this.selected.filter(id => ! this.pageIds.includes(id));
+        },
+    }">
+        {{-- شريط الإجراءات: يظهر عند وجود تحديد فقط فلا يزاحم الجدول --}}
+        @can('deleteAny', \App\Modules\Catalog\Models\Product::class)
+            <div x-show="selected.length > 0" x-cloak
+                 class="flex flex-wrap items-center justify-between gap-3 mb-3 px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-200">
+                <span class="text-sm text-emerald-900">
+                    {{ __('المحدَّد') }}: <span class="font-bold tabular-nums" x-text="selected.length"></span>
+                </span>
+                <div class="flex items-center gap-2">
+                    <button type="button" @click="selected = []" class="btn-secondary btn-sm">{{ __('إلغاء التحديد') }}</button>
+                    <button type="button" @click="confirming = true" class="btn-danger btn-sm">{{ __('حذف المحدَّد') }}</button>
+                </div>
+            </div>
+
+            {{-- تأكيد الحذف — بنفس هيئة نافذة التأكيد المفردة في بقيّة اللوحة --}}
+            <template x-teleport="body">
+                <div x-show="confirming" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" x-transition.opacity>
+                    <div class="absolute inset-0 bg-slate-900/50" @click="confirming = false"></div>
+                    <div class="relative admin-card w-full max-w-md p-6" @keydown.escape.window="confirming = false" x-transition>
+                        <div class="flex items-start gap-3">
+                            <span class="grid place-items-center w-11 h-11 rounded-full bg-rose-50 text-rose-500 shrink-0">
+                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                            </span>
+                            <div class="min-w-0">
+                                <h3 class="text-lg font-semibold text-gray-900">{{ __('حذف الأصناف المحدَّدة') }}</h3>
+                                <p class="mt-1 text-sm text-gray-500">
+                                    {{ __('سيُحذف') }} <span class="font-bold tabular-nums" x-text="selected.length"></span>
+                                    {{ __('صنفًا من الكتالوج.') }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex items-center justify-end gap-2">
+                            <button type="button" @click="confirming = false" class="btn-secondary">{{ __('إلغاء') }}</button>
+                            <form method="POST" action="{{ route('admin.products.bulk-destroy') }}">
+                                @csrf @method('DELETE')
+                                <template x-for="id in selected" :key="id">
+                                    <input type="hidden" name="products[]" :value="id" />
+                                </template>
+                                <button type="submit" class="btn-danger">{{ __('حذف') }}</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        @endcan
+
         <x-admin.table>
             <thead>
                 <tr>
-                    <th class="w-8"><input type="checkbox" x-model="all" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" /></th>
+                    <th class="w-8">
+                        <input type="checkbox" :checked="allOnPage" @change="toggleAll($event.target.checked)"
+                               aria-label="{{ __('تحديد كل أصناف الصفحة') }}"
+                               class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                    </th>
                     <th>{{ __('الصورة') }}</th>
                     <th>{{ __('اسم المنتج') }}</th>
                     <th>{{ __('القسم') }}</th>
@@ -69,7 +139,11 @@
                         $fmt = fn ($n) => rtrim(rtrim(number_format((float) $n, 3), '0'), '.');
                     @endphp
                     <tr>
-                        <td><input type="checkbox" :checked="all" value="{{ $product->id }}" class="row-check rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" /></td>
+                        <td>
+                            <input type="checkbox" x-model="selected" value="{{ $product->id }}"
+                                   aria-label="{{ __('تحديد') }} {{ $product->name }}"
+                                   class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                        </td>
                         <td>
                             @if ($product->primaryImage)
                                 <img src="{{ $product->primaryImage->url() }}" alt="" class="w-11 h-11 rounded-md object-cover bg-gray-100" />

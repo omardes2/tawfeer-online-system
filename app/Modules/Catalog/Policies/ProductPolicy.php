@@ -34,4 +34,15 @@ class ProductPolicy
     {
         return $user->can('catalog.products.delete');
     }
+
+    /**
+     * قدرة على مستوى الصنف لا النموذج — لإظهار أدوات الحذف الجماعي.
+     *
+     * `delete` تتطلّب نموذجًا فلا تصلح لسؤال «هل يملك الحذف أصلًا؟». وهي لا
+     * تغني عنها: الحذف الفعلي يفحص `delete` لكل منتج على حدة.
+     */
+    public function deleteAny(User $user): bool
+    {
+        return $user->can('catalog.products.delete');
+    }
 }

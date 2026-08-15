@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin\Catalog;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Catalog\BulkDeleteProductsRequest;
 use App\Http\Requests\Catalog\StoreProductImageRequest;
 use App\Http\Requests\Catalog\StoreProductRequest;
 use App\Http\Requests\Catalog\UpdateProductRequest;
@@ -20,6 +21,7 @@ use App\Modules\Inventory\Models\InventoryStock;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
@@ -42,7 +44,9 @@ class ProductController extends Controller
             ->when($request->filled('search'), fn ($q) => $q->where(fn ($w) => $w
                 ->where('name', 'like', '%'.$request->string('search').'%')
                 ->orWhere('sku', 'like', '%'.$request->string('search').'%')))
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')));
+            // الظهور على الموقع بدل حالة التحرير: هذا ما يسأل عنه المشغّل فعلًا
+            // («ما الذي يراه الزبون؟»)، والتبديل متاح في العمود نفسه من الجدول.
+            ->when($request->filled('visibility'), fn ($q) => $q->where('visibility', $request->string('visibility')));
 
         match ($sort) {
             'price_asc' => $query->orderBy('retail_price'),
@@ -108,6 +112,35 @@ class ProductController extends Controller
         $this->service->delete($product);
 
         return redirect()->route('admin.products.index')->with('success', __('تم حذف المنتج.'));
+    }
+
+    /**
+     * حذف الأصناف المُحدَّدة.
+     *
+     * الصلاحية تُفحص لكل صنف على حدة — قائمة المعرّفات تصل من المتصفّح، وفحصٌ
+     * عامّ واحد يسمح بتمرير صنف لا يملك المستخدم حذفه ضمن الدفعة.
+     *
+     * داخل معاملة: «حذف المحدَّد» وعدٌ بالكل أو لا شيء؛ سقوطُه في المنتصف يترك
+     * المشغّل أمام قائمة لا يعرف ما جرى لها.
+     */
+    public function bulkDestroy(BulkDeleteProductsRequest $request): RedirectResponse
+    {
+        $products = Product::whereIn('id', $request->validated('products'))->get();
+
+        $denied = $products->filter(fn (Product $p) => $request->user()->cannot('delete', $p));
+        if ($denied->isNotEmpty()) {
+            return back()->with('error', __('لا تملك صلاحية حذف :count من الأصناف المحدَّدة.', ['count' => $denied->count()]));
+        }
+
+        DB::transaction(function () use ($products) {
+            $products->each(fn (Product $p) => $this->service->delete($p));
+        });
+
+        return back()->with('success', trans_choice(
+            '{1}تم حذف صنف واحد.|{2}تم حذف صنفين.|[3,*]تم حذف :count أصناف.',
+            $products->count(),
+            ['count' => $products->count()],
+        ));
     }
 
     /** تبديل إظهار المنتج على الموقع (visible ⇄ hidden). */
