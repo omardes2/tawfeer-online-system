@@ -123,6 +123,7 @@
                     <th>{{ __('اسم المنتج') }}</th>
                     <th>{{ __('القسم') }}</th>
                     <th>{{ __('السعر') }}</th>
+                    <th>{{ __('سعر الجملة') }}</th>
                     <th>{{ __('المتوفّرة') }}</th>
                     <th>{{ __('المباعة') }}</th>
                     <th>{{ __('إظهار على الموقع') }}</th>
@@ -133,6 +134,17 @@
                 @forelse ($products as $product)
                     @php
                         $price = $product->defaultVariant?->retail_price ?? $product->retail_price;
+
+                        // سعر الجملة: رقمٌ واحد إن اتّفقت المقاسات، ومدًى إن اختلفت.
+                        // الرجوع لسعر المنتج حين لا يحمله أيٌّ من متغيّراته.
+                        $wMin = $product->variants_min_wholesale_price ?? $product->wholesale_price;
+                        $wMax = $product->variants_max_wholesale_price ?? $product->wholesale_price;
+                        $money = fn ($n) => number_format((float) $n, 2).' '.$sym;
+                        $wholesale = match (true) {
+                            $wMin === null => '—',
+                            (float) $wMin === (float) $wMax => $money($wMin),
+                            default => number_format((float) $wMin, 2).' – '.$money($wMax),
+                        };
                         $available = (float) ($product->stocks_sum_on_hand ?? 0) - (float) ($product->stocks_sum_reserved ?? 0);
                         $sold = (float) ($product->order_items_sum_qty_shipped ?? 0);
                         $shown = $product->visibility === 'visible';
@@ -156,7 +168,8 @@
                             <span class="block text-[11px] text-gray-400 font-mono">{{ $product->sku }}</span>
                         </td>
                         <td class="text-gray-500">{{ $product->category?->name ?: '—' }}</td>
-                        <td class="tabular-nums whitespace-nowrap">{{ $price !== null ? number_format((float) $price, 2).' '.$sym : '—' }}</td>
+                        <td class="tabular-nums whitespace-nowrap">{{ $price !== null ? $money($price) : '—' }}</td>
+                        <td class="tabular-nums whitespace-nowrap {{ $wholesale === '—' ? 'text-gray-300' : 'text-gray-600' }}">{{ $wholesale }}</td>
                         <td class="tabular-nums">
                             <span @class(['font-medium', 'text-rose-600' => $available <= 0, 'text-gray-800' => $available > 0])>{{ $fmt($available) }}</span>
                         </td>
@@ -189,7 +202,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="9" class="!p-0">
+                    <tr><td colspan="10" class="!p-0">
                         <x-admin.empty-state
                             :title="__('لا توجد منتجات')"
                             :description="__('ابدأ بإضافة أول منتج للكتالوج.')"

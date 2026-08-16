@@ -41,6 +41,12 @@ class ProductController extends Controller
             ->withSum('stocks', 'on_hand')       // stocks_sum_on_hand
             ->withSum('stocks', 'reserved')      // stocks_sum_reserved
             ->withSum('orderItems', 'qty_shipped') // order_items_sum_qty_shipped (المباع)
+            // سعر الجملة من **المتغيّرات** لا من المتغيّر الافتراضي وحده: المنتج
+            // ذو المقاسات قد يختلف سعر جملته بينها، والافتراضي فيه حاملٌ مجرَّد
+            // غالبًا بلا سعر — فيظهر العمود فارغًا وهو ليس كذلك. الحدّان يُظهران
+            // رقمًا واحدًا عند التطابق ومدًى عند الاختلاف، بلا استعلامٍ لكل صفّ.
+            ->withMin('variants', 'wholesale_price') // variants_min_wholesale_price
+            ->withMax('variants', 'wholesale_price') // variants_max_wholesale_price
             ->when($request->filled('search'), fn ($q) => $q->where(fn ($w) => $w
                 ->where('name', 'like', '%'.$request->string('search').'%')
                 ->orWhere('sku', 'like', '%'.$request->string('search').'%')))
