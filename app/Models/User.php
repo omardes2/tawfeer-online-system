@@ -79,6 +79,18 @@ class User extends Authenticatable
      *
      * والدور الإداري يسبق القيد، فمديرٌ يحمل صفة مسوّق يبقى يرى الجميع.
      */
+    /**
+     * هل يبيع هذا المستخدم بصفته مسوّقًا؟
+     *
+     * يحكم ما يراه من كتالوج: الصنف الممنوع على المسوّقين يختفي عنه في شاشة
+     * إنشاء الطلب وفي قائمة الأسعار. والمدير الذي يحمل دور المسوّق عرضًا يبقى
+     * مديرًا — القيد على من دورُه المسوّق لا على من مرّ به.
+     */
+    public function sellsAsAffiliate(): bool
+    {
+        return $this->hasRole('affiliate') && ! $this->hasAnyRole(self::FULL_ORDER_VIEW_ROLES);
+    }
+
     public function restrictedToOwnOrders(): bool
     {
         if ($this->hasAnyRole(self::FULL_ORDER_VIEW_ROLES)) {

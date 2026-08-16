@@ -765,6 +765,9 @@ class OrderController extends Controller
         // (كمية كل مقاس على حدة)، لا ببطاقة واحدة على المتغيّر الافتراضي — فكميته
         // تُوزَّع على المقاسات وتصبح صفرًا، وخصم المخزون يجب أن يقع على المقاس المُباع.
         return Product::query()->active()
+            // الصنف الممنوع على المسوّقين يختفي من بطاقاتهم — لا يُعرض ثم يُرفض
+            // عند الحفظ. ولا يمسّ ذلك موظفي المبيعات ولا المدير.
+            ->when(auth()->user()?->sellsAsAffiliate(), fn ($q) => $q->availableToAffiliates())
             ->with(['variants.attributeValues', 'defaultVariant', 'primaryImage'])
             ->orderBy('name')
             ->get()

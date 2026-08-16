@@ -127,6 +127,7 @@
                     <th>{{ __('المتوفّرة') }}</th>
                     <th>{{ __('المباعة') }}</th>
                     <th>{{ __('إظهار على الموقع') }}</th>
+                    <th>{{ __('متاح للمسوّقين') }}</th>
                     <th></th>
                 </tr>
             </thead>
@@ -148,6 +149,7 @@
                         $available = (float) ($product->stocks_sum_on_hand ?? 0) - (float) ($product->stocks_sum_reserved ?? 0);
                         $sold = (float) ($product->order_items_sum_qty_shipped ?? 0);
                         $shown = $product->visibility === 'visible';
+                        $forAffiliates = (bool) $product->available_to_affiliates;
                         $fmt = fn ($n) => rtrim(rtrim(number_format((float) $n, 3), '0'), '.');
                     @endphp
                     <tr>
@@ -188,6 +190,26 @@
                                 <span class="text-xs {{ $shown ? 'text-emerald-600' : 'text-gray-400' }}">{{ $shown ? __('ظاهر') : __('مخفي') }}</span>
                             @endcan
                         </td>
+                        {{--
+                            مفتاحٌ ثانٍ بهيئة الأول: إتاحة الصنف للمسوّقين. منعُه
+                            يُخفيه عن شاشة إنشاء الطلب لدى المسوّق وعن «الأصناف
+                            والأسعار» — ولا يمسّ الزبون ولا موظفي المبيعات.
+                        --}}
+                        <td>
+                            @can('update', $product)
+                                <form method="POST" action="{{ route('admin.products.toggle-affiliate', $product) }}">
+                                    @csrf
+                                    <button type="submit" role="switch" aria-checked="{{ $forAffiliates ? 'true' : 'false' }}"
+                                            aria-label="{{ __('إتاحة :p للمسوّقين', ['p' => $product->name]) }}"
+                                            class="relative inline-block h-6 w-11 rounded-full transition-colors {{ $forAffiliates ? 'bg-emerald-500' : 'bg-gray-300' }}"
+                                            title="{{ $forAffiliates ? __('مُفعّل للمسوّقين — اضغط للإخفاء') : __('مخفي عن المسوّقين — اضغط للتفعيل') }}">
+                                        <span class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all {{ $forAffiliates ? 'end-0.5' : 'start-0.5' }}"></span>
+                                    </button>
+                                </form>
+                            @else
+                                <span class="text-xs {{ $forAffiliates ? 'text-emerald-600' : 'text-gray-400' }}">{{ $forAffiliates ? __('مُفعّل') : __('مخفي') }}</span>
+                            @endcan
+                        </td>
                         <td class="text-end">
                             <div class="inline-flex items-center gap-1.5">
                                 @can('update', $product)
@@ -202,7 +224,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="10" class="!p-0">
+                    <tr><td colspan="11" class="!p-0">
                         <x-admin.empty-state
                             :title="__('لا توجد منتجات')"
                             :description="__('ابدأ بإضافة أول منتج للكتالوج.')"

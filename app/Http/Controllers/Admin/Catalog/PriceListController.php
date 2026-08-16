@@ -23,7 +23,11 @@ class PriceListController extends Controller
 
         $category = $request->integer('category') ?: null;
 
+        // المسوّق لا يرى الممنوع عليه؛ والمدير يراه موسومًا ليعرف ما يخفيه عنهم.
+        $hidesUnavailable = $request->user()?->sellsAsAffiliate() ?? false;
+
         $products = Product::query()
+            ->when($hidesUnavailable, fn ($q) => $q->availableToAffiliates())
             ->with('category:id,name')
             // السعران من المتغيّرات: المنتج ذو المقاسات قد تختلف أسعاره بينها،
             // وافتراضيُّه حاملٌ مجرَّد بلا سعر غالبًا — فيُقرأ الحدّان لا رقمُه.

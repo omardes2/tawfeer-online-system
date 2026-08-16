@@ -160,6 +160,24 @@ class ProductController extends Controller
         return back()->with('success', $show ? __('أصبح المنتج ظاهرًا على الموقع.') : __('أُخفي المنتج من الموقع.'));
     }
 
+    /**
+     * إتاحة الصنف للمسوّقين أو منعه — مستقلّ عن الظهور على الموقع.
+     *
+     * المنع يُخفيه عن شاشة إنشاء الطلب لدى المسوّق وعن «الأصناف والأسعار»، ولا
+     * يمسّ الزبون ولا موظفي المبيعات: الصنف يبقى يُباع في المتجر ومن اللوحة.
+     */
+    public function toggleAffiliate(Product $product): RedirectResponse
+    {
+        $this->authorize('update', $product);
+
+        $allow = ! $product->available_to_affiliates;
+        $product->update(['available_to_affiliates' => $allow]);
+
+        return back()->with('success', $allow
+            ? __('أصبح الصنف متاحًا للمسوّقين.')
+            : __('مُنع الصنف عن المسوّقين — لن يظهر لهم في إنشاء الطلب ولا في الأصناف والأسعار.'));
+    }
+
     public function storeImage(StoreProductImageRequest $request, Product $product): RedirectResponse
     {
         $this->authorize('update', $product);

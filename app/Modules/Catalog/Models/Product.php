@@ -35,12 +35,13 @@ class Product extends Model
         'cost_price', 'average_cost', 'retail_price', 'wholesale_price', 'marketer_price',
         'min_price', 'promo_price', 'promo_starts_at', 'promo_ends_at', 'target_margin',
         'weight', 'cbm', 'reorder_level', 'track_inventory',
-        'status', 'visibility', 'is_featured', 'sort_order', 'is_active',
+        'status', 'visibility', 'available_to_affiliates', 'is_featured', 'sort_order', 'is_active',
         'meta_title', 'meta_description', 'meta_keywords', 'search_keywords',
         'revenue_account_id', 'inventory_account_id', 'cogs_account_id',
     ];
 
     protected $casts = [
+        'available_to_affiliates' => 'boolean',
         'cost_price' => 'decimal:4',
         'average_cost' => 'decimal:4',
         'retail_price' => 'decimal:2',
@@ -149,6 +150,16 @@ class Product extends Model
     public function scopeVisible($query)
     {
         return $query->where('visibility', 'visible');
+    }
+
+    /**
+     * الأصناف التي يجوز للمسوّق بيعها.
+     *
+     * مستقلّ عن `visible`: الظهور للزبون شيء، وإتاحة الصنف للمسوّق شيء آخر.
+     */
+    public function scopeAvailableToAffiliates($query)
+    {
+        return $query->where('available_to_affiliates', true);
     }
 
     protected static function newFactory(): Factory

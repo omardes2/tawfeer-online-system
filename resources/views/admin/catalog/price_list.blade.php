@@ -62,6 +62,10 @@
                 <tr>
                     <td class="font-medium text-gray-800">
                         {{ $product->name }}
+                        {{-- يظهر للمدير وحده: المسوّق لا يرى الصنف الممنوع أصلًا --}}
+                        @unless ($product->available_to_affiliates)
+                            <span class="ms-1 align-middle rounded px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-500">{{ __('مخفي عن المسوّقين') }}</span>
+                        @endunless
                         <span class="block text-[11px] text-gray-400 font-mono">{{ $product->sku }}</span>
                     </td>
                     <td class="text-gray-500">{{ $product->category?->name ?: '—' }}</td>
