@@ -107,9 +107,15 @@
                 </p>
             </x-admin.field>
 
+            {{--
+                `x-show` يُخفي ولا يحذف: الحقلان يبقيان في النموذج ويُرسَلان
+                صفرَين مع الفاتورة المحلية فتسقط على «أكبر من صفر». التعطيل
+                يمنع إرسالهما أصلًا (والخلفية تُعامل الصفر كفراغ احتياطًا).
+            --}}
             <div x-show="head.currency !== base" x-cloak class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <x-admin.field :label="__('سعر الصرف مقابل الدولار')" name="fx_rate_to_usd">
                     <input type="number" step="0.000001" min="0" name="fx_rate_to_usd" x-model.number="head.fx_rate_to_usd"
+                           :disabled="head.currency === base"
                            class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
                     <p class="mt-1 text-xs text-gray-500">
                         {{ __('كم') }} <span class="font-medium" x-text="symbol(head.currency)"></span> {{ __('يساوي 1 $ — مثال: 7.15') }}
@@ -117,6 +123,7 @@
                 </x-admin.field>
                 <x-admin.field :label="__('سعر الدولار بالعملة الأساسية')" name="usd_rate">
                     <input type="number" step="0.000001" min="0" name="usd_rate" x-model.number="head.usd_rate"
+                           :disabled="head.currency === base"
                            class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
                     <p class="mt-1 text-xs text-gray-500">{{ __('كم :c يساوي 1 $ — مثال: 3.65', ['c' => $currencies[$baseCurrency] ?? $baseCurrency]) }}</p>
                 </x-admin.field>

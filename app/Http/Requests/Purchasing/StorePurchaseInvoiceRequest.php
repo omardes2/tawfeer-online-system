@@ -14,6 +14,21 @@ class StorePurchaseInvoiceRequest extends FormRequest
         return $this->user()?->can('purchasing.invoices.create') ?? false;
     }
 
+    /**
+     * الصفر في سعري الصرف معناه «غير مُدخَل» لا «سعر صرف يساوي صفرًا».
+     *
+     * حقول الاستيراد تبقى في صفحة الفاتورة حتى للفاتورة المحلية (تُخفى ولا
+     * تُحذف)، فتصل أصفارًا فتسقط على `gt:0` — ورسالة «يجب أن يكون أكبر من صفر»
+     * تظهر على حقلين لا يراهما المستخدم أصلًا، فيتعذّر حفظ أي فاتورة بالشيكل.
+     */
+    protected function prepareForValidation(): void
+    {
+        $this->merge(array_map(
+            fn ($rate) => (float) $rate > 0 ? $rate : null,
+            $this->only(['fx_rate_to_usd', 'usd_rate']),
+        ));
+    }
+
     public function rules(): array
     {
         return [
