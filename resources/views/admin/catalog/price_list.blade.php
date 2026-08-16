@@ -102,16 +102,30 @@
                         @if ($options->isNotEmpty())
                             <div class="flex flex-wrap gap-1.5">
                                 @foreach ($options as $variant)
-                                    @php $inStock = (float) ($available[$variant->id] ?? 0) > 0; @endphp
-                                    <span class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] {{ $inStock ? 'bg-emerald-50 text-emerald-800' : 'bg-gray-100 text-gray-400 line-through' }}"
-                                          title="{{ $inStock ? __('متوفّر') : __('نفد') }}">
+                                    @php
+                                        $vQty = (float) ($available[$variant->id] ?? 0);
+                                        $low = $vQty > 0 && $vQty < $lowStock;
+                                    @endphp
+                                    <span @class([
+                                            'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px]',
+                                            'bg-gray-100 text-gray-400 line-through' => $vQty <= 0,
+                                            'bg-rose-50 text-rose-700' => $low,
+                                            'bg-emerald-50 text-emerald-800' => $vQty > 0 && ! $low,
+                                        ])
+                                          title="{{ $vQty <= 0 ? __('نفد') : ($low ? __('على وشك النفاد') : __('متوفّر')) }}">
                                         {{ $variant->optionLabel() }}
+                                        @if ($low)
+                                            <span class="font-medium">{{ __('(في نهايته)') }}</span>
+                                        @endif
                                     </span>
                                 @endforeach
                             </div>
                         @else
                             <span class="text-xs {{ $simpleQty > 0 ? 'text-emerald-700' : 'text-gray-400' }}">
                                 {{ $simpleQty > 0 ? __('متوفّر') : __('غير متوفّر') }}
+                                @if ($simpleQty > 0 && $simpleQty < $lowStock)
+                                    <span class="font-medium text-rose-600">{{ __('(في نهايته)') }}</span>
+                                @endif
                             </span>
                         @endif
                     </td>
@@ -133,6 +147,6 @@
     @endif
 
     <p class="mt-4 text-xs text-gray-500">
-        {{ __('الصنف الذي تختلف أسعار مقاساته يظهر بمدًى (من – إلى). والمقاس المشطوب نافد من المستودع.') }}
+        {{ __('الصنف الذي تختلف أسعار مقاساته يظهر بمدًى (من – إلى). والمقاس المشطوب نافد، و«في نهايته» يعني أن ما تبقّى منه أقلّ من :n قطع.', ['n' => $lowStock]) }}
     </p>
 </x-app-layout>

@@ -19,6 +19,15 @@ use Illuminate\View\View;
  */
 class PriceListController extends Controller
 {
+    /**
+     * حدّ التنبيه: ما دون هذا العدد يُوسَم «في نهايته».
+     *
+     * رقمٌ واحد للكتالوج كلّه لا حدٌّ لكل صنف: الغاية تنبيهُ المسوّق قبل أن
+     * يَعِد زبونًا بما يوشك أن ينفد، لا إدارةُ إعادة الطلب — تلك لها
+     * `reorder_level` وشاشة «تنبيهات النقص».
+     */
+    private const LOW_STOCK = 10;
+
     public function index(Request $request): View
     {
         $this->authorize('catalog.price_list.view');
@@ -50,6 +59,7 @@ class PriceListController extends Controller
             // المتاح لكل متغيّر (المعروض فقط) باستعلامٍ واحد لا استعلامٍ لكل صفّ.
             // «المتاح» = الموجود ناقص المحجوز: المحجوز مباعٌ فعلًا وإن لم يخرج بعد.
             'available' => $this->availableByVariant($products->getCollection()),
+            'lowStock' => self::LOW_STOCK,
             // الفئات التي فيها أصناف فعلًا: فئة فارغة في الفلتر تعطي صفحة خاوية.
             'categories' => Category::query()
                 ->whereIn('id', Product::query()->whereNotNull('category_id')->distinct()->pluck('category_id'))
