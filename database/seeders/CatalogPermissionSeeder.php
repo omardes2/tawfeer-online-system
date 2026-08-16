@@ -53,5 +53,12 @@ class CatalogPermissionSeeder extends Seeder
                 $role->givePermissionTo($viewOnly);
             }
         }
+
+        // قائمة الأسعار: صلاحية قراءةٍ مستقلّة عن الكتالوج — المسوّق يعرف ما
+        // يبيع وبكم، ولا يفتح له ذلك بابَ التعديل ولا رؤية التكلفة.
+        Permission::findOrCreate('catalog.price_list.view', 'web');
+        foreach (['admin', 'manager', 'affiliate'] as $roleName) {
+            Role::where('name', $roleName)->first()?->givePermissionTo('catalog.price_list.view');
+        }
     }
 }

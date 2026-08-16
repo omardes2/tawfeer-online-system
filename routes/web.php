@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\Accounting\VoucherController as AdminVoucherContr
 use App\Http\Controllers\Admin\Ai\AiContentController;
 use App\Http\Controllers\Admin\Catalog\BrandController;
 use App\Http\Controllers\Admin\Catalog\CategoryController;
+use App\Http\Controllers\Admin\Catalog\PriceListController;
 use App\Http\Controllers\Admin\Catalog\ProductAttributeController;
 use App\Http\Controllers\Admin\Catalog\ProductController;
 use App\Http\Controllers\Admin\Catalog\ProductImportController;
@@ -187,6 +188,10 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
 
     // المنتجات ووسائطها (Phase 2.3)
     // الاستيراد قبل الـresource كي لا تبتلع products/{product} المسار «products/import».
+    // الأصناف والأسعار: قائمة أسعار للقراءة (للمسوّق أساسًا) — قبل الـresource
+    // وإلّا ابتلعها products/{product}. صلاحيتها مستقلّة عن الكتالوج.
+    Route::get('price-list', [PriceListController::class, 'index'])->name('price_list');
+
     Route::get('products/import', [ProductImportController::class, 'form'])->name('products.import');
     Route::post('products/import', [ProductImportController::class, 'upload'])->name('products.import.upload');
     // كذلك «products/bulk»: قبل الـresource وإلّا ابتلعه products/{product}.

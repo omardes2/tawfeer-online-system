@@ -54,6 +54,11 @@ final class AdminNavigation
                 ['admin.purchasing.shipments.index', 'شحنات الاستيراد', 'purchasing.shipments.view', 'admin.purchasing.shipments.*'],
                 ['admin.purchasing.returns.index', 'مرتجعات الموردين', 'purchasing.returns.view', 'admin.purchasing.returns.*'],
             ]],
+            // قسمٌ مستقلّ لا بندٌ تحت «المنتجات»: المسوّق لا يملك صلاحيات الكتالوج
+            // فيختفي ذلك القسم عنه بالكامل — ومعه كانت ستختفي قائمة الأسعار.
+            ['الأصناف والأسعار', 'box', [
+                ['admin.price_list', 'الأصناف والأسعار', 'catalog.price_list.view', 'admin.price_list'],
+            ]],
             ['العملاء', 'users', [
                 ['admin.crm.customers.index', 'العملاء', 'crm.customers.view', 'admin.crm.customers.*'],
             ]],
