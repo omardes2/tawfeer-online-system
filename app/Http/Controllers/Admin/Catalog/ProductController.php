@@ -101,15 +101,24 @@ class ProductController extends Controller
     }
 
     /**
-     * النموذج يمثّل المجموعة الكاملة للوسوم/السمات؛ نمرّرها دائمًا (حتى فارغة)
-     * ليتمكّن المستخدم من إزالة الكل — بخلاف دلالة الـAPI الجزئية.
+     * السمات تُرسل من النموذج دائمًا (ولو فارغة) فيصحّ تفريغها بإزالة كل
+     * الاختيارات — بخلاف دلالة الـAPI الجزئية.
+     *
+     * أمّا **الوسوم** فلم تعد في النموذج، ففرض مصفوفة فارغة كان يمسح وسوم
+     * الصنف عند كل حفظ. تُمرَّر فقط إن أرسلها الطلب فعلًا (الـAPI أو نموذج
+     * لاحق)، وإلا تُركت كما هي.
      */
     private function withRelationSets(Request $request): array
     {
-        return array_merge($request->validated(), [
-            'tag_ids' => $request->input('tag_ids', []),
+        $data = array_merge($request->validated(), [
             'attribute_ids' => $request->input('attribute_ids', []),
         ]);
+
+        if ($request->has('tag_ids')) {
+            $data['tag_ids'] = (array) $request->input('tag_ids', []);
+        }
+
+        return $data;
     }
 
     public function destroy(Product $product): RedirectResponse

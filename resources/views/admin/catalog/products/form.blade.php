@@ -1,173 +1,194 @@
-<x-app-layout>
-    <x-slot name="header"><h2 class="font-semibold text-xl text-gray-800">{{ $product->exists ? __('تعديل منتج') : __('منتج جديد') }}</h2></x-slot>
-    <div class="py-8 max-w-4xl mx-auto sm:px-6 lg:px-8 space-y-6">
-        <div class="bg-white shadow-sm sm:rounded-lg p-6">
-            <x-admin.flash />
-            <form method="POST" action="{{ $product->exists ? route('admin.products.update', $product) : route('admin.products.store') }}" class="space-y-6">
-                @csrf @if ($product->exists) @method('PUT') @endif
+<x-app-layout :title="$product->exists ? __('تعديل منتج') : __('منتج جديد')">
+    @php
+        $sym = \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪');
+        $inputClass = 'w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500';
+    @endphp
 
-                {{-- الهوية --}}
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <x-admin.field :label="__('الاسم (عربي)')" name="name"><input type="text" name="name" value="{{ old('name', $product->name) }}" required class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" /></x-admin.field>
-                    <x-admin.field :label="__('الاسم (إنجليزي)')" name="name_en"><input type="text" name="name_en" value="{{ old('name_en', $product->name_en) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" /></x-admin.field>
-                    <x-admin.field :label="__('الرابط (slug) — اختياري')" name="slug"><input type="text" name="slug" value="{{ old('slug', $product->slug) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" /></x-admin.field>
-                    <x-admin.field :label="__('الباركود')" name="barcode"><input type="text" name="barcode" value="{{ old('barcode', $product->barcode) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" /></x-admin.field>
+    <x-admin.header
+        :title="$product->exists ? __('تعديل منتج') : __('منتج جديد')"
+        :description="__('بيانات الصنف وسعره ومخزونه كما تظهر في المتجر واللوحة.')"
+        :breadcrumbs="[
+            __('الرئيسية') => route('admin.dashboard'),
+            __('المنتجات') => route('admin.products.index'),
+            ($product->exists ? $product->name : __('منتج جديد')) => null,
+        ]" />
+
+    <x-admin.flash />
+
+    <form method="POST" action="{{ $product->exists ? route('admin.products.update', $product) : route('admin.products.store') }}"
+          class="space-y-5 max-w-5xl">
+        @csrf @if ($product->exists) @method('PUT') @endif
+
+        {{-- معلومات أساسية --}}
+        <x-admin.form-section :title="__('معلومات أساسية')" :cols="2">
+            <x-slot:icon>
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.852l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
+            </x-slot:icon>
+
+            <x-admin.field :label="__('اسم المنتج')" name="name" required>
+                <input type="text" name="name" value="{{ old('name', $product->name) }}" required
+                       placeholder="{{ __('أدخل اسم المنتج') }}" class="{{ $inputClass }}" />
+            </x-admin.field>
+            <x-admin.field :label="__('الباركود')" name="barcode">
+                <input type="text" name="barcode" value="{{ old('barcode', $product->barcode) }}" class="{{ $inputClass }}" />
+            </x-admin.field>
+            <x-admin.field :label="__('الفئة')" name="category_id" required>
+                <select name="category_id" required class="{{ $inputClass }}">
+                    <option value="">{{ __('— اختر —') }}</option>
+                    @foreach ($categories as $c)<option value="{{ $c->id }}" @selected(old('category_id', $product->category_id) == $c->id)>{{ $c->name }}</option>@endforeach
+                </select>
+            </x-admin.field>
+            <x-admin.field :label="__('العلامة التجارية')" name="brand_id">
+                <select name="brand_id" class="{{ $inputClass }}">
+                    <option value="">{{ __('— بلا —') }}</option>
+                    @foreach ($brands as $b)<option value="{{ $b->id }}" @selected(old('brand_id', $product->brand_id) == $b->id)>{{ $b->name }}</option>@endforeach
+                </select>
+            </x-admin.field>
+            <x-admin.field :label="__('الوحدة')" name="unit_id" required>
+                <select name="unit_id" required class="{{ $inputClass }}">
+                    <option value="">{{ __('— اختر —') }}</option>
+                    @foreach ($units as $u)<option value="{{ $u->id }}" @selected(old('unit_id', $product->unit_id) == $u->id)>{{ $u->name }}</option>@endforeach
+                </select>
+            </x-admin.field>
+            <x-admin.field :label="__('الرابط (slug)')" name="slug">
+                <input type="text" name="slug" value="{{ old('slug', $product->slug) }}"
+                       placeholder="{{ __('يُولَّد من الاسم إن تُرك فارغًا') }}" class="{{ $inputClass }}" />
+            </x-admin.field>
+        </x-admin.form-section>
+
+        {{-- الوصف --}}
+        <x-admin.form-section :title="__('الوصف')">
+            <x-slot:icon>
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"/></svg>
+            </x-slot:icon>
+
+            <x-admin.field :label="__('وصف مختصر')" name="short_description">
+                <input type="text" name="short_description" value="{{ old('short_description', $product->short_description) }}"
+                       placeholder="{{ __('سطر واحد يظهر تحت اسم المنتج') }}" class="{{ $inputClass }}" />
+            </x-admin.field>
+            <x-admin.field :label="__('الوصف التفصيلي')" name="description">
+                <textarea name="description" rows="5" placeholder="{{ __('أدخل وصف المنتج التفصيلي…') }}"
+                          class="{{ $inputClass }}">{{ old('description', $product->description) }}</textarea>
+            </x-admin.field>
+        </x-admin.form-section>
+
+        {{-- التسعير --}}
+        @php
+            $v = $product->defaultVariant;
+            // «سعر البيع» = السعر الأصلي المعروض في صفحة المخزن (products.retail_price المُزامَن مع المتغيّر).
+            $sellPrice = old('retail_price', $v?->retail_price ?? $product->retail_price);
+            $promoPrice = old('promo_price', $v?->promo_price ?? $product->promo_price);
+            $hasDiscount = is_numeric($sellPrice) && is_numeric($promoPrice)
+                && (float) $promoPrice > 0 && (float) $promoPrice < (float) $sellPrice;
+            $discountPct = $hasDiscount ? (int) round((1 - $promoPrice / $sellPrice) * 100) : 0;
+        @endphp
+        <x-admin.form-section :title="__('التسعير')" :cols="2">
+            <x-slot:icon>
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185zM9.75 9h.008v.008H9.75V9zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 4.5h.008v.008h-.008V13.5zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
+            </x-slot:icon>
+
+            <div class="rounded-lg border border-gray-200 overflow-hidden">
+                <div class="flex items-center justify-between bg-gray-50 px-4 py-2 border-b border-gray-200">
+                    <span class="text-sm font-medium text-gray-700">{{ __('السعر الأصلي (سعر البيع)') }}</span>
+                    <span class="text-xs text-gray-400">{{ __('السعر المعروض قبل الخصم') }}</span>
                 </div>
-
-                {{-- التصنيف --}}
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <x-admin.field :label="__('الفئة')" name="category_id">
-                        <select name="category_id" required class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
-                            <option value="">{{ __('— اختر —') }}</option>
-                            @foreach ($categories as $c)<option value="{{ $c->id }}" @selected(old('category_id', $product->category_id) == $c->id)>{{ $c->name }}</option>@endforeach
-                        </select>
-                    </x-admin.field>
-                    <x-admin.field :label="__('العلامة التجارية')" name="brand_id">
-                        <select name="brand_id" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
-                            <option value="">{{ __('— بلا —') }}</option>
-                            @foreach ($brands as $b)<option value="{{ $b->id }}" @selected(old('brand_id', $product->brand_id) == $b->id)>{{ $b->name }}</option>@endforeach
-                        </select>
-                    </x-admin.field>
-                    <x-admin.field :label="__('الوحدة')" name="unit_id">
-                        <select name="unit_id" required class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
-                            <option value="">{{ __('— اختر —') }}</option>
-                            @foreach ($units as $u)<option value="{{ $u->id }}" @selected(old('unit_id', $product->unit_id) == $u->id)>{{ $u->name }}</option>@endforeach
-                        </select>
-                    </x-admin.field>
-                </div>
-
-                {{-- الأوصاف --}}
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <x-admin.field :label="__('وصف مختصر (عربي)')" name="short_description"><input type="text" name="short_description" value="{{ old('short_description', $product->short_description) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" /></x-admin.field>
-                    <x-admin.field :label="__('وصف مختصر (إنجليزي)')" name="short_description_en"><input type="text" name="short_description_en" value="{{ old('short_description_en', $product->short_description_en) }}" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" /></x-admin.field>
-                    <x-admin.field :label="__('الوصف (عربي)')" name="description"><textarea name="description" rows="3" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">{{ old('description', $product->description) }}</textarea></x-admin.field>
-                    <x-admin.field :label="__('الوصف (إنجليزي)')" name="description_en"><textarea name="description_en" rows="3" class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">{{ old('description_en', $product->description_en) }}</textarea></x-admin.field>
-                </div>
-
-                {{-- الأسعار (تُزامَن مع المتغيّر الافتراضي وتظهر في الموقع والمخزن) --}}
-                @php
-                    $v = $product->defaultVariant;
-                    // «سعر البيع» = السعر الأصلي المعروض في صفحة المخزن (products.retail_price المُزامَن مع المتغيّر).
-                    $sellPrice = old('retail_price', $v?->retail_price ?? $product->retail_price);
-                    $promoPrice = old('promo_price', $v?->promo_price ?? $product->promo_price);
-                    $hasDiscount = is_numeric($sellPrice) && is_numeric($promoPrice)
-                        && (float) $promoPrice > 0 && (float) $promoPrice < (float) $sellPrice;
-                    $discountPct = $hasDiscount ? (int) round((1 - $promoPrice / $sellPrice) * 100) : 0;
-                @endphp
-                <div class="border-t border-gray-100 pt-4 mt-2">
-                    <h3 class="text-sm font-semibold text-gray-700 mb-3">{{ __('الأسعار') }}</h3>
-
-                    {{-- جدول السعر الأصلي (نفس «سعر البيع» في صفحة المخزن) --}}
-                    <div class="rounded-lg border border-gray-200 overflow-hidden mb-3">
-                        <div class="flex items-center justify-between bg-gray-50 px-4 py-2 border-b border-gray-200">
-                            <span class="text-sm font-medium text-gray-700">{{ __('السعر الأصلي (سعر البيع)') }}</span>
-                            <span class="text-xs text-gray-400">{{ __('السعر المعروض قبل الخصم') }}</span>
-                        </div>
-                        <div class="px-4 py-3">
-                            <div class="relative max-w-xs">
-                                <input type="number" step="0.01" min="0" name="retail_price" value="{{ $sellPrice }}"
-                                    class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500 ps-12" />
-                                <span class="absolute inset-y-0 start-0 flex items-center px-3 text-gray-400 text-sm">{{ __('₪') }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {{-- جدول سعر الخصم (يظهر تحت السعر الأصلي) --}}
-                    <div class="rounded-lg border border-rose-200 overflow-hidden">
-                        <div class="flex items-center justify-between bg-rose-50 px-4 py-2 border-b border-rose-200">
-                            <span class="text-sm font-medium text-rose-700">{{ __('سعر الخصم (العرض)') }}</span>
-                            @if ($hasDiscount)
-                                <span class="text-xs text-rose-500">{{ __('خصم') }} {{ $discountPct }}%</span>
-                            @else
-                                <span class="text-xs text-gray-400">{{ __('اتركه فارغًا إن لا يوجد عرض') }}</span>
-                            @endif
-                        </div>
-                        <div class="px-4 py-3">
-                            <div class="relative max-w-xs">
-                                <input type="number" step="0.01" min="0" name="promo_price" value="{{ $promoPrice }}"
-                                    placeholder="{{ __('مثال: 80') }}"
-                                    class="w-full rounded-md border-gray-300 focus:border-rose-400 focus:ring-rose-400 ps-12" />
-                                <span class="absolute inset-y-0 start-0 flex items-center px-3 text-gray-400 text-sm">{{ __('₪') }}</span>
-                            </div>
-                            @if ($hasDiscount)
-                                <p class="mt-2 text-xs text-gray-500">
-                                    {{ __('سيظهر في الموقع:') }}
-                                    <span class="text-gray-400 line-through">{{ $sellPrice }}</span>
-                                    <span class="text-rose-600 font-semibold mx-1">{{ $promoPrice }}</span>
-                                    {{ __('₪') }}
-                                </p>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-
-                {{-- المخزون: حدّ التنبيه بالنقص --}}
-                <div class="border-t border-gray-100 pt-4 mt-2">
-                    <h3 class="text-sm font-semibold text-gray-700 mb-3">{{ __('المخزون') }}</h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <x-admin.field :label="__('حدّ التنبيه بالنقص')" name="reorder_level">
-                            <input type="number" step="0.001" min="0" name="reorder_level"
-                                   value="{{ old('reorder_level', $product->reorder_level !== null ? (float) $product->reorder_level : '') }}"
-                                   placeholder="{{ __('الافتراضي: :n', ['n' => (float) \App\Modules\Foundation\Services\Settings::get('inventory.default_reorder_level', 0)]) }}"
-                                   class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
-                            <p class="mt-1 text-xs text-gray-500">
-                                {{ __('يظهر الصنف في «تنبيهات النقص» عندما ينزل المتوفّر إلى هذا الحدّ أو دونه. اتركه فارغًا لاستخدام الحدّ الافتراضي من الإعدادات.') }}
-                            </p>
-                        </x-admin.field>
-
-                        {{-- حجم الوحدة: عليه يُوزَّع الشحن البحري في فواتير الاستيراد --}}
-                        <x-admin.field :label="__('الحجم (CBM) للوحدة')" name="cbm">
-                            <input type="number" step="any" min="0" name="cbm"
-                                   value="{{ old('cbm', $product->cbm !== null ? (float) $product->cbm : '') }}"
-                                   placeholder="{{ __('مثال: 0.00531') }}"
-                                   class="w-full rounded-md border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
-                            <p class="mt-1 text-xs text-gray-500">
-                                {{ __('حجم القطعة الواحدة بالمتر المكعّب. يُستخدم في فاتورة الاستيراد لتوزيع الشحن البحري على الأصناف، ويبقى قابلًا للتعديل داخل كل فاتورة.') }}
-                            </p>
-                        </x-admin.field>
+                <div class="px-4 py-3">
+                    <div class="relative">
+                        <input type="number" step="0.01" min="0" name="retail_price" value="{{ $sellPrice }}"
+                               class="{{ $inputClass }} ps-12 tabular-nums" />
+                        <span class="absolute inset-y-0 start-0 flex items-center px-3 text-gray-400 text-sm">{{ $sym }}</span>
                     </div>
                 </div>
+            </div>
 
-                {{-- الوسوم والسمات --}}
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('الوسوم') }}</label>
-                        <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 border rounded-md">
-                            @php $selTags = old('tag_ids', $product->exists ? $product->tags->pluck('id')->all() : []); @endphp
-                            @forelse ($tags as $tag)
-                                <label class="inline-flex items-center gap-1 text-sm"><input type="checkbox" name="tag_ids[]" value="{{ $tag->id }}" @checked(in_array($tag->id, $selTags)) class="rounded border-gray-300 text-emerald-600" />{{ $tag->name }}</label>
-                            @empty
-                                <span class="text-xs text-gray-400">{{ __('لا توجد وسوم') }}</span>
-                            @endforelse
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('السمات المطبّقة') }}</label>
-                        <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 border rounded-md">
-                            @php $selAttrs = old('attribute_ids', $product->exists ? $product->attributes->pluck('id')->all() : []); @endphp
-                            @forelse ($attributes as $attr)
-                                <label class="inline-flex items-center gap-1 text-sm"><input type="checkbox" name="attribute_ids[]" value="{{ $attr->id }}" @checked(in_array($attr->id, $selAttrs)) class="rounded border-gray-300 text-emerald-600" />{{ $attr->name }}</label>
-                            @empty
-                                <span class="text-xs text-gray-400">{{ __('لا توجد سمات') }}</span>
-                            @endforelse
-                        </div>
-                    </div>
+            <div class="rounded-lg border border-rose-200 overflow-hidden">
+                <div class="flex items-center justify-between bg-rose-50 px-4 py-2 border-b border-rose-200">
+                    <span class="text-sm font-medium text-rose-700">{{ __('سعر الخصم (العرض)') }}</span>
+                    @if ($hasDiscount)
+                        <span class="text-xs text-rose-500">{{ __('خصم') }} {{ $discountPct }}%</span>
+                    @else
+                        <span class="text-xs text-gray-400">{{ __('اتركه فارغًا إن لا يوجد عرض') }}</span>
+                    @endif
                 </div>
-
-                {{-- SEO --}}
-                <details class="border rounded-md p-3">
-                    <summary class="text-sm font-medium text-gray-700 cursor-pointer">{{ __('تحسين محركات البحث (SEO) والبحث') }}</summary>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
-                        <x-admin.field :label="__('عنوان Meta')" name="meta_title"><input type="text" name="meta_title" value="{{ old('meta_title', $product->meta_title) }}" class="w-full rounded-md border-gray-300" /></x-admin.field>
-                        <x-admin.field :label="__('كلمات Meta')" name="meta_keywords"><input type="text" name="meta_keywords" value="{{ old('meta_keywords', $product->meta_keywords) }}" class="w-full rounded-md border-gray-300" /></x-admin.field>
-                        <x-admin.field :label="__('وصف Meta')" name="meta_description"><textarea name="meta_description" rows="2" class="w-full rounded-md border-gray-300">{{ old('meta_description', $product->meta_description) }}</textarea></x-admin.field>
-                        <x-admin.field :label="__('كلمات البحث')" name="search_keywords"><textarea name="search_keywords" rows="2" class="w-full rounded-md border-gray-300">{{ old('search_keywords', $product->search_keywords) }}</textarea></x-admin.field>
+                <div class="px-4 py-3">
+                    <div class="relative">
+                        <input type="number" step="0.01" min="0" name="promo_price" value="{{ $promoPrice }}"
+                               placeholder="{{ __('مثال: 80') }}"
+                               class="{{ $inputClass }} ps-12 tabular-nums focus:border-rose-400 focus:ring-rose-400" />
+                        <span class="absolute inset-y-0 start-0 flex items-center px-3 text-gray-400 text-sm">{{ $sym }}</span>
                     </div>
-                </details>
+                    @if ($hasDiscount)
+                        <p class="mt-2 text-xs text-gray-500">
+                            {{ __('سيظهر في الموقع:') }}
+                            <span class="text-gray-400 line-through">{{ $sellPrice }}</span>
+                            <span class="text-rose-600 font-semibold mx-1">{{ $promoPrice }}</span>
+                            {{ $sym }}
+                        </p>
+                    @endif
+                </div>
+            </div>
+        </x-admin.form-section>
 
-                <div class="flex gap-2 pt-2"><button class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('حفظ') }}</button><a href="{{ route('admin.products.index') }}" class="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('إلغاء') }}</a></div>
-            </form>
+        {{-- المخزون --}}
+        <x-admin.form-section :title="__('المخزون')" :cols="2">
+            <x-slot:icon>
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
+            </x-slot:icon>
+
+            <x-admin.field :label="__('حدّ التنبيه بالنقص')" name="reorder_level">
+                <input type="number" step="0.001" min="0" name="reorder_level"
+                       value="{{ old('reorder_level', $product->reorder_level !== null ? (float) $product->reorder_level : '') }}"
+                       placeholder="{{ __('الافتراضي: :n', ['n' => (float) \App\Modules\Foundation\Services\Settings::get('inventory.default_reorder_level', 0)]) }}"
+                       class="{{ $inputClass }}" />
+                <p class="mt-1 text-xs text-gray-500">
+                    {{ __('يظهر الصنف في «تنبيهات النقص» عندما ينزل المتوفّر إلى هذا الحدّ أو دونه. اتركه فارغًا لاستخدام الحدّ الافتراضي من الإعدادات.') }}
+                </p>
+            </x-admin.field>
+        </x-admin.form-section>
+
+        {{-- السمات: اختيارها هنا هو ما يفتح مصفوفة المقاسات/الألوان أدناه --}}
+        <x-admin.form-section :title="__('السمات المطبّقة')"
+                              :description="__('اختر السمات (مقاس/لون) لتظهر تركيباتها في «الخيارات والمتغيّرات».')">
+            <x-slot:icon>
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"/></svg>
+            </x-slot:icon>
+
+            <div class="flex flex-wrap gap-2">
+                @php $selAttrs = old('attribute_ids', $product->exists ? $product->attributes->pluck('id')->all() : []); @endphp
+                @forelse ($attributes as $attr)
+                    <label class="inline-flex items-center gap-1.5 text-sm rounded-lg border border-gray-200 px-3 py-1.5 cursor-pointer hover:border-emerald-400 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50">
+                        <input type="checkbox" name="attribute_ids[]" value="{{ $attr->id }}" @checked(in_array($attr->id, $selAttrs))
+                               class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                        {{ $attr->name }}
+                    </label>
+                @empty
+                    <span class="text-xs text-gray-400">{{ __('لا توجد سمات') }}</span>
+                @endforelse
+            </div>
+        </x-admin.form-section>
+
+        {{-- SEO --}}
+        <details class="admin-card p-5 md:p-6">
+            <summary class="font-semibold text-gray-900 cursor-pointer">{{ __('تحسين محركات البحث (SEO) والبحث') }}</summary>
+            <div class="grid gap-5 md:grid-cols-2 mt-5 pt-5 border-t border-gray-100">
+                <x-admin.field :label="__('عنوان Meta')" name="meta_title"><input type="text" name="meta_title" value="{{ old('meta_title', $product->meta_title) }}" class="{{ $inputClass }}" /></x-admin.field>
+                <x-admin.field :label="__('كلمات Meta')" name="meta_keywords"><input type="text" name="meta_keywords" value="{{ old('meta_keywords', $product->meta_keywords) }}" class="{{ $inputClass }}" /></x-admin.field>
+                <x-admin.field :label="__('وصف Meta')" name="meta_description"><textarea name="meta_description" rows="2" class="{{ $inputClass }}">{{ old('meta_description', $product->meta_description) }}</textarea></x-admin.field>
+                <x-admin.field :label="__('كلمات البحث')" name="search_keywords"><textarea name="search_keywords" rows="2" class="{{ $inputClass }}">{{ old('search_keywords', $product->search_keywords) }}</textarea></x-admin.field>
+            </div>
+        </details>
+
+        {{--
+            شريط الإجراءات بطاقةً في نهاية النموذج لا ملتصقًا بأسفل الشاشة:
+            الصفحة تُكمل بعد النموذج بأقسامٍ لها حفظُها (المتغيّرات والوسائط)،
+            فزرٌّ عائم يظلّ معك فيها يوهم أنه يحفظها هي.
+        --}}
+        <div class="admin-card p-4 flex items-center gap-2">
+            <button class="btn-primary">{{ $product->exists ? __('حفظ التعديلات') : __('حفظ المنتج') }}</button>
+            <a href="{{ route('admin.products.index') }}" class="btn-secondary">{{ __('إلغاء') }}</a>
+            <span class="ms-auto text-xs text-gray-400">{{ __('الأقسام أدناه لها حفظها الخاص.') }}</span>
         </div>
+    </form>
 
         {{-- مساعد المحتوى بالذكاء الاصطناعي (Phase 6 / ADR-044) — اقتراح فقط --}}
         <x-admin.ai-panel :product="$product->exists ? $product : null" />
