@@ -111,6 +111,21 @@ class AdminNavigationTest extends TestCase
         }
     }
 
+    /**
+     * «شحنات الاستيراد» ظاهرة لمدير النظام.
+     *
+     * اختفت عن الإنتاج لأن صلاحيتها أُضيفت إلى البذرة وحدها، والنشر يشغّل
+     * `migrate` لا `seed` — فبدت الميزة مفقودة وبقيت قائمة الشحنات في فاتورة
+     * المصاريف فارغة بلا سبب ظاهر.
+     */
+    public function test_admin_sees_the_import_shipments_link(): void
+    {
+        $this->actingAs($this->userWithRole('admin'));
+
+        $this->assertContains('شحنات الاستيراد', $this->labels(AdminNavigation::groups()));
+        $this->get(route('admin.purchasing.shipments.index'))->assertOk();
+    }
+
     public function test_sales_role_can_see_low_stock_alerts(): void
     {
         $this->actingAs($this->userWithRole('sales'));
