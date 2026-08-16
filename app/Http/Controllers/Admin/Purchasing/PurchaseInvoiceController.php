@@ -13,6 +13,7 @@ use App\Modules\Purchasing\Services\PurchaseInvoiceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -249,12 +250,13 @@ class PurchaseInvoiceController extends Controller
      * فلا يعرف النظام لمن تعود مصاريفها المستحقّة. والحقل هنا **إسناد** لا
      * إعادة تسعير: مبلغ الحساب الوسيط مُرحَّل أصلًا، والربط يقول لأي شحنة يعود.
      */
-    public function linkShipment(Request $request, PurchaseInvoice $invoice): RedirectResponse
+    public function classify(Request $request, PurchaseInvoice $invoice): RedirectResponse
     {
         $this->authorize('purchasing.shipments.manage');
 
         $data = $request->validate([
             'import_shipment_id' => ['nullable', 'integer', 'exists:import_shipments,id'],
+            'expense_category' => ['nullable', 'string', Rule::in(array_keys(PurchaseInvoice::EXPENSE_CATEGORIES))],
         ]);
 
         $target = $data['import_shipment_id'] ?? null;
@@ -270,9 +272,16 @@ class PurchaseInvoiceController extends Controller
             }
         }
 
-        $invoice->update(['import_shipment_id' => $target]);
+        $invoice->update([
+            'import_shipment_id' => $target,
+            // تصنيف المصروف لفاتورة المصاريف وحدها — وتصنيفُ فاتورة بضاعة
+            // يُنتج وسمًا كاذبًا في القائمة. يُترك كما هو إن لم يُرسَل.
+            'expense_category' => $invoice->isExpenseInvoice()
+                ? ($data['expense_category'] ?? $invoice->expense_category ?? 'other')
+                : null,
+        ]);
 
-        return back()->with('success', $target ? __('رُبطت الفاتورة بالشحنة.') : __('فُكّ ربط الفاتورة بالشحنة.'));
+        return back()->with('success', $target ? __('حُفظ تصنيف الفاتورة.') : __('فُكّ ربط الفاتورة بالشحنة.'));
     }
 
     public function approve(PurchaseInvoice $invoice): RedirectResponse

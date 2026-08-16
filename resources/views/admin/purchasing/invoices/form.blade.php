@@ -33,6 +33,7 @@
             'commission_rate' => (float) old('commission_rate', $editing ? (float) $invoice->commission_rate : 0),
             'cbm_rate_usd' => (float) old('cbm_rate_usd', $editing ? (float) $invoice->cbm_rate_usd : 0),
             'kind' => old('kind', $editing ? $invoice->kind : 'goods'),
+            'expense_category' => old('expense_category', $editing ? ($invoice->expense_category ?? 'other') : 'sea_freight'),
             'import_shipment_id' => (string) old('import_shipment_id', $editing ? $invoice->import_shipment_id : ''),
         ];
     @endphp
@@ -89,6 +90,24 @@
                     {{ __('فاتورة المصاريف تحتاج شحنة — بغيرها لا يُعرف أيّ تقدير تُطفئ.') }}
                 </p>
             </x-admin.field>
+
+            {{--
+                نوع المصروف: يظهر لفاتورة المصاريف وحدها. `x-if` لا `x-show` كي
+                لا يُرسَل الحقل مع فاتورة البضاعة فيُصنَّف ما ليس مصروفًا.
+            --}}
+            <template x-if="isExpense()">
+                <x-admin.field :label="__('نوع المصروف')" name="expense_category">
+                    <select name="expense_category" x-model="head.expense_category"
+                            class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500">
+                        @foreach (\App\Modules\Purchasing\Models\PurchaseInvoice::EXPENSE_CATEGORIES as $key => $label)
+                            <option value="{{ $key }}">{{ __($label) }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">
+                        {{ __('يظهر وسمًا بجانب رقم الفاتورة، ويُفصّل مصاريف الشحنة حسب نوعها.') }}
+                    </p>
+                </x-admin.field>
+            </template>
         </x-admin.form-section>
 
         {{--

@@ -268,7 +268,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('invoices/{invoice}/pay', [PurchaseInvoiceController::class, 'pay'])->name('invoices.pay');
         Route::post('invoices/{invoice}/reverse', [PurchaseInvoiceController::class, 'reverse'])->name('invoices.reverse');
         // إسناد الفاتورة لشحنة بلا تعديلها: التعديل يعكس المخزون فيتعذّر بعد البيع.
-        Route::post('invoices/{invoice}/shipment', [PurchaseInvoiceController::class, 'linkShipment'])->name('invoices.link_shipment');
+        Route::post('invoices/{invoice}/shipment', [PurchaseInvoiceController::class, 'classify'])->name('invoices.classify');
     });
 
     // المبيعات (Phase 2.6)

@@ -84,6 +84,7 @@ class PurchaseInvoiceService
                 'goods_receipt_id' => $data['goods_receipt_id'] ?? null,
                 'import_shipment_id' => $data['import_shipment_id'] ?? null,
                 'kind' => $kind,
+                'expense_category' => $this->expenseCategory($data, $kind),
                 'supplier_reference' => $data['supplier_reference'] ?? null,
                 'invoice_date' => $date->toDateString(),
                 'due_date' => $data['due_date'] ?? null,
@@ -152,6 +153,7 @@ class PurchaseInvoiceService
                 'supplier_id' => $data['supplier_id'] ?? $invoice->supplier_id,
                 'import_shipment_id' => $data['import_shipment_id'] ?? null,
                 'kind' => $kind,
+                'expense_category' => $this->expenseCategory($data, $kind),
                 'supplier_reference' => $data['supplier_reference'] ?? null,
                 'invoice_date' => $date->toDateString(),
                 'due_date' => $data['due_date'] ?? null,
@@ -466,6 +468,7 @@ class PurchaseInvoiceService
                 'supplier_id' => $data['supplier_id'] ?? $invoice->supplier_id,
                 'import_shipment_id' => $data['import_shipment_id'] ?? null,
                 'kind' => $kind,
+                'expense_category' => $this->expenseCategory($data, $kind),
                 'supplier_reference' => $data['supplier_reference'] ?? null,
                 'invoice_date' => $date->toDateString(),
                 'due_date' => $data['due_date'] ?? null,
@@ -584,6 +587,26 @@ class PurchaseInvoiceService
         return empty($data['import_shipment_id'])
             ? PurchaseInvoice::KIND_GOODS
             : PurchaseInvoice::KIND_EXPENSES;
+    }
+
+    /**
+     * تصنيف المصروف — لفاتورة المصاريف وحدها.
+     *
+     * فاتورة البضاعة تُصفَّر تصنيفُها ولو أُرسل: تصنيفُ ما ليس مصروفًا يُنتج
+     * وسمًا كاذبًا في القائمة. والافتراض `other` لا خطأ تحقّق: التصنيف تسهيلُ
+     * قراءةٍ لا شرطُ صحّةٍ محاسبية.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function expenseCategory(array $data, string $kind): ?string
+    {
+        if ($kind !== PurchaseInvoice::KIND_EXPENSES) {
+            return null;
+        }
+
+        $category = $data['expense_category'] ?? null;
+
+        return isset(PurchaseInvoice::EXPENSE_CATEGORIES[$category]) ? $category : 'other';
     }
 
     /**

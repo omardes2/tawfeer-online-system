@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Purchasing;
 
 use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Purchasing\Models\PurchaseInvoice;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -37,6 +38,8 @@ class StorePurchaseInvoiceRequest extends FormRequest
             'goods_receipt_id' => ['nullable', 'integer', 'exists:goods_receipts,id'],
             'import_shipment_id' => ['nullable', 'integer', 'exists:import_shipments,id'],
             'kind' => ['nullable', Rule::in(['goods', 'expenses'])],
+            // تصنيف المصروف لفاتورة المصاريف وحدها — ويُهمَل مع البضاعة.
+            'expense_category' => ['nullable', Rule::in(array_keys(PurchaseInvoice::EXPENSE_CATEGORIES))],
             'supplier_reference' => ['nullable', 'string', 'max:80'],
             'invoice_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],

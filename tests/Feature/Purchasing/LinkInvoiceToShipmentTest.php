@@ -76,7 +76,7 @@ class LinkInvoiceToShipmentTest extends TestCase
 
     private function link(PurchaseInvoice $invoice, ?ImportShipment $shipment)
     {
-        return $this->post(route('admin.purchasing.invoices.link_shipment', $invoice), [
+        return $this->post(route('admin.purchasing.invoices.classify', $invoice), [
             'import_shipment_id' => $shipment?->id,
         ]);
     }

@@ -30,9 +30,25 @@ class PurchaseInvoice extends Model
 
     public const KIND_EXPENSES = 'expenses';
 
+    /**
+     * تصنيف فاتورة المصاريف — ما الذي تخصّه من مصاريف الشحنة.
+     *
+     * قائمة مغلقة لا نصّ حرّ: الوصف يُكتب بألف صيغة، والتجميع والفلترة يحتاجان
+     * مفتاحًا ثابتًا. `other` هو المهرب الذي يمنع إجبار المستخدم على تصنيفٍ خطأ.
+     *
+     * @var array<string, string>
+     */
+    public const EXPENSE_CATEGORIES = [
+        'sea_freight' => 'شحن بحري',
+        'customs' => 'تخليص وجمارك',
+        'commission' => 'عمولة مكتب',
+        'inland' => 'نقل داخلي',
+        'other' => 'مصاريف أخرى',
+    ];
+
     protected $fillable = [
         'uuid', 'number', 'supplier_id', 'purchase_order_id', 'goods_receipt_id',
-        'import_shipment_id', 'kind',
+        'import_shipment_id', 'kind', 'expense_category',
         'supplier_reference', 'invoice_date', 'due_date', 'status', 'payment_status',
         'subtotal', 'tax_amount', 'total', 'amount_paid', 'currency', 'notes',
         'fx_rate_to_usd', 'usd_rate', 'commission_rate', 'cbm_rate_usd',
@@ -86,6 +102,40 @@ class PurchaseInvoice extends Model
     public function isExpenseInvoice(): bool
     {
         return $this->kind === self::KIND_EXPENSES;
+    }
+
+    /**
+     * وسم الفاتورة كما يُقرأ في القائمة: «بضاعة» أو نوع المصروف.
+     *
+     * فواتير الشحنة الواحدة تتشابه أرقامًا ومورّدًا، فبلا وسمٍ لا يُعرف ما تخصّه
+     * إلا بفتح كلٍّ منها.
+     */
+    public function kindLabel(): string
+    {
+        if (! $this->isExpenseInvoice()) {
+            return __('بضاعة');
+        }
+
+        return __(self::EXPENSE_CATEGORIES[$this->expense_category] ?? self::EXPENSE_CATEGORIES['other']);
+    }
+
+    /**
+     * لون الوسم من ألوان `x-admin.badge` الخمسة: البضاعة محايدة، والنقل بنوعيه
+     * أزرق (بحريّ أو داخليّ — كلاهما نقل)، والرسوم الحكومية كهرمانية، والعمولة
+     * خضراء. `red` محجوز للخطأ فلا يُستعمل تصنيفًا.
+     */
+    public function kindTone(): string
+    {
+        if (! $this->isExpenseInvoice()) {
+            return 'gray';
+        }
+
+        return match ($this->expense_category) {
+            'sea_freight', 'inland' => 'blue',
+            'customs' => 'amber',
+            'commission' => 'green',
+            default => 'gray',
+        };
     }
 
     public function items(): HasMany

@@ -63,9 +63,10 @@
                             <p class="font-medium text-gray-400">—</p>
                         @endif
                     </div>
-                    @if ($invoice->isExpenseInvoice())
-                        <div><p class="text-gray-500">{{ __('نوع الفاتورة') }}</p><x-admin.badge tone="blue" :label="__('مصاريف شحنة')" /></div>
-                    @endif
+                    <div>
+                        <p class="text-gray-500">{{ __('نوع الفاتورة') }}</p>
+                        <x-admin.badge :tone="$invoice->kindTone()" :label="$invoice->kindLabel()" />
+                    </div>
                     @if ($invoice->journalEntry)
                         <div><p class="text-gray-500">{{ __('القيد') }}</p><a href="{{ route('admin.accounting.journal.show', $invoice->journalEntry) }}" class="font-mono text-emerald-600 hover:underline">{{ $invoice->journalEntry->number }}</a></div>
                     @endif
@@ -97,10 +98,10 @@
             --}}
             @if ($invoice->isImport() || $invoice->isExpenseInvoice())
                 @can('purchasing.shipments.manage')
-                    <form method="POST" action="{{ route('admin.purchasing.invoices.link_shipment', $invoice) }}"
+                    <form method="POST" action="{{ route('admin.purchasing.invoices.classify', $invoice) }}"
                           class="admin-card admin-card-pad">
                         @csrf
-                        <h3 class="text-sm font-semibold text-gray-800 mb-1">{{ __('الشحنة / الكونتينر') }}</h3>
+                        <h3 class="text-sm font-semibold text-gray-800 mb-1">{{ __('تصنيف الفاتورة') }}</h3>
                         <p class="text-xs text-gray-500 mb-3">
                             {{ __('إسناد فقط — لا يمسّ البنود ولا المخزون ولا القيد المحاسبي.') }}
                         </p>
@@ -120,7 +121,17 @@
                                     </option>
                                 @endif
                             </select>
-                            <button type="submit" class="btn-primary btn-sm">{{ __('حفظ الإسناد') }}</button>
+                            {{-- نوع المصروف يُعدَّل من هنا أيضًا: الفاتورة المُرحّلة
+                                 لا تُفتح للتعديل، وتصنيفُها لا يمسّ مبالغها. --}}
+                            @if ($invoice->isExpenseInvoice())
+                                <select name="expense_category"
+                                        class="rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500 min-w-[12rem]">
+                                    @foreach (\App\Modules\Purchasing\Models\PurchaseInvoice::EXPENSE_CATEGORIES as $key => $label)
+                                        <option value="{{ $key }}" @selected(($invoice->expense_category ?? 'other') === $key)>{{ __($label) }}</option>
+                                    @endforeach
+                                </select>
+                            @endif
+                            <button type="submit" class="btn-primary btn-sm">{{ __('حفظ') }}</button>
                             @error('import_shipment_id')<span class="text-sm text-rose-600">{{ $message }}</span>@enderror
                         </div>
                         @if ($openShipments->isEmpty() && ! $invoice->importShipment)

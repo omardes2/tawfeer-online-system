@@ -56,7 +56,11 @@
             @endphp
             @forelse ($invoices as $inv)
                 <tr>
-                    <td class="font-mono text-xs text-gray-800">{{ $inv->number }}</td>
+                    {{-- الوسم بجانب الرقم: فواتير الشحنة الواحدة تتشابه رقمًا ومورّدًا. --}}
+                    <td class="whitespace-nowrap">
+                        <span class="font-mono text-xs text-gray-800">{{ $inv->number }}</span>
+                        <x-admin.badge class="ms-2 align-middle" :tone="$inv->kindTone()" :label="$inv->kindLabel()" :icon="false" />
+                    </td>
                     <td class="font-medium text-gray-800">{{ $inv->supplier?->name }}</td>
                     <td class="text-gray-500 whitespace-nowrap">{{ $inv->invoice_date?->format('Y-m-d') }}</td>
                     <td class="text-start"><x-admin.money :value="$inv->total" class="font-medium" /></td>
