@@ -13,7 +13,8 @@
             <tr>
                 <th>{{ __('الزبون') }}</th>
                 <th class="text-start">{{ __('عدد الطلبات') }}</th>
-                <th class="text-start">{{ __('مجموع المبيعات') }}</th>
+                <th class="text-start">{{ __('سعر البيع') }}</th>
+                <th class="text-start">{{ __('الربح') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -22,9 +23,10 @@
                     <td class="font-medium text-gray-800">{{ $r['name'] }}</td>
                     <td class="text-start tabular-nums">{{ number_format($r['orders_count']) }}</td>
                     <td class="text-start font-medium tabular-nums whitespace-nowrap">{{ number_format($r['sales_total'], 2) }} {{ $sym }}</td>
+                    <td class="text-start tabular-nums whitespace-nowrap {{ $r['profit'] < 0 ? 'text-rose-600' : 'text-emerald-700' }}">{{ number_format($r['profit'], 2) }} {{ $sym }}</td>
                 </tr>
             @empty
-                <tr><td colspan="3" class="!p-0">
+                <tr><td colspan="4" class="!p-0">
                     <x-admin.empty-state :title="__('لا توجد مبيعات')" :description="__('لم تُسجّل أي مبيعات بعد.')" />
                 </td></tr>
             @endforelse
@@ -35,22 +37,13 @@
                     <td>{{ __('الإجمالي') }}</td>
                     <td class="text-start tabular-nums">{{ number_format($totalOrders) }}</td>
                     <td class="text-start tabular-nums whitespace-nowrap">{{ number_format($totalSales, 2) }} {{ $sym }}</td>
+                    <td class="text-start tabular-nums whitespace-nowrap {{ $totalProfit < 0 ? 'text-rose-600' : 'text-emerald-700' }}">{{ number_format($totalProfit, 2) }} {{ $sym }}</td>
                 </tr>
             </tfoot>
         @endif
     </x-admin.table>
 
-    {{-- الرقم هنا **يشمل التوصيل**: هو ما يُحصَّل من الزبون لا ما بِيع من بضاعة --}}
     @include('admin.reports.business._basis', [
-        'basisIncludes' => [
-            __('قيمة البضاعة بعد الخصم'),
-            __('رسوم التوصيل'),
-            __('الضريبة إن وُجدت'),
-            __('كل الطلبات المؤكّدة فأكثر — بموظف أو بغيره'),
-        ],
-        'basisExcludes' => [
-            __('الطلبات المسودّة والجديدة والملغاة'),
-        ],
-        'basisNote' => __('هذا الرقم يجيب على «كم حُصِّل من الزبائن؟». لمعرفة قيمة البضاعة المباعة وحدها راجع «المبيعات حسب المنتج» — الفرق بينهما هو رسوم التوصيل، وهي تُحصَّل لصالح شركة التوصيل لا كإيراد لك.'),
+        'basisNote' => __('مجموع هذه الصفحة يطابق «المبيعات حسب المنتج» و«المبيعات حسب موظف المبيعات» لنفس الفترة — الثلاثة تُحتسب على قيمة البضاعة المباعة نفسها.'),
     ])
 </x-app-layout>

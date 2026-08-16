@@ -45,6 +45,30 @@ class OrderItem extends Model
     }
 
     /**
+     * قيمة بيع البند: ثمن البضاعة بعد خصم السطر — بلا توصيل ولا ضريبة ولا عمولات.
+     *
+     * هذا **أساس تقارير المبيعات الثلاثة** (حسب الزبون/المنتج/الموظف). نظيرُه في
+     * SQL موجود في `BusinessReportController::SALE_SQL`؛ أيّ تعديل هنا يلزمه هناك.
+     */
+    public function goodsSale(): float
+    {
+        return (float) $this->qty * (float) $this->unit_price - (float) $this->discount;
+    }
+
+    /**
+     * تكلفة البند: لقطة سعر الشراء وقت البيع، أو متوسط تكلفة المتغيّر إن غابت اللقطة.
+     * نظيرُه في SQL: `BusinessReportController::COST_SQL`.
+     */
+    public function goodsCost(): float
+    {
+        $unit = $this->wholesale_cost_snapshot !== null
+            ? (float) $this->wholesale_cost_snapshot
+            : (float) ($this->variant?->average_cost ?? 0);
+
+        return (float) $this->qty * $unit;
+    }
+
+    /**
      * خيارات المتغيّر (لون/مقاس) كنصّ واحد، أو `''` لصنفٍ بلا خيارات.
      *
      * موضعٌ واحد تقرأ منه الفاتورةُ وحمولةُ الشحنة معًا: بند «قميص» بلا لونه
