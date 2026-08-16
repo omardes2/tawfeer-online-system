@@ -36,10 +36,12 @@ use App\Http\Controllers\Admin\Purchasing\PurchaseOrderController as AdminPurcha
 use App\Http\Controllers\Admin\Purchasing\SupplierController as AdminSupplierController;
 use App\Http\Controllers\Admin\Purchasing\SupplierReturnController as AdminSupplierReturnController;
 use App\Http\Controllers\Admin\Recommendations\RecommendationRuleController as AdminRecommendationRuleController;
+use App\Http\Controllers\Admin\Reports\AdBudgetController;
 use App\Http\Controllers\Admin\Reports\BusinessReportController;
 use App\Http\Controllers\Admin\Returns\ReturnController as AdminReturnController;
 use App\Http\Controllers\Admin\Roles\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
+use App\Http\Controllers\Admin\Settings\AdChannelController;
 use App\Http\Controllers\Admin\Settings\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Admin\Settlements\SettlementController as AdminSettlementController;
 use App\Http\Controllers\Admin\Shipping\AreaController;
@@ -366,6 +368,12 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('sales/by-affiliate', [BusinessReportController::class, 'salesByAffiliate'])->name('sales.by_affiliate')->middleware('can:reports.sales_summary.view');
         Route::get('receivables/customers', [BusinessReportController::class, 'receivablesCustomers'])->name('receivables.customers')->middleware('can:reports.statements.view');
         Route::get('receivables/suppliers', [BusinessReportController::class, 'receivablesSuppliers'])->name('receivables.suppliers')->middleware('can:reports.statements.view');
+
+        // الميزانية اليومية: ربح كل صنف على كل صفحة مقابل صرفه الإعلاني.
+        Route::get('ad-budget', [AdBudgetController::class, 'index'])->name('ad_budget')->middleware('can:reports.ad_budget.view');
+        Route::post('ad-budget/spend', [AdBudgetController::class, 'storeSpend'])->name('ad_budget.spend');
+        Route::delete('ad-budget/spend/{spend}', [AdBudgetController::class, 'destroySpend'])->name('ad_budget.spend.destroy');
+        Route::post('ad-budget/fixed-cost', [AdBudgetController::class, 'storeFixedCost'])->name('ad_budget.fixed_cost');
     });
 
     // لوحة التحكّم التنفيذية (Production) — للقراءة فقط
@@ -407,6 +415,14 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('/', [AdminSettingsController::class, 'edit'])->name('edit')->middleware('can:settings.system.view');
         Route::put('/', [AdminSettingsController::class, 'update'])->name('update')->middleware('can:settings.system.manage');
+
+        // قنوات الإعلان (صفحات البيع) وربطها بحسابات البزنس لدى شركة التوصيل.
+        Route::middleware('can:reports.ad_budget.manage')->group(function () {
+            Route::get('ad-channels', [AdChannelController::class, 'index'])->name('ad_channels.index');
+            Route::post('ad-channels', [AdChannelController::class, 'store'])->name('ad_channels.store');
+            Route::put('ad-channels/{adChannel}', [AdChannelController::class, 'update'])->name('ad_channels.update');
+            Route::delete('ad-channels/{adChannel}', [AdChannelController::class, 'destroy'])->name('ad_channels.destroy');
+        });
     });
 
     // مسح كاش التطبيق من اللوحة (تحديثات الواجهة/الإعدادات) — بلا سطر أوامر.

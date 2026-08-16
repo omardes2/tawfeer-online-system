@@ -100,9 +100,11 @@ final class AdminNavigation
                 ['admin.reports.sales.by_affiliate', 'المبيعات حسب المسوّقين', 'reports.sales_summary.view', 'admin.reports.sales.by_affiliate'],
                 ['admin.reports.receivables.customers', 'كشف حساب العملاء', 'reports.statements.view', 'admin.reports.receivables.customers'],
                 ['admin.reports.receivables.suppliers', 'كشف حساب الموردين', 'reports.statements.view', 'admin.reports.receivables.suppliers'],
+                ['admin.reports.ad_budget', 'الميزانية اليومية', 'reports.ad_budget.view', 'admin.reports.ad_budget*'],
             ]],
             ['الإعدادات', 'cog', [
-                ['admin.settings.edit', 'إعدادات النظام', 'settings.system.view', 'admin.settings.*'],
+                ['admin.settings.edit', 'إعدادات النظام', 'settings.system.view', 'admin.settings.edit'],
+                ['admin.settings.ad_channels.index', 'قنوات الإعلان', 'reports.ad_budget.manage', 'admin.settings.ad_channels.*'],
             ]],
         ];
     }

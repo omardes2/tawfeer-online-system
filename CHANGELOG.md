@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Daily ad budget (manual ad-spend tracking) — ADR-051
+- New report **«الميزانية اليومية»** (`admin.reports.ad_budget`): one row per
+  **(product × sales page)** showing orders, sales, profit before ads, and two
+  hand-entered fields copied from Meta Ads Manager — **spend (USD)** and
+  **conversations started** — then net profit, cost per order, and a verdict
+  (**زد / ثبّت / أنقص / أوقف**) computed over a rolling window.
+- **Automatic page attribution, no extra field at order entry.** Each sales page
+  has its own delivery-company business account and each employee is linked to
+  hers, so `orders.ad_channel_id` is resolved from the creator's business at
+  creation time. It is stored as a **snapshot**, not derived on read: moving an
+  employee to another page must not retroactively reassign her past orders.
+  One-off backfill via `php artisan ads:backfill-order-channels`.
+- New tables `ad_channels` (unique `delivery_business_id`), `ad_daily_spends`
+  (unique per date/channel/product, stores the day's `fx_rate` because entry
+  happens the next day), and `operating_daily_costs` (effective-dated).
+- **The fixed daily operating cost is not allocated to products.** It does not
+  change when an ad is paused, so allocating it would stop ads that are in fact
+  contributing to covering it. Product rows are net of ad spend only; the fixed
+  cost appears once, in the day summary.
+- Profit here is measured on **placed** orders (returns ≤ 5%), excluding
+  `returned` orders and prorating `returned_qty` — deliberately a different
+  basis from the three sales reports, which are unchanged.
+- Verdicts are withheld below a minimum order count and when a day inside the
+  window has no spend entered, with two immediate stops: spend with zero
+  conversations, and heavy spend with zero orders. Thresholds live in settings.
+- Channel management under **الإعدادات ← قنوات الإعلان**; permissions
+  `reports.ad_budget.{view,manage}` (admin + manager only), created in a
+  migration as well as the seeder.
+
 ### Changed — Cash & banks chart hierarchy + direct-sales receivable mapping
 - Restructured the "cash" area of the chart of accounts into a control-account
   tree: **1010 «النقدية والبنوك»** (control) branches into **1011 «حساب النقدية»**

@@ -8,6 +8,7 @@ use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\City;
 use App\Modules\Foundation\Models\Warehouse;
+use App\Modules\Marketing\Models\AdChannel;
 use App\Modules\Payment\Models\Payment;
 use App\Modules\Shipping\Models\Shipment;
 use App\Support\Concerns\Auditable;
@@ -36,7 +37,7 @@ class Order extends Model
         'tracking_number', 'delivery_external_id', 'delivery_status',
         'delivery_dispatch_error', 'delivery_dispatch_attempts', 'delivery_dispatch_attempted_at',
         'delivery_cancel_error', 'delivery_cancel_attempted_at',
-        'channel', 'status', 'payment_status', 'assigned_to', 'affiliate_id',
+        'channel', 'ad_channel_id', 'status', 'payment_status', 'assigned_to', 'affiliate_id',
         'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'total', 'amount_paid',
         'notes', 'cancel_reason',
         'confirmed_at', 'reserved_at', 'shipped_at', 'delivered_at', 'cancelled_at', 'settled_at',
@@ -140,6 +141,37 @@ class Order extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /** قناة الإعلان (صفحة البيع) التي جاء منها الطلب — لقطةٌ لا اشتقاق. */
+    public function adChannel(): BelongsTo
+    {
+        return $this->belongsTo(AdChannel::class);
+    }
+
+    /**
+     * تثبيت قناة الإعلان لحظة الإنشاء، من حساب البزنس الخاصّ بمنشئ الطلب.
+     *
+     * هنا لا في `OrderService`: للطلب أكثر من مسار إنشاء (شاشة الموظف، الطلب
+     * المُساعَد، نقطة البيع، متجر الويب)، ولو وُضع في أحدها لخرجت طلبات الباقين
+     * بلا قناة فبدت صفحاتُها أقلّ مبيعًا ممّا هي. وطلب الويب لا منشئ له فتبقى
+     * قناته فارغة — وهذا صحيح: لا إعلان صفحةٍ وراءه.
+     */
+    protected static function booted(): void
+    {
+        parent::booted();
+
+        static::creating(function (self $order): void {
+            if ($order->ad_channel_id !== null || ! $order->created_by) {
+                return;
+            }
+
+            $business = User::whereKey($order->created_by)->value('delivery_business_id');
+
+            $order->ad_channel_id = $business
+                ? AdChannel::where('delivery_business_id', $business)->value('id')
+                : null;
+        });
     }
 
     protected static function newFactory(): Factory
