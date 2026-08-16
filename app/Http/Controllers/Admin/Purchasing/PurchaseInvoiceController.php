@@ -235,7 +235,44 @@ class PurchaseInvoiceController extends Controller
             'invoice' => $invoice->load(['items.variant.product', 'supplier', 'journalEntry', 'importShipment']),
             'treasuries' => Treasury::where('is_active', true)->orderBy('name')->get(),
             'currencies' => self::CURRENCIES,
+            // شحنات مفتوحة فقط: الربط بشحنة مُغلقة يغيّر فرقًا سبق إقفاله بقيد.
+            'openShipments' => ImportShipment::where('status', 'open')->orderByDesc('id')->get(),
         ]);
+    }
+
+    /**
+     * ربط فاتورة قائمة بشحنة استيراد (أو فكّ ربطها) — **بلا لمس البنود ولا
+     * المخزون ولا القيد**.
+     *
+     * المسار الوحيد قبله كان «تعديل الفاتورة»، وهو يعكس المخزون ويعيد إدخاله:
+     * فإن بِيع جزء من بضاعة الكونتينر تعذّر الحفظ، وبقيت الفاتورة بلا شحنة
+     * فلا يعرف النظام لمن تعود مصاريفها المستحقّة. والحقل هنا **إسناد** لا
+     * إعادة تسعير: مبلغ الحساب الوسيط مُرحَّل أصلًا، والربط يقول لأي شحنة يعود.
+     */
+    public function linkShipment(Request $request, PurchaseInvoice $invoice): RedirectResponse
+    {
+        $this->authorize('purchasing.shipments.manage');
+
+        $data = $request->validate([
+            'import_shipment_id' => ['nullable', 'integer', 'exists:import_shipments,id'],
+        ]);
+
+        $target = $data['import_shipment_id'] ?? null;
+
+        // فاتورة المصاريف بلا شحنة لا معنى لها — مصاريفُ ماذا؟
+        if ($target === null && $invoice->isExpenseInvoice()) {
+            return back()->withErrors(['import_shipment_id' => __('فاتورة المصاريف لا بدّ لها من شحنة.')]);
+        }
+
+        foreach ([$invoice->importShipment, $target ? ImportShipment::find($target) : null] as $shipment) {
+            if ($shipment && ! $shipment->isOpen()) {
+                return back()->withErrors(['import_shipment_id' => __('الشحنة :n مُغلقة — أعد فتحها أولًا.', ['n' => $shipment->number])]);
+            }
+        }
+
+        $invoice->update(['import_shipment_id' => $target]);
+
+        return back()->with('success', $target ? __('رُبطت الفاتورة بالشحنة.') : __('فُكّ ربط الفاتورة بالشحنة.'));
     }
 
     public function approve(PurchaseInvoice $invoice): RedirectResponse

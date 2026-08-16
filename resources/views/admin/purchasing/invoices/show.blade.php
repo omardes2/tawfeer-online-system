@@ -55,12 +55,14 @@
                     <div><p class="text-gray-500">{{ __('مرجع المورد') }}</p><p class="font-medium text-gray-800">{{ $invoice->supplier_reference ?? '—' }}</p></div>
                     <div><p class="text-gray-500">{{ __('الحالة') }}</p><x-admin.badge :tone="$statusTone[$invoice->status] ?? 'gray'" :label="__($statusLabel[$invoice->status] ?? $invoice->status)" /></div>
                     <div><p class="text-gray-500">{{ __('الدفع') }}</p><x-admin.badge :tone="$payTone[$invoice->payment_status] ?? 'gray'" :label="__($payLabel[$invoice->payment_status] ?? $invoice->payment_status)" /></div>
-                    @if ($invoice->importShipment)
-                        <div>
-                            <p class="text-gray-500">{{ __('الشحنة') }}</p>
+                    <div>
+                        <p class="text-gray-500">{{ __('الشحنة') }}</p>
+                        @if ($invoice->importShipment)
                             <a href="{{ route('admin.purchasing.shipments.show', $invoice->importShipment) }}" class="font-mono text-emerald-600 hover:underline">{{ $invoice->importShipment->number }}</a>
-                        </div>
-                    @endif
+                        @else
+                            <p class="font-medium text-gray-400">—</p>
+                        @endif
+                    </div>
                     @if ($invoice->isExpenseInvoice())
                         <div><p class="text-gray-500">{{ __('نوع الفاتورة') }}</p><x-admin.badge tone="blue" :label="__('مصاريف شحنة')" /></div>
                     @endif
@@ -85,6 +87,49 @@
                         <div><p class="text-gray-500">{{ __('ذمّة المورد بالدولار') }}</p><x-admin.money :value="(float) $invoice->usd_rate > 0 ? (float) $invoice->subtotal / (float) $invoice->usd_rate : 0" symbol="$" class="block font-medium text-gray-800" /></div>
                     </div>
                 </div>
+            @endif
+
+            {{--
+                إسناد الفاتورة لشحنة من هنا لا من شاشة التعديل: التعديل يعكس
+                المخزون ويعيد إدخاله، فيتعذّر بعد بيع جزء من بضاعة الكونتينر
+                (أو إن كان في الفاتورة بندٌ قديم على صنف مجرَّد) — وتبقى مصاريفها
+                المستحقّة بلا شحنة تُنسب إليها. هنا يتغيّر الإسناد وحده.
+            --}}
+            @if ($invoice->isImport() || $invoice->isExpenseInvoice())
+                @can('purchasing.shipments.manage')
+                    <form method="POST" action="{{ route('admin.purchasing.invoices.link_shipment', $invoice) }}"
+                          class="admin-card admin-card-pad">
+                        @csrf
+                        <h3 class="text-sm font-semibold text-gray-800 mb-1">{{ __('الشحنة / الكونتينر') }}</h3>
+                        <p class="text-xs text-gray-500 mb-3">
+                            {{ __('إسناد فقط — لا يمسّ البنود ولا المخزون ولا القيد المحاسبي.') }}
+                        </p>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <select name="import_shipment_id"
+                                    class="rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500 min-w-[18rem]">
+                                <option value="">{{ __('— بلا شحنة —') }}</option>
+                                @foreach ($openShipments as $sh)
+                                    <option value="{{ $sh->id }}" @selected($invoice->import_shipment_id === $sh->id)>
+                                        {{ $sh->number }}@if ($sh->reference) — {{ $sh->reference }}@endif
+                                    </option>
+                                @endforeach
+                                {{-- الشحنة المُغلقة المرتبطة تبقى ظاهرة كي لا يبدو الحقل فارغًا. --}}
+                                @if ($invoice->importShipment && ! $invoice->importShipment->isOpen())
+                                    <option value="{{ $invoice->importShipment->id }}" selected>
+                                        {{ $invoice->importShipment->number }} ({{ __('مُغلقة') }})
+                                    </option>
+                                @endif
+                            </select>
+                            <button type="submit" class="btn-primary btn-sm">{{ __('حفظ الإسناد') }}</button>
+                            @error('import_shipment_id')<span class="text-sm text-rose-600">{{ $message }}</span>@enderror
+                        </div>
+                        @if ($openShipments->isEmpty() && ! $invoice->importShipment)
+                            <p class="mt-3 text-xs text-amber-700">
+                                {{ __('لا توجد شحنات مفتوحة — أنشئ الشحنة أولًا من «شحنات الاستيراد».') }}
+                            </p>
+                        @endif
+                    </form>
+                @endcan
             @endif
 
             <x-admin.table :title="__('البنود')" dense>
