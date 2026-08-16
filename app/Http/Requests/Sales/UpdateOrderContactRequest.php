@@ -23,6 +23,8 @@ class UpdateOrderContactRequest extends FormRequest
             'customer_phone' => ['required', 'string', 'max:40', 'regex:/^\d{10}$/'],
             'customer_email' => ['nullable', 'email', 'max:180'],
             'shipping_address' => ['required', 'string', 'max:1000'],
+            // عدد الطرود لا القطع — يُصحَّح قبل الإرسال، فبعده لا تتزامن التعديلات.
+            'parcels_count' => ['sometimes', 'integer', 'min:1', 'max:'.config('shipping.max_parcels_per_shipment', 12)],
             'notes' => ['nullable', 'string', 'max:2000'],
             // الأصناف (تعديل الكميات/الأسعار) — صنف واحد على الأقل.
             'items' => ['required', 'array', 'min:1'],

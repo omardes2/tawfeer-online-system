@@ -32,7 +32,7 @@ class Order extends Model
     protected $fillable = [
         'number', 'branch_id', 'warehouse_id', 'customer_id',
         'customer_name', 'customer_phone', 'customer_email', 'shipping_address',
-        'city_id', 'area_id', 'has_return', 'return_notes',
+        'city_id', 'area_id', 'has_return', 'return_notes', 'parcels_count',
         'tracking_number', 'delivery_external_id', 'delivery_status',
         'delivery_dispatch_error', 'delivery_dispatch_attempts', 'delivery_dispatch_attempted_at',
         'delivery_cancel_error', 'delivery_cancel_attempted_at',
@@ -47,6 +47,7 @@ class Order extends Model
 
     protected $casts = [
         'has_return' => 'boolean',
+        'parcels_count' => 'integer',
         'subtotal' => 'decimal:2',
         'discount_total' => 'decimal:2',
         'tax_total' => 'decimal:2',

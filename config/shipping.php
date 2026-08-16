@@ -15,6 +15,13 @@ return [
     */
     'provider' => env('SHIPPING_PROVIDER', 'null'),
 
+    /*
+    | أقصى عدد طرود تقبله شركة التوصيل في الشحنة الواحدة. تجاوزه يُرفض لديها
+    | برمز 422 — ورفضٌ لا تنفع معه إعادة المحاولة. يُفحص قبل الإرسال بدل انتظار
+    | الرفض. القيمة من المزوّد (Opost: 12)، وتُغيَّر من .env إن رُفع السقف.
+    */
+    'max_parcels_per_shipment' => (int) env('SHIPPING_MAX_PARCELS', 12),
+
     'drivers' => [
         'null' => [
             'delivery' => NullDeliveryProvider::class,

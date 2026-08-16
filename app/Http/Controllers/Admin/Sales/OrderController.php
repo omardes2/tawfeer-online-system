@@ -359,6 +359,7 @@ class OrderController extends Controller
                 'customer_email' => $request->validated('customer_email'),
                 'shipping_address' => $request->validated('shipping_address'),
                 'notes' => $request->validated('notes'),
+                'parcels_count' => (int) ($request->validated('parcels_count') ?: $order->parcels_count ?: 1),
             ], $items);
         } catch (ValidationException $e) {
             return back()->withInput()->with('error', collect($e->errors())->flatten()->first());

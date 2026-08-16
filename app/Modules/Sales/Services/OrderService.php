@@ -135,7 +135,9 @@ class OrderService
             $order->items()->delete();
             $this->syncItems($order, $items);
             $order->update(array_intersect_key($data, array_flip([
-                'customer_name', 'customer_phone', 'customer_email', 'shipping_address', 'notes',
+                // `parcels_count` بيانُ شحنٍ كبقية بيانات التوصيل: يُصحَّح قبل
+                // الإرسال، ولا يمسّ البنود ولا القيد ولا المخزون.
+                'customer_name', 'customer_phone', 'customer_email', 'shipping_address', 'notes', 'parcels_count',
             ])));
             $order->unsetRelation('items'); // تفريغ البنود القديمة المُحمَّلة حتى يُعاد الاحتساب على الجديدة.
             $this->recomputeTotals($order);

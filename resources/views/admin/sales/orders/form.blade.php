@@ -205,6 +205,19 @@
              التقديم يجب أن يبقيا في المدى دون تمرير للأسفل في كل مرّة. --}}
         <div class="space-y-6 lg:sticky lg:top-20 lg:self-start">
             <x-admin.form-section :title="__('خيارات إضافية')">
+                {{--
+                    عدد الطرود لا القطع: هو ما يستلمه السائق ويُمسح ضوئيًا، وعليه
+                    تُبنى المطالبة لو ضاع شيء. واحدٌ في الغالبية العظمى.
+                --}}
+                <x-admin.field :label="__('عدد الطرود')" name="parcels_count">
+                    <input type="number" min="1" max="{{ config('shipping.max_parcels_per_shipment', 12) }}" step="1"
+                           name="parcels_count" value="{{ old('parcels_count', 1) }}"
+                           class="w-full rounded-lg border-gray-300 text-sm tabular-nums focus:border-emerald-500 focus:ring-emerald-500" />
+                    <p class="mt-1 text-xs text-gray-500">
+                        {{ __('عدد الصناديق/الأكياس المُسلَّمة للسائق — لا عدد القطع. الحدّ الأقصى لدى شركة التوصيل :n.', ['n' => config('shipping.max_parcels_per_shipment', 12)]) }}
+                    </p>
+                </x-admin.field>
+
                 <label class="flex items-center justify-between gap-3 cursor-pointer">
                     <span class="text-sm font-medium text-gray-700">{{ __('هل يوجد مرتجع؟') }}</span>
                     <span class="relative inline-flex items-center">

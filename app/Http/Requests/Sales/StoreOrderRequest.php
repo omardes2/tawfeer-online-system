@@ -34,6 +34,10 @@ class StoreOrderRequest extends FormRequest
             // العنوان إجباري على شاشة الإدارة (Opost يرفض الشحنة بلا عنوان).
             'shipping_address' => [$admin ? 'required' : 'nullable', 'string', 'max:1000'],
             'has_return' => ['sometimes', 'boolean'],
+            // عدد الطرود المُسلَّمة لشركة التوصيل — لا عدد القطع. تجاوز سقف
+            // المزوّد يُرفض لديه برمز 422، ورفضٌ لا تنفع معه إعادة المحاولة،
+            // فيُفحص هنا قبل الإرسال بدل انتظار الرفض.
+            'parcels_count' => ['sometimes', 'integer', 'min:1', 'max:'.config('shipping.max_parcels_per_shipment', 12)],
             'return_notes' => ['nullable', 'string', 'max:1000'],
             'channel' => ['sometimes', Rule::in(['web', 'manual', 'marketer', 'pos'])],
             'notes' => ['nullable', 'string'],

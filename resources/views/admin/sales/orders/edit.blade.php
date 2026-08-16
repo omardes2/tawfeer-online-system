@@ -57,6 +57,17 @@
                                class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
                         @error('shipping_address')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                     </div>
+                    {{-- عدد الطرود لا القطع: هو ما يستلمه السائق ويُمسح ضوئيًا --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('عدد الطرود') }}</label>
+                        <input type="number" min="1" max="{{ config('shipping.max_parcels_per_shipment', 12) }}" step="1"
+                               name="parcels_count" value="{{ old('parcels_count', $order->parcels_count ?: 1) }}"
+                               class="w-full rounded-lg border-gray-300 text-sm tabular-nums focus:border-emerald-500 focus:ring-emerald-500" />
+                        <p class="mt-1 text-xs text-gray-500">
+                            {{ __('الصناديق/الأكياس المُسلَّمة للسائق — لا عدد القطع. الحدّ الأقصى :n.', ['n' => config('shipping.max_parcels_per_shipment', 12)]) }}
+                        </p>
+                        @error('parcels_count')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                    </div>
                 </div>
 
                 {{-- ————— الأصناف ————— --}}

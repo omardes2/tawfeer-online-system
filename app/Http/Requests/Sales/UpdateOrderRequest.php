@@ -20,6 +20,9 @@ class UpdateOrderRequest extends FormRequest
             'customer_phone' => ['sometimes', 'string', 'max:40'],
             'customer_email' => ['nullable', 'email', 'max:180'],
             'shipping_address' => ['nullable', 'string', 'max:1000'],
+            // عدد الطرود لا القطع — تجاوز سقف المزوّد يُرفض لديه بلا فائدة من
+            // إعادة المحاولة، فيُفحص قبل الإرسال.
+            'parcels_count' => ['sometimes', 'integer', 'min:1', 'max:'.config('shipping.max_parcels_per_shipment', 12)],
             'channel' => ['sometimes', Rule::in(['web', 'manual', 'marketer', 'pos'])],
             'notes' => ['nullable', 'string'],
             'items' => ['sometimes', 'array', 'min:1'],

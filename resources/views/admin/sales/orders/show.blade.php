@@ -14,6 +14,9 @@
                 @if ($order->shipping_total > 0)<span>{{ __('رسوم التوصيل') }}: <b>{{ $order->shipping_total }}</b></span>@endif
                 @if ($order->tracking_number)<span>{{ __('رقم التتبّع') }}: <b class="font-mono">{{ $order->tracking_number }}</b></span>@endif
             </div>
+            @if (($order->parcels_count ?? 1) > 1)
+                <p class="text-sm text-gray-500">{{ __('عدد الطرود') }}: <span class="font-medium tabular-nums text-gray-700">{{ $order->parcels_count }}</span></p>
+            @endif
             @if ($order->shipping_address)
                 <p class="text-sm text-gray-500">{{ __('العنوان') }}: {{ $order->shipping_address }}</p>
             @endif
