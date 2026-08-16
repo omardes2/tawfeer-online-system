@@ -16,7 +16,7 @@
     <x-admin.flash />
 
     <form method="POST" action="{{ $product->exists ? route('admin.products.update', $product) : route('admin.products.store') }}"
-          class="space-y-5 max-w-5xl">
+          class="space-y-5">
         @csrf @if ($product->exists) @method('PUT') @endif
 
         {{-- معلومات أساسية --}}
@@ -190,12 +190,17 @@
         </div>
     </form>
 
+    {{--
+        أقسامٌ لها حفظُها الخاص خارج النموذج. حاوية واحدة بنفس تباعده وعرضه
+        فتبدو الصفحة قطعةً واحدة — كانت بلا حاوية فبانت بعرضٍ مخالف.
+    --}}
+    <div class="space-y-5 mt-5">
         {{-- مساعد المحتوى بالذكاء الاصطناعي (Phase 6 / ADR-044) — اقتراح فقط --}}
         <x-admin.ai-panel :product="$product->exists ? $product : null" />
 
         {{-- الخيارات والمتغيّرات (مقاسات/ألوان) — مصفوفة حيّة: اختر القيم فتظهر السعر والكمية فورًا --}}
         @if ($product->exists)
-            <div class="bg-white shadow-sm sm:rounded-lg p-6" x-data="variantMatrix(@js($variantMatrix))">
+            <div class="admin-card p-5 md:p-6" x-data="variantMatrix(@js($variantMatrix))">
                 <h3 class="font-semibold text-gray-800 mb-1">{{ __('الخيارات والمتغيّرات') }}</h3>
                 <p class="text-xs text-gray-400 mb-5">{{ __('اختر القيم (مقاس/لون) فتظهر التركيبات فورًا. عدّل السعر والكمية لكل تركيبة ثم اضغط «حفظ المتغيّرات».') }}</p>
 
@@ -289,7 +294,7 @@
                 $thumbnail = $product->images->firstWhere('is_primary', true);
                 $gallery = $product->images->where('is_primary', false);
             @endphp
-            <div class="bg-white shadow-sm sm:rounded-lg p-6">
+            <div class="admin-card p-5 md:p-6">
                 <h3 class="font-semibold text-gray-800 mb-1">{{ __('الملفات والوسائط') }}</h3>
                 <p class="text-xs text-gray-400 mb-5">{{ __('الصورة المصغّرة تظهر في قوائم الموقع وبطاقة المنتج، وألبوم الصور يظهر داخل صفحة المنتج.') }}</p>
 
