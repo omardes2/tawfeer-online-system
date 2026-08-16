@@ -143,8 +143,8 @@ class PriceListPageTest extends TestCase
             ->assertSee($image->url(), false);
     }
 
-    /** المقاسات وكمياتها — والنافد يبقى ظاهرًا لا محذوفًا. */
-    public function test_it_lists_variant_options_with_their_quantities(): void
+    /** المقاسات وتوفّرها — بلا كميات، والنافد يبقى ظاهرًا مشطوبًا لا محذوفًا. */
+    public function test_it_lists_variant_options_without_leaking_quantities(): void
     {
         $product = Product::factory()->create(['name' => 'صنف بمقاسات ومخزون']);
         $warehouse = Warehouse::where('is_default', true)->firstOrFail();
@@ -171,11 +171,17 @@ class PriceListPageTest extends TestCase
         $html = $this->actingAs($this->withRole('affiliate'))
             ->get(route('admin.price_list'))->assertOk()->getContent();
 
-        // المقاسان ظاهران، والمتوفّر بجانب كلٍّ منهما.
+        // المقاسان ظاهران كلاهما.
         $this->assertStringContainsString('L', $html);
         $this->assertStringContainsString('XL', $html);
-        $this->assertStringContainsString('>7<', preg_replace('/\s+/', '', $html));
+
         // النافد مشطوب لا محذوف.
         $this->assertStringContainsString('line-through', $html);
+
+        // ولا يتسرّب الرصيد: «7» لا تظهر في خانة المقاسات — أرقام المستودع
+        // شأنٌ داخلي، والمسوّق يحتاج «متوفّر أم لا» لا غير.
+        preg_match_all('/<td[^>]*>(?:(?!<\/td>).)*line-through(?:(?!<\/td>).)*<\/td>/s', $html, $cells);
+        $this->assertNotEmpty($cells[0]);
+        $this->assertStringNotContainsString('7', $cells[0][0]);
     }
 }

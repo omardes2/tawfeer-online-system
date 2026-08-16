@@ -24,8 +24,6 @@
                 : number_format((float) $min, 2).' – '.number_format((float) $max, 2).' '.$sym;
         };
 
-        // كمية بلا أصفار زائدة: «12» لا «12.000».
-        $qty = fn ($n) => rtrim(rtrim(number_format((float) $n, 3), '0'), '.');
     @endphp
 
     {{-- الفلاتر: الفئة أساسًا (هي ما طُلب)، والبحث معها لأن القائمة طويلة --}}
@@ -59,7 +57,7 @@
                 <th>{{ __('الفئة') }}</th>
                 <th class="text-start">{{ __('سعر البيع') }}</th>
                 <th class="text-start">{{ __('سعر الجملة') }}</th>
-                <th>{{ __('المقاسات والمتوفّر') }}</th>
+                <th>{{ __('المقاسات المتوفّرة') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -95,24 +93,25 @@
                         {{ $priceCell($product->variants_min_wholesale_price, $product->variants_max_wholesale_price, $product->wholesale_price) }}
                     </td>
                     {{--
-                        المقاسات وكمياتها: المسوّق يحتاج أن يعرف أيّ مقاسٍ موجود
-                        قبل أن يَعِد زبونًا. المقاس النافد يبقى ظاهرًا مشطوبًا لا
-                        محذوفًا — غيابُه يُقرأ «غير موجود أصلًا» لا «نفد».
+                        التوفّر لا الكمية: المسوّق يحتاج أن يعرف أيّ مقاسٍ يستطيع
+                        بيعه، لا كم بقي منه في المستودع — الأرقام شأنٌ داخلي.
+                        والمقاس النافد يبقى ظاهرًا مشطوبًا لا محذوفًا: غيابُه
+                        يُقرأ «غير موجود أصلًا» لا «نفد».
                     --}}
                     <td>
                         @if ($options->isNotEmpty())
                             <div class="flex flex-wrap gap-1.5">
                                 @foreach ($options as $variant)
-                                    @php $vQty = (float) ($available[$variant->id] ?? 0); @endphp
-                                    <span class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] {{ $vQty > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-gray-100 text-gray-400 line-through' }}">
+                                    @php $inStock = (float) ($available[$variant->id] ?? 0) > 0; @endphp
+                                    <span class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] {{ $inStock ? 'bg-emerald-50 text-emerald-800' : 'bg-gray-100 text-gray-400 line-through' }}"
+                                          title="{{ $inStock ? __('متوفّر') : __('نفد') }}">
                                         {{ $variant->optionLabel() }}
-                                        <span class="tabular-nums font-medium">{{ $qty($vQty) }}</span>
                                     </span>
                                 @endforeach
                             </div>
                         @else
-                            <span class="text-xs tabular-nums {{ $simpleQty > 0 ? 'text-gray-600' : 'text-gray-400' }}">
-                                {{ $qty($simpleQty) }}
+                            <span class="text-xs {{ $simpleQty > 0 ? 'text-emerald-700' : 'text-gray-400' }}">
+                                {{ $simpleQty > 0 ? __('متوفّر') : __('غير متوفّر') }}
                             </span>
                         @endif
                     </td>
@@ -134,6 +133,6 @@
     @endif
 
     <p class="mt-4 text-xs text-gray-500">
-        {{ __('الصنف الذي تختلف أسعار مقاساته يظهر بمدًى (من – إلى). والمتوفّر هو الرصيد بعد خصم المحجوز للطلبات، والمقاس المشطوب نافد.') }}
+        {{ __('الصنف الذي تختلف أسعار مقاساته يظهر بمدًى (من – إلى). والمقاس المشطوب نافد من المستودع.') }}
     </p>
 </x-app-layout>
