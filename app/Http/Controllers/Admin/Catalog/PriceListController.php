@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin\Catalog;
 use App\Http\Controllers\Controller;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Inventory\Models\InventoryStock;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 /**
@@ -28,7 +30,7 @@ class PriceListController extends Controller
 
         $products = Product::query()
             ->when($hidesUnavailable, fn ($q) => $q->availableToAffiliates())
-            ->with('category:id,name')
+            ->with(['category:id,name', 'primaryImage', 'variants.attributeValues', 'defaultVariant'])
             // السعران من المتغيّرات: المنتج ذو المقاسات قد تختلف أسعاره بينها،
             // وافتراضيُّه حاملٌ مجرَّد بلا سعر غالبًا — فيُقرأ الحدّان لا رقمُه.
             ->withMin('variants', 'retail_price')
@@ -45,11 +47,37 @@ class PriceListController extends Controller
 
         return view('admin.catalog.price_list', [
             'products' => $products,
+            // المتاح لكل متغيّر (المعروض فقط) باستعلامٍ واحد لا استعلامٍ لكل صفّ.
+            // «المتاح» = الموجود ناقص المحجوز: المحجوز مباعٌ فعلًا وإن لم يخرج بعد.
+            'available' => $this->availableByVariant($products->getCollection()),
             // الفئات التي فيها أصناف فعلًا: فئة فارغة في الفلتر تعطي صفحة خاوية.
             'categories' => Category::query()
                 ->whereIn('id', Product::query()->whereNotNull('category_id')->distinct()->pluck('category_id'))
                 ->orderBy('name')->get(['id', 'name']),
             'activeCategory' => $category,
         ]);
+    }
+
+    /**
+     * الكميات المتاحة لمتغيّرات الصفحة المعروضة، مفهرسةً بـ variant_id.
+     *
+     * تُجمَع من كل المستودعات كعمود «المتوفّرة» في صفحة المنتجات — السؤال هنا
+     * «هل يوجد؟» لا «في أي مستودع؟».
+     *
+     * @param  Collection<int, Product>  $products
+     */
+    private function availableByVariant($products): Collection
+    {
+        $ids = $products->flatMap(fn (Product $p) => $p->variants->pluck('id'))->unique();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        return InventoryStock::query()
+            ->whereIn('variant_id', $ids)
+            ->groupBy('variant_id')
+            ->selectRaw('variant_id, SUM(on_hand - reserved) as qty')
+            ->pluck('qty', 'variant_id');
     }
 }

@@ -5,9 +5,13 @@ namespace Tests\Feature\Catalog;
 use App\Models\User;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\ProductAttribute;
+use App\Modules\Catalog\Models\ProductAttributeValue;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Foundation\Models\Branch;
+use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Foundation\Support\AdminNavigation;
+use App\Modules\Inventory\Models\InventoryStock;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -125,5 +129,53 @@ class PriceListPageTest extends TestCase
             ->assertOk()
             ->assertSee('100.00 – 140.00', false)
             ->assertSee('60.00 – 90.00', false);
+    }
+
+    /** صورة الصنف المصغّرة بجانب اسمه. */
+    public function test_it_shows_the_product_thumbnail(): void
+    {
+        $product = Product::factory()->create(['name' => 'صنف بصورة']);
+        $image = $product->images()->create(['path' => 'products/demo.jpg', 'is_primary' => true, 'sort_order' => 0]);
+
+        $this->actingAs($this->withRole('affiliate'))
+            ->get(route('admin.price_list'))
+            ->assertOk()
+            ->assertSee($image->url(), false);
+    }
+
+    /** المقاسات وكمياتها — والنافد يبقى ظاهرًا لا محذوفًا. */
+    public function test_it_lists_variant_options_with_their_quantities(): void
+    {
+        $product = Product::factory()->create(['name' => 'صنف بمقاسات ومخزون']);
+        $warehouse = Warehouse::where('is_default', true)->firstOrFail();
+        $attribute = ProductAttribute::create(['name' => 'المقاس', 'slug' => 'size-pl', 'type' => 'select']);
+
+        foreach ([['L', 7], ['XL', 0]] as $i => [$label, $onHand]) {
+            $value = ProductAttributeValue::create([
+                'attribute_id' => $attribute->id, 'value' => $label, 'label' => $label, 'sort_order' => $i,
+            ]);
+            $variant = ProductVariant::factory()->create([
+                'product_id' => $product->id, 'sku' => 'PL-SIZE-'.$label,
+                'is_default' => false, 'retail_price' => 100, 'wholesale_price' => 60,
+            ]);
+            $variant->attributeValues()->attach($value->id);
+
+            if ($onHand > 0) {
+                InventoryStock::create([
+                    'variant_id' => $variant->id, 'warehouse_id' => $warehouse->id,
+                    'on_hand' => $onHand, 'reserved' => 0,
+                ]);
+            }
+        }
+
+        $html = $this->actingAs($this->withRole('affiliate'))
+            ->get(route('admin.price_list'))->assertOk()->getContent();
+
+        // المقاسان ظاهران، والمتوفّر بجانب كلٍّ منهما.
+        $this->assertStringContainsString('L', $html);
+        $this->assertStringContainsString('XL', $html);
+        $this->assertStringContainsString('>7<', preg_replace('/\s+/', '', $html));
+        // النافد مشطوب لا محذوف.
+        $this->assertStringContainsString('line-through', $html);
     }
 }

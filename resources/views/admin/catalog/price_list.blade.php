@@ -23,6 +23,9 @@
                 ? number_format((float) $min, 2).' '.$sym
                 : number_format((float) $min, 2).' – '.number_format((float) $max, 2).' '.$sym;
         };
+
+        // كمية بلا أصفار زائدة: «12» لا «12.000».
+        $qty = fn ($n) => rtrim(rtrim(number_format((float) $n, 3), '0'), '.');
     @endphp
 
     {{-- الفلاتر: الفئة أساسًا (هي ما طُلب)، والبحث معها لأن القائمة طويلة --}}
@@ -51,15 +54,31 @@
     <x-admin.table>
         <thead>
             <tr>
+                <th>{{ __('الصورة') }}</th>
                 <th>{{ __('الصنف') }}</th>
                 <th>{{ __('الفئة') }}</th>
                 <th class="text-start">{{ __('سعر البيع') }}</th>
                 <th class="text-start">{{ __('سعر الجملة') }}</th>
+                <th>{{ __('المقاسات والمتوفّر') }}</th>
             </tr>
         </thead>
         <tbody>
             @forelse ($products as $product)
+                @php
+                    // المتغيّرات ذات الخيارات هي المقاسات/الألوان الحقيقية؛ وما
+                    // عداها منتجٌ بسيط يُعرض رصيده الواحد.
+                    $options = $product->variants->filter(fn ($v) => $v->attributeValues->isNotEmpty())->values();
+                    $simpleQty = (float) ($available[$product->defaultVariant?->id] ?? 0);
+                @endphp
                 <tr>
+                    <td>
+                        @if ($product->primaryImage)
+                            <img src="{{ $product->primaryImage->url() }}" alt="" loading="lazy"
+                                 class="w-11 h-11 rounded-md object-cover bg-gray-100" />
+                        @else
+                            <span class="grid place-items-center w-11 h-11 rounded-md bg-gray-100 text-gray-300 text-xs">—</span>
+                        @endif
+                    </td>
                     <td class="font-medium text-gray-800">
                         {{ $product->name }}
                         {{-- يظهر للمدير وحده: المسوّق لا يرى الصنف الممنوع أصلًا --}}
@@ -75,9 +94,31 @@
                     <td class="text-start tabular-nums whitespace-nowrap text-gray-600">
                         {{ $priceCell($product->variants_min_wholesale_price, $product->variants_max_wholesale_price, $product->wholesale_price) }}
                     </td>
+                    {{--
+                        المقاسات وكمياتها: المسوّق يحتاج أن يعرف أيّ مقاسٍ موجود
+                        قبل أن يَعِد زبونًا. المقاس النافد يبقى ظاهرًا مشطوبًا لا
+                        محذوفًا — غيابُه يُقرأ «غير موجود أصلًا» لا «نفد».
+                    --}}
+                    <td>
+                        @if ($options->isNotEmpty())
+                            <div class="flex flex-wrap gap-1.5">
+                                @foreach ($options as $variant)
+                                    @php $vQty = (float) ($available[$variant->id] ?? 0); @endphp
+                                    <span class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] {{ $vQty > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-gray-100 text-gray-400 line-through' }}">
+                                        {{ $variant->optionLabel() }}
+                                        <span class="tabular-nums font-medium">{{ $qty($vQty) }}</span>
+                                    </span>
+                                @endforeach
+                            </div>
+                        @else
+                            <span class="text-xs tabular-nums {{ $simpleQty > 0 ? 'text-gray-600' : 'text-gray-400' }}">
+                                {{ $qty($simpleQty) }}
+                            </span>
+                        @endif
+                    </td>
                 </tr>
             @empty
-                <tr><td colspan="4" class="!p-0">
+                <tr><td colspan="6" class="!p-0">
                     <x-admin.empty-state
                         :title="__('لا توجد أصناف')"
                         :description="request()->hasAny(['search', 'category'])
@@ -93,6 +134,6 @@
     @endif
 
     <p class="mt-4 text-xs text-gray-500">
-        {{ __('الصنف الذي تختلف أسعار مقاساته يظهر بمدًى (من – إلى).') }}
+        {{ __('الصنف الذي تختلف أسعار مقاساته يظهر بمدًى (من – إلى). والمتوفّر هو الرصيد بعد خصم المحجوز للطلبات، والمقاس المشطوب نافد.') }}
     </p>
 </x-app-layout>
