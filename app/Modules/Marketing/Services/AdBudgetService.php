@@ -101,6 +101,7 @@ class AdBudgetService
                     'profit_before_ads' => $sale['profit'],
                     'spend_usd' => $spend['usd'],
                     'spend' => $spend['local'],
+                    'fx_rate' => $spend['fx_rate'],
                     'conversations' => $spend['conversations'],
                     'has_spend_row' => $spend['exists'],
                     'spend_id' => $spend['id'],
@@ -242,6 +243,9 @@ class AdBudgetService
             ->groupBy('ad_channel_id', 'product_id')
             ->selectRaw('ad_channel_id as cid, product_id as pid, '
                 .'SUM(amount_usd) as usd, SUM(amount_usd * fx_rate) as local, '
+                // سعر صرف الصفّ نفسه — يُعاد إلى الواجهة كي لا يدهسه الافتراضيُّ
+                // عند أول تعديل. صفٌّ واحد لكل مفتاح في اليوم، فالأقصى هو هو.
+                .'MAX(fx_rate) as fx_rate, '
                 .'SUM(conversations) as conversations, MIN(id) as row_id, '
                 // قيمة المنصّة بجانب اليدوية — تُعرَض عند اختلافهما ولا تدهسها.
                 .'SUM(COALESCE(synced_amount_usd, amount_usd)) as synced_usd, '
@@ -255,6 +259,7 @@ class AdBudgetService
                 return [((int) $r->cid).':'.((int) $r->pid) => [
                     'usd' => $usd,
                     'local' => round((float) $r->local, 2),
+                    'fx_rate' => (float) $r->fx_rate,
                     'conversations' => (int) $r->conversations,
                     'exists' => true,
                     // صفٌّ واحد لكل مفتاح في اليوم الواحد (الفهرس الفريد)، فالأدنى هو هو.
@@ -406,7 +411,7 @@ class AdBudgetService
     private function zeroSpend(): array
     {
         return [
-            'usd' => 0.0, 'local' => 0.0, 'conversations' => 0, 'exists' => false, 'id' => null,
+            'usd' => 0.0, 'local' => 0.0, 'fx_rate' => null, 'conversations' => 0, 'exists' => false, 'id' => null,
             'platform_usd' => 0.0, 'platform_conversations' => 0, 'conflict' => false,
         ];
     }

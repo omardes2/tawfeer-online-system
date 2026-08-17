@@ -381,6 +381,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('ad-budget/spend', [AdBudgetController::class, 'storeSpend'])->name('ad_budget.spend');
         Route::delete('ad-budget/spend/{spend}', [AdBudgetController::class, 'destroySpend'])->name('ad_budget.spend.destroy');
         Route::post('ad-budget/fixed-cost', [AdBudgetController::class, 'storeFixedCost'])->name('ad_budget.fixed_cost');
+        Route::post('ad-budget/usd-rate', [AdBudgetController::class, 'storeRate'])->name('ad_budget.usd_rate');
     });
 
     // لوحة التحكّم التنفيذية (Production) — للقراءة فقط

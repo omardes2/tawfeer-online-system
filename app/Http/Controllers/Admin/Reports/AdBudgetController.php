@@ -84,6 +84,46 @@ class AdBudgetController extends Controller
         return back()->with('success', __('حُذف صفّ الصرف.'));
     }
 
+    /**
+     * ضبط سعر صرف الدولار الافتراضي.
+     *
+     * كان الرقم في الإعدادات بلا شاشةٍ تعدّله، فيبقى ما ضُبط أوّل مرّة (3.7)
+     * ويُحتسب به كل صرفٍ جديد مهما تغيّر السوق — وهو رقمٌ يتحرّك أسبوعيًّا،
+     * وخطؤه يُضخّم تكلفة الطلب بالشيكل فيُوقَف إعلانٌ رابح.
+     *
+     * والصفوف المحفوظة لا تتغيّر تلقائيًّا: كل صفٍّ يحمل سعر يومه وربحُ ذلك
+     * اليوم مثبَّت عليه. أمّا تصحيح يومٍ أُدخل بسعرٍ خاطئ فطلبٌ صريح.
+     */
+    public function storeRate(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()->can('reports.ad_budget.manage'), 403);
+
+        $data = $request->validate([
+            'usd_rate' => ['required', 'numeric', 'min:0.0001', 'max:100'],
+            'apply_day' => ['nullable', 'date'],
+        ]);
+
+        $rate = round((float) $data['usd_rate'], 4);
+        Settings::set('ads.usd_rate', $rate, 'ads', 'double');
+
+        if (empty($data['apply_day'])) {
+            return back()->with('success', __('حُدِّث سعر الصرف الافتراضي إلى :r — ويسري على ما يُدخَل بعده.', ['r' => $rate]));
+        }
+
+        $day = Carbon::parse($data['apply_day']);
+
+        $updated = AdDailySpend::query()
+            ->whereBetween('spend_date', [
+                $day->copy()->startOfDay()->format('Y-m-d H:i:s'),
+                $day->copy()->endOfDay()->format('Y-m-d H:i:s'),
+            ])
+            ->update(['fx_rate' => $rate]);
+
+        return back()->with('success', __('حُدِّث سعر الصرف إلى :r، وأُعيد احتساب :n صفًّا في يوم :d.', [
+            'r' => $rate, 'n' => $updated, 'd' => $day->toDateString(),
+        ]));
+    }
+
     /** ضبط المصروف التشغيلي الثابت — بتاريخ سريان فلا يُعاد كتابة الماضي. */
     public function storeFixedCost(StoreOperatingCostRequest $request): RedirectResponse
     {

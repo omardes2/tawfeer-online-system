@@ -472,4 +472,67 @@ class AdBudgetPageTest extends TestCase
 
         $this->assertSame(Carbon::yesterday()->toDateString(), $response->viewData('day')->toDateString());
     }
+
+    // ────────── سعر الصرف ──────────
+
+    /**
+     * تعديل المحادثات وحدها لا يدهس سعر صرف الصفّ.
+     *
+     * كان النموذج المخفيّ يحمل **الافتراضيَّ الحاليّ** لا سعر الصفّ، فأيّ تعديلٍ
+     * على صفٍّ أُدخل بسعر 3.05 كان يُعيد كتابته بـ3.7 — فيتغيّر ربح يومٍ مضى
+     * بلا أن يقصد أحد، وبلا أثرٍ يدلّ على ما جرى.
+     */
+    public function test_editing_a_row_keeps_its_own_exchange_rate(): void
+    {
+        Settings::set('ads.usd_rate', 3.7, 'ads', 'double');
+
+        $product = $this->product();
+        $spend = $this->spend($product, 10, 5);
+        $spend->forceFill(['fx_rate' => 3.05])->save();
+
+        $html = $this->actingAs($this->admin())
+            ->get(route('admin.reports.ad_budget', ['day' => $this->day->toDateString()]))
+            ->assertOk()->getContent();
+
+        // النموذج المخفيّ يحمل سعر الصفّ لا الافتراضيّ.
+        $this->assertStringContainsString('name="fx_rate" value="3.05"', $html);
+    }
+
+    /** وسعر الصرف الافتراضي يُضبَط من الصفحة. */
+    public function test_the_default_exchange_rate_is_editable_from_the_page(): void
+    {
+        $this->actingAs($this->admin())
+            ->post(route('admin.reports.ad_budget.usd_rate'), ['usd_rate' => 3.05])
+            ->assertRedirect();
+
+        $this->assertSame(3.05, (float) Settings::get('ads.usd_rate'));
+    }
+
+    /** وإعادة احتساب يومٍ بسعرٍ جديد تُصحّح صفوفه هو وحده. */
+    public function test_recalculating_a_day_rewrites_only_that_day(): void
+    {
+        $product = $this->product();
+        $today = $this->spend($product, 10, 5);
+        $today->forceFill(['fx_rate' => 3.7])->save();
+
+        $earlier = $this->spend($product, 10, 5, $this->day->copy()->subDay());
+        $earlier->forceFill(['fx_rate' => 3.7])->save();
+
+        $this->actingAs($this->admin())->post(route('admin.reports.ad_budget.usd_rate'), [
+            'usd_rate' => 3.05,
+            'apply_day' => $this->day->toDateString(),
+        ])->assertRedirect();
+
+        $this->assertEquals(3.05, (float) $today->refresh()->fx_rate);
+        // يوم الأمس لم يُمسّ: ربحُه مثبَّت على سعره.
+        $this->assertEquals(3.7, (float) $earlier->refresh()->fx_rate);
+    }
+
+    /** ولا يضبطه من لا يملك الإدارة. */
+    public function test_the_rate_is_gated_by_permission(): void
+    {
+        $this->actingAs($this->withRole('affiliate'))
+            ->post(route('admin.reports.ad_budget.usd_rate'), ['usd_rate' => 3.05])
+            ->assertForbidden();
+    }
 }

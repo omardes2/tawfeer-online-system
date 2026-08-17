@@ -122,6 +122,38 @@
     </div>
 
     @if ($can)
+        {{--
+            سعر الصرف: رقمٌ يتحرّك أسبوعيًّا، وكان محبوسًا في الإعدادات بلا شاشة
+            تعدّله — فيبقى ما ضُبط أوّل مرّة ويُحتسب به كل صرفٍ جديد. وخطؤه
+            يُضخّم تكلفة الطلب بالشيكل فيُوقَف إعلانٌ رابح.
+        --}}
+        <div class="admin-card p-4 mb-5 report-no-print" x-data="{ open: false }">
+            <button type="button" x-on:click="open = ! open" class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <svg class="w-4 h-4 text-gray-400 transition" :class="open && 'rotate-90'" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                {{ __('سعر صرف الدولار') }}
+                <span class="font-bold tabular-nums text-emerald-700">{{ rtrim(rtrim(number_format($rate, 4, '.', ''), '0'), '.') }}</span>
+            </button>
+            <form x-show="open" x-cloak method="POST" action="{{ route('admin.reports.ad_budget.usd_rate') }}"
+                  class="mt-4 flex flex-wrap items-end gap-3">
+                @csrf
+                <div>
+                    <label for="usd-rate" class="block text-xs text-gray-500 mb-1">{{ __('كم شيكلًا للدولار') }}</label>
+                    <input id="usd-rate" type="number" step="0.0001" min="0.0001" name="usd_rate"
+                           value="{{ rtrim(rtrim(number_format($rate, 4, '.', ''), '0'), '.') }}" required
+                           class="w-32 rounded-lg border-gray-300 text-sm tabular-nums focus:border-emerald-500 focus:ring-emerald-500" />
+                </div>
+                <label class="flex items-center gap-2 pb-2 cursor-pointer">
+                    <input type="checkbox" name="apply_day" value="{{ $dayString }}"
+                           class="rounded text-emerald-600 focus:ring-emerald-500">
+                    <span class="text-sm text-gray-700">{{ __('أعِد احتساب صفوف يوم :d بهذا السعر', ['d' => $dayString]) }}</span>
+                </label>
+                <button type="submit" class="btn-primary btn-sm">{{ __('حفظ') }}</button>
+                <p class="w-full text-xs text-gray-400 leading-relaxed">
+                    {{ __('السعر الجديد يسري على ما يُدخَل بعده. والصفوف المحفوظة تحتفظ بسعر يومها — ربح ذلك اليوم مثبَّت عليه — إلّا إن طلبتَ إعادة احتساب اليوم المعروض صراحةً.') }}
+                </p>
+            </form>
+        </div>
+
         {{-- ضبط المصروف الثابت — بتاريخ سريان فلا يُعاد كتابة ربح الماضي. --}}
         <div class="admin-card p-4 mb-5 report-no-print" x-data="{ open: false }">
             <button type="button" x-on:click="open = ! open" class="flex items-center gap-2 text-sm font-semibold text-gray-700">
@@ -180,7 +212,12 @@
                     <input type="hidden" name="spend_date" value="{{ $dayString }}">
                     <input type="hidden" name="ad_channel_id" value="{{ $r['channel_id'] }}">
                     <input type="hidden" name="product_id" value="{{ $r['product_id'] }}">
-                    <input type="hidden" name="fx_rate" value="{{ $rate }}">
+                    {{--
+                        سعر صرف **هذا الصفّ** لا الافتراضيّ: كان تعديلُ المحادثات
+                        وحدها يدهس سعر اليوم المحفوظ بالافتراضي الحاليّ، فيتغيّر
+                        ربح يومٍ مضى بلا أن يقصد أحد. والافتراضيّ للصفّ الجديد وحده.
+                    --}}
+                    <input type="hidden" name="fx_rate" value="{{ $r['fx_rate'] ?: $rate }}">
                 </form>
             @endforeach
         </div>
