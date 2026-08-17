@@ -37,6 +37,20 @@
                             {{ __('يظهر الصنف في «تنبيهات النقص» عندما ينزل المتوفّر إلى هذا الحدّ أو دونه. صفر يعني تنبيه الأصناف النافدة فقط. يمكن تجاوزه لكل صنف من صفحة المنتج.') }}
                         </p>
                     </x-admin.field>
+
+                    {{-- قسم التقييمات في المتجر: إطفاؤه لا يحذف رأيًا، بل يُخفي القسم. --}}
+                    <x-admin.field :label="__('تقييمات الزبائن في المتجر')" name="storefront_reviews_enabled">
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="hidden" name="storefront_reviews_enabled" value="0" />
+                            <input type="checkbox" name="storefront_reviews_enabled" value="1"
+                                   @checked(old('storefront_reviews_enabled', $values['storefront_reviews_enabled'] ?? true))
+                                   class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                            {{ __('إظهار قسم «التقييم وآراء الزبائن» في صفحة المنتج') }}
+                        </label>
+                        <p class="mt-1 text-xs text-gray-500">
+                            {{ __('عند الإطفاء يختفي القسم من كل صفحات المنتجات ويتوقّف استقبال تقييمات جديدة. التقييمات المحفوظة تبقى كما هي وتعود بالإشعال.') }}
+                        </p>
+                    </x-admin.field>
                 </div>
 
                 {{-- OpenAI --}}

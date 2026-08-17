@@ -43,6 +43,7 @@ class SettingsController extends Controller
         'opost_base_url' => 'opost.base_url',
         'opost_api_key' => 'opost.api_key',
         'opost_webhook_secret' => 'opost.webhook_secret',
+        'storefront_reviews_enabled' => 'storefront.reviews_enabled',
         'seo_meta_title' => 'seo.meta_title',
         'seo_meta_description' => 'seo.meta_description',
         'system_maintenance' => 'system.maintenance',
@@ -51,7 +52,7 @@ class SettingsController extends Controller
         'system_locale' => 'system.locale',
     ];
 
-    private const BOOLEANS = ['openai_enabled', 'whatsapp_enabled', 'system_maintenance'];
+    private const BOOLEANS = ['openai_enabled', 'whatsapp_enabled', 'system_maintenance', 'storefront_reviews_enabled'];
 
     public function __construct(private readonly SystemSettingsService $service) {}
 
@@ -99,6 +100,7 @@ class SettingsController extends Controller
             'opost_base_url' => ['nullable', 'url', 'max:250'],
             'opost_api_key' => ['nullable', 'string', 'max:200'],
             'opost_webhook_secret' => ['nullable', 'string', 'max:200'],
+            'storefront_reviews_enabled' => ['nullable', 'boolean'],
             'seo_meta_title' => ['nullable', 'string', 'max:70'],
             'seo_meta_description' => ['nullable', 'string', 'max:180'],
             'system_maintenance' => ['nullable', 'boolean'],

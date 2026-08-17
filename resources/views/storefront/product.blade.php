@@ -316,9 +316,12 @@
         }
     @endphp
 
-    {{-- التقييم وآراء الزبائن — قبل التوصيات: رأيٌ في هذا المنتج أولى من منتج آخر --}}
-    <x-storefront.reviews :product="$product" :summary="$reviewSummary" :reviews="$reviews"
-        :can-review="$canReview" :existing="$existingReview" />
+    {{-- التقييم وآراء الزبائن — قبل التوصيات: رأيٌ في هذا المنتج أولى من منتج آخر.
+         يُخفى القسم كلّه بإعدادٍ واحد؛ قسمٌ فارغ يقول «لا توجد تقييمات» أسوأ من غيابه. --}}
+    @if (\App\Modules\Foundation\Services\Settings::get('storefront.reviews_enabled', true))
+        <x-storefront.reviews :product="$product" :summary="$reviewSummary" :reviews="$reviews"
+            :can-review="$canReview" :existing="$existingReview" />
+    @endif
 
     @foreach ($recoSections as $section)
         <x-storefront.section :title="$section['title']" :items="$section['items']"

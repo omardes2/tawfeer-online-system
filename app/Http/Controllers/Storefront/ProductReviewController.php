@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Storefront;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Store\StoreProductReviewRequest;
 use App\Modules\Crm\Models\Customer;
+use App\Modules\Foundation\Services\Settings;
 use App\Modules\Store\Services\ReviewService;
 use App\Modules\Store\Services\StorefrontService;
 use Illuminate\Http\RedirectResponse;
@@ -25,6 +26,10 @@ class ProductReviewController extends Controller
 
     public function store(StoreProductReviewRequest $request, string $slug): RedirectResponse
     {
+        // القسم مُطفأ من الإعدادات: يُغلق الاستقبال في الخادم أيضًا، لا في الواجهة
+        // وحدها — إخفاء النموذج لا يمنع إرسالًا مباشرًا إلى المسار.
+        abort_unless(Settings::get('storefront.reviews_enabled', true), 404);
+
         $product = $this->storefront->findProductBySlug($slug);
         // المرساة تُعيد الزبون إلى القسم نفسه لا إلى أعلى الصفحة.
         $back = route('storefront.product', $product->slug).'#reviews';
