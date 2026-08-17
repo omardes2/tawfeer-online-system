@@ -15,6 +15,7 @@ class AdDailySpend extends Model
     protected $fillable = [
         'spend_date', 'ad_channel_id', 'product_id',
         'amount_usd', 'fx_rate', 'conversations', 'entered_by',
+        'source', 'synced_amount_usd', 'synced_conversations', 'synced_at',
     ];
 
     protected $casts = [
@@ -22,7 +23,23 @@ class AdDailySpend extends Model
         'amount_usd' => 'decimal:2',
         'fx_rate' => 'decimal:4',
         'conversations' => 'integer',
+        'synced_amount_usd' => 'decimal:2',
+        'synced_conversations' => 'integer',
+        'synced_at' => 'datetime',
     ];
+
+    /**
+     * قيمة المنصّة تخالف ما أُدخل يدويًّا.
+     *
+     * لا يُدهَس اليدوي ولا يُخفى ما تقوله المنصّة — يُعرَض الاختلاف ليقرّر المستخدم.
+     */
+    public function conflictsWithPlatform(): bool
+    {
+        return $this->source === 'manual'
+            && $this->synced_at !== null
+            && (abs((float) $this->amount_usd - (float) $this->synced_amount_usd) >= 0.01
+                || (int) $this->conversations !== (int) $this->synced_conversations);
+    }
 
     public function channel(): BelongsTo
     {

@@ -42,6 +42,7 @@ use App\Http\Controllers\Admin\Returns\ReturnController as AdminReturnController
 use App\Http\Controllers\Admin\Roles\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\Settings\AdChannelController;
+use App\Http\Controllers\Admin\Settings\AdExternalMapController;
 use App\Http\Controllers\Admin\Settings\SettingsController as AdminSettingsController;
 use App\Http\Controllers\Admin\Settlements\SettlementController as AdminSettlementController;
 use App\Http\Controllers\Admin\Shipping\AreaController;
@@ -422,6 +423,13 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
             Route::post('ad-channels', [AdChannelController::class, 'store'])->name('ad_channels.store');
             Route::put('ad-channels/{adChannel}', [AdChannelController::class, 'update'])->name('ad_channels.update');
             Route::delete('ad-channels/{adChannel}', [AdChannelController::class, 'destroy'])->name('ad_channels.destroy');
+
+            // ربط حملات المنصّة ومجموعاتها الإعلانية بالقنوات والأصناف.
+            Route::get('ad-maps', [AdExternalMapController::class, 'index'])->name('ad_maps.index');
+            Route::put('ad-maps/{adExternalMap}', [AdExternalMapController::class, 'update'])->name('ad_maps.update');
+            Route::post('ad-maps/{adExternalMap}/ignore', [AdExternalMapController::class, 'toggleIgnore'])->name('ad_maps.ignore');
+            Route::post('ad-maps/accept-suggestions', [AdExternalMapController::class, 'acceptSuggestions'])->name('ad_maps.accept');
+            Route::post('ad-maps/sync', [AdExternalMapController::class, 'sync'])->name('ad_maps.sync');
         });
     });
 

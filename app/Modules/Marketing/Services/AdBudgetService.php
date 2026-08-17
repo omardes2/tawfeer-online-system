@@ -104,6 +104,9 @@ class AdBudgetService
                     'conversations' => $spend['conversations'],
                     'has_spend_row' => $spend['exists'],
                     'spend_id' => $spend['id'],
+                    'conflict' => $spend['conflict'],
+                    'platform_usd' => $spend['platform_usd'],
+                    'platform_conversations' => $spend['platform_conversations'],
                     'net_profit' => round($sale['profit'] - $spend['local'], 2),
                     'cpa' => $sale['orders'] > 0 ? round($spend['local'] / $sale['orders'], 2) : null,
                     'window' => $window,
@@ -239,16 +242,29 @@ class AdBudgetService
             ->groupBy('ad_channel_id', 'product_id')
             ->selectRaw('ad_channel_id as cid, product_id as pid, '
                 .'SUM(amount_usd) as usd, SUM(amount_usd * fx_rate) as local, '
-                .'SUM(conversations) as conversations, MIN(id) as row_id')
+                .'SUM(conversations) as conversations, MIN(id) as row_id, '
+                // قيمة المنصّة بجانب اليدوية — تُعرَض عند اختلافهما ولا تدهسها.
+                .'SUM(COALESCE(synced_amount_usd, amount_usd)) as synced_usd, '
+                .'SUM(COALESCE(synced_conversations, conversations)) as synced_conv, '
+                ."MAX(CASE WHEN source = 'manual' AND synced_at IS NOT NULL THEN 1 ELSE 0 END) as manual_synced")
             ->get()
-            ->mapWithKeys(fn ($r) => [((int) $r->cid).':'.((int) $r->pid) => [
-                'usd' => round((float) $r->usd, 2),
-                'local' => round((float) $r->local, 2),
-                'conversations' => (int) $r->conversations,
-                'exists' => true,
-                // صفٌّ واحد لكل مفتاح في اليوم الواحد (الفهرس الفريد)، فالأدنى هو هو.
-                'id' => (int) $r->row_id,
-            ]]);
+            ->mapWithKeys(function ($r) {
+                $usd = round((float) $r->usd, 2);
+                $syncedUsd = round((float) $r->synced_usd, 2);
+
+                return [((int) $r->cid).':'.((int) $r->pid) => [
+                    'usd' => $usd,
+                    'local' => round((float) $r->local, 2),
+                    'conversations' => (int) $r->conversations,
+                    'exists' => true,
+                    // صفٌّ واحد لكل مفتاح في اليوم الواحد (الفهرس الفريد)، فالأدنى هو هو.
+                    'id' => (int) $r->row_id,
+                    'platform_usd' => $syncedUsd,
+                    'platform_conversations' => (int) $r->synced_conv,
+                    'conflict' => (int) $r->manual_synced === 1
+                        && (abs($usd - $syncedUsd) >= 0.01 || (int) $r->conversations !== (int) $r->synced_conv),
+                ]];
+            });
     }
 
     /**
@@ -389,6 +405,9 @@ class AdBudgetService
 
     private function zeroSpend(): array
     {
-        return ['usd' => 0.0, 'local' => 0.0, 'conversations' => 0, 'exists' => false, 'id' => null];
+        return [
+            'usd' => 0.0, 'local' => 0.0, 'conversations' => 0, 'exists' => false, 'id' => null,
+            'platform_usd' => 0.0, 'platform_conversations' => 0, 'conflict' => false,
+        ];
     }
 }

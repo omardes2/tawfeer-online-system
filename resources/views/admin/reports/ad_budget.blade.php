@@ -218,6 +218,12 @@
                         @else
                             <span class="tabular-nums text-gray-400">{{ $r['spend_usd'] > 0 ? '$'.number_format($r['spend_usd'], 2) : '—' }}</span>
                         @endif
+                        {{-- المنصّة تقول رقمًا آخر: يُعرَض ولا يدهس اليدويّ — القرار للمستخدم. --}}
+                        @if ($r['conflict'])
+                            <span class="block mt-1 text-[11px] text-amber-600" title="{{ __('قيمة المنصّة تختلف عمّا أُدخل يدويًّا') }}">
+                                {{ __('المنصّة: $:s · :c محادثة', ['s' => number_format($r['platform_usd'], 2), 'c' => $r['platform_conversations']]) }}
+                            </span>
+                        @endif
                     </td>
                     <td class="text-start">
                         @if ($can && ! $r['unassigned'])

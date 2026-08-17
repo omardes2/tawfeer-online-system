@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Ad-spend sync from the ad platform (read-only) — ADR-052
+- New integration layer (`AdPlatformProviderInterface` + `null`/`fake`/`meta`
+  drivers, `config/ads.php`) that pulls each ad set's **daily spend** and
+  **messaging conversations started** from the Meta Marketing API, filling the
+  two fields that were previously copied by hand.
+- **Read-only by design.** The contract cannot create, pause, or fund anything;
+  writing to the platform will be a separate contract requiring `ads_management`
+  rather than an extension of this one, so an import bug cannot spend money.
+- Defaults to the `null` driver: with nothing configured the system behaves
+  exactly as before and manual entry keeps working. Secrets live in `.env` only.
+- New `ad_external_maps` links platform IDs to system entities — **campaign → ad
+  channel, ad set → product** — keyed by ID, not name, so renaming a campaign
+  does not silently drop a day's spend. Name matching (with Arabic
+  normalisation) only *suggests*; an operator confirms. Unmapped rows are never
+  guessed and never written.
+- New settings screen **ربط الحملات**: pending queue with suggestions, a
+  one-click "link all suggested" action, ignore for non-product ad sets, and an
+  on-demand sync button.
+- `ads:sync-spend` runs nightly when enabled and **re-pulls the last 3 days**,
+  because Meta revises figures for 24–72h. Two ad sets promoting the same
+  product on the same page are summed rather than overwriting each other.
+- Manual entries are never overwritten: `source` plus `synced_*` columns record
+  what the platform reported alongside what a human typed, and the daily budget
+  page shows the difference when they disagree.
+
 ### Added — Daily ad budget (manual ad-spend tracking) — ADR-051
 - New report **«الميزانية اليومية»** (`admin.reports.ad_budget`): one row per
   **(product × sales page)** showing orders, sales, profit before ads, and two

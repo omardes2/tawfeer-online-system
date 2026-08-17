@@ -337,6 +337,13 @@
 ### `operating_daily_costs`
 `effective_from` (فريد) · `amount` · `note` · `created_by`. المصروف التشغيلي الثابت **لا يُوزَّع على الأصناف** — هو لا يتغيّر بإيقاف إعلانٍ أو زيادته، ومكانُه بطاقة اليوم وحدها. وتاريخ السريان يمنع تغيّرَ الرواتب اليوم من إعادة كتابة ربح الشهر الماضي.
 
+### `ad_external_maps` (ADR-052)
+`provider` · `external_type` (campaign/adset) · `external_id` · `external_name` · `ad_channel_id` → ad_channels · `product_id` → products · `suggested_ad_channel_id` · `suggested_product_id` · `is_ignored` · `last_seen_at`. فريد (provider, external_type, external_id).
+الربط **بالمعرّف لا بالاسم**: المطابقة النصّية تنكسر عند أول إعادة تسمية فيضيع صرفُ يومٍ بصمت. والاسم يبقى للعرض، والمقترح للتأكيد بنقرة — الربط الخاطئ يَنسب صرفًا إلى صنفٍ لم يُعلَن عليه، وهو خطأ لا يظهر في أي رقم.
+
+### `ad_daily_spends` — أعمدة المزامنة (ADR-052)
+`source` (manual/meta) · `synced_amount_usd` · `synced_conversations` · `synced_at`. المزامنة لا تدهس ما أُدخل باليد ولا تُخفي ما تقوله المنصّة: تُكتب قيمتها في `synced_*` ويُعرَض الاختلاف ليقرّر المستخدم.
+
 > **أساس الربح هنا يفترق عن تقارير المبيعات الثلاثة عمدًا:** تلك تُبقي المرتجع مبيعًا، وهذه تستبعد حالة «مُرتجَع» وتخصم `returned_qty` بالتناسب — فالاحتساب على الطلبات المُدخَلة لا المسلَّمة، والـ5% تُلتقط حين تُسجَّل بلا انتظار. الفارق محصورٌ في `AdBudgetService`.
 
 ---

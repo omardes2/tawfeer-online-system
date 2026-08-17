@@ -33,3 +33,12 @@ if (config('delivery.escalation.enabled')) {
 */
 Schedule::command('marketing:run-birthdays')->dailyAt('09:00')->withoutOverlapping();
 Schedule::command('marketing:run-abandoned-carts')->hourly()->withoutOverlapping();
+
+/*
+| سحب الصرف الإعلاني (ADR-052) — مفعّل بالإعداد فقط (config/ads.php)، وآمن بلا ربط
+| (المحرّك الافتراضي `null`). يُعيد سحب آخر عدّة أيام لأن أرقام Meta تُراجَع بعد
+| نشرها بيومٍ إلى ثلاثة، فالرقم الأوّلي ليس نهائيًّا.
+*/
+if (config('ads.sync.enabled')) {
+    Schedule::command('ads:sync-spend')->cron(config('ads.sync.cron'))->withoutOverlapping();
+}

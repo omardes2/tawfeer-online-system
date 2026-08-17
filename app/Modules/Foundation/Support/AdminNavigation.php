@@ -105,6 +105,7 @@ final class AdminNavigation
             ['الإعدادات', 'cog', [
                 ['admin.settings.edit', 'إعدادات النظام', 'settings.system.view', 'admin.settings.edit'],
                 ['admin.settings.ad_channels.index', 'قنوات الإعلان', 'reports.ad_budget.manage', 'admin.settings.ad_channels.*'],
+                ['admin.settings.ad_maps.index', 'ربط الحملات', 'reports.ad_budget.manage', 'admin.settings.ad_maps.*'],
             ]],
         ];
     }
