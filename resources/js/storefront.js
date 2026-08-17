@@ -192,8 +192,146 @@ window.sfSearch = (initial = '') => ({
     },
 });
 
+/*
+| ⚠️ Protected Delivery Integration — Do Not Modify.
+|
+| «شراء الآن» — شكلٌ آخر حول مسار الإتمام القائم لا مسار جديد. نفس النقاط، ونفس
+| التسلسل (start ← PATCH ← place)، ونفس مفاتيح النموذج، ونفس ترويسات الهوية.
+| **رسوم التوصيل تأتي من استجابة الـPATCH وحدها ولا تُحسب هنا إطلاقًا.**
+|
+| وجلسة الإتمام تُبنى من السلة لا من صنف، فالصنف يُضاف أولًا ثم تُفتح الجلسة —
+| والملخّص يعرض السلة كاملةً ويُنبّه حين تحمل غير هذا الصنف.
+*/
+const quickBuy = (areas) => ({
+    areas,
+    shown: false,
+    busy: false,
+    placing: false,
+    sessionId: null,
+    error: null,
+    order: null,
+    variantUuid: null,
+    totals: { subtotal: 0, delivery_fee: 0, total: 0 },
+    form: {
+        customer_name: '', customer_phone: '',
+        shipping_address: '', city_id: '', area_id: '', payment_method_code: 'cod',
+    },
+
+    get cartCount() {
+        return Alpine.store('cart').items.length;
+    },
+
+    /** أصنافٌ في السلة غير الذي فُتح اللوح من أجله. */
+    get otherItems() {
+        return Alpine.store('cart').items.filter((i) => i.variant_id !== this.variantUuid).length;
+    },
+
+    async open(variantUuid) {
+        if (!variantUuid || this.busy) return;
+
+        this.busy = true;
+        this.error = null;
+        this.order = null;
+        this.variantUuid = variantUuid;
+
+        try {
+            const store = Alpine.store('cart');
+            // لا يُضاف مكرّرًا: الصنف الموجود في السلة يبقى بكميته.
+            const inCart = store.items.some((i) => i.variant_id === variantUuid);
+            if (!inCart && !(await store.add(variantUuid, 1))) {
+                this.busy = false;
+                return;
+            }
+
+            this.shown = true;
+            document.body.style.overflow = 'hidden';
+            await this.start();
+        } finally {
+            this.busy = false;
+        }
+    },
+
+    close() {
+        this.shown = false;
+        document.body.style.overflow = '';
+    },
+
+    async start() {
+        try {
+            const res = await fetch('/api/v1/store/checkout', {
+                method: 'POST',
+                headers: window.StorefrontIdentity.headers(),
+            });
+            if (!res.ok) throw new Error('start');
+            const data = (await res.json()).data;
+            this.sessionId = data.id;
+            this.applyTotals(data);
+            window.StorefrontAnalytics.track('CheckoutStarted', { session: this.sessionId, quick: true });
+        } catch (e) {
+            this.error = window.SF_I18N?.error;
+        }
+    },
+
+    money(v) {
+        return `${Number(v || 0).toFixed(2)} ${window.SF_I18N?.currency ?? ''}`.trim();
+    },
+
+    areasOf(cityId) {
+        return cityId ? this.areas.filter((a) => Number(a.city_id) === Number(cityId)) : [];
+    },
+
+    pickCity() {
+        this.form.area_id = '';
+        this.sync();
+    },
+
+    applyTotals(data) {
+        if (data && data.cart) {
+            this.totals = {
+                subtotal: data.cart.subtotal ?? 0,
+                delivery_fee: data.cart.delivery_fee ?? 0,
+                total: data.cart.total ?? 0,
+            };
+        }
+    },
+
+    /** يحفظ الجلسة ويقرأ الرسوم المحسوبة في الخلفية. */
+    async sync() {
+        if (!this.sessionId) return;
+        try {
+            const res = await fetch(`/api/v1/store/checkout/${this.sessionId}`, {
+                method: 'PATCH',
+                headers: window.StorefrontIdentity.headers(),
+                body: JSON.stringify(this.form),
+            });
+            if (res.ok) this.applyTotals((await res.json()).data);
+        } catch (e) { /* تجاهل — تُعاد المزامنة عند الإتمام */ }
+    },
+
+    async place() {
+        if (!this.sessionId) return;
+        this.placing = true;
+        this.error = null;
+        try {
+            const h = window.StorefrontIdentity.headers();
+            await fetch(`/api/v1/store/checkout/${this.sessionId}`, {
+                method: 'PATCH', headers: h, body: JSON.stringify(this.form),
+            });
+            const res = await fetch(`/api/v1/store/checkout/${this.sessionId}/place`, { method: 'POST', headers: h });
+            if (!res.ok) throw new Error('place');
+            this.order = (await res.json()).data;
+            await Alpine.store('cart').refresh();
+        } catch (e) {
+            this.error = window.SF_I18N?.error;
+        } finally {
+            this.placing = false;
+        }
+    },
+});
+
 document.addEventListener('alpine:init', () => {
     Alpine.store('cart', cartStore);
+    Alpine.data('quickBuy', quickBuy);
 });
 
 window.Alpine = Alpine;

@@ -13,6 +13,7 @@ use App\Support\Contracts\StorefrontRecommendationProvider;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 /**
@@ -109,7 +110,9 @@ class StorefrontController extends Controller
             'crossSell' => $this->reco->crossSell($product, 8),
             'upsell' => $this->reco->upsell($product, 8),
             'bundles' => $this->reco->bundles($product, 8),
-        ]);
+            // «شراء الآن» يعرض نفس مدن ومناطق الإتمام — من الدالّة نفسها كي لا
+            // يفترق ما يراه الزبون هنا عمّا يراه هناك.
+        ] + $this->deliveryDestinations());
     }
 
     public function cart(): View
@@ -122,18 +125,34 @@ class StorefrontController extends Controller
 
     public function checkout(): View
     {
-        // المدن والمناطق بنفس تصفية لوحة الإدارة: المدن المسعّرة والمفعّلة فقط،
-        // فلا يختار الزبون مدينة لا سعر لها ولا ربط خارجي لدى شركة التوصيل.
-        $ratedCityIds = DeliveryCityRate::where('is_active', true)->pluck('city_id')->filter();
-
         return view('storefront.checkout', [
             // توصيات في الإتمام (Phase 6 / ADR-045): الأكثر مبيعًا (بيع تكميلي خفيف).
             'recommendations' => $this->reco->bestSellers(8),
+        ] + $this->deliveryDestinations());
+    }
+
+    /**
+     * ⚠️ Protected Delivery Integration — Do Not Modify.
+     *
+     * المدن والمناطق بنفس تصفية لوحة الإدارة: المدن المسعّرة والمفعّلة فقط، فلا
+     * يختار الزبون مدينة لا سعر لها ولا ربط خارجي لدى شركة التوصيل.
+     *
+     * استُخرجت لتشترك فيها صفحة الإتمام و«شراء الآن» في صفحة المنتج: نسخُ
+     * الاستعلام كان سيسمح بافتراق القائمتين عند أي تعديل مستقبلي، فيرى الزبون
+     * مدينةً في أحد المسارين ولا يراها في الآخر.
+     *
+     * @return array{cities: Collection, areas: Collection}
+     */
+    private function deliveryDestinations(): array
+    {
+        $ratedCityIds = DeliveryCityRate::where('is_active', true)->pluck('city_id')->filter();
+
+        return [
             'cities' => City::whereIn('id', $ratedCityIds)->where('is_active', true)
                 ->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
             'areas' => Area::whereIn('city_id', $ratedCityIds)->where('is_active', true)
                 ->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'city_id']),
-        ]);
+        ];
     }
 
     public function setLocale(Request $request, string $locale): RedirectResponse

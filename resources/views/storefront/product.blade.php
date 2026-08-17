@@ -188,6 +188,12 @@
                             variant-expr="matched?.uuid ?? null"
                             max-expr="matched?.max ?? 0"
                             enabled-expr="canAdd" />
+
+                        {{-- «شراء الآن»: لا يُفعَّل حتى يكتمل اختيار المتغيّر — تمامًا كزرّ الإضافة --}}
+                        <x-storefront.quick-buy
+                            variant-expr="matched?.uuid ?? null"
+                            enabled-expr="canAdd"
+                            :cities="$cities" :areas="$areas" />
                     </div>
                 </div>
             @else
@@ -218,6 +224,7 @@
                     @if ($variant && $inStock)
                         <x-storefront.add-to-cart size="lg" :variant="$variant->uuid"
                             :max="(int) floor($available)" :hide-add-on-mobile="true" />
+                        <x-storefront.quick-buy :variant="$variant->uuid" :cities="$cities" :areas="$areas" />
                     @else
                         <button type="button" disabled class="sf-btn sf-btn-lg sf-btn-block bg-[color:var(--sf-bg)] text-[color:var(--sf-text-soft)]">
                             {{ __('storefront.out_of_stock') }}

@@ -72,6 +72,9 @@
         window.SF_I18N = @js([
             'added_to_cart' => __('storefront.added_to_cart'),
             'add_failed' => __('storefront.add_failed'),
+            // «شراء الآن» يعرض رسالة الخطأ والعملة من هنا — الترجمة تبقى في ملفّات اللغة.
+            'error' => __('storefront.error'),
+            'currency' => __('storefront.currency'),
         ]);
     </script>
 
