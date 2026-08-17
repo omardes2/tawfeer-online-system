@@ -202,6 +202,125 @@ window.sfSearch = (initial = '') => ({
 | وجلسة الإتمام تُبنى من السلة لا من صنف، فالصنف يُضاف أولًا ثم تُفتح الجلسة —
 | والملخّص يعرض السلة كاملةً ويُنبّه حين تحمل غير هذا الصنف.
 */
+/**
+ * عروض الكمّية في صفحة المنتج.
+ *
+ * ⚠️ Protected Delivery Integration — Do Not Modify.
+ *
+ * **شكلٌ حول المسار القائم لا مسار جديد.** الإضافة تمرّ على مخزن السلة نفسه
+ * (`POST /api/v1/store/cart/items`) نداءً لكل مقاس، والإتمام يفتح لوح «شراء
+ * الآن» نفسه بتسلسله المعتاد. لا نقطة API مستحدثة، ولا حساب سعرٍ هنا: سعر
+ * العرض تحسبه الخلفية عند التسعير، وما يُعرَض في هذه الشاشة **إعلانٌ** لا
+ * مصدرُ حقيقة.
+ *
+ * والكمّيات تُضاف مجمَّعة بالمقاس لا قطعةً قطعة: خمسُ نداءاتٍ لمقاسٍ واحد
+ * تتسابق على الصفّ نفسه فتضيع بعضها.
+ */
+const productOffers = (offers, variants, config) => ({
+    offers,
+    variants,
+    hasOptions: config.hasOptions ?? false,
+    basePrice: config.basePrice ?? 0,
+    baseVariant: config.baseVariant ?? null,
+    selected: offers.length ? offers[0].id : null,
+    /** المقاس المختار لكل قطعة: { 0: uuid, 1: uuid, ... } */
+    picks: {},
+    busy: false,
+
+    get offer() {
+        return this.offers.find((o) => o.id === this.selected) ?? null;
+    },
+
+    get qty() {
+        return this.offer?.qty ?? 1;
+    },
+
+    /** القطع المطلوب اختيار مقاسٍ لها. */
+    get units() {
+        return Array.from({ length: this.qty }, (_, i) => i);
+    },
+
+    get available() {
+        return this.variants.filter((v) => v.available);
+    },
+
+    /** أُختير مقاسٌ لكل قطعة؟ المنتج البسيط لا خيار فيه فهو مكتملٌ دائمًا. */
+    get isComplete() {
+        if (!this.hasOptions) return Boolean(this.baseVariant);
+        return this.units.every((i) => Boolean(this.picks[i]));
+    },
+
+    /** سعر القطعة داخل العرض المختار — للعرض وحده. */
+    get unitPrice() {
+        return this.offer ? this.offer.unit_price : this.basePrice;
+    },
+
+    pick(unit, uuid) {
+        this.picks = { ...this.picks, [unit]: uuid };
+    },
+
+    /** يُعاد ضبط الاختيارات عند تبديل العرض: قطعُ عرضٍ آخر لا تعني شيئًا. */
+    choose(id) {
+        this.selected = id;
+        this.picks = {};
+    },
+
+    /** { uuid: عدد } — الأساس الذي تُبنى عليه نداءات الإضافة. */
+    get grouped() {
+        if (!this.hasOptions) {
+            return this.baseVariant ? { [this.baseVariant]: this.qty } : {};
+        }
+
+        return this.units.reduce((acc, i) => {
+            const uuid = this.picks[i];
+            if (uuid) acc[uuid] = (acc[uuid] ?? 0) + 1;
+            return acc;
+        }, {});
+    },
+
+    async addAll() {
+        const store = Alpine.store('cart');
+        const groups = Object.entries(this.grouped);
+
+        for (const [uuid, count] of groups) {
+            if (!(await store.add(uuid, count))) return null;
+        }
+
+        return groups.length ? groups[0][0] : null;
+    },
+
+    async add() {
+        if (!this.isComplete || this.busy) return;
+        this.busy = true;
+        try {
+            await this.addAll();
+        } finally {
+            this.busy = false;
+        }
+    },
+
+    async buyNow() {
+        if (!this.isComplete || this.busy) return;
+        this.busy = true;
+
+        try {
+            const first = await this.addAll();
+            if (!first) return;
+
+            // القطع أُضيفت بمقاساتها، فيُفتح اللوح بلا إضافةٍ سادسة.
+            window.dispatchEvent(new CustomEvent('quick-buy:open', {
+                detail: { variant: first, skipAdd: true, ownUuids: Object.keys(this.grouped) },
+            }));
+        } finally {
+            this.busy = false;
+        }
+    },
+
+    money(v) {
+        return `${Number(v || 0).toFixed(2)}`;
+    },
+});
+
 const quickBuy = (areas) => ({
     areas,
     shown: false,
@@ -211,6 +330,7 @@ const quickBuy = (areas) => ({
     error: null,
     order: null,
     variantUuid: null,
+    ownUuids: [],
     totals: { subtotal: 0, delivery_fee: 0, total: 0 },
     form: {
         customer_name: '', customer_phone: '',
@@ -223,22 +343,30 @@ const quickBuy = (areas) => ({
 
     /** أصنافٌ في السلة غير الذي فُتح اللوح من أجله. */
     get otherItems() {
-        return Alpine.store('cart').items.filter((i) => i.variant_id !== this.variantUuid).length;
+        return Alpine.store('cart').items.filter((i) => !this.ownUuids.includes(i.variant_id)).length;
     },
 
-    async open(variantUuid) {
+    /**
+     * فتح اللوح.
+     *
+     * `skipAdd` لعرض الكمّية: قطعُه أُضيفت بمقاساتها قبل الفتح، وإضافةُ واحدةٍ
+     * أخرى هنا كانت ستكسر كمّية العرض فيسقط سعرُه. و`ownUuids` تُميّز قطع
+     * العرض عن بقيّة السلة في تنبيه «سلّتك تحمل أصنافًا أخرى».
+     */
+    async open(variantUuid, options = {}) {
         if (!variantUuid || this.busy) return;
 
         this.busy = true;
         this.error = null;
         this.order = null;
         this.variantUuid = variantUuid;
+        this.ownUuids = options.ownUuids ?? [variantUuid];
 
         try {
             const store = Alpine.store('cart');
             // لا يُضاف مكرّرًا: الصنف الموجود في السلة يبقى بكميته.
             const inCart = store.items.some((i) => i.variant_id === variantUuid);
-            if (!inCart && !(await store.add(variantUuid, 1))) {
+            if (!options.skipAdd && !inCart && !(await store.add(variantUuid, 1))) {
                 this.busy = false;
                 return;
             }
@@ -332,6 +460,7 @@ const quickBuy = (areas) => ({
 document.addEventListener('alpine:init', () => {
     Alpine.store('cart', cartStore);
     Alpine.data('quickBuy', quickBuy);
+    Alpine.data('productOffers', productOffers);
 });
 
 window.Alpine = Alpine;

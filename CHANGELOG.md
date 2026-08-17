@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Product quantity offers — ADR-056
+- New **«عروض الكمّية»** section on the product edit page: define tiers like
+  "buy 5 for 100", shown on the product page as selectable cards with the
+  per-unit price and the regular price struck through.
+- **Defined on the product, not the variant** (owner's call): a customer buying
+  five pieces in different sizes counts that as one offer, so quantity is summed
+  across the product's variants and the price applies to all of them.
+- **Priced in the cart layer alone — checkout is untouched.** Auditing the path
+  first showed `CheckoutService` copies `unit_price` from the cart line without
+  repricing, and the delivery fee reads the cart subtotal. So the offer is
+  applied in `CartService` and everything downstream runs unchanged: no new API
+  endpoint, no fee arithmetic in the browser, no altered contract — which is
+  what the tests guard before they guard the offer itself.
+- The highest reached tier wins and spreads over every unit: buying six under a
+  "5 for 100" offer pays 100 for six, not five discounted plus one at full price
+  — two prices on one product reads as a bug to the customer.
+- An offer never raises the price (a stale offer on a since-discounted product
+  would otherwise punish buying more), and pricing is recomputed on every add and
+  remove, so dropping below the tier restores the regular price.
+- Minimum tier is two units — a "offer" on one unit is a second price for the
+  product and belongs in the promo price field — and one offer per quantity.
+- Below-cost offers are warned about (red row, compared against wholesale cost)
+  but never blocked: clearing stock at a loss can be deliberate.
+- Mobile-first storefront card: full-width touch targets, a size picker per unit
+  inside the selected card only, and the sticky bar scrolls to the offers instead
+  of buying directly — buying from the bar would skip the offer and charge full
+  price while the customer believes they took it.
+
 ### Added — Purchase measurement and web-order attribution — ADR-054
 - New measurement layer (`ConversionTrackerInterface` + `null`/`fake`/`meta`
   drivers) sending **Purchase** to the Meta Conversions API, plus the browser

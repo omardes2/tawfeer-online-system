@@ -210,4 +210,13 @@ return [
     'cod_hint' => 'Pay the courier in cash when your order arrives.',
 
     'all_rights' => 'All rights reserved',
+
+    // عروض الكمّية على صفحة المنتج
+    'offers_title' => 'Choose your offer',
+    'offers_hint' => 'Save more when you buy more',
+    'offer_single' => 'Buy one for :p',
+    'offer_original' => 'Regular price',
+    'offer_pick_for_unit' => 'Choose the option for item :n',
+    'offer_pick_all' => 'Choose options for every item first',
+    'offer_total' => 'Total',
 ];

@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\Catalog\PriceListController;
 use App\Http\Controllers\Admin\Catalog\ProductAttributeController;
 use App\Http\Controllers\Admin\Catalog\ProductController;
 use App\Http\Controllers\Admin\Catalog\ProductImportController;
+use App\Http\Controllers\Admin\Catalog\ProductOfferController;
 use App\Http\Controllers\Admin\Catalog\ProductReviewController as AdminProductReviewController;
 use App\Http\Controllers\Admin\Catalog\ProductTagController;
 use App\Http\Controllers\Admin\Catalog\ProductVariantController;
@@ -208,6 +209,13 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::resource('products', ProductController::class)->except('show');
     Route::post('products/{product}/toggle-visibility', [ProductController::class, 'toggleVisibility'])->name('products.toggle-visibility');
     Route::post('products/{product}/toggle-affiliate', [ProductController::class, 'toggleAffiliate'])->name('products.toggle-affiliate');
+    // عروض الكمّية على الصنف — تُدار من صفحة تعديل المنتج.
+    Route::middleware('can:catalog.products.update')->group(function () {
+        Route::post('products/{product}/offers', [ProductOfferController::class, 'store'])->name('products.offers.store');
+        Route::put('products/{product}/offers/{offer}', [ProductOfferController::class, 'update'])->name('products.offers.update');
+        Route::delete('products/{product}/offers/{offer}', [ProductOfferController::class, 'destroy'])->name('products.offers.destroy');
+    });
+
     Route::post('products/{product}/images', [ProductController::class, 'storeImage'])->name('products.images.store');
     Route::post('products/{product}/images/{image}/primary', [ProductController::class, 'setPrimaryImage'])->name('products.images.primary');
     Route::delete('products/{product}/images/{image}', [ProductController::class, 'destroyImage'])->name('products.images.destroy');

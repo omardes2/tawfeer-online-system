@@ -9,6 +9,14 @@
     'compact' => false,
     // يُخفى على الجوّال حين يحمله الشريط اللاصق بدلًا منه (فلا يتكرّر الزرّ).
     'hideOnMobile' => false,
+    /*
+    | يستمع لحدث الفتح العامّ. **نسخةٌ واحدة في الصفحة تفعل** — الصفحة تحمل
+    | أكثر من لوح (المتغيّرات، المنتج البسيط، الشريط اللاصق)، ولو استمعت كلُّها
+    | لانفتحت ثلاثة ألواحٍ فوق بعضها عند أول ضغطة.
+    */
+    'listens' => false,
+    // بلا زرّ: يحمله شيءٌ آخر (بطاقة العروض) ويفتحه بالحدث.
+    'triggerless' => false,
 ])
 
 {{--
@@ -33,9 +41,10 @@
 @endphp
 
 <div x-data="quickBuy(@js($areas))" @keydown.escape.window="close()"
+     @if ($listens) @quick-buy:open.window="open($event.detail.variant, $event.detail)" @endif
      @class(['contents' => $compact, 'hidden lg:block' => $hideOnMobile])>
 
-    <button type="button" @click="open({!! $variantJs !!})"
+    <button type="button" @click="open({!! $variantJs !!})" @class(['hidden' => $triggerless])
             :disabled="!({!! $enabledExpr !!}) || !({!! $variantJs !!}) || busy"
             @class([
                 'sf-btn-primary whitespace-nowrap shrink-0 min-h-10 !px-3 gap-1.5 text-[13px]' => $compact,

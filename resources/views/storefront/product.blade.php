@@ -56,6 +56,18 @@
         ];
     })->values();
 
+    // عروض الكمّية — تُعرَض حين تُوجد وحدها.
+    $offers = $product->activeOffers;
+
+    // تسمية كل متغيّر لبطاقة العرض: «S-M» بدل تركيبة معرّفات.
+    $offerVariantsJs = $optionVariants->map(function ($v) use ($cart) {
+        return [
+            'uuid' => $v->uuid,
+            'label' => $v->attributeValues->map(fn ($x) => $x->label ?: $x->value)->join(' / '),
+            'available' => $cart->availableQty($v) > 1e-9,
+        ];
+    })->values();
+
     // بحذف زرّ المفضّلة سقط استعلاما العميل والمفضّلة اللذان كانا يُنفَّذان
     // في كل عرض لصفحة منتج لمستخدم مسجَّل.
 
@@ -183,18 +195,29 @@
                     </div>
 
                     {{-- الإضافة للسلة (نفس مكوّن البطاقة، والمتغيّر يتبع الاختيار) --}}
-                    <div class="mt-6 scroll-mt-32" id="sf-buy">
-                        <x-storefront.add-to-cart size="lg"
-                            variant-expr="matched?.uuid ?? null"
-                            max-expr="matched?.max ?? 0"
-                            enabled-expr="canAdd" />
+                    @if ($offers->isEmpty())
+                        <div class="mt-6 scroll-mt-32" id="sf-buy">
+                            <x-storefront.add-to-cart size="lg"
+                                variant-expr="matched?.uuid ?? null"
+                                max-expr="matched?.max ?? 0"
+                                enabled-expr="canAdd" />
 
-                        {{-- «شراء الآن»: لا يُفعَّل حتى يكتمل اختيار المتغيّر — تمامًا كزرّ الإضافة --}}
-                        <x-storefront.quick-buy
-                            variant-expr="matched?.uuid ?? null"
-                            enabled-expr="canAdd"
-                            :cities="$cities" :areas="$areas" />
-                    </div>
+                            {{-- «شراء الآن»: لا يُفعَّل حتى يكتمل اختيار المتغيّر — تمامًا كزرّ الإضافة --}}
+                            <x-storefront.quick-buy
+                                variant-expr="matched?.uuid ?? null"
+                                enabled-expr="canAdd"
+                                :cities="$cities" :areas="$areas" />
+                        </div>
+                    @else
+                        {{-- بطاقة العروض تحلّ محلّ الأزرار: هي التي تحمل الكمّية والمقاسات --}}
+                        <div class="scroll-mt-32" id="sf-buy">
+                            <x-storefront.offer-picker
+                                :product="$product" :offers="$offers"
+                                :variants="$offerVariantsJs" :option-groups="$optionGroups"
+                                :has-options="true" :base-price="$price" :regular-price="$regular"
+                                :cities="$cities" :areas="$areas" />
+                        </div>
+                    @endif
                 </div>
             @else
                 <div class="mt-4">
@@ -221,7 +244,13 @@
                 {{-- زرّ «أضف» وحده يُخفى على الجوّال (الشريط اللاصق يحمله)، بينما محدّد
                      الكمية يبقى ظاهرًا تحت المنتج لأنه تحكّم بما في السلة لا تكرار. --}}
                 <div class="mt-6 scroll-mt-32" id="sf-buy">
-                    @if ($variant && $inStock)
+                    @if ($variant && $inStock && $offers->isNotEmpty())
+                        <x-storefront.offer-picker
+                            :product="$product" :offers="$offers"
+                            :has-options="false" :base-variant="$variant->uuid"
+                            :base-price="$price" :regular-price="$regular"
+                            :cities="$cities" :areas="$areas" />
+                    @elseif ($variant && $inStock)
                         <x-storefront.add-to-cart size="lg" :variant="$variant->uuid"
                             :max="(int) floor($available)" :hide-add-on-mobile="true" />
                         <x-storefront.quick-buy :variant="$variant->uuid" :cities="$cities" :areas="$areas"
@@ -365,7 +394,15 @@
                 @endunless
             </div>
 
-            @if (! $hasOptions && $variant && $inStock)
+            @if ($offers->isNotEmpty())
+                {{-- مع العروض لا يشتري الشريط مباشرةً: الكمّية والمقاسات تُختار
+                     في البطاقة، وشراءٌ من هنا كان يتخطّى العرض فيدفع الزبون
+                     السعر العادي وهو يظنّ أنه أخذ العرض. --}}
+                <a href="#sf-buy" class="sf-btn-primary shrink-0">
+                    <x-storefront.icon name="tag" class="w-4 h-4" />
+                    {{ __('storefront.offers_title') }}
+                </a>
+            @elseif (! $hasOptions && $variant && $inStock)
                 {{-- زرّان في شريطٍ ضيّق: «أضف» يتقلّص و«شراء الآن» يبقى ظاهرًا كاملًا،
                      لأنه المسار الأقصر إلى الطلب وهو ما جاء الزبون من أجله. --}}
                 <div class="shrink-0 flex items-center gap-2">

@@ -359,6 +359,110 @@
                 @error('images.*')<p class="mt-3 text-xs text-rose-600">{{ $message }}</p>@enderror
             </div>
         @endif
+
+        {{-- عروض الكمّية — على الصنف، وتطال متغيّراته جميعًا --}}
+        @if ($product->exists)
+            @php
+                $regular = (float) ($product->defaultVariant?->promo_price ?: $product->defaultVariant?->retail_price ?: 0);
+                $cost = (float) ($product->defaultVariant?->average_cost ?: 0);
+                $currency = \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪');
+            @endphp
+            <div class="admin-card p-5 md:p-6">
+                <h3 class="font-semibold text-gray-800 mb-1">{{ __('عروض الكمّية') }}</h3>
+                <p class="text-xs text-gray-400 mb-5 leading-relaxed">
+                    {{ __('«اشترِ 5 قطع بـ100» — تظهر في صفحة المنتج ليختار منها الزبون. والعرض على الصنف كلّه: خمس قطعٍ بمقاساتٍ مختلفة عرضٌ واحد.') }}
+                    @if ($regular > 0)
+                        <span class="block mt-1">{{ __('السعر العادي للقطعة: :p :c', ['p' => number_format($regular, 2), 'c' => $currency]) }}</span>
+                    @endif
+                </p>
+
+                <x-admin.table dense>
+                    <thead>
+                        <tr>
+                            <th>{{ __('الكمّية') }}</th>
+                            <th>{{ __('السعر الإجمالي') }}</th>
+                            <th>{{ __('سعر القطعة') }}</th>
+                            <th>{{ __('التسمية') }}</th>
+                            <th>{{ __('مفعّل') }}</th>
+                            <th class="w-px"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($product->offers as $offer)
+                            @php
+                                $unit = $offer->unitPrice();
+                                $belowCost = $cost > 0 && $unit < $cost;
+                            @endphp
+                            <tr class="{{ $belowCost ? 'bg-rose-50/60' : '' }}">
+                                <td>
+                                    <form method="POST" action="{{ route('admin.products.offers.update', [$product, $offer]) }}" id="offer-{{ $offer->id }}">@csrf @method('PUT')</form>
+                                    <input type="number" min="2" max="999" name="min_qty" form="offer-{{ $offer->id }}" value="{{ $offer->min_qty }}"
+                                           class="w-20 rounded-md border-gray-300 text-sm tabular-nums focus:border-emerald-500 focus:ring-emerald-500">
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" min="0" name="total_price" form="offer-{{ $offer->id }}" value="{{ number_format((float) $offer->total_price, 2, '.', '') }}"
+                                           class="w-28 rounded-md border-gray-300 text-sm tabular-nums focus:border-emerald-500 focus:ring-emerald-500">
+                                </td>
+                                <td class="tabular-nums text-sm {{ $belowCost ? 'text-rose-700 font-semibold' : 'text-gray-700' }}">
+                                    {{ number_format($unit, 2) }} {{ $currency }}
+                                    @if ($belowCost)
+                                        <span class="block text-[11px]">{{ __('تحت تكلفة الجملة (:c)', ['c' => number_format($cost, 2)]) }}</span>
+                                    @elseif ($regular > 0)
+                                        <span class="block text-[11px] text-emerald-700">{{ __('يوفّر :s', ['s' => number_format($offer->savingsAgainst($regular), 2)]) }}</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    <input type="text" maxlength="60" name="label" form="offer-{{ $offer->id }}" value="{{ $offer->label }}"
+                                           placeholder="{{ __('عرض التوفير') }}"
+                                           class="w-40 rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                                </td>
+                                <td>
+                                    <input type="hidden" name="is_active" value="0" form="offer-{{ $offer->id }}">
+                                    <input type="checkbox" name="is_active" value="1" form="offer-{{ $offer->id }}" @checked($offer->is_active)
+                                           class="rounded text-emerald-600 focus:ring-emerald-500">
+                                </td>
+                                <td class="whitespace-nowrap">
+                                    <button type="submit" form="offer-{{ $offer->id }}" class="btn-secondary btn-sm">{{ __('حفظ') }}</button>
+                                    <x-admin.confirm
+                                        :action="route('admin.products.offers.destroy', [$product, $offer])"
+                                        method="DELETE"
+                                        :trigger="__('حذف')"
+                                        :message="__('حذف عرض :n قطع؟', ['n' => $offer->min_qty])" />
+                                </td>
+                            </tr>
+                        @endforeach
+
+                        {{-- صفّ الإضافة --}}
+                        <tr class="bg-gray-50/60">
+                            <td>
+                                <form method="POST" action="{{ route('admin.products.offers.store', $product) }}" id="offer-new">@csrf</form>
+                                <input type="number" min="2" max="999" name="min_qty" form="offer-new" placeholder="2" required
+                                       class="w-20 rounded-md border-gray-300 text-sm tabular-nums focus:border-emerald-500 focus:ring-emerald-500">
+                            </td>
+                            <td>
+                                <input type="number" step="0.01" min="0" name="total_price" form="offer-new" placeholder="0.00" required
+                                       class="w-28 rounded-md border-gray-300 text-sm tabular-nums focus:border-emerald-500 focus:ring-emerald-500">
+                            </td>
+                            <td class="text-xs text-gray-400">{{ __('يُحتسب آليًّا') }}</td>
+                            <td>
+                                <input type="text" maxlength="60" name="label" form="offer-new" placeholder="{{ __('عرض التوفير') }}"
+                                       class="w-40 rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                            </td>
+                            <td>
+                                <input type="hidden" name="is_active" value="1" form="offer-new">
+                                <span class="text-xs text-gray-400">{{ __('نعم') }}</span>
+                            </td>
+                            <td><button type="submit" form="offer-new" class="btn-primary btn-sm">{{ __('أضف') }}</button></td>
+                        </tr>
+                    </tbody>
+                </x-admin.table>
+
+                <p class="mt-3 text-xs text-gray-500 leading-relaxed">
+                    {{ __('العرض لا يرفع السعر أبدًا: لو صار أغلى من السعر العادي — بتخفيضٍ لاحق مثلًا — يدفع الزبون الأقلّ.') }}
+                    {{ __('ومن اشترى أكثر من كمّية العرض يأخذ سعره على القطع كلّها.') }}
+                </p>
+            </div>
+        @endif
     </div>
 
     {{-- مصفوفة المتغيّرات الحيّة: تبني التركيبات من القيم المختارة وتحفظ السعر/الكمية --}}

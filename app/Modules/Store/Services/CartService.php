@@ -4,6 +4,7 @@ namespace App\Modules\Store\Services;
 
 use App\Models\User;
 use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Catalog\Services\OfferPricing;
 use App\Modules\Crm\Models\Customer;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Inventory\Models\InventoryStock;
@@ -16,6 +17,8 @@ use Illuminate\Validation\ValidationException;
  */
 class CartService
 {
+    public function __construct(private readonly OfferPricing $offers) {}
+
     /** سلة المستخدم النشطة (تُنشأ عند الحاجة). */
     public function forUser(User $user): Cart
     {
@@ -104,6 +107,8 @@ class CartService
                 ['qty' => $newQty, 'unit_price' => $this->sellingPrice($variant)],
             );
 
+            $this->applyOffers($cart, $variant);
+
             return $cart->fresh('items');
         });
     }
@@ -122,12 +127,17 @@ class CartService
             ['qty' => $qty, 'unit_price' => $this->sellingPrice($variant)],
         );
 
+        $this->applyOffers($cart, $variant);
+
         return $cart->fresh('items');
     }
 
     public function removeItem(Cart $cart, ProductVariant $variant): Cart
     {
         $cart->items()->where('variant_id', $variant->id)->delete();
+
+        // بعد الحذف قد تنزل الكمّية تحت العرض، فيعود الباقي إلى سعره العادي.
+        $this->applyOffers($cart, $variant);
 
         return $cart->fresh('items');
     }
@@ -137,6 +147,48 @@ class CartService
         $cart->items()->delete();
 
         return $cart->fresh('items');
+    }
+
+    /**
+     * إعادة تسعير بنود صنفٍ بعد تغيّر كمّيته — عروض الكمّية.
+     *
+     * ⚠️ Protected Delivery Integration — Do Not Modify.
+     *
+     * العرض يُطبَّق **هنا وحده**، في طبقة تسعير السلة. ومسار الإتمام لا يُمسّ:
+     * هو ينسخ `unit_price` من بند السلة إلى بند الطلب كما كان يفعل دائمًا،
+     * ورسوم التوصيل تُحسب على مجموع السلة كما كانت. فلا نقطة API مستحدثة ولا
+     * عقد مختلف ولا حساب رسومٍ في الواجهة.
+     *
+     * والكمّية تُجمع عبر **متغيّرات الصنف كلّها**: خمس قطعٍ بمقاساتٍ مختلفة
+     * عرضٌ واحد. ويُعاد الحساب في كل تغيير — إضافةً كان أو حذفًا — فنزولُ
+     * الكمّية تحت العرض يُعيد الباقي إلى سعره العادي.
+     */
+    private function applyOffers(Cart $cart, ProductVariant $variant): void
+    {
+        $product = $variant->product;
+
+        if (! $product) {
+            return;
+        }
+
+        $offers = $product->activeOffers()->get();
+
+        if ($offers->isEmpty()) {
+            return;
+        }
+
+        $variantIds = $product->variants()->pluck('id');
+        $lines = $cart->items()->whereIn('variant_id', $variantIds)->with('variant')->get();
+        $qty = (float) $lines->sum('qty');
+
+        foreach ($lines as $line) {
+            $regular = $line->variant ? $this->sellingPrice($line->variant) : (float) $line->unit_price;
+            $price = $this->offers->unitPrice($offers, $qty, $regular);
+
+            if (abs((float) $line->unit_price - $price) >= 0.001) {
+                $line->update(['unit_price' => $price]);
+            }
+        }
     }
 
     /** سعر البيع الفعّال من الكتالوج (عرض ترويجي إن وُجد، وإلا التجزئة). لا محرّك تسعير (مؤجّل). */

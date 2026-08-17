@@ -101,6 +101,18 @@ class Product extends Model
         return $this->hasMany(ProductReview::class);
     }
 
+    /** عروض الكمّية — على الصنف، وتطال متغيّراته جميعًا. */
+    public function offers(): HasMany
+    {
+        return $this->hasMany(ProductOffer::class)->orderBy('min_qty');
+    }
+
+    /** ما يُعرَض منها في المتجر. */
+    public function activeOffers(): HasMany
+    {
+        return $this->offers()->where('is_active', true);
+    }
+
     /** المعتمَد وحده — ما يراه زوّار المتجر. */
     public function approvedReviews(): HasMany
     {
