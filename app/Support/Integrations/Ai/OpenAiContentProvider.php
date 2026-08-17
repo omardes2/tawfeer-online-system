@@ -5,6 +5,7 @@ namespace App\Support\Integrations\Ai;
 use App\Support\Contracts\Ai\AiContentProviderInterface;
 use App\Support\Contracts\Ai\AiContentRequest;
 use App\Support\Contracts\Ai\AiContentResult;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -37,7 +38,7 @@ class OpenAiContentProvider implements AiContentProviderInterface
                 ]);
 
             if ($response->failed()) {
-                return $this->fallback($request, 'http '.$response->status());
+                return $this->fallback($request, $this->reason($response));
             }
 
             $data = $response->json();
@@ -78,7 +79,7 @@ class OpenAiContentProvider implements AiContentProviderInterface
                 ]);
 
             if ($response->failed()) {
-                return $this->bundleFallback($request, $context, 'http '.$response->status());
+                return $this->bundleFallback($request, $context, $this->reason($response));
             }
 
             $data = $response->json();
@@ -99,6 +100,26 @@ class OpenAiContentProvider implements AiContentProviderInterface
         } catch (Throwable $e) {
             return $this->bundleFallback($request, $context, mb_substr($e->getMessage(), 0, 200));
         }
+    }
+
+    /**
+     * سبب الفشل كما ذكره المزوّد، لا رمز الحالة وحده.
+     *
+     * كان يُسجَّل «http 404» فحسب، وهو لا يفرّق بين نموذجٍ غير متاح للحساب
+     * ورصيدٍ نافد ومفتاحٍ خاطئ — وكلّها ترتدّ إلى القالب بالمظهر نفسه، فيبدو
+     * الأمر عطلًا في النظام. ونصّ الخطأ من OpenAI يسمّي السبب ولا يحمل أسرارًا.
+     */
+    private function reason(Response $response): string
+    {
+        $message = (string) ($response->json('error.message') ?? '');
+        $code = (string) ($response->json('error.code') ?? '');
+
+        return mb_substr(trim(sprintf(
+            'http %d%s%s',
+            $response->status(),
+            $code !== '' ? ' ['.$code.']' : '',
+            $message !== '' ? ' — '.$message : '',
+        )), 0, 200);
     }
 
     private function bundleFallback(AiContentRequest $request, array $context, string $error): AiContentResult
