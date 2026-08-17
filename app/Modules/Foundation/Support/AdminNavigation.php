@@ -43,6 +43,9 @@ final class AdminNavigation
                 ['admin.tags.index', 'الوسوم', ['viewAny', $m('Catalog\\Models\\ProductTag')], 'admin.tags.*'],
                 ['admin.units.index', 'وحدات القياس', ['viewAny', $m('Catalog\\Models\\Unit')], 'admin.units.*'],
                 ['admin.attributes.index', 'الخيارات والمتغيّرات', ['viewAny', $m('Catalog\\Models\\ProductAttribute')], 'admin.attributes.*'],
+                // شاشةٌ قائمة منذ بنائها ولم يكن لها بندٌ يقود إليها: التقييم
+                // المعلّق لا يُنشر حتى يُعتمد، ولا سبيل لاعتماده بلا رابط.
+                ['admin.reviews.index', 'تقييمات الزبائن', ['viewAny', $m('Catalog\\Models\\ProductReview')], 'admin.reviews.*'],
             ]],
             ['المخزون والمشتريات', 'inventory', [
                 ['admin.inventory.stocks', 'أرصدة المخزون', 'inventory.stocks.view', 'admin.inventory.stocks'],
