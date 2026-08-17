@@ -1,8 +1,11 @@
 <?php
 
 use App\Support\Integrations\AdPlatform\FakeAdPlatformProvider;
+use App\Support\Integrations\AdPlatform\FakeAdPlatformWriter;
 use App\Support\Integrations\AdPlatform\MetaAdsProvider;
+use App\Support\Integrations\AdPlatform\MetaAdsWriter;
 use App\Support\Integrations\AdPlatform\NullAdPlatformProvider;
+use App\Support\Integrations\AdPlatform\NullAdPlatformWriter;
 
 return [
     /*
@@ -32,6 +35,43 @@ return [
         'conversation_action' => env('META_ADS_CONVERSATION_ACTION', 'onsite_conversion.messaging_conversation_started_7d'),
 
         'timeout' => (int) env('META_ADS_TIMEOUT', 30),
+    ],
+
+    /*
+    | **الكتابة** — منفصلة عن القراءة بمحرّكٍ ورمزٍ وإعدادٍ مستقلّ (ADR-053).
+    |
+    | الافتراض `null`: النظام لا يملك صلاحية إنفاق مالٍ إلّا بقرارٍ صريح على
+    | الخادم. ورمز الكتابة غيرُ رمز القراءة — صلاحيته `ads_management`، وغيابُه
+    | يُبقي محرّك الكتابة «غير مضبوط» ولو كان رمز القراءة حاضرًا.
+    */
+    'write' => [
+        'driver' => env('ADS_WRITE_DRIVER', 'null'),
+
+        'drivers' => [
+            'null' => NullAdPlatformWriter::class,
+            'fake' => FakeAdPlatformWriter::class, // للاختبارات — بلا أي اتصال شبكي.
+            'meta' => MetaAdsWriter::class,
+        ],
+
+        'token' => env('META_ADS_WRITE_TOKEN'),
+
+        /*
+        | معامل الوحدة الصغرى لكل عملة. Meta تقبل الميزانية بالسنت لا بالدولار،
+        | ومعظم العملات على 100 — والاستثناءات هنا لأن خلط الوحدتين يصرف مئة
+        | ضعفٍ بلا أن ترفضه المنصّة.
+        */
+        'currency_offsets' => [
+            'JPY' => 1, 'KRW' => 1, 'VND' => 1, 'CLP' => 1, 'ISK' => 1, 'PYG' => 1, 'UGX' => 1,
+        ],
+    ],
+
+    /*
+    | الطيّار الآلي (ADR-053). الجدولة هنا، أمّا التفعيل والسقف والصفحات فمن
+    | لوحة التحكّم (المبدأ 8) — هي أرقام عملٍ يغيّرها صاحب العمل بلا نشر.
+    */
+    'autopilot' => [
+        // بعد المزامنة بساعة: القرار على صرفٍ لم يُسحَب بعدُ قرارٌ على فراغ.
+        'cron' => env('ADS_AUTOPILOT_CRON', '30 5 * * *'),
     ],
 
     'sync' => [

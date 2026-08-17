@@ -157,13 +157,15 @@ class AdSpendSyncService
         $provider = $this->platform->provider()->name();
         $new = 0;
 
+        // الحملة الأمّ تُلتقط مع المجموعة في الصفّ نفسه — بلا نداءٍ إضافي. وبها
+        // وحدها يعرف الطيّار أيّ مجموعةٍ تخصّ أيّ صفحة.
         $externals = $rows
             ->flatMap(fn (AdInsightRow $r) => [
-                AdExternalMap::TYPE_CAMPAIGN.':'.$r->campaignId => [AdExternalMap::TYPE_CAMPAIGN, $r->campaignId, $r->campaignName],
-                AdExternalMap::TYPE_ADSET.':'.$r->adsetId => [AdExternalMap::TYPE_ADSET, $r->adsetId, $r->adsetName],
+                AdExternalMap::TYPE_CAMPAIGN.':'.$r->campaignId => [AdExternalMap::TYPE_CAMPAIGN, $r->campaignId, $r->campaignName, null],
+                AdExternalMap::TYPE_ADSET.':'.$r->adsetId => [AdExternalMap::TYPE_ADSET, $r->adsetId, $r->adsetName, $r->campaignId],
             ]);
 
-        foreach ($externals as [$type, $id, $name]) {
+        foreach ($externals as [$type, $id, $name, $parent]) {
             if ($id === '') {
                 continue;
             }
@@ -178,6 +180,11 @@ class AdSpendSyncService
 
             $map->external_name = $name;
             $map->last_seen_at = now();
+
+            // مجموعةٌ نُقلت إلى حملةٍ أخرى تُحدَّث أمُّها؛ والحملة نفسها بلا أمّ.
+            if ($parent !== null && $parent !== '') {
+                $map->parent_external_id = $parent;
+            }
 
             // الاقتراح يُحدَّث ما دام غير مربوط؛ وبعد الربط لا معنى له.
             if (! $map->isLinked()) {

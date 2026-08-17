@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Ad autopilot: writing to the ad platform — ADR-053
+- New **«الطيّار الآلي للإعلانات»** screen (`admin.marketing.autopilot`) that
+  turns the existing daily-budget verdicts into actions on the platform: it
+  pauses losing ad sets and trims budgets that sit above the target cost per
+  order, every morning, on its own.
+- **No new decision engine.** The verdict still comes from `AdBudgetService`,
+  computed on real profit after wholesale cost and returns — which is precisely
+  what the platform's own automated rules cannot see: they know the cost of a
+  conversion, not the margin of the product.
+- **A second contract, not an extension** (`AdPlatformWriterInterface`). The
+  write token (`ads_management`) is separate from the read token in `.env`, and
+  its absence leaves the writer unconfigured even when the read token is
+  present — so an import bug still cannot spend money. The default driver is
+  `null`, which refuses loudly rather than silently.
+- **The brake is automated; the accelerator is not.** Only `pause` and
+  `decrease` are ever executed. Raising a budget is not implemented in any mode,
+  even when the verdict says to: a wrong pause costs one day of profit and is
+  undone with a click, a wrong raise spends all night and is not recoverable.
+- Two levels before money moves: `suggest` writes decisions without touching the
+  platform, `brake` executes. Everything else is owner-controlled from the
+  dashboard — master switch, **daily cap**, max decrease %, cooldown days,
+  minimum budget, and which pages the autopilot manages
+  (`ad_channels.autopilot_enabled`).
+- The cap is enforced on the post-plan total: if what the plan leaves running
+  exceeds it, the least profitable ad sets are paused until it doesn't. An unset
+  cap does not block braking — pausing and trimming never increase spend.
+- Guards that are technical, not timid: budget edits above ~20% reset the
+  platform's learning phase, so a daily aggressive trim performs *worse* than no
+  intervention; hence the decrease ceiling and the cooldown (pausing is exempt).
+  Campaign-level (CBO) budgets are never touched, since editing one would hit
+  profitable ad sets in the same campaign.
+- New `ad_autopilot_decisions` records every decision **with the numbers it was
+  based on**, and records abstentions as fully as actions — "why I did *not*
+  cut" is what an owner needs. One-click revert restores exactly what was there;
+  a red button pauses every linked ad set immediately.
+- `ads:autopilot` is scheduled each morning after the spend sync and is inert
+  without configuration. The screen doubles as the daily summary: what was
+  paused and why, what it saved, alongside the day's sales and operating profit.
+- New permissions `marketing.autopilot.{view,manage}` — **manage** is granted to
+  the system administrator only, being the one permission in the system that
+  spends money outside it.
+- Out of scope, deliberately: creating campaigns or creatives, raising budgets
+  automatically, and picking products to launch. A website-purchase objective
+  additionally needs Meta Pixel + Conversions API and click-level attribution
+  for web orders, neither of which exists yet.
+
 ### Added — Ad-spend sync from the ad platform (read-only) — ADR-052
 - New integration layer (`AdPlatformProviderInterface` + `null`/`fake`/`meta`
   drivers, `config/ads.php`) that pulls each ad set's **daily spend** and

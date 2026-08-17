@@ -17,7 +17,7 @@ class AdExternalMap extends Model
     public const TYPE_ADSET = 'adset';
 
     protected $fillable = [
-        'provider', 'external_type', 'external_id', 'external_name',
+        'provider', 'external_type', 'external_id', 'external_name', 'parent_external_id',
         'ad_channel_id', 'product_id',
         'suggested_ad_channel_id', 'suggested_product_id',
         'is_ignored', 'last_seen_at',

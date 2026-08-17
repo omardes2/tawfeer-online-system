@@ -344,6 +344,17 @@
 ### `ad_daily_spends` — أعمدة المزامنة (ADR-052)
 `source` (manual/meta) · `synced_amount_usd` · `synced_conversations` · `synced_at`. المزامنة لا تدهس ما أُدخل باليد ولا تُخفي ما تقوله المنصّة: تُكتب قيمتها في `synced_*` ويُعرَض الاختلاف ليقرّر المستخدم.
 
+### `ad_external_maps.parent_external_id` (ADR-053)
+الحملة الأمّ لكل مجموعة إعلانية. بدونها يعرف الجدول «المجموعة ← صنف» و«الحملة ← صفحة» ولا يعرف أن تلك المجموعة داخل تلك الحملة — فيعجز الطيّار عن السؤال الوحيد الذي يحتاجه: أيّ مجموعةٍ أوقِف من أجل (صنفٍ على صفحة)؟ والقيمة موجودة في كل صفّ نتائج بجانب `adset_id`، فتُلتقط أثناء المزامنة بلا نداءٍ إضافي.
+
+### `ad_channels.autopilot_enabled` (ADR-053)
+تسليم الصفحة إلى الطيّار الآلي — **لكل صفحة على حدة** لا مفتاحٌ واحد للأربع: صاحب العمل يجرّب الأتمتة على صفحةٍ يعرف أرقامها ويُبقي الباقي بيده. الافتراض `false`.
+
+### `ad_autopilot_decisions` (ADR-053)
+`decided_on` (يوم التشغيل) · `report_day` (يوم البيانات) · `ad_channel_id` → ad_channels · `product_id` → products · `external_id` · `external_name` · `action` (pause/resume/decrease/increase/skip) · `verdict` · `reason` · `budget_before` · `budget_after` · `currency` · `window_spend` · `window_orders` · `window_cpa` · `window_net_profit` · `status` (planned/applied/skipped/failed/reverted) · `error` · `source` (auto/manual) · `mode` (suggest/brake) · `applied_at` · `reverted_at` · `reverted_by` → users · `created_by` → users.
+**فريد (decided_on, external_id, source)** — تشغيل الأمر يدويًّا أثناء عمل الجدولة يُحدِّث الصفّ ولا يُنشئ ثانيًا، فلا يُخفَّض الصرف مرّتين بحكمٍ واحد. والحارس في القاعدة لا في الخدمة وحدها.
+التاريخان مختلفان دائمًا: الطيّار يعمل صباح اليوم على أرقام أمس. وتُحفَظ **أرقام النافذة** لأن مراجعة القرار بعد شهر تحتاج ما كان يراه يومئذٍ لا ما تراه اليوم. و**يُسجَّل الامتناع (`skip`) كما يُسجَّل الفعل** — «لم أخفّض ولماذا» معلومةٌ يحتاجها صاحب العمل، وبغيرها يبدو الصمت رضًا.
+
 > **أساس الربح هنا يفترق عن تقارير المبيعات الثلاثة عمدًا:** تلك تُبقي المرتجع مبيعًا، وهذه تستبعد حالة «مُرتجَع» وتخصم `returned_qty` بالتناسب — فالاحتساب على الطلبات المُدخَلة لا المسلَّمة، والـ5% تُلتقط حين تُسجَّل بلا انتظار. الفارق محصورٌ في `AdBudgetService`.
 
 ---
