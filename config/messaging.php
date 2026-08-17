@@ -18,6 +18,13 @@ return [
         'marketing' => env('MESSAGING_MARKETING', 'null'),
     ],
 
+    /*
+    | مفتاح الدولة للأرقام المحلّية عند التوحيد — «0599…» ⇐ «970599…».
+    | التوحيد شرطُ عدم التكرار: الرقم نفسه بثلاث صيغٍ يعني ثلاث رسائل لشخصٍ
+    | واحد، وهو أسرع طريقٍ إلى الحجب ثم حظر الرقم.
+    */
+    'country_code' => env('MESSAGING_COUNTRY_CODE', '970'),
+
     'drivers' => [
         'null' => NullMessagingProvider::class,
         'fake' => FakeMessagingProvider::class, // للاختبارات فقط (Phase 6)

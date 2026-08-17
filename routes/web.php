@@ -30,6 +30,7 @@ use App\Http\Controllers\Admin\Inventory\StockAdjustmentController as AdminStock
 use App\Http\Controllers\Admin\Inventory\WarehouseController as AdminWarehouseController;
 use App\Http\Controllers\Admin\Marketing\CampaignController as AdminCampaignController;
 use App\Http\Controllers\Admin\Marketing\CampaignTemplateController as AdminCampaignTemplateController;
+use App\Http\Controllers\Admin\Marketing\ContactController;
 use App\Http\Controllers\Admin\Payment\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\Purchasing\GoodsReceiptController as AdminGoodsReceiptController;
 use App\Http\Controllers\Admin\Purchasing\ImportShipmentController;
@@ -479,6 +480,16 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('campaigns/{campaign}/activate', [AdminCampaignController::class, 'activate'])->name('campaigns.activate')->middleware('can:marketing.campaigns.approve');
         Route::post('campaigns/{campaign}/pause', [AdminCampaignController::class, 'pause'])->name('campaigns.pause')->middleware('can:marketing.campaigns.manage');
         Route::post('campaigns/{campaign}/test', [AdminCampaignController::class, 'test'])->name('campaigns.test')->middleware('can:marketing.campaigns.manage');
+
+        /*
+        | جهات الاتصال التسويقية — قائمة أرقامٍ مستقلّة عن سجلّ العملاء، فلا
+        | يُنشئ الاستيراد حسابًا محاسبيًّا لكل رقم.
+        */
+        Route::get('contacts', [ContactController::class, 'index'])->name('contacts.index')->middleware('can:marketing.contacts.view');
+        Route::middleware('can:marketing.contacts.manage')->group(function () {
+            Route::post('contacts/import', [ContactController::class, 'import'])->name('contacts.import');
+            Route::post('contacts/{contact}/opt-out', [ContactController::class, 'optOut'])->name('contacts.opt_out');
+        });
     });
 
     // التسويات المالية (Phase 4.6)

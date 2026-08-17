@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Marketing contacts: the base for WhatsApp outreach — ADR-057
+- New **«جهات الاتصال التسويقية»** screen: import a CSV of customer numbers with
+  manual column mapping, normalisation, de-duplication, and automatic matching to
+  existing customers.
+- **A separate table, not the customers table — the key decision here.** Creating
+  a customer also creates a ledger account; importing ~15,000 numbers as customers
+  would have created 15,000 accounting accounts for people who never bought
+  anything, flooding the chart of accounts and every receivables screen. A
+  customer is someone you transacted with; a contact is a number on a list.
+- **The number is the identity, in one canonical form.** The same number arrives
+  as `0599…`, `+970599…` and `00970599…` in a single file; without normalisation
+  it enters three times and one person receives three messages — the fastest route
+  to being blocked, and blocks are what sink a number's quality rating and
+  eventually ban it.
+- Length is validated on the *national* part, not after prefixing the country
+  code: measuring afterwards rescues short garbage — `2026-08-18` becomes eight
+  digits, reaches eleven with the prefix, and passes as a phone number.
+- **Importing does not create consent.** What the importer selects is recorded as
+  a *merchant's assertion* with a free-text basis, not a customer's consent. The
+  default is `unknown`, and unknown contacts are not sendable — the guard lives in
+  the data, not in the intent of whoever clicks the button.
+- `blocked_at` is the most important column: anyone who blocked us is never
+  messaged again, even with consent on file. Re-importing never revives an
+  opted-out contact — only descriptive fields are refreshed.
+- Streamed read and chunked writes, so a 15,000-row file neither exhausts memory
+  nor issues a query per row.
+- New permissions `marketing.contacts.{view,manage}` — the list is exportable
+  personal data, and whoever holds it can walk away with it.
+- Still out of scope: the WhatsApp Cloud API driver, approved template registry,
+  delivery/block webhooks, and throttled sending with tier limits and an automatic
+  stop when the block rate climbs.
+
 ### Added — Product quantity offers — ADR-056
 - New **«عروض الكمّية»** section on the product edit page: define tiers like
   "buy 5 for 100", shown on the product page as selectable cards with the
