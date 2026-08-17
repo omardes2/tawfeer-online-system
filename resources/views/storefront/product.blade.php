@@ -224,7 +224,8 @@
                     @if ($variant && $inStock)
                         <x-storefront.add-to-cart size="lg" :variant="$variant->uuid"
                             :max="(int) floor($available)" :hide-add-on-mobile="true" />
-                        <x-storefront.quick-buy :variant="$variant->uuid" :cities="$cities" :areas="$areas" />
+                        <x-storefront.quick-buy :variant="$variant->uuid" :cities="$cities" :areas="$areas"
+                            :hide-on-mobile="true" />
                     @else
                         <button type="button" disabled class="sf-btn sf-btn-lg sf-btn-block bg-[color:var(--sf-bg)] text-[color:var(--sf-text-soft)]">
                             {{ __('storefront.out_of_stock') }}
@@ -365,8 +366,13 @@
             </div>
 
             @if (! $hasOptions && $variant && $inStock)
-                <div class="shrink-0 w-40">
-                    <x-storefront.add-to-cart :variant="$variant->uuid" :max="(int) floor($available)" />
+                {{-- زرّان في شريطٍ ضيّق: «أضف» يتقلّص و«شراء الآن» يبقى ظاهرًا كاملًا،
+                     لأنه المسار الأقصر إلى الطلب وهو ما جاء الزبون من أجله. --}}
+                <div class="shrink-0 flex items-center gap-2">
+                    <div class="w-[7.5rem]">
+                        <x-storefront.add-to-cart :variant="$variant->uuid" :max="(int) floor($available)" />
+                    </div>
+                    <x-storefront.quick-buy :variant="$variant->uuid" :cities="$cities" :areas="$areas" compact />
                 </div>
             @else
                 <a href="#sf-buy" class="sf-btn-primary shrink-0">

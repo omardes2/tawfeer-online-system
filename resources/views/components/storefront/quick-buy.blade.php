@@ -5,6 +5,10 @@
     'enabledExpr' => 'true',
     'cities' => [],
     'areas' => [],
+    // مضغوط: داخل الشريط اللاصق على الجوّال — بلا عرضٍ كامل ولا هامش علوي.
+    'compact' => false,
+    // يُخفى على الجوّال حين يحمله الشريط اللاصق بدلًا منه (فلا يتكرّر الزرّ).
+    'hideOnMobile' => false,
 ])
 
 {{--
@@ -28,12 +32,16 @@
     $variantJs = $variantExpr ?: "'".$variant."'";
 @endphp
 
-<div x-data="quickBuy(@js($areas))" @keydown.escape.window="close()">
+<div x-data="quickBuy(@js($areas))" @keydown.escape.window="close()"
+     @class(['contents' => $compact, 'hidden lg:block' => $hideOnMobile])>
 
     <button type="button" @click="open({!! $variantJs !!})"
             :disabled="!({!! $enabledExpr !!}) || !({!! $variantJs !!}) || busy"
-            class="sf-btn-outline sf-btn-block sf-btn-lg mt-2">
-        <x-storefront.icon name="bolt" class="w-5 h-5" />
+            @class([
+                'sf-btn-primary whitespace-nowrap shrink-0 min-h-10 !px-3 gap-1.5 text-[13px]' => $compact,
+                'sf-btn-outline sf-btn-block sf-btn-lg mt-2' => ! $compact,
+            ])>
+        <x-storefront.icon name="bolt" :class="$compact ? 'w-4 h-4' : 'w-5 h-5'" />
         {{ __('storefront.buy_now') }}
     </button>
 
