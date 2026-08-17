@@ -42,7 +42,8 @@ class AdBudgetController extends Controller
         return view('admin.reports.ad_budget', $report + [
             'channelId' => $channelId,
             'allChannels' => AdChannel::ordered()->get(),
-            'products' => Product::orderBy('name')->get(['id', 'name']),
+            // الاسم والرمز معًا: قائمة الأصناف طويلة، والبحث يقبل الاثنين.
+            'products' => Product::orderBy('name')->get(['id', 'name', 'sku']),
             'currency' => (string) Settings::get('store.currency_symbol', '₪'),
             'company' => (string) Settings::get('store.name', 'توفير أونلاين'),
             'unlinkedChannels' => AdChannel::where('is_active', true)->whereNull('delivery_business_id')->count(),

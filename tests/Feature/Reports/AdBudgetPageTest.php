@@ -433,6 +433,25 @@ class AdBudgetPageTest extends TestCase
             ->assertSee(__('كل أرقام هذه الصفحة ليوم :d وحده.', ['d' => $this->day->toDateString()]), false);
     }
 
+    /**
+     * اختيار الصنف بالبحث كتابةً لا بقائمة منسدلة.
+     *
+     * الكتالوج يتجاوز المئة صنف، والتمرير حتى آخر الحروف أبطأ من كتابة كلمة.
+     * والقيمة المرسَلة تبقى `product_id` كما هي — تغيّر شكلُ الاختيار لا عقدُه.
+     */
+    public function test_the_product_is_chosen_by_typing(): void
+    {
+        $this->product('حزام استقامة الظهر');
+
+        $html = $this->actingAs($this->admin())
+            ->get(route('admin.reports.ad_budget'))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/<input[^>]*type="hidden"[^>]*name="product_id"/', $html);
+        $this->assertStringContainsString(__('اكتب اسم الصنف أو رمزه…'), $html);
+        // ولا قائمة منسدلة للأصناف بعد اليوم.
+        $this->assertDoesNotMatchRegularExpression('/<select[^>]*name="product_id"/', $html);
+    }
+
     /** وصفوف «بلا قناة» تُشرَح بدل أن تُترك تُقرأ خللًا. */
     public function test_unassigned_rows_explain_themselves(): void
     {

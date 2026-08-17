@@ -292,7 +292,29 @@
     @if ($can)
         <div class="admin-card p-4 mt-5 report-no-print">
             <h3 class="font-semibold text-gray-800 mb-3">{{ __('إضافة صرف صنف') }}</h3>
-            <form method="POST" action="{{ route('admin.reports.ad_budget.spend') }}" class="flex flex-wrap items-end gap-3">
+            <form method="POST" action="{{ route('admin.reports.ad_budget.spend') }}"
+                  x-data="{
+                        items: {{ Illuminate\Support\Js::from($products->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'sku' => $p->sku])) }},
+                        query: '',
+                        open: false,
+                        selectedId: '',
+                        norm(text) {
+                            return (text ?? '').toString()
+                                .replace(/[ً-ْـ]/g, '')
+                                .replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
+                                .toLowerCase().trim();
+                        },
+                        get matches() {
+                            const q = this.norm(this.query);
+                            const pool = q === '' ? this.items
+                                : this.items.filter(i => this.norm(i.name).includes(q) || this.norm(i.sku).includes(q));
+
+                            return pool.slice(0, 40);
+                        },
+                        pick(item) { this.selectedId = item.id; this.query = item.name; this.open = false; },
+                  }"
+                  x-on:keydown.escape="open = false"
+                  class="flex flex-wrap items-end gap-3">
                 @csrf
                 <input type="hidden" name="spend_date" value="{{ $dayString }}">
                 <div>
@@ -304,14 +326,41 @@
                         @endforeach
                     </select>
                 </div>
-                <div>
+                {{--
+                    بحثٌ بالكتابة لا قائمة منسدلة: الكتالوج يتجاوز المئة صنف،
+                    والتمرير حتى «حزام استقامة الظهر» أبطأ من كتابة «حزام».
+                    التطبيع يتسامح مع اختلاف الهمزة والتاء المربوطة والألف
+                    المقصورة والتشكيل — «جهاز تنظيف الاذن» تجده بـ«الأذن».
+                --}}
+                <div class="relative">
                     <label class="block text-xs text-gray-500 mb-1">{{ __('الصنف') }}</label>
-                    <select name="product_id" required
-                            class="rounded-lg border-gray-300 text-sm min-w-[14rem] focus:border-emerald-500 focus:ring-emerald-500">
-                        @foreach ($products as $p)
-                            <option value="{{ $p->id }}">{{ $p->name }}</option>
-                        @endforeach
-                    </select>
+                    <input type="hidden" name="product_id" :value="selectedId">
+                    <input type="text" x-model="query" autocomplete="off"
+                           x-on:focus="open = true"
+                           {{-- كل تعديل يدوي يُلغي الاختيار: نصٌّ لا يطابق صنفًا ليس اختيارًا. --}}
+                           x-on:input="selectedId = ''; open = true"
+                           x-on:click.outside="open = false"
+                           placeholder="{{ __('اكتب اسم الصنف أو رمزه…') }}"
+                           class="w-full min-w-[16rem] rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+                    <ul x-show="open" x-cloak
+                        class="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto rounded-lg bg-white shadow-lg ring-1 ring-black/5 py-1">
+                        <template x-for="item in matches" :key="item.id">
+                            <li>
+                                <button type="button" x-on:click="pick(item)"
+                                        class="w-full text-start px-3 py-1.5 text-sm text-gray-700 hover:bg-emerald-50">
+                                    <span x-text="item.name"></span>
+                                    <span class="block text-[11px] text-gray-400 font-mono" x-text="item.sku"></span>
+                                </button>
+                            </li>
+                        </template>
+                        <li x-show="matches.length === 0" class="px-3 py-2 text-sm text-gray-400">
+                            {{ __('لا صنف يطابق البحث.') }}
+                        </li>
+                    </ul>
+                    {{-- تنبيهٌ صامت بدل رفضٍ من الخادم بعد ملء بقية الحقول. --}}
+                    <p x-show="query !== '' && selectedId === ''" x-cloak class="mt-1 text-[11px] text-amber-600">
+                        {{ __('اختر صنفًا من القائمة.') }}
+                    </p>
                 </div>
                 <div>
                     <label class="block text-xs text-gray-500 mb-1">{{ __('الصرف $') }}</label>
@@ -328,7 +377,10 @@
                     <input type="number" step="0.0001" min="0.0001" name="fx_rate" value="{{ $rate }}" required
                            class="w-24 rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
                 </div>
-                <button type="submit" class="btn-primary btn-sm">{{ __('حفظ') }}</button>
+                <button type="submit" class="btn-primary btn-sm"
+                        :disabled="selectedId === ''" :class="selectedId === '' && 'opacity-50 cursor-not-allowed'">
+                    {{ __('حفظ') }}
+                </button>
             </form>
         </div>
     @endif
