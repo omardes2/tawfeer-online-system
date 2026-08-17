@@ -409,6 +409,43 @@ class AdBudgetPageTest extends TestCase
             ->assertSee(__('الربح التشغيلي لليوم'), false);
     }
 
+    /**
+     * الأرقام ليومٍ واحد، والنافذة للتقييم وحده.
+     *
+     * الصياغة الأولى قُرئت على أن الصفحة كلّها لثلاثة أيام، فبدا الكشف غير يومي.
+     */
+    public function test_the_figures_cover_one_day_even_though_the_verdict_looks_back(): void
+    {
+        $product = $this->product();
+        $this->sell($product);                                  // 100 ₪ أمس
+        $this->sell($product, $this->day->copy()->subDay());    // 100 ₪ قبله
+
+        $report = $this->report();
+
+        $this->assertSame(1, $report['totals']['orders'], 'تسرّب طلبُ يومٍ آخر إلى أرقام اليوم.');
+        $this->assertSame(100.0, $report['totals']['sales']);
+        // بينما تحمل النافذة الطلبين معًا للحكم وحده.
+        $this->assertSame(2, $this->rowFor($report, $product)['window']['orders']);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.reports.ad_budget', ['day' => $this->day->toDateString()]))
+            ->assertOk()
+            ->assertSee(__('كل أرقام هذه الصفحة ليوم :d وحده.', ['d' => $this->day->toDateString()]), false);
+    }
+
+    /** وصفوف «بلا قناة» تُشرَح بدل أن تُترك تُقرأ خللًا. */
+    public function test_unassigned_rows_explain_themselves(): void
+    {
+        $this->channel->update(['delivery_business_id' => null]);
+        $this->employee->update(['delivery_business_id' => null]);
+        $this->sell($this->product());
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.reports.ad_budget', ['day' => $this->day->toDateString()]))
+            ->assertOk()
+            ->assertSee('ads:backfill-order-channels', false);
+    }
+
     /** واليوم الافتراضي أمس: أرقام Meta تُنسخ في اليوم التالي. */
     public function test_it_defaults_to_yesterday(): void
     {

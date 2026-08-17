@@ -34,6 +34,27 @@
         </div>
     @endif
 
+    {{--
+        صفوف «بلا قناة» تُترك بلا تفسير فتُقرأ خللًا. لها سببان لا ثالث لهما،
+        وأولهما هو الغالب بعد تفعيل الميزة مباشرةً.
+    --}}
+    @if ($can && $rows->contains('unassigned', true))
+        <div class="report-no-print mb-5">
+            <x-admin.alert tone="amber" :title="__('طلبات غير مُسنَدة إلى صفحة')">
+                {{ __('هذه الطلبات لا تحمل قناة، فلا يمكن نسب صرفٍ إعلاني إليها.') }}
+                <span class="block mt-1 text-xs">
+                    {{ __('إن كانت طلبات سابقة لتفعيل الميزة، شغّل مرّة واحدة:') }}
+                    <code class="px-1 py-0.5 rounded bg-amber-100 font-mono" dir="ltr">php artisan ads:backfill-order-channels</code>
+                </span>
+                <span class="block mt-1 text-xs">
+                    {{ __('وإن كانت طلبات جديدة، فمنشئها غير مرتبط بحساب بزنس — راجع') }}
+                    <a href="{{ route('admin.settings.ad_channels.index') }}" class="font-semibold underline">{{ __('قنوات الإعلان') }}</a>
+                    {{ __('وبطاقة الموظف.') }}
+                </span>
+            </x-admin.alert>
+        </div>
+    @endif
+
     {{-- شريط اليوم: الافتراضي أمس لأن أرقام Meta تُنسخ في اليوم التالي. --}}
     <div class="admin-card p-4 mb-5 report-no-print">
         <form method="GET" action="{{ route('admin.reports.ad_budget') }}" class="flex flex-wrap items-end gap-3">
@@ -64,8 +85,17 @@
                 <button type="button" onclick="window.print()" class="btn-secondary btn-sm">{{ __('طباعة / PDF') }}</button>
             </div>
         </form>
-        <p class="mt-3 text-xs text-gray-500">
-            {{ __('الحكم محسوبٌ على :n أيام تنتهي بهذا اليوم (:from ← :to).', ['n' => $window_days, 'from' => $window_from->toDateString(), 'to' => $dayString]) }}
+        {{--
+            الصياغة الأولى («الحكم محسوبٌ على 3 أيام») قُرئت على أن الصفحة كلّها
+            لثلاثة أيام. الأرقام كلّها ليومٍ واحد؛ النافذة تخصّ عمود التقييم وحده.
+        --}}
+        <p class="mt-3 text-xs text-gray-500 leading-relaxed">
+            <span class="font-medium text-gray-700">{{ __('كل أرقام هذه الصفحة ليوم :d وحده.', ['d' => $dayString]) }}</span>
+            @if ($window_days > 1)
+                {{ __('وعمود «التقييم» وحده ينظر إلى آخر :n أيام (:from ← :to)، لأن المحادثة تتحوّل إلى طلب بعد يوم أو يومين فالحكم على يومٍ واحد يظلم الإعلان الجديد.', [
+                    'n' => $window_days, 'from' => $window_from->toDateString(), 'to' => $dayString,
+                ]) }}
+            @endif
         </p>
     </div>
 
