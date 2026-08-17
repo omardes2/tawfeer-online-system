@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — WhatsApp sending arm: driver, templates, statuses, throttling — ADR-058
+- New `WhatsAppCloudProvider` behind the existing messaging contract, plus a
+  signed status webhook and a throttled broadcast command. The list was built in
+  the previous stage; this is the arm that sends it.
+- **Marketing messages are approved templates, not free text.** Outside the
+  24-hour window a customer opens by writing to you, the platform rejects free
+  text outright — so a campaign built on body text alone fails completely on its
+  first real send, after the list, the campaign and the timing are already done.
+  `campaign_templates` gains `provider_template`, `provider_language` and
+  `provider_params`; the body text stays for preview and record.
+- Template variables are positional, not named — the platform numbers them
+  `{{1}}`, `{{2}}` — so reordering puts the customer's name where the product
+  name belongs **with no error raised**. `provider_params` is an ordered list.
+- No automatic retry on send: a call that succeeded before the connection dropped
+  would be executed twice, and one person receiving the same message twice is
+  exactly what makes them block you.
+- **The webhook is a prerequisite, not a nicety.** Without it you send blind —
+  no automatic stop on rising failures, no knowledge that a number stopped
+  receiving. Signature verification runs on the *raw* body (re-encoding JSON
+  shifts whitespace and breaks the HMAC), and an unsigned request is refused:
+  a public endpoint without it lets anyone claim your messages were delivered.
+- Statuses never regress (they arrive out of order), permanent failure codes mark
+  the contact blocked forever, and transient ones — a rate limit is our fault, not
+  the number's — do not.
+- A broadcast path separate from `MessageDispatcher` by design: that one is built
+  around a customer, reading consent from their preferences. A contact is not a
+  customer and has its own guards; forcing either into the other would weaken
+  both. `campaign_messages.marketing_contact_id` records who was reached.
+- The daily cap is the number's tier with the platform, not a preference, and is
+  counted **across all campaigns** — the platform counts the number, not the
+  campaign. Sending stops automatically once the failure rate passes a threshold
+  on a large enough sample, and customers are messaged before strangers so the
+  first wave of blocks, if it comes, comes from the most forgiving segment.
+- `whatsapp:broadcast` is manual, not scheduled, on purpose: bulk sending is a
+  decision by a human who watches — a batch, then the delivery and failure
+  numbers, then the call to widen. A nightly schedule turns a 15,000-number list
+  into a wave of blocks nobody stops before morning.
+
 ### Added — Marketing contacts: the base for WhatsApp outreach — ADR-057
 - New **«جهات الاتصال التسويقية»** screen: import a CSV of customer numbers with
   manual column mapping, normalisation, de-duplication, and automatic matching to

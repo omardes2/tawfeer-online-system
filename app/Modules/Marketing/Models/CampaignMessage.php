@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class CampaignMessage extends Model
 {
     protected $fillable = [
-        'campaign_id', 'customer_id', 'channel', 'recipient', 'body', 'status',
+        'campaign_id', 'customer_id', 'marketing_contact_id', 'channel', 'recipient', 'body', 'status',
         'provider_reference', 'error', 'idempotency_key', 'attempts', 'is_test', 'sent_at',
     ];
 

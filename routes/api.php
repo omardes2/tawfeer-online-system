@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\V1\Store\CartController;
 use App\Http\Controllers\Api\V1\Store\CheckoutController;
 use App\Http\Controllers\Api\V1\WarehouseController;
 use App\Http\Controllers\Api\V1\WarehouseLocationController;
+use App\Http\Controllers\Api\Webhooks\WhatsAppWebhookController;
 use App\Http\Resources\UserResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -388,4 +389,13 @@ Route::prefix('v1')->group(function () {
         Route::match(['put', 'patch'], 'checkout/{session}', [CheckoutController::class, 'update']);
         Route::post('checkout/{session}/place', [CheckoutController::class, 'place']);
     });
+});
+
+/*
+| Webhook واتساب (ADR-058) — عامّ بالضرورة، ومحميّ بتوقيع سرّ التطبيق لا بجلسة.
+| بلا هذه النقطة نُرسل ولا نعرف ما وصل، فلا إيقاف تلقائي عند ارتفاع الفشل.
+*/
+Route::prefix('webhooks/whatsapp')->group(function () {
+    Route::get('/', [WhatsAppWebhookController::class, 'verify'])->name('webhooks.whatsapp.verify');
+    Route::post('/', [WhatsAppWebhookController::class, 'handle'])->name('webhooks.whatsapp.handle');
 });
