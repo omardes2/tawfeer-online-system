@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Facebook/Instagram post composer — ADR-055
+- New **«محتوى المنشورات»** screen: pick a product by typeahead, choose platform,
+  page, tone and language, generate copy, edit it, and copy the finished post.
+- **It generates and saves; it never publishes.** Auto-publishing needs page
+  permissions and app review, and more importantly it would put a generation
+  mistake in front of customers before anyone read it. "Published" is a stamp a
+  human applies, and a test asserts no route in the system posts to the platform.
+- **The tracked link is the point, not the copy.** A post with a bare link sells
+  without anyone knowing it sold: the order lands under "unattributed", the paid
+  ad looks like the only thing working, and organic posting gets dropped for
+  being "ineffective". The tag is the same one web-order attribution reads, so
+  organic posts and paid ads are measured on one ruler and show up in the same
+  daily budget report.
+- Uses `utm_campaign=tw-ch-{id}` rather than `utm_content`, which is reserved for
+  ad set ids — stuffing an organic token there would send attribution looking for
+  an ad set that does not exist. The channel is verified on resolution, so a token
+  for a deleted page attributes nothing. The link is stored with the post rather
+  than rebuilt, so later settings changes cannot show a link customers never saw.
+- Reuses the existing `AiContentService` (`social_caption` type) with its rate
+  limit, usage log and graceful fallback — no new AI layer. Product price is part
+  of the prompt inputs: a post without a price produces conversations whose first
+  question is "how much?", and those count against the campaign without converting.
+- New `social_posts` table keeps what was written, for which product, on which
+  page, and with which model — a fallback-generated text reads differently, and
+  whoever reads the post a month later needs to know which it was.
+- New permissions `marketing.social.{view,manage}`, granted to admin and manager.
+
 ### Added — Purchase measurement and web-order attribution — ADR-054
 - New measurement layer (`ConversionTrackerInterface` + `null`/`fake`/`meta`
   drivers) sending **Purchase** to the Meta Conversions API, plus the browser

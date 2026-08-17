@@ -95,6 +95,7 @@ final class AdminNavigation
                 ['admin.marketing.campaigns.index', 'الحملات التسويقية', 'marketing.campaigns.view', 'admin.marketing.campaigns.*'],
                 ['admin.marketing.templates.index', 'قوالب الرسائل', 'marketing.templates.manage', 'admin.marketing.templates.*'],
                 ['admin.recommendations.index', 'توصيات المنتجات', 'recommendations.manage', 'admin.recommendations.*'],
+                ['admin.marketing.social.index', 'محتوى المنشورات', 'marketing.social.view', 'admin.marketing.social.*'],
                 ['admin.marketing.autopilot.index', 'الطيّار الآلي للإعلانات', 'marketing.autopilot.view', 'admin.marketing.autopilot.*'],
             ]],
             ['التقارير', 'chart', [

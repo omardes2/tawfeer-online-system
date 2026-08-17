@@ -30,6 +30,7 @@ use App\Http\Controllers\Admin\Inventory\WarehouseController as AdminWarehouseCo
 use App\Http\Controllers\Admin\Marketing\AdAutopilotController;
 use App\Http\Controllers\Admin\Marketing\CampaignController as AdminCampaignController;
 use App\Http\Controllers\Admin\Marketing\CampaignTemplateController as AdminCampaignTemplateController;
+use App\Http\Controllers\Admin\Marketing\SocialPostController;
 use App\Http\Controllers\Admin\Payment\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\Purchasing\GoodsReceiptController as AdminGoodsReceiptController;
 use App\Http\Controllers\Admin\Purchasing\ImportShipmentController;
@@ -482,6 +483,19 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('autopilot/run', [AdAutopilotController::class, 'run'])->name('autopilot.run')->middleware('can:marketing.autopilot.manage');
         Route::post('autopilot/decisions/{decision}/revert', [AdAutopilotController::class, 'revert'])->name('autopilot.revert')->middleware('can:marketing.autopilot.manage');
         Route::post('autopilot/stop-all', [AdAutopilotController::class, 'stopAll'])->name('autopilot.stop_all')->middleware('can:marketing.autopilot.manage');
+
+        /*
+        | محتوى منشورات فيسبوك وإنستغرام (ADR-055) — توليدٌ وحفظٌ ونسخ، بلا نشر.
+        */
+        Route::get('social-posts', [SocialPostController::class, 'index'])->name('social.index')->middleware('can:marketing.social.view');
+        Route::middleware('can:marketing.social.manage')->group(function () {
+            Route::post('social-posts/suggest', [SocialPostController::class, 'suggest'])->name('social.suggest');
+            Route::post('social-posts/link', [SocialPostController::class, 'link'])->name('social.link');
+            Route::post('social-posts', [SocialPostController::class, 'store'])->name('social.store');
+            Route::put('social-posts/{socialPost}', [SocialPostController::class, 'update'])->name('social.update');
+            Route::post('social-posts/{socialPost}/published', [SocialPostController::class, 'markPublished'])->name('social.published');
+            Route::delete('social-posts/{socialPost}', [SocialPostController::class, 'destroy'])->name('social.destroy');
+        });
     });
 
     // التسويات المالية (Phase 4.6)
