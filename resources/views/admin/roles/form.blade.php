@@ -6,6 +6,7 @@
     @php
         // يُحسَب مرّة هنا لا داخل الحلقة: الصفحة تعرض ~224 صلاحية، واستدعاء
         // التسمية والشرح لكلٍّ منها ثلاث مرّات في العرض كان يتكرّر بلا داعٍ.
+        $granted = old('permissions', $assigned);
         $meta = [];
         foreach ($groups as $module => $perms) {
             foreach ($perms as $perm) {
@@ -13,10 +14,14 @@
                     'label' => PermissionLabel::for($perm->name),
                     'hint' => PermissionLabel::describe($perm->name),
                     'sensitive' => PermissionLabel::isSensitive($perm->name),
+                    'unused' => in_array($perm->name, $unused, true),
+                    'granted' => in_array($perm->name, $granted, true),
                 ];
             }
         }
         $sensitiveCount = collect($meta)->where('sensitive', true)->count();
+        // الميتة الممنوحة تبقى ظاهرة دائمًا: إخفاؤها يجعلها تُحذف عند الحفظ.
+        $unusedHidden = collect($meta)->filter(fn ($m) => $m['unused'] && ! $m['granted'])->count();
     @endphp
 
     <div class="py-8 max-w-6xl mx-auto sm:px-6 lg:px-8"
@@ -24,6 +29,7 @@
             q: '',
             onlySelected: false,
             hideSensitive: false,
+            showUnused: false,
             /** يطابق الاسم العربي والشرح والمفتاح الإنجليزي معًا. */
             matches(haystack) {
                 return this.q === '' || haystack.toLowerCase().includes(this.q.toLowerCase());
@@ -94,8 +100,19 @@
                         <input type="checkbox" x-model="hideSensitive" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
                         <span class="text-gray-600">{{ __('أخفِ الحسّاسة') }}</span>
                     </label>
+                    @if ($unusedHidden > 0)
+                        {{--
+                            الميتة مخفيّة افتراضيًّا لا محذوفة: بقايا مراحل سابقة
+                            لا يفحصها الكود، فعرضُها يوهم أنها تفتح شيئًا. وتبقى في
+                            الصفحة كي لا تُسحَب من دورٍ يحملها عند الحفظ.
+                        --}}
+                        <label class="inline-flex items-center gap-2">
+                            <input type="checkbox" x-model="showUnused" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                            <span class="text-gray-600">{{ __('أظهر غير المستخدمة (:n)', ['n' => $unusedHidden]) }}</span>
+                        </label>
+                    @endif
                     <span class="text-xs text-gray-400 ms-auto">
-                        {{ trans_choice('صلاحية واحدة|:count صلاحية في النظام', count($meta), ['count' => count($meta)]) }}
+                        {{ trans_choice('صلاحية واحدة|:count صلاحية مستخدمة', count($meta) - $unusedHidden, ['count' => count($meta) - $unusedHidden]) }}
                         · {{ __(':n منها حسّاسة', ['n' => $sensitiveCount]) }}
                     </span>
                 </div>
@@ -111,14 +128,21 @@
                             $items = collect($perms)->map(fn ($p) => [
                                 'h' => $meta[$p->name]['label'].' '.$meta[$p->name]['hint'].' '.$p->name,
                                 's' => $meta[$p->name]['sensitive'],
+                                // الميتة الممنوحة تُحسَب ظاهرةً دائمًا.
+                                'u' => $meta[$p->name]['unused'] && ! $meta[$p->name]['granted'],
                             ])->values();
+                            $visibleCount = $items->where('u', false)->count();
                         @endphp
                         <div class="rounded-lg border border-gray-200"
                              x-data="{
                                 open: true,
                                 count: 0,
                                 items: {{ Illuminate\Support\Js::from($items) }},
-                                get shown() { return this.items.filter(i => matches(i.h) && (! hideSensitive || ! i.s)).length; },
+                                get shown() {
+                                    return this.items.filter(i => matches(i.h)
+                                        && (! hideSensitive || ! i.s)
+                                        && (showUnused || ! i.u)).length;
+                                },
                              }"
                              x-init="count = selectedIn($el); $el.addEventListener('change', () => count = selectedIn($el))"
                              x-show="shown > 0 && (! onlySelected || count > 0)">
@@ -129,7 +153,7 @@
                                     {{-- عدّاد الممنوح: يقول بلمحة أين مُنح الدور صلاحيات دون فتح القسم. --}}
                                     <span class="rounded-full px-2 py-0.5 text-[11px] font-medium"
                                           :class="count > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-500'"
-                                          x-text="count + ' / {{ count($perms) }}'"></span>
+                                          x-text="count + ' / ' + (showUnused ? {{ count($perms) }} : {{ $visibleCount }})"></span>
                                 </button>
                                 <label class="text-xs text-gray-500 flex items-center gap-1.5">
                                     {{-- يُطلَق `change` عمدًا: التحديد الجماعي يكتب على DOM مباشرةً،
@@ -151,8 +175,9 @@
                                         x-data="{ granted: {{ in_array($perm->name, old('permissions', $assigned)) ? 'true' : 'false' }} }"
                                         x-show="matches(@js($m['label'].' '.$m['hint'].' '.$perm->name))
                                                 && (! onlySelected || granted)
-                                                && (! hideSensitive || ! {{ $m['sensitive'] ? 'true' : 'false' }})"
-                                        class="flex items-start gap-2.5 rounded-md p-2 hover:bg-gray-50 cursor-pointer">
+                                                && (! hideSensitive || ! {{ $m['sensitive'] ? 'true' : 'false' }})
+                                                && (showUnused || granted || ! {{ $m['unused'] ? 'true' : 'false' }})"
+                                        class="flex items-start gap-2.5 rounded-md p-2 hover:bg-gray-50 cursor-pointer {{ $m['unused'] ? 'bg-gray-50/70' : '' }}">
                                         <input type="checkbox" name="permissions[]" value="{{ $perm->name }}"
                                             @checked(in_array($perm->name, old('permissions', $assigned)))
                                             x-model="granted"
@@ -162,6 +187,10 @@
                                                 <span class="text-sm font-medium text-gray-800">{{ $m['label'] }}</span>
                                                 @if ($m['sensitive'])
                                                     <span class="rounded px-1.5 py-0.5 text-[10px] font-semibold bg-rose-100 text-rose-700 ring-1 ring-rose-200">{{ __('حسّاسة') }}</span>
+                                                @endif
+                                                @if ($m['unused'])
+                                                    <span class="rounded px-1.5 py-0.5 text-[10px] font-semibold bg-gray-200 text-gray-600 ring-1 ring-gray-300"
+                                                          title="{{ __('لا يفحصها الكود في أي مكان — بقيّة من مرحلة سابقة، ومنحها لا يفتح شيئًا.') }}">{{ __('غير مستخدمة') }}</span>
                                                 @endif
                                             </span>
                                             {{-- الشرح هو المقصود من التعديل: الاسم وحده لا يميّز. --}}

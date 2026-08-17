@@ -32,6 +32,7 @@ class RoleController extends Controller
         return view('admin.roles.form', [
             'role' => new Role,
             'groups' => $this->service->grouped(),
+            'unused' => $this->service->unusedPermissions(),
             'assigned' => [],
         ]);
     }
@@ -49,6 +50,7 @@ class RoleController extends Controller
         return view('admin.roles.form', [
             'role' => $role,
             'groups' => $this->service->grouped(),
+            'unused' => $this->service->unusedPermissions(),
             'assigned' => $role->permissions->pluck('name')->all(),
         ]);
     }

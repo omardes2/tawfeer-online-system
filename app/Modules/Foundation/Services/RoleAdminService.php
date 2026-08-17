@@ -2,6 +2,7 @@
 
 namespace App\Modules\Foundation\Services;
 
+use App\Support\PermissionUsage;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Permission;
@@ -71,5 +72,18 @@ class RoleAdminService
     {
         return Permission::orderBy('name')->get()
             ->groupBy(fn (Permission $p) => explode('.', $p->name)[0]);
+    }
+
+    /**
+     * الصلاحيات التي لا أثر لها في الكود — بقايا مراحل سابقة.
+     *
+     * تُوسَم ولا تُحذف من الشاشة: صلاحيةٌ ممنوحةٌ لدورٍ ثم أُخفيت تُحذف عند أول
+     * حفظ، لأن الحفظ يُزامن القائمة المُرسَلة. الإخفاء عرضٌ لا استبعاد.
+     *
+     * @return array<int, string>
+     */
+    public function unusedPermissions(): array
+    {
+        return PermissionUsage::unused(Permission::pluck('name'));
     }
 }
