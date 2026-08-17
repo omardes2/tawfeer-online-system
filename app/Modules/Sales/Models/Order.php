@@ -8,7 +8,9 @@ use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\City;
 use App\Modules\Foundation\Models\Warehouse;
+use App\Modules\Marketing\Jobs\SendPurchaseConversion;
 use App\Modules\Marketing\Models\AdChannel;
+use App\Modules\Marketing\Services\AdAttributionService;
 use App\Modules\Payment\Models\Payment;
 use App\Modules\Shipping\Models\Shipment;
 use App\Support\Concerns\Auditable;
@@ -37,7 +39,7 @@ class Order extends Model
         'tracking_number', 'delivery_external_id', 'delivery_status',
         'delivery_dispatch_error', 'delivery_dispatch_attempts', 'delivery_dispatch_attempted_at',
         'delivery_cancel_error', 'delivery_cancel_attempted_at',
-        'channel', 'ad_channel_id', 'status', 'payment_status', 'assigned_to', 'affiliate_id',
+        'channel', 'ad_channel_id', 'ad_click_id', 'ad_source', 'ad_campaign_ref', 'ad_set_ref', 'status', 'payment_status', 'assigned_to', 'affiliate_id',
         'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'total', 'amount_paid',
         'notes', 'cancel_reason',
         'confirmed_at', 'reserved_at', 'shipped_at', 'delivered_at', 'cancelled_at', 'settled_at',
@@ -150,28 +152,80 @@ class Order extends Model
     }
 
     /**
-     * تثبيت قناة الإعلان لحظة الإنشاء، من حساب البزنس الخاصّ بمنشئ الطلب.
+     * تثبيت نسبة الإعلان لحظة الإنشاء — بمسارين لا مسار واحد.
      *
      * هنا لا في `OrderService`: للطلب أكثر من مسار إنشاء (شاشة الموظف، الطلب
      * المُساعَد، نقطة البيع، متجر الويب)، ولو وُضع في أحدها لخرجت طلبات الباقين
-     * بلا قناة فبدت صفحاتُها أقلّ مبيعًا ممّا هي. وطلب الويب لا منشئ له فتبقى
-     * قناته فارغة — وهذا صحيح: لا إعلان صفحةٍ وراءه.
+     * بلا قناة فبدت صفحاتُها أقلّ مبيعًا ممّا هي.
+     *
+     * **طلب الموظفة** يُنسَب عبر حساب البزنس: الطلب ← منشئُه ← حسابُ بزنسه ←
+     * الصفحة. و**طلب الويب** لا منشئ له، فيُنسَب عبر معرّف المجموعة الإعلانية
+     * الذي حمله رابط الإعلان — وبدونه كان يسقط بلا قناة، فتظهر كل مبيعات
+     * حملات الموقع تحت «غير منسوب» ولا يُحكَم على واحدةٍ منها.
      */
     protected static function booted(): void
     {
         parent::booted();
 
         static::creating(function (self $order): void {
-            if ($order->ad_channel_id !== null || ! $order->created_by) {
+            if ($order->ad_channel_id !== null) {
                 return;
             }
 
-            $business = User::whereKey($order->created_by)->value('delivery_business_id');
+            if ($order->created_by) {
+                $business = User::whereKey($order->created_by)->value('delivery_business_id');
 
-            $order->ad_channel_id = $business
-                ? AdChannel::where('delivery_business_id', $business)->value('id')
-                : null;
+                $order->ad_channel_id = $business
+                    ? AdChannel::where('delivery_business_id', $business)->value('id')
+                    : null;
+
+                return;
+            }
+
+            $order->applyWebAttribution();
         });
+
+        /*
+        | حدث «شراء» لمنصّة القياس — من هنا لا من متحكّم الإتمام: مسار الإتمام
+        | محميّ ولا يُمسّ، وهذا يعمل لكل طلب ويبٍّ مهما تعدّدت مساراته.
+        |
+        | ويُرسَل عند **الإنشاء** لا عند التسليم، اتّساقًا مع أساس «الميزانية
+        | اليومية» (الاحتساب على الطلبات المُدخَلة، والمرتجعات ≤ 5%). والانتظار
+        | أسبوعًا حتى التسليم كان سيحرم المنصّة من الإشارة التي تُحسِّن عليها.
+        */
+        static::created(function (self $order): void {
+            if ($order->channel === 'web') {
+                SendPurchaseConversion::dispatch($order->id);
+            }
+        });
+    }
+
+    /**
+     * نسبة طلب الويب من الكعكة التي كتبتها زيارة الإعلان.
+     *
+     * الشرط الوحيد أن تكون القناة `web`. ولا حاجة لفحص سياق التشغيل: الطلب
+     * المُنشأ في مهمّةٍ مجدولة أو أمر سطرٍ لا كعكة له، فتعود النسبة فارغة
+     * وحدها — وفحصُ «هل نحن في سطر الأوامر؟» كان يُلغي النسبة في الاختبارات
+     * كلّها وهي تعمل من سطر الأوامر بطبيعتها.
+     */
+    private function applyWebAttribution(): void
+    {
+        if ($this->channel !== 'web') {
+            return;
+        }
+
+        $attribution = app(AdAttributionService::class);
+        $stored = $attribution->stored();
+
+        if ($stored === []) {
+            return;
+        }
+
+        $this->ad_click_id = $stored['click_id'] ?? null;
+        $this->ad_source = $stored['source'] ?? null;
+        $this->ad_campaign_ref = $stored['campaign'] ?? null;
+        $this->ad_set_ref = $stored['adset'] ?? null;
+        $this->ad_channel_id = $attribution->resolveChannelId($this->ad_set_ref);
     }
 
     protected static function newFactory(): Factory

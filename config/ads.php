@@ -6,6 +6,9 @@ use App\Support\Integrations\AdPlatform\MetaAdsProvider;
 use App\Support\Integrations\AdPlatform\MetaAdsWriter;
 use App\Support\Integrations\AdPlatform\NullAdPlatformProvider;
 use App\Support\Integrations\AdPlatform\NullAdPlatformWriter;
+use App\Support\Integrations\Pixel\FakeConversionTracker;
+use App\Support\Integrations\Pixel\MetaConversionsApiTracker;
+use App\Support\Integrations\Pixel\NullConversionTracker;
 
 return [
     /*
@@ -71,6 +74,38 @@ return [
         'currency_offsets' => [
             'JPY' => 1, 'KRW' => 1, 'VND' => 1, 'CLP' => 1, 'ISK' => 1, 'PYG' => 1, 'UGX' => 1,
         ],
+    ],
+
+    /*
+    | **قياس التحويل** — بكسل ميتا وConversions API (ADR-054).
+    |
+    | شرطُ هدف «الشراء عبر الموقع»: المنصّة لا تُحسِّن على ما لا تراه، وبلا حدث
+    | شراءٍ يصلها تختار جمهورًا ينقر لا جمهورًا يشتري. والافتراض `null` فالمتجر
+    | يعمل كاملًا بلا قياس، والأسرار في `.env` وحدها.
+    |
+    | ومستقلّ عن حسابَي القراءة والكتابة: البكسل يخصّ **الموقع** لا الحساب
+    | الإعلاني، ويُشارَك بين الحسابات — فربطُه بأحدهما كان سيوقف القياس عند أول
+    | فصلٍ بينهما.
+    */
+    'pixel' => [
+        'driver' => env('ADS_PIXEL_DRIVER', 'null'),
+
+        'drivers' => [
+            'null' => NullConversionTracker::class,
+            'fake' => FakeConversionTracker::class,
+            'meta' => MetaConversionsApiTracker::class,
+        ],
+
+        'id' => env('META_PIXEL_ID'),
+        'token' => env('META_PIXEL_TOKEN'),
+        // يُملأ أثناء الضبط ليظهر الحدث في أداة فحص الأحداث، ثم يُفرَّغ.
+        'test_event_code' => env('META_PIXEL_TEST_EVENT_CODE'),
+        'version' => env('META_ADS_VERSION', 'v21.0'),
+        'timeout' => 15,
+        // مفتاح الدولة للأرقام المحلّية قبل التجزئة — «0599…» ⇐ «970599…».
+        'country_code' => env('META_PIXEL_COUNTRY_CODE', '970'),
+        // عملة قيمة الحدث — عملة المتجر لا عملة الحساب الإعلاني.
+        'currency' => env('META_PIXEL_CURRENCY', 'ILS'),
     ],
 
     /*

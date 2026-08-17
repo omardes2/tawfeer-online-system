@@ -453,4 +453,21 @@
     @push('structured-data')
         <x-storefront.json-ld :data="$productLd" />
     @endpush
+
+    {{--
+        «مشاهدة صنف» — الإشارة التي تتعلّم منها المنصّة من يهتمّ بهذا الصنف.
+        معرّف المحتوى هو معرّف المنتج، ويجب أن يطابق معرّفات كتالوج المنتجات
+        حين يُبنى، وإلّا لم تربط المنصّة المشاهدة بالصنف المُعلَن عنه.
+    --}}
+    @push('pixel-events')
+        <script>
+            fbq('track', 'ViewContent', @js([
+                'content_ids' => [(string) $product->id],
+                'content_name' => $product->name,
+                'content_type' => 'product',
+                'value' => round((float) $price, 2),
+                'currency' => config('ads.pixel.currency', 'ILS'),
+            ]));
+        </script>
+    @endpush
 </x-storefront.layout>

@@ -67,6 +67,10 @@
     {{-- Structured data (JSON-LD) — pages push here --}}
     @stack('structured-data')
 
+    {{-- قياس التحويل — لا يطبع شيئًا بلا معرّف بكسل مضبوط --}}
+    <x-storefront.meta-pixel />
+
+
     {{-- نصوص يحتاجها JS (مخزن السلة يُطلق التنبيه) — تبقى الترجمة في ملفّات اللغة --}}
     <script>
         window.SF_I18N = @js([

@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Purchase measurement and web-order attribution — ADR-054
+- New measurement layer (`ConversionTrackerInterface` + `null`/`fake`/`meta`
+  drivers) sending **Purchase** to the Meta Conversions API, plus the browser
+  pixel for PageView and ViewContent. Prerequisite for a website-purchase
+  objective: the platform cannot optimise for what it never sees, so without it
+  a sales campaign buys clickers rather than buyers.
+- **Server-side, off the critical path.** The checkout sequence is protected and
+  is not touched: Purchase is dispatched from `Order::created` onto the queue, so
+  a slow platform call can never delay or fail an order confirmation. Browser
+  events are lost to ad blockers and iOS; a purchase is too important for that.
+- `event_id` is derived from the order (`purchase.{uuid}`), so a retry after a
+  network failure is never counted twice, and a future browser-side event would
+  deduplicate against it. Sent at order creation, not delivery — consistent with
+  the daily-budget basis (placed orders; returns ≤5%).
+- **Attribution through `utm_content`, not `fbclid`.** The platform does not tell
+  you the campaign behind a click id, so the ad's own link carries
+  `utm_content={{adset.id}}`; the ad set resolves to product and page through the
+  same `ad_external_maps` that spend sync uses — no second source of truth. The
+  click id is stored as `fb.1.{ms}.{id}` because the Conversions API needs it for
+  matching.
+- Stored in a 30-day cookie rather than the session (a visitor clicks today and
+  buys in two days), last click wins, and new columns on `orders`:
+  `ad_click_id`, `ad_source`, `ad_campaign_ref`, `ad_set_ref`.
+- Two attribution paths, kept apart: staff orders through the delivery business
+  account as before, web orders through the ad set. The web cookie is ignored for
+  staff orders — a saleswoman who browsed the store after clicking an ad would
+  otherwise donate her manual orders to that campaign. An unlinked ad set is never
+  guessed; the order stays unassigned and the reference is kept for later linking.
+- The pixel is independent of both the read and write ad accounts: it belongs to
+  the *site*, is shared between accounts, and binding it to either would break
+  measurement the moment they are separated.
+- Customer email and phone are SHA-256 hashed after normalisation to
+  international format before leaving the server, and empty fields are omitted
+  rather than sent blank.
+
 ### Added — Ad autopilot: writing to the ad platform — ADR-053
 - New **«الطيّار الآلي للإعلانات»** screen (`admin.marketing.autopilot`) that
   turns the existing daily-budget verdicts into actions on the platform: it
