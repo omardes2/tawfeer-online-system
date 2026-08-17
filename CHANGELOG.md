@@ -7,33 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added — Facebook/Instagram post composer — ADR-055
-- New **«محتوى المنشورات»** screen: pick a product by typeahead, choose platform,
-  page, tone and language, generate copy, edit it, and copy the finished post.
-- **It generates and saves; it never publishes.** Auto-publishing needs page
-  permissions and app review, and more importantly it would put a generation
-  mistake in front of customers before anyone read it. "Published" is a stamp a
-  human applies, and a test asserts no route in the system posts to the platform.
-- **The tracked link is the point, not the copy.** A post with a bare link sells
-  without anyone knowing it sold: the order lands under "unattributed", the paid
-  ad looks like the only thing working, and organic posting gets dropped for
-  being "ineffective". The tag is the same one web-order attribution reads, so
-  organic posts and paid ads are measured on one ruler and show up in the same
-  daily budget report.
-- Uses `utm_campaign=tw-ch-{id}` rather than `utm_content`, which is reserved for
-  ad set ids — stuffing an organic token there would send attribution looking for
-  an ad set that does not exist. The channel is verified on resolution, so a token
-  for a deleted page attributes nothing. The link is stored with the post rather
-  than rebuilt, so later settings changes cannot show a link customers never saw.
-- Reuses the existing `AiContentService` (`social_caption` type) with its rate
-  limit, usage log and graceful fallback — no new AI layer. Product price is part
-  of the prompt inputs: a post without a price produces conversations whose first
-  question is "how much?", and those count against the campaign without converting.
-- New `social_posts` table keeps what was written, for which product, on which
-  page, and with which model — a fallback-generated text reads differently, and
-  whoever reads the post a month later needs to know which it was.
-- New permissions `marketing.social.{view,manage}`, granted to admin and manager.
-
 ### Added — Purchase measurement and web-order attribution — ADR-054
 - New measurement layer (`ConversionTrackerInterface` + `null`/`fake`/`meta`
   drivers) sending **Purchase** to the Meta Conversions API, plus the browser
@@ -68,52 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Customer email and phone are SHA-256 hashed after normalisation to
   international format before leaving the server, and empty fields are omitted
   rather than sent blank.
-
-### Added — Ad autopilot: writing to the ad platform — ADR-053
-- New **«الطيّار الآلي للإعلانات»** screen (`admin.marketing.autopilot`) that
-  turns the existing daily-budget verdicts into actions on the platform: it
-  pauses losing ad sets and trims budgets that sit above the target cost per
-  order, every morning, on its own.
-- **No new decision engine.** The verdict still comes from `AdBudgetService`,
-  computed on real profit after wholesale cost and returns — which is precisely
-  what the platform's own automated rules cannot see: they know the cost of a
-  conversion, not the margin of the product.
-- **A second contract, not an extension** (`AdPlatformWriterInterface`). The
-  write token (`ads_management`) is separate from the read token in `.env`, and
-  its absence leaves the writer unconfigured even when the read token is
-  present — so an import bug still cannot spend money. The default driver is
-  `null`, which refuses loudly rather than silently.
-- **The brake is automated; the accelerator is not.** Only `pause` and
-  `decrease` are ever executed. Raising a budget is not implemented in any mode,
-  even when the verdict says to: a wrong pause costs one day of profit and is
-  undone with a click, a wrong raise spends all night and is not recoverable.
-- Two levels before money moves: `suggest` writes decisions without touching the
-  platform, `brake` executes. Everything else is owner-controlled from the
-  dashboard — master switch, **daily cap**, max decrease %, cooldown days,
-  minimum budget, and which pages the autopilot manages
-  (`ad_channels.autopilot_enabled`).
-- The cap is enforced on the post-plan total: if what the plan leaves running
-  exceeds it, the least profitable ad sets are paused until it doesn't. An unset
-  cap does not block braking — pausing and trimming never increase spend.
-- Guards that are technical, not timid: budget edits above ~20% reset the
-  platform's learning phase, so a daily aggressive trim performs *worse* than no
-  intervention; hence the decrease ceiling and the cooldown (pausing is exempt).
-  Campaign-level (CBO) budgets are never touched, since editing one would hit
-  profitable ad sets in the same campaign.
-- New `ad_autopilot_decisions` records every decision **with the numbers it was
-  based on**, and records abstentions as fully as actions — "why I did *not*
-  cut" is what an owner needs. One-click revert restores exactly what was there;
-  a red button pauses every linked ad set immediately.
-- `ads:autopilot` is scheduled each morning after the spend sync and is inert
-  without configuration. The screen doubles as the daily summary: what was
-  paused and why, what it saved, alongside the day's sales and operating profit.
-- New permissions `marketing.autopilot.{view,manage}` — **manage** is granted to
-  the system administrator only, being the one permission in the system that
-  spends money outside it.
-- Out of scope, deliberately: creating campaigns or creatives, raising budgets
-  automatically, and picking products to launch. A website-purchase objective
-  additionally needs Meta Pixel + Conversions API and click-level attribution
-  for web orders, neither of which exists yet.
 
 ### Added — Ad-spend sync from the ad platform (read-only) — ADR-052
 - New integration layer (`AdPlatformProviderInterface` + `null`/`fake`/`meta`

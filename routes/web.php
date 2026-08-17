@@ -27,10 +27,8 @@ use App\Http\Controllers\Admin\Inventory\InventoryController;
 use App\Http\Controllers\Admin\Inventory\InventoryCountController as AdminInventoryCountController;
 use App\Http\Controllers\Admin\Inventory\StockAdjustmentController as AdminStockAdjustmentController;
 use App\Http\Controllers\Admin\Inventory\WarehouseController as AdminWarehouseController;
-use App\Http\Controllers\Admin\Marketing\AdAutopilotController;
 use App\Http\Controllers\Admin\Marketing\CampaignController as AdminCampaignController;
 use App\Http\Controllers\Admin\Marketing\CampaignTemplateController as AdminCampaignTemplateController;
-use App\Http\Controllers\Admin\Marketing\SocialPostController;
 use App\Http\Controllers\Admin\Payment\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\Purchasing\GoodsReceiptController as AdminGoodsReceiptController;
 use App\Http\Controllers\Admin\Purchasing\ImportShipmentController;
@@ -472,30 +470,6 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('campaigns/{campaign}/activate', [AdminCampaignController::class, 'activate'])->name('campaigns.activate')->middleware('can:marketing.campaigns.approve');
         Route::post('campaigns/{campaign}/pause', [AdminCampaignController::class, 'pause'])->name('campaigns.pause')->middleware('can:marketing.campaigns.manage');
         Route::post('campaigns/{campaign}/test', [AdminCampaignController::class, 'test'])->name('campaigns.test')->middleware('can:marketing.campaigns.manage');
-
-        /*
-        | الطيّار الآلي للإعلانات (ADR-053). «الاطّلاع» يرى القرارات وأسبابها،
-        | و«الإدارة» وحدها تضبط السقف وتشغّل وتُلغي وتُوقف — وهي الصلاحية
-        | الوحيدة في النظام التي تُنفق مالًا خارجه.
-        */
-        Route::get('autopilot', [AdAutopilotController::class, 'index'])->name('autopilot.index')->middleware('can:marketing.autopilot.view');
-        Route::put('autopilot/settings', [AdAutopilotController::class, 'updateSettings'])->name('autopilot.settings')->middleware('can:marketing.autopilot.manage');
-        Route::post('autopilot/run', [AdAutopilotController::class, 'run'])->name('autopilot.run')->middleware('can:marketing.autopilot.manage');
-        Route::post('autopilot/decisions/{decision}/revert', [AdAutopilotController::class, 'revert'])->name('autopilot.revert')->middleware('can:marketing.autopilot.manage');
-        Route::post('autopilot/stop-all', [AdAutopilotController::class, 'stopAll'])->name('autopilot.stop_all')->middleware('can:marketing.autopilot.manage');
-
-        /*
-        | محتوى منشورات فيسبوك وإنستغرام (ADR-055) — توليدٌ وحفظٌ ونسخ، بلا نشر.
-        */
-        Route::get('social-posts', [SocialPostController::class, 'index'])->name('social.index')->middleware('can:marketing.social.view');
-        Route::middleware('can:marketing.social.manage')->group(function () {
-            Route::post('social-posts/suggest', [SocialPostController::class, 'suggest'])->name('social.suggest');
-            Route::post('social-posts/link', [SocialPostController::class, 'link'])->name('social.link');
-            Route::post('social-posts', [SocialPostController::class, 'store'])->name('social.store');
-            Route::put('social-posts/{socialPost}', [SocialPostController::class, 'update'])->name('social.update');
-            Route::post('social-posts/{socialPost}/published', [SocialPostController::class, 'markPublished'])->name('social.published');
-            Route::delete('social-posts/{socialPost}', [SocialPostController::class, 'destroy'])->name('social.destroy');
-        });
     });
 
     // التسويات المالية (Phase 4.6)

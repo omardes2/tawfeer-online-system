@@ -2,7 +2,6 @@
 
 namespace App\Modules\Marketing\Services;
 
-use App\Modules\Marketing\Models\AdChannel;
 use App\Modules\Marketing\Models\AdExternalMap;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
@@ -78,31 +77,6 @@ class AdAttributionService
         $data = json_decode($raw, true);
 
         return is_array($data) ? array_map(fn ($v) => (string) $v, $data) : [];
-    }
-
-    /** رمز القناة في روابط المنشورات العضوية — `tw-ch-7`. */
-    public static function channelToken(int $channelId): string
-    {
-        return 'tw-ch-'.$channelId;
-    }
-
-    /**
-     * القناة من رمزٍ عضويّ في `utm_campaign`.
-     *
-     * المنشور على صفحةٍ ليس إعلانًا مدفوعًا ولا مجموعة إعلانية له، لكنّنا نعرف
-     * الصفحة التي نشرناه عليها يقينًا — فيُوضَع رمزُها في الرابط. وبلا هذا كان
-     * المنشور العضويّ يبيع ولا يُعرَف أنه باع، فيبدو الإعلان المدفوع وحده هو
-     * الذي يعمل.
-     *
-     * والقناة تُتحقَّق من وجودها: رمزٌ لقناةٍ محذوفة لا يُنسَب إليه شيء.
-     */
-    public function resolveChannelFromToken(?string $campaignRef): ?int
-    {
-        if (! $campaignRef || ! preg_match('/^tw-ch-(\d+)$/', $campaignRef, $m)) {
-            return null;
-        }
-
-        return AdChannel::whereKey((int) $m[1])->value('id');
     }
 
     /**

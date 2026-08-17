@@ -42,10 +42,3 @@ Schedule::command('marketing:run-abandoned-carts')->hourly()->withoutOverlapping
 if (config('ads.sync.enabled')) {
     Schedule::command('ads:sync-spend')->cron(config('ads.sync.cron'))->withoutOverlapping();
 }
-
-/*
-| الطيّار الآلي (ADR-053) — بعد المزامنة، لأن القرار على صرفٍ لم يُسحَب قرارٌ على
-| فراغ. مجدولٌ دائمًا وآمنٌ دائمًا: التفعيل من اللوحة لا من هنا، والافتراض مطفأ
-| ومحرّك الكتابة `null` — فلا يملك أصلًا صلاحية إنفاق مال.
-*/
-Schedule::command('ads:autopilot')->cron(config('ads.autopilot.cron'))->withoutOverlapping();

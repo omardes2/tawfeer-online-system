@@ -226,10 +226,7 @@ class Order extends Model
         $this->ad_campaign_ref = $stored['campaign'] ?? null;
         $this->ad_set_ref = $stored['adset'] ?? null;
 
-        // المجموعة الإعلانية أولًا (إعلان مدفوع)، فإن لم تكن فرمز الصفحة الذي
-        // يحمله رابط المنشور العضويّ. وما لا يُحلّ يبقى بلا قناة لا يُخمَّن.
-        $this->ad_channel_id = $attribution->resolveChannelId($this->ad_set_ref)
-            ?? $attribution->resolveChannelFromToken($this->ad_campaign_ref);
+        $this->ad_channel_id = $attribution->resolveChannelId($this->ad_set_ref);
     }
 
     protected static function newFactory(): Factory

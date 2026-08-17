@@ -24,11 +24,10 @@ class AdChannel extends Model
         'other' => 'أخرى',
     ];
 
-    protected $fillable = ['name', 'platform', 'delivery_business_id', 'is_active', 'autopilot_enabled', 'sort_order'];
+    protected $fillable = ['name', 'platform', 'delivery_business_id', 'is_active', 'sort_order'];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'autopilot_enabled' => 'boolean',
         'sort_order' => 'integer',
     ];
 
