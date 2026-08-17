@@ -435,6 +435,26 @@ class AdAutopilotTest extends TestCase
         $this->assertFalse(app(AdPlatformManager::class)->writer()->isConfigured());
     }
 
+    /**
+     * وحساب القراءة لا يُورَّث للكتابة.
+     *
+     * الطيّار يعمل على حسابٍ إعلاني آخر غير الذي تُقرأ منه حملات الرسائل. ووراثةٌ
+     * ضمنية عند غياب الإعداد كانت ستجعله يتصرّف في الحساب القائم وصاحبُه يظنّه
+     * معزولًا — وهو أسوأ من التعطّل، لأنه يعمل ويبدو صحيحًا.
+     */
+    public function test_the_writer_never_inherits_the_read_account(): void
+    {
+        config()->set('ads.write.driver', 'meta');
+        config()->set('ads.write.token', 'write-token');
+        config()->set('ads.meta.account_id', '111');   // حساب حملات الرسائل
+        config()->set('ads.write.account_id', null);
+
+        $this->assertFalse(app(AdPlatformManager::class)->writer()->isConfigured());
+
+        config()->set('ads.write.account_id', '222');
+        $this->assertTrue(app(AdPlatformManager::class)->writer()->isConfigured());
+    }
+
     // ────────── التراجع والإيقاف الطارئ ──────────
 
     /** التراجع يعيد ما كان بالضبط لا ما يُحسب من جديد. */

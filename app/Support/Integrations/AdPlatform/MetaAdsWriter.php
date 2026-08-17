@@ -14,8 +14,10 @@ use RuntimeException;
  *
  * ثلاثة قرارات في هذا الملف:
  *
- * 1. **رمزٌ منفصل.** `META_ADS_WRITE_TOKEN` لا `META_ADS_TOKEN`. ولو غاب فالمحرّك
- *    «غير مضبوط» ولو كان رمز القراءة حاضرًا — وهذا هو الحاجز كلّه.
+ * 1. **رمزٌ وحسابٌ منفصلان.** `META_ADS_WRITE_TOKEN` و`META_ADS_WRITE_ACCOUNT_ID`،
+ *    لا رمز القراءة ولا حسابها. وغيابُ أيٍّ منهما يُبقي المحرّك «غير مضبوط» ولو
+ *    كان رمز القراءة حاضرًا — وهذا هو الحاجز كلّه. ولا وراثة ضمنية لحساب القراءة:
+ *    كانت ستجعل الطيّار يتصرّف في حساب حملات الرسائل وصاحبُه يظنّه معزولًا.
  *
  * 2. **بلا إعادة محاولة تلقائية على الكتابة.** القراءة تُعاد بلا ضرر، أمّا نداءٌ
  *    كتابةٌ انقطع بعد وصوله فإعادتُه تعني تنفيذه مرّتين. تكرار «أوقف» غير ضارّ،
@@ -44,7 +46,7 @@ class MetaAdsWriter implements AdPlatformWriterInterface
 
     public function isConfigured(): bool
     {
-        return filled(config('ads.write.token')) && filled(config('ads.meta.account_id'));
+        return filled(config('ads.write.token')) && filled(config('ads.write.account_id'));
     }
 
     public function adSets(array $externalIds): Collection
@@ -137,7 +139,7 @@ class MetaAdsWriter implements AdPlatformWriterInterface
             return $this->currency;
         }
 
-        $account = 'act_'.ltrim((string) config('ads.meta.account_id'), 'act_');
+        $account = 'act_'.ltrim((string) config('ads.write.account_id'), 'act_');
 
         $response = $this->http()->retry(2, 1000, throw: false)->get(
             self::BASE.'/'.$this->version().'/'.$account,

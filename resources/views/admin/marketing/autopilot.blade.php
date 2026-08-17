@@ -54,8 +54,8 @@
                 </ul>
                 @unless ($writerReady)
                     <span class="block mt-2 text-xs">
-                        {{ __('رمز الكتابة غير رمز القراءة: صلاحيته «ads_management» ويحتاج مراجعة تطبيق من المنصّة. يُضبط في ملف البيئة على الخادم:') }}
-                        <code class="block mt-1 text-[11px] font-mono bg-amber-100 rounded p-2 leading-relaxed" dir="ltr">ADS_WRITE_DRIVER=meta<br>META_ADS_WRITE_TOKEN=…</code>
+                        {{ __('الكتابة لها رمزٌ وحسابٌ إعلاني مستقلّان عن اللذين تُقرأ منهما حملات الرسائل — لا يرثان شيئًا منهما. صلاحية الرمز «ads_management» وتحتاج مراجعة تطبيق من المنصّة. يُضبطان في ملف البيئة على الخادم:') }}
+                        <code class="block mt-1 text-[11px] font-mono bg-amber-100 rounded p-2 leading-relaxed" dir="ltr">ADS_WRITE_DRIVER=meta<br>META_ADS_WRITE_TOKEN=…<br>META_ADS_WRITE_ACCOUNT_ID=…</code>
                     </span>
                 @endunless
             </x-admin.alert>
