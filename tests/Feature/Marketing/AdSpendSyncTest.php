@@ -110,6 +110,46 @@ class AdSpendSyncTest extends TestCase
         $this->assertSame($this->channel->id, $campaign->suggested_ad_channel_id);
     }
 
+    /**
+     * اسم الصنف الأطول من اسم المجموعة يُطابَق أيضًا.
+     *
+     * الاحتواء في اتجاه واحد كان يفشل هنا: «شواية متنقلة» لا يرد داخل «شواية -
+     * جديد»، فيخرج الصفّ بلا مقترح ويُربَط يدويًّا بلا سبب — وهي حال معظم
+     * المجموعات، لأن اسمها على المنصّة يحمل لاحقةً تسويقية لا تخصّ الصنف.
+     */
+    public function test_a_shared_word_is_enough_to_suggest(): void
+    {
+        $product = Product::factory()->create(['name' => 'شواية متنقلة']);
+        FakeAdPlatformProvider::fake([$this->row(['adsetName' => 'شواية - جديد'])]);
+
+        $this->sync();
+
+        $this->assertSame($product->id, AdExternalMap::where('external_id', 'A1')->value('suggested_product_id'));
+    }
+
+    /** والأقرب يفوز: كلمةٌ عامّة مشتركة لا تهزم اسمًا يُطابق بكامله. */
+    public function test_the_closest_candidate_wins_over_a_generic_word(): void
+    {
+        Product::factory()->create(['name' => 'جهاز تعطير']);
+        $exact = Product::factory()->create(['name' => 'جهاز تعطير مركزي']);
+        FakeAdPlatformProvider::fake([$this->row(['adsetName' => 'جهاز تعطير مركزي - ريماركتنغ'])]);
+
+        $this->sync();
+
+        $this->assertSame($exact->id, AdExternalMap::where('external_id', 'A1')->value('suggested_product_id'));
+    }
+
+    /** وبلا كلمةٍ مشتركة لا مقترح — الصمت أصدق من تخمين. */
+    public function test_nothing_is_suggested_without_a_shared_word(): void
+    {
+        Product::factory()->create(['name' => 'مكنسة كليكي']);
+        FakeAdPlatformProvider::fake([$this->row(['adsetName' => 'اختبار جمهور بارد'])]);
+
+        $this->sync();
+
+        $this->assertNull(AdExternalMap::where('external_id', 'A1')->value('suggested_product_id'));
+    }
+
     /** والتطبيع العربي يُنجح المطابقة حيث كان اختلافُ الهمزة يُفشلها. */
     public function test_the_suggestion_tolerates_arabic_spelling_differences(): void
     {

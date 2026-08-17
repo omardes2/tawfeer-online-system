@@ -196,37 +196,78 @@ class AdSpendSyncService
     /**
      * أقرب مرشَّح لاسمٍ خارجي — **اقتراحٌ للعرض لا ربطٌ تلقائي**.
      *
-     * أطولُ اسمٍ يرد داخل الاسم الخارجي هو الفائز: «مكنسة» و«مكنسة كليكي» كلاهما
-     * يرد في «مكنسة كليكي — نسخة»، والأطول أدقّ. والحدّ الأدنى ثلاثة أحرف يمنع
-     * اسمًا قصيرًا من مطابقة كل شيء.
+     * المطابقة على **الكلمات المشتركة** لا على احتواء اسمٍ داخل آخر. الاحتواء في
+     * اتجاه واحد كان يفشل كلّما كان اسم الصنف أطول من اسم المجموعة الإعلانية:
+     * «شواية متنقلة» لا يرد داخل «شواية - جديد»، فيخرج الصفّ بلا مقترح ويُربَط
+     * يدويًّا بلا سبب — وهذه هي حال معظم المجموعات عمليًّا، لأن اسمها على المنصّة
+     * يحمل لاحقةً تسويقية لا تخصّ الصنف.
+     *
+     * الترجيح بشقّين: مجموع أطوال الكلمات المشتركة (الكلمة الطويلة أدلّ من
+     * القصيرة)، ونسبة تغطيتها لاسم المرشَّح — فالصنف الذي تشترك كلماته كلُّها
+     * أدقّ من صنفٍ تشترك كلمةٌ واحدة منه. والاحتواء الكامل يبقى الأقوى.
+     *
+     * التساهل هنا مقصود وآمن: المخرَج اقتراحٌ يمرّ على عين المستخدم قبل أن يُربَط.
      *
      * @param  Collection<int, object>  $candidates
      */
     private function suggest(string $externalName, Collection $candidates): ?int
     {
         $needle = $this->normalize($externalName);
+        $needleTokens = $this->tokens($needle);
 
-        if ($needle === '') {
+        if ($needleTokens === []) {
             return null;
         }
 
         $best = null;
-        $bestLength = 0;
+        $bestScore = 0.0;
 
         foreach ($candidates as $candidate) {
             $name = $this->normalize($candidate->name);
+            $tokens = $this->tokens($name);
 
-            if (mb_strlen($name) < 3 || ! str_contains($needle, $name)) {
+            if ($tokens === []) {
                 continue;
             }
 
-            if (mb_strlen($name) > $bestLength) {
+            $shared = array_intersect($tokens, $needleTokens);
+
+            if ($shared === []) {
+                continue;
+            }
+
+            $score = array_sum(array_map('mb_strlen', $shared))
+                + (count($shared) / count($tokens)) * 10;
+
+            // اسمٌ يرد كاملًا داخل الآخر يقين لا ترجيح.
+            if (str_contains($needle, $name) || str_contains($name, $needle)) {
+                $score += 100;
+            }
+
+            if ($score > $bestScore) {
                 $best = $candidate->id;
-                $bestLength = mb_strlen($name);
+                $bestScore = $score;
             }
         }
 
         return $best;
+    }
+
+    /**
+     * كلمات الاسم بعد التطبيع، بلا ما دون ثلاثة أحرف.
+     *
+     * الحدّ يُسقط حروف العطف وأدوات الربط («مع»، «في»، «من») التي تشترك فيها كل
+     * الأسماء تقريبًا فتُنتج مطابقاتٍ بلا معنى.
+     *
+     * @return array<int, string>
+     */
+    private function tokens(string $normalized): array
+    {
+        $parts = preg_split('/[^\p{L}\p{N}]+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        return array_values(array_unique(
+            array_filter($parts, fn (string $token) => mb_strlen($token) >= 3),
+        ));
     }
 
     /**
