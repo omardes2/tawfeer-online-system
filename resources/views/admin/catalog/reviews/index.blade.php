@@ -3,7 +3,11 @@
     <div class="py-8 max-w-7xl mx-auto sm:px-6 lg:px-8">
         <div class="bg-white shadow-sm sm:rounded-lg p-6">
             <x-admin.flash />
-            <x-admin.header :title="__('تقييمات الزبائن')" />
+            <x-admin.header :title="__('تقييمات الزبائن')">
+                @can('catalog.reviews.update')
+                    <a href="{{ route('admin.reviews.import') }}" class="btn-secondary btn-sm">{{ __('استيراد من ملف') }}</a>
+                @endcan
+            </x-admin.header>
 
             {{-- التبويبات: المعلّق أوّلًا لأنه ما ينتظر قرارًا --}}
             @php

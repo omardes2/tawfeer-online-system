@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\Catalog\ProductImportController;
 use App\Http\Controllers\Admin\Catalog\ProductReviewController as AdminProductReviewController;
 use App\Http\Controllers\Admin\Catalog\ProductTagController;
 use App\Http\Controllers\Admin\Catalog\ProductVariantController;
+use App\Http\Controllers\Admin\Catalog\ReviewImportController;
 use App\Http\Controllers\Admin\Catalog\UnitController;
 use App\Http\Controllers\Admin\Commissions\CommissionController as AdminCommissionController;
 use App\Http\Controllers\Admin\Crm\CustomerController as AdminCustomerController;
@@ -182,6 +183,10 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
 
     // مراجعة تقييمات الزبائن: اعتماد/رفض/حذف — لا إنشاء ولا تحرير للنصّ.
     Route::get('reviews', [AdminProductReviewController::class, 'index'])->name('reviews.index');
+    // استيراد آراءٍ قيلت فعلًا خارج المتجر (واتساب) — معاينة ثم تنفيذ.
+    Route::get('reviews/import', [ReviewImportController::class, 'form'])->name('reviews.import');
+    Route::post('reviews/import', [ReviewImportController::class, 'upload'])->name('reviews.import.upload');
+    Route::get('reviews/import/template', [ReviewImportController::class, 'template'])->name('reviews.import.template');
     Route::patch('reviews/{review}/approve', [AdminProductReviewController::class, 'approve'])->name('reviews.approve');
     Route::patch('reviews/{review}/reject', [AdminProductReviewController::class, 'reject'])->name('reviews.reject');
     Route::delete('reviews/{review}', [AdminProductReviewController::class, 'destroy'])->name('reviews.destroy');
