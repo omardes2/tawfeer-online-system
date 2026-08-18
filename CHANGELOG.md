@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — "Product decision board" report
+- A new read-only report under Reports that answers the two questions the
+  existing per-product report cannot: **what does this product actually earn**,
+  and **when does it run out**.
+- Net profit per product = sales − cost of goods − ad spend booked on that
+  product − the delivery cost actually paid to the courier. A product can lead
+  the sales report and still show here as losing, which is the whole point: the
+  by-product report stops at gross profit, so ad spend and delivery never reach
+  the number anyone looks at.
+- Returns are netted on both sides (quantity and cost), but the delivery cost of
+  a returned order stays charged to the product, because it was paid. That is
+  what exposes a high return rate eating the margin.
+- Delivery cost is read from the shipment's stored `shipping_cost` and split
+  across the order's items by their share of the order value. It only reads —
+  the delivery integration, its fees and its logic are untouched.
+- Coverage: daily sales velocity over the selected period, days of cover
+  (stock ÷ velocity), quantity already in transit on open import shipments, and
+  a suggested order quantity = velocity × (lead time + safety stock) − stock on
+  hand − incoming, floored at zero. Subtracting what is already at sea is what
+  keeps the board from asking to re-buy a container that was bought last month.
+- Lead time (default 90 days) and safety stock (default 14 days) are settings,
+  not constants — a container from China is not a local supplier, and the figure
+  moves with the season. Editing them requires `reports.ad_budget.manage`.
+- A verdict per row — idle, losing, reorder, healthy — evaluated in that order,
+  so an idle product is never suggested for purchase: buying it is freezing cash.
+- Period filter, CSV export and print like the other reports; the page itself is
+  gated by `reports.sales_summary.view`.
+
 ### Added — phone lookup pre-fills the new-order form
 - On the admin new-order form, typing a customer's phone now looks them up and
   fills the empty name, city, area and detailed-address fields from their most
