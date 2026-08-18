@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Accounting\Models\JournalLine;
 use App\Modules\Crm\Models\Customer;
+use App\Modules\Foundation\Models\Area;
+use App\Modules\Foundation\Models\City;
 use App\Modules\Foundation\Services\Settings;
 use App\Modules\Purchasing\Models\PurchaseInvoice;
 use App\Modules\Purchasing\Models\Supplier;
@@ -147,6 +149,70 @@ class BusinessReportController extends Controller
             'file' => 'sales-by-affiliate',
             'roles' => ['affiliate'],
         ]);
+    }
+
+    /**
+     * المبيعات حسب المدن والمناطق: قيمة البضاعة وربحها وعدد الطلبات لكل منطقة،
+     * مجمَّعةً تحت مدينتها.
+     *
+     * البيانات من `orders.city_id`/`orders.area_id` (لقطةُ الطلب) — لا من مسار
+     * التوصيل ولا من الشحنة: قراءةٌ للتقرير لا مساس بالتكامل المحميّ. والطلب
+     * يحمل مدينةً ومنطقةً واحدة، فمجموع الطلبات عبر المناطق يطابق طلبات الفترة
+     * بلا ازدواج — بخلاف تقرير المنتج الذي يعدّ الطلب في كل صنف.
+     *
+     * تُعرَض «بلا منطقة» و«بلا مدينة» عمدًا: الطلب الهاتفي قد يُدخَل بمدينةٍ بلا
+     * منطقة، وإسقاطُهما كان يجعل المجموع أقلّ من مبيعات الفترة بلا سببٍ ظاهر.
+     */
+    public function salesByLocation(Request $request): View|StreamedResponse
+    {
+        $range = $this->range($request);
+
+        $grouped = $this->soldGoods($range)
+            ->groupBy('orders.city_id', 'orders.area_id')
+            ->selectRaw('orders.city_id, orders.area_id, '.$this->aggregates())
+            ->get();
+
+        $cityNames = City::whereIn('id', $grouped->pluck('city_id')->filter()->unique())->pluck('name', 'id');
+        $areaNames = Area::whereIn('id', $grouped->pluck('area_id')->filter()->unique())->pluck('name', 'id');
+
+        // بناء الشجرة: مدينة ← مناطقها، كلٌّ مرتَّبة بالمبيعات تنازليًّا.
+        $cities = $grouped
+            ->groupBy(fn ($r) => (int) $r->city_id) // 0 = بلا مدينة
+            ->map(function (Collection $rows, $cityId) use ($cityNames, $areaNames) {
+                $areas = $rows->map(fn ($r) => [
+                    'area' => $r->area_id ? ($areaNames[$r->area_id] ?? ('#'.$r->area_id)) : __('بلا منطقة محدّدة'),
+                    'orders_count' => (int) $r->orders_count,
+                    'sales_total' => round((float) $r->sale_total, 2),
+                    'profit' => round((float) $r->sale_total - (float) $r->cost_total, 2),
+                ])->sortByDesc('sales_total')->values();
+
+                return [
+                    'city' => $cityId ? ($cityNames[$cityId] ?? ('#'.$cityId)) : __('بلا مدينة محدّدة'),
+                    'orders_count' => $areas->sum('orders_count'),
+                    'sales_total' => round($areas->sum('sales_total'), 2),
+                    'profit' => round($areas->sum('profit'), 2),
+                    'areas' => $areas,
+                ];
+            })
+            ->sortByDesc('sales_total')
+            ->values();
+
+        if ($request->query('export') === 'csv') {
+            $flat = $cities->flatMap(fn ($c) => $c['areas']->map(fn ($a) => [
+                $c['city'], $a['area'], $a['orders_count'],
+                number_format($a['sales_total'], 2, '.', ''), number_format($a['profit'], 2, '.', ''),
+            ]));
+
+            return $this->csv('sales-by-location',
+                [__('المدينة'), __('المنطقة'), __('عدد الطلبات'), __('سعر البيع'), __('الربح')], $flat);
+        }
+
+        return view('admin.reports.business.sales_by_location', [
+            'cities' => $cities,
+            'totalOrders' => $this->distinctOrders($range),
+            'totalSales' => round($cities->sum('sales_total'), 2),
+            'totalProfit' => round($cities->sum('profit'), 2),
+        ] + $this->viewMeta($range));
     }
 
     /**

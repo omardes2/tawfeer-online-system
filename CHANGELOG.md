@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — "Sales by city and area" report
+- A new read-only report under Reports: sales value, profit, and order count per
+  area, grouped under each city, with the same date-range filter, CSV export and
+  print as the other sales reports.
+- Grouped from `orders.city_id`/`orders.area_id` — the order's own snapshot, not
+  the shipment or the delivery integration; it reads for the report and touches
+  nothing protected.
+- An order sits in exactly one city and area, so order counts sum across areas to
+  the period's order total with no double counting — unlike the by-product report
+  where an order is counted under each of its products.
+- Orders with a city but no area, or no city at all, are shown in explicit
+  "بلا منطقة محدّدة" / "بلا مدينة محدّدة" buckets so the totals reconcile with the
+  period instead of quietly coming up short.
+
 ### Fixed — the "Buy now" button rendered with no styling at all
 - On the product page it appeared as bare text with the bolt icon on its own
   line, instead of a full-width outlined button.
