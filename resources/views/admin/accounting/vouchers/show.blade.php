@@ -38,6 +38,9 @@
                 <div><dt class="text-gray-500">{{ __('المبلغ') }}</dt><dd class="font-bold text-lg">{{ number_format($voucher->amount, 2) }} {{ $voucher->currency }}</dd></div>
                 <div><dt class="text-gray-500">{{ __('الخزينة') }}</dt><dd>{{ $voucher->treasury?->name }}</dd></div>
                 <div><dt class="text-gray-500">{{ __('الحساب المقابل') }}</dt><dd>{{ $voucher->counterAccount?->code }} — {{ $voucher->counterAccount?->name }}</dd></div>
+                @if ($voucher->expenseCategory)
+                    <div><dt class="text-gray-500">{{ __('تصنيف المصروف') }}</dt><dd>{{ $voucher->expenseCategory->name }}</dd></div>
+                @endif
                 <div><dt class="text-gray-500">{{ __('الطرف') }}</dt><dd>{{ $voucher->party_name ?: '—' }}</dd></div>
                 <div><dt class="text-gray-500">{{ __('طريقة الدفع') }}</dt><dd>{{ $voucher->payment_method ?: '—' }}</dd></div>
                 @if ($voucher->category)<div><dt class="text-gray-500">{{ __('الفئة') }}</dt><dd>{{ $voucher->category }}</dd></div>@endif

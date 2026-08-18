@@ -42,7 +42,7 @@ class VoucherService
             'tax_amount' => 0,
             'created_by' => auth()->id(),
         ], collect($data)->only([
-            'voucher_date', 'treasury_id', 'counter_treasury_id', 'counter_account_id',
+            'voucher_date', 'treasury_id', 'counter_treasury_id', 'counter_account_id', 'expense_category_id',
             'customer_id', 'supplier_id', 'employee_id', 'party_name', 'amount', 'currency',
             'payment_method', 'reference', 'category', 'tax_amount', 'description', 'notes',
             'attachments', 'is_recurring', 'recurrence',
@@ -57,7 +57,7 @@ class VoucherService
             throw ValidationException::withMessages(['status' => __('السند المُرحّل يُعدَّل بإعادة الترحيل (عكس + قيد مُصحّح).')]);
         }
         $voucher->update(collect($data)->only([
-            'voucher_date', 'treasury_id', 'counter_treasury_id', 'counter_account_id',
+            'voucher_date', 'treasury_id', 'counter_treasury_id', 'counter_account_id', 'expense_category_id',
             'customer_id', 'supplier_id', 'employee_id', 'party_name', 'amount', 'currency',
             'payment_method', 'reference', 'category', 'tax_amount', 'description', 'notes',
             'attachments', 'is_recurring', 'recurrence',
@@ -88,7 +88,7 @@ class VoucherService
 
             // 2) تطبيق القيم الجديدة.
             $voucher->update(collect($data)->only([
-                'voucher_date', 'treasury_id', 'counter_treasury_id', 'counter_account_id',
+                'voucher_date', 'treasury_id', 'counter_treasury_id', 'counter_account_id', 'expense_category_id',
                 'customer_id', 'supplier_id', 'employee_id', 'party_name', 'amount', 'currency',
                 'payment_method', 'reference', 'category', 'tax_amount', 'description', 'notes', 'attachments',
             ])->all());

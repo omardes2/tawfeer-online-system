@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Accounting;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Accounting\StoreVoucherRequest;
 use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Models\ExpenseCategory;
 use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Accounting\Services\VoucherService;
@@ -59,7 +60,7 @@ class VoucherController extends Controller
     public function store(StoreVoucherRequest $request, string $kind): RedirectResponse
     {
         $this->auth($kind, 'create');
-        $data = $request->validated();
+        $data = $this->resolveExpenseAccount($kind, $request->validated());
         $data['attachments'] = $this->storeAttachments($request);
 
         $voucher = $this->service->create($kind, $data);
@@ -74,7 +75,7 @@ class VoucherController extends Controller
 
         return view('admin.accounting.vouchers.show', [
             'kind' => $kind,
-            'voucher' => $voucher->load(['treasury.glAccount', 'counterAccount', 'customer', 'supplier', 'employee', 'journalEntry', 'creator']),
+            'voucher' => $voucher->load(['treasury.glAccount', 'counterAccount', 'expenseCategory', 'customer', 'supplier', 'employee', 'journalEntry', 'creator']),
         ]);
     }
 
@@ -93,7 +94,7 @@ class VoucherController extends Controller
         abort_unless($voucher->kind === $kind, 404);
         abort_if(in_array($voucher->status, ['reversed', 'cancelled', 'rejected'], true), 403, __('لا يمكن تعديل سند بهذه الحالة.'));
 
-        $data = $request->validated();
+        $data = $this->resolveExpenseAccount($kind, $request->validated());
         $newAttachments = $this->storeAttachments($request);
         if ($newAttachments) {
             $data['attachments'] = array_merge($voucher->attachments ?? [], $newAttachments);
@@ -191,6 +192,29 @@ class VoucherController extends Controller
 
     // ————————————————————————————————— داخلي —————————————————————————————————
 
+    /**
+     * سند المصروف يختار تصنيفًا؛ الحساب يُشتقّ منه.
+     *
+     * الحساب هو ما يُرحَّل عليه القيد كما كان — التصنيف طبقةٌ فوقه لا بديلٌ عنه.
+     * وغيابُ التصنيف عند التعديل يترك الحساب على حاله (سندٌ قديم بلا تصنيف).
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function resolveExpenseAccount(string $kind, array $data): array
+    {
+        if ($kind !== 'expense' || empty($data['expense_category_id'])) {
+            unset($data['expense_category_id']);
+
+            return $data;
+        }
+
+        $category = ExpenseCategory::findOrFail($data['expense_category_id']);
+        $data['counter_account_id'] = $category->account_id;
+
+        return $data;
+    }
+
     private function formData(string $kind, FinancialVoucher $voucher): array
     {
         return [
@@ -198,6 +222,12 @@ class VoucherController extends Controller
             'voucher' => $voucher,
             'treasuries' => Treasury::active()->orderByDesc('is_default')->orderBy('name')->get(),
             'accounts' => Account::query()->postable()->whereIn('type', self::COUNTER_TYPES[$kind])->orderBy('code')->get(),
+            // التصنيفات النشطة + تصنيف السند الحالي وإن عُطّل، فلا يُفقد عند التعديل.
+            'categories' => $kind === 'expense'
+                ? ExpenseCategory::with('account')
+                    ->where(fn ($q) => $q->active()->orWhere('id', $voucher->expense_category_id))
+                    ->ordered()->get()
+                : collect(),
             'customers' => in_array($kind, ['receipt', 'income'], true) ? Customer::orderBy('name')->limit(500)->get(['id', 'name']) : collect(),
             'suppliers' => in_array($kind, ['payment', 'expense'], true) ? Supplier::orderBy('name')->limit(500)->get(['id', 'name']) : collect(),
         ];

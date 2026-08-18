@@ -33,6 +33,7 @@ class FinancialVoucher extends Model
 
     protected $fillable = [
         'number', 'kind', 'status', 'voucher_date', 'treasury_id', 'counter_treasury_id', 'counter_account_id',
+        'expense_category_id',
         'customer_id', 'supplier_id', 'employee_id', 'party_name', 'amount', 'currency', 'payment_method',
         'reference', 'category', 'tax_amount', 'description', 'notes', 'attachments', 'is_recurring', 'recurrence',
         'idempotency_key', 'journal_entry_id', 'reversal_entry_id',
@@ -63,6 +64,12 @@ class FinancialVoucher extends Model
     public function counterAccount(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'counter_account_id');
+    }
+
+    /** تصنيف المصروف المختار (سندات المصروف وحدها). */
+    public function expenseCategory(): BelongsTo
+    {
+        return $this->belongsTo(ExpenseCategory::class, 'expense_category_id');
     }
 
     public function customer(): BelongsTo

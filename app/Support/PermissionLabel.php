@@ -156,6 +156,7 @@ class PermissionLabel
         'payments' => 'المدفوعات',
         'receipts' => 'سندات القبض',
         'expenses' => 'المصروفات',
+        'expense_categories' => 'تصنيفات المصروفات',
         'income' => 'الإيرادات',
         'transfers' => 'التحويلات',
         'reports' => 'التقارير',

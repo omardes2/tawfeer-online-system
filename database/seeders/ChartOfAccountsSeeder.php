@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Models\AccountingPeriod;
+use App\Modules\Accounting\Models\ExpenseCategory;
 use App\Modules\Accounting\Models\FiscalYear;
 use Illuminate\Database\Seeder;
 
@@ -90,6 +91,31 @@ class ChartOfAccountsSeeder extends Seeder
                 ['code' => $code],
                 ['name' => $name, 'type' => $type, 'parent_id' => $parents[$parent], 'is_postable' => true],
             );
+        }
+
+        // أبُ تصنيفات المصروفات التي يُعرّفها المستخدم (مراقب — الترحيل على
+        // فروعه). مفصولٌ عن 5000 لأن تحته حسابات النظام (5050/5060) وهي نتائجُ
+        // تقديرٍ لا مصروفٌ تشغيلي، فخلطُها يُفسد تقرير المصاريف.
+        Account::query()->firstOrCreate(
+            ['code' => '5100'],
+            ['name' => 'مصاريف تشغيلية', 'name_en' => 'Operating Expenses', 'type' => 'expense', 'parent_id' => $parents['5000'], 'is_postable' => false],
+        );
+
+        // تصنيفان يقابلان حسابَين يُرحّل عليهما النظام آليًا. لولاهما لأنشأ
+        // المستخدم تصنيفًا بالاسم نفسه على حسابٍ جديد، فانقسم مصروفُ الشحن بين
+        // حسابين يحملان الاسم ذاته ولا يجتمعان في تقرير.
+        $systemCategories = [
+            ['5020', 'مصروف الشحن', 'Shipping Expense', 10],
+            ['5040', 'عمولات المسوّقين', 'Affiliate Commissions', 20],
+        ];
+        foreach ($systemCategories as [$code, $name, $nameEn, $order]) {
+            $account = Account::query()->where('code', $code)->first();
+            if ($account) {
+                ExpenseCategory::query()->firstOrCreate(
+                    ['account_id' => $account->id],
+                    ['name' => $name, 'name_en' => $nameEn, 'is_system' => true, 'is_active' => true, 'sort_order' => $order],
+                );
+            }
         }
 
         // تكلفة البضاعة المباعة — حساب رئيسي مستقلّ (نوع «تكلفة بضاعة»)، قابل للترحيل.

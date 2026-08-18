@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\Accounting\AccountingController as AdminAccountin
 use App\Http\Controllers\Admin\Accounting\AccountMappingController;
 use App\Http\Controllers\Admin\Accounting\BankController as AdminBankController;
 use App\Http\Controllers\Admin\Accounting\CashboxController as AdminCashboxController;
+use App\Http\Controllers\Admin\Accounting\ExpenseCategoryController as AdminExpenseCategoryController;
 use App\Http\Controllers\Admin\Accounting\FinanceReportController as AdminFinanceReportController;
 use App\Http\Controllers\Admin\Accounting\JournalEntryController as AdminJournalEntryController;
 use App\Http\Controllers\Admin\Accounting\TransferController as AdminTransferController;
@@ -547,6 +548,14 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::resource('cashboxes', AdminCashboxController::class)->parameters(['cashboxes' => 'treasury']);
         // الحسابات البنكية
         Route::resource('banks', AdminBankController::class)->parameters(['banks' => 'treasury']);
+
+        // تصنيفات المصروفات — كل تصنيف يفتح حسابه تحت «مصاريف تشغيلية».
+        Route::prefix('expense-categories')->name('expense_categories.')->group(function () {
+            Route::get('/', [AdminExpenseCategoryController::class, 'index'])->name('index');
+            Route::post('/', [AdminExpenseCategoryController::class, 'store'])->name('store');
+            Route::put('{category}', [AdminExpenseCategoryController::class, 'update'])->name('update');
+            Route::delete('{category}', [AdminExpenseCategoryController::class, 'destroy'])->name('destroy');
+        });
 
         // السندات (قبض/صرف/مصروف/إيراد آخر) — موحّدة حسب النوع
         Route::prefix('vouchers/{kind}')->name('vouchers.')->whereIn('kind', ['receipt', 'payment', 'expense', 'income'])->group(function () {

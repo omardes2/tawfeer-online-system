@@ -76,6 +76,7 @@ final class AdminNavigation
                 ['admin.accounting.vouchers.index', 'سندات الصرف', 'accounting.payments.view', 'admin.accounting.vouchers.*', ['payment']],
                 ['admin.accounting.vouchers.index', 'المصروفات', 'accounting.expenses.view', 'admin.accounting.vouchers.*', ['expense']],
                 ['admin.accounting.vouchers.index', 'إيرادات أخرى', 'accounting.income.view', 'admin.accounting.vouchers.*', ['income']],
+                ['admin.accounting.expense_categories.index', 'تصنيفات المصروفات', 'accounting.expense_categories.view', 'admin.accounting.expense_categories.*'],
                 ['admin.accounting.cashboxes.index', 'الخزائن النقدية', 'accounting.cashboxes.view', 'admin.accounting.cashboxes.*'],
                 ['admin.accounting.banks.index', 'الحسابات البنكية', 'accounting.banks.view', 'admin.accounting.banks.*'],
                 ['admin.accounting.transfers.index', 'التحويلات', 'accounting.transfers.view', 'admin.accounting.transfers.*'],

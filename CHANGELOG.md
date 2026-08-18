@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — user-defined expense categories, each with its own account
+- The expense voucher's "expense account" dropdown listed chart-of-accounts
+  leaves directly — five seeded ones, three of which the system posts to on its
+  own — and the chart of accounts screen is **read-only**: there was no route to
+  create an account anywhere in the panel. So a category like "unloading labour"
+  simply had nowhere to go, and whoever needed it dropped the amount on the
+  nearest existing account, where it mixed with a different expense and could
+  never be separated again.
+- `expense_categories` is a name the user understands sitting on top of an
+  account. Creating one opens a postable leaf account under **Operating
+  Expenses (5100)** named after it, using the same mechanism that already opens
+  supplier and customer ledger accounts — one way of doing one thing.
+- **A new parent, not 5000 itself.** Under 5000 live the system accounts —
+  import estimate variance (5050) and FX differences (5060) — which are
+  estimation outcomes, not money spent. Mixing user categories in with them
+  makes an "operating expenses" report swallow them and stop being comparable
+  month to month.
+- Renaming a category renames its account: otherwise the trial balance shows a
+  name the panel doesn't have.
+- Deletion is guarded twice. A system category (shipping, affiliate commissions)
+  is wired to an account the system posts to automatically, and a category whose
+  account has moved would leave a number with no name in the reports. Both are
+  deactivated instead — and the account itself is never deleted, only
+  deactivated, since deleting it would orphan posted journal lines.
+- Account codes come from the highest existing suffix, not the child count: a
+  deletion would otherwise hand out a code already in use, and account codes are
+  unique, so creation would fail with an error the user cannot act on.
+- The voucher form submits a **category**; the controller derives the account,
+  so the posted entry is unchanged. A quick-add dialog creates a category
+  without leaving the voucher — leaving it would discard everything typed so
+  far. Validation errors come back as JSON explicitly, because the app renders
+  JSON for `api/*` only and the dialog would otherwise show a generic failure
+  instead of "name already used".
+- Editing an older voucher that predates categories leaves its account alone
+  when the category is left empty, so its notes or attachment can still be
+  fixed without moving its account.
+
 ### Fixed — closing an import shipment returned a 500
 - `journal_entries.source` held 20 characters; the source written when a shipment
   is closed, `import_shipment_close`, is 21. MySQL in strict mode refuses the
