@@ -220,7 +220,10 @@
 > عبر السنة يعني أن تكلفة الـCBM المستخدَمة تحتاج تحديثًا.
 
 ### `journal_entries`
-`entry_number` · `date` · `description` · `reference_type` · `reference_id` · `posted_by` → users
+`entry_number` · `date` · `description` · `source` · `reference_type` · `reference_id` · `posted_by` → users
+> `source` سعتُه 40 حرفًا. كانت 20 فرفض MySQL `import_shipment_close` (21 حرفًا)
+> وسقط إغلاق الشحنة بخطأ 500؛ وSQLite لا يفرض أطوال `varchar` فلم يكشفه أي اختبار.
+> أي مصدرٍ جديد يبقى تحت السعة — يحرسه `JournalSourceLengthTest`.
 
 ### `journal_lines`
 `journal_entry_id` → journal_entries · `account_id` → accounts · `debit` · `credit`

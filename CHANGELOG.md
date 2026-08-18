@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — closing an import shipment returned a 500
+- `journal_entries.source` held 20 characters; the source written when a shipment
+  is closed, `import_shipment_close`, is 21. MySQL in strict mode refuses the
+  insert (`1406 Data too long`), so every attempt to close a shipment with a
+  non-zero variance died with a 500 — the shipment stayed open, no partial entry
+  survived (the whole close runs in one transaction).
+- The bug was invisible to the suite because **SQLite does not enforce `varchar`
+  lengths**: it stored 21 characters in a 20-character column without complaint,
+  and all 19 shipment tests passed green while production could not close a
+  single shipment.
+- The column is widened to 40. The old ceiling was tight on names, not just on
+  this one: `purchase_invoice_fx` is 19 and `sales_return_cogs` is 17 — the next
+  source added would likely have hit it too.
+- `JournalSourceLengthTest` now measures every literal `source` in the files that
+  post journal entries against the column's capacity, so the same class of
+  mismatch fails here instead of in production.
+
 ### Added — WhatsApp sending arm: driver, templates, statuses, throttling — ADR-058
 - New `WhatsAppCloudProvider` behind the existing messaging contract, plus a
   signed status webhook and a throttled broadcast command. The list was built in
