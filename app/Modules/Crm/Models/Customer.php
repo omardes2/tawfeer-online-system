@@ -4,6 +4,7 @@ namespace App\Modules\Crm\Models;
 
 use App\Models\User;
 use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Store\Models\WishlistItem;
@@ -39,6 +40,7 @@ class Customer extends Model
     protected $casts = [
         'tags' => 'array',
         'credit_limit' => 'decimal:2',
+        'opening_balance' => 'decimal:2',
         'loyalty_points' => 'integer',
         'is_high_risk' => 'boolean',
         'is_blocked' => 'boolean',
@@ -69,6 +71,18 @@ class Customer extends Model
     public function glAccount(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'gl_account_id');
+    }
+
+    /**
+     * قيد الرصيد الافتتاحي.
+     *
+     * خارج `$fillable` عمدًا هو و`opening_balance`: الرصيد يُكتب من الخدمة مع
+     * قيده في معاملةٍ واحدة، فإسنادٌ جماعي يكتب الرقم بلا قيدٍ يقابله كان يترك
+     * رصيدًا معروضًا لا أثر له في الدفاتر.
+     */
+    public function openingEntry(): BelongsTo
+    {
+        return $this->belongsTo(JournalEntry::class, 'opening_entry_id');
     }
 
     /**

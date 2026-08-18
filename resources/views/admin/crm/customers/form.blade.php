@@ -22,7 +22,29 @@
                     <x-admin.field :label="__('التصنيف')" name="category">
                         <input type="text" name="category" value="{{ old('category', $customer->category) }}" placeholder="{{ __('تجزئة/جملة/VIP') }}" class="w-full rounded-md border-gray-300 text-sm" />
                     </x-admin.field>
+
+                    {{--
+                        رصيدٌ افتتاحي يُنشئ قيدًا في اليومية، فهو لمن يملك صلاحية
+                        القيود وحده — لا لكل من يُنشئ عميلًا.
+                    --}}
+                    @can('accounting.journal.create')
+                        <x-admin.field :label="__('رصيد افتتاحي')" name="opening_balance"
+                                       :hint="__('ما على العميل قبل دخوله النظام. موجب = مدين لك، سالب = دفع مقدَّمًا. يُرحَّل قيدًا: مدين ذمم العميل / دائن رأس المال.')">
+                            <div class="relative">
+                                <input type="number" step="0.01" name="opening_balance"
+                                       value="{{ old('opening_balance', $customer->exists ? (float) $customer->opening_balance : null) }}"
+                                       placeholder="0.00" class="w-full rounded-md border-gray-300 text-sm pe-10" />
+                                <span class="absolute inset-y-0 end-0 flex items-center px-3 text-xs text-gray-400">₪</span>
+                            </div>
+                        </x-admin.field>
+                    @endcan
                 </div>
+
+                @if ($customer->exists && $customer->opening_entry_id)
+                    <p class="text-xs text-amber-600 -mt-2">
+                        {{ __('لهذا العميل رصيد افتتاحي مُرحّل. تغيير الرقم يعكس القيد الأصلي ويُرحّل قيدًا مصحَّحًا — لا يُعدَّل قيد مُرحّل ولا يُحذف.') }}
+                    </p>
+                @endif
 
                 <div class="border-t pt-4">
                     <div class="flex items-center justify-between mb-2">

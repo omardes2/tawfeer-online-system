@@ -112,6 +112,19 @@
 
 ### `customers`
 `user_id` → users (nullable) · `name` · `email` · `phone` · `loyalty_points` · `default_address_id`
+· `gl_account_id` → accounts · `opening_balance` · `opening_entry_id` → journal_entries
+> **الرصيد الافتتاحي قيدٌ لا رقمٌ معروض:** موجبٌ ⇒ مدين حساب العميل الفرعي تحت
+> «ذمم العملاء» (أصل) / دائن «رأس المال 3010» — وهو نفس الطرف المقابل الذي
+> تستخدمه الأرصدة الافتتاحية للخزائن (`ACC_OPENING_EQUITY`). والسالب (دفعة
+> مقدَّمة من العميل) ينعكس طرفاه.
+>
+> `opening_entry_id` هو الحارس: بدونه لا يُعرف أن القيد رُحّل، فيتكرّر مع كل حفظٍ
+> لصفحة التعديل ويتضاعف الرصيد بصمت. وتغيير الرقم **يعكس القيد الأصلي ويُرحّل
+> مصحَّحًا** لا يُعدّله (BR-ACC-09).
+>
+> العمودان خارج `$fillable`: يُكتبان من الخدمة مع القيد في معاملةٍ واحدة، فإسنادٌ
+> جماعي كان يترك رصيدًا معروضًا بلا أثرٍ في الدفاتر. والحقل في الشاشة خلف صلاحية
+> `accounting.journal.create` وحدها.
 
 ### `addresses`
 `customer_id` → customers · `line1` · `line2` · `city` · `region` · `country` · `is_default`

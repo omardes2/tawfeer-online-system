@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Services;
 
 use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Services\AccountingService;
 use App\Modules\Accounting\Services\PostingAccountResolver;
 use App\Modules\Crm\Models\Customer;
 use App\Modules\Crm\Models\CustomerAddress;
@@ -23,12 +24,18 @@ class CustomerService
             ? $this->normalizePhone($data['primary_phone'])
             : null;
 
-        return DB::transaction(function () use ($data, $phones, $addresses, $contacts) {
+        $opening = $this->extractOpening($data);
+
+        return DB::transaction(function () use ($data, $phones, $addresses, $contacts, $opening) {
             $customer = Customer::create($data + ['created_by' => auth()->id()]);
             $this->syncPhones($customer, $phones);
             $this->syncAddresses($customer, $addresses);
             $this->syncContacts($customer, $contacts);
             $this->ensureLedgerAccount($customer);
+
+            if ($opening !== null) {
+                $this->syncOpeningBalance($customer, $opening);
+            }
 
             return $customer;
         });
@@ -40,9 +47,15 @@ class CustomerService
             $data['primary_phone'] = $this->normalizePhone($data['primary_phone']);
         }
 
-        return DB::transaction(function () use ($customer, $data, $phones, $addresses, $contacts) {
+        $opening = $this->extractOpening($data);
+
+        return DB::transaction(function () use ($customer, $data, $phones, $addresses, $contacts, $opening) {
             $customer->update($data);
             $this->ensureLedgerAccount($customer); // ينشئه إن غاب، ويزامن الاسم إن تغيّر
+
+            if ($opening !== null) {
+                $this->syncOpeningBalance($customer, $opening);
+            }
 
             if ($phones !== null) {
                 $customer->phones()->delete();
@@ -65,6 +78,96 @@ class CustomerService
     {
         // حذف ناعم فقط لكيان مهم (BR-CUST-13).
         $customer->delete();
+    }
+
+    /**
+     * ينتزع الرصيد الافتتاحي من بيانات النموذج.
+     *
+     * لا يُمرَّر إلى `Customer::create/update` مع بقيّة الحقول: كتابةُ الرقم
+     * إسنادًا جماعيًا كانت تترك رصيدًا معروضًا بلا قيدٍ يقابله في الدفاتر.
+     * وغيابُ المفتاح (`null`) يعني «لا تمسّه» — لا «صفّره»؛ ففرقُ الأمرين أن
+     * حفظًا لا يحمل الحقل (لغياب الصلاحية) كان سيمحو رصيدًا مُرحّلًا.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function extractOpening(array &$data): ?float
+    {
+        if (! array_key_exists('opening_balance', $data)) {
+            return null;
+        }
+
+        $value = $data['opening_balance'];
+        unset($data['opening_balance']);
+
+        return $value === null || $value === '' ? 0.0 : round((float) $value, 2);
+    }
+
+    /**
+     * ترحيل الرصيد الافتتاحي للعميل — أو تصحيحه.
+     *
+     * الموجب يعني أن العميل **مدين لنا**: مدين حسابه الفرعي في «ذمم العملاء»
+     * (أصل) / دائن رأس المال. والسالب يعني دفعةً مقدَّمة منه فينعكس الطرفان —
+     * ومنعُ السالب كان سيُجبر المستخدم على تجاهل الدفعات المقدَّمة أو إدخالها
+     * بقيدٍ يدوي خارج الشاشة.
+     *
+     * وتغييرُ الرقم بعد ترحيله **يعكس القيد الأصلي ويُرحّل مصحَّحًا** — القيد
+     * المُرحّل لا يُعدَّل ولا يُحذف (BR-ACC-09).
+     */
+    public function syncOpeningBalance(Customer $customer, float $amount): Customer
+    {
+        $amount = round($amount, 2);
+
+        if (abs($amount - (float) $customer->opening_balance) < 0.01) {
+            return $customer; // لا تغيير — ولا قيد بلا أثر.
+        }
+
+        $account = $customer->glAccount()->first() ?: $this->ensureLedgerAccount($customer);
+        if (! $account) {
+            throw ValidationException::withMessages([
+                'opening_balance' => __('لا يمكن ترحيل رصيد افتتاحي قبل تهيئة دليل الحسابات.'),
+            ]);
+        }
+
+        $accounting = app(AccountingService::class);
+        $equity = config('accounting.opening.equity_account');
+
+        return DB::transaction(function () use ($customer, $account, $amount, $accounting, $equity) {
+            $existing = $customer->openingEntry()->first();
+            if ($existing && ! $existing->isReversed()) {
+                $accounting->reverse($existing, [
+                    'description' => __('عكس رصيد افتتاحي للعميل :name', ['name' => $customer->name]),
+                ]);
+            }
+
+            $entry = null;
+            if (abs($amount) >= 0.01) {
+                $value = abs($amount);
+                $lines = $amount > 0
+                    ? [
+                        ['account_code' => $account->code, 'debit' => $value, 'credit' => 0],
+                        ['account_code' => $equity, 'debit' => 0, 'credit' => $value],
+                    ]
+                    : [
+                        ['account_code' => $equity, 'debit' => $value, 'credit' => 0],
+                        ['account_code' => $account->code, 'debit' => 0, 'credit' => $value],
+                    ];
+
+                $entry = $accounting->postEntry([
+                    'entry_date' => now()->toDateString(),
+                    'description' => __('رصيد افتتاحي للعميل :name', ['name' => $customer->name]),
+                    'source' => 'customer_opening',
+                    'reference_type' => 'customer',
+                    'reference_id' => $customer->id,
+                ], $lines);
+            }
+
+            $customer->forceFill([
+                'opening_balance' => $amount,
+                'opening_entry_id' => $entry?->id,
+            ])->save();
+
+            return $customer;
+        });
     }
 
     /**

@@ -12,6 +12,18 @@ class StoreCustomerRequest extends FormRequest
         return true;
     }
 
+    /**
+     * الرصيد الافتتاحي يُنشئ قيدًا في اليومية، فيُسقَط ممّن لا يملك صلاحية
+     * القيود — لا يُرفض الطلب: الحقل لا يُعرض له أصلًا، ووصولُه يعني تلاعبًا
+     * لا خطأً يستحقّ رسالةً تُربكه.
+     */
+    protected function prepareForValidation(): void
+    {
+        if (! $this->user()?->can('accounting.journal.create')) {
+            $this->request->remove('opening_balance');
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -23,6 +35,8 @@ class StoreCustomerRequest extends FormRequest
             'tags' => ['sometimes', 'array'],
             'tags.*' => ['string', 'max:40'],
             'credit_limit' => ['nullable', 'numeric', 'min:0'],
+            // الرصيد الافتتاحي: موجب = العميل مدين لنا، سالب = دفع مقدَّمًا.
+            'opening_balance' => ['nullable', 'numeric', 'between:-99999999999.99,99999999999.99'],
             'notes' => ['nullable', 'string'],
             'phones' => ['sometimes', 'array'],
             'phones.*.phone' => ['required_with:phones', 'string', 'max:40'],

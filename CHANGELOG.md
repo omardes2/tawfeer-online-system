@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — customer opening balance, posted as a real entry
+- A customer who owed money before the system existed had nowhere to record it.
+  The customer form now takes an **opening balance**, posted as a balanced
+  entry: **debit the customer's sub-account under Accounts Receivable (asset),
+  credit Capital (3010)** — the same counterpart the treasury opening balance
+  already uses, so the two don't diverge. It is `ACC_OPENING_EQUITY` in config,
+  so moving it to a dedicated suspense account is an env change, not a code one.
+- Negative balances are supported: a customer who paid in advance credits the
+  receivable instead. Refusing negatives would have forced that case into a
+  manual journal entry outside the screen.
+- `opening_entry_id` on the customer is the guard, not decoration. Without it
+  nothing knows the entry was already posted, and every save of the edit page —
+  to fix a phone number — would post it again and silently double the balance.
+- Changing the amount **reverses the original entry and posts a corrected one**;
+  a posted entry is never edited or deleted (BR-ACC-09). Clearing it reverses
+  without posting anything new.
+- A save that doesn't carry the field means "leave it alone", not "zero it" —
+  otherwise a salesperson updating a phone number would wipe a posted balance.
+- The field is only shown to, and only accepted from, users with
+  `accounting.journal.create`. Salespeople create customers daily; an opening
+  balance is a journal entry, not customer data.
+- The balance needs no new display: the customer statement is derived from
+  posted journal lines, so the opening entry appears in it and in the running
+  balance on its own.
+
 ### Added — user-defined expense categories, each with its own account
 - The expense voucher's "expense account" dropdown listed chart-of-accounts
   leaves directly — five seeded ones, three of which the system posts to on its
