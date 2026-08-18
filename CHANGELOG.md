@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — the "Buy now" button rendered with no styling at all
+- On the product page it appeared as bare text with the bolt icon on its own
+  line, instead of a full-width outlined button.
+- The trigger carried **two `@class` directives**. Each one renders a complete
+  `class` attribute, so the element got two of them — and a browser keeps the
+  first and silently ignores the rest. The first was the `triggerless` toggle,
+  empty in the normal case, so every style class was dropped.
+- Introduced when the `triggerless` prop was added for the quantity-offer card.
+  No behaviour test could catch it: the button worked, the checkout path was
+  intact, only the appearance was gone.
+- Merged into a single `@class`. `QuickBuyButtonStyleTest` now asserts the
+  trigger renders exactly one `class` attribute and carries its style in each
+  mode — scoped to the trigger tag, since the panel holds other buttons that
+  share those classes and would make a whole-page assertion pass regardless.
+- Nothing in the checkout contract was touched: no `name`, `id`, `data-*`,
+  Alpine binding, event or API parameter changed — only the class list.
+
 ### Fixed — a supplier's opening balance was never posted to the ledger
 - `suppliers.opening_balance` has existed since the beginning and both supplier
   requests accepted it, but **nothing ever posted it**. It was mass-assigned onto

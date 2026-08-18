@@ -44,9 +44,15 @@
      @if ($listens) @quick-buy:open.window="open($event.detail.variant, $event.detail)" @endif
      @class(['contents' => $compact, 'hidden lg:block' => $hideOnMobile])>
 
-    <button type="button" @click="open({!! $variantJs !!})" @class(['hidden' => $triggerless])
+    {{--
+        `@class` واحدة لا اثنتان: كلٌّ منهما تُصيّر السمة `class` كاملةً، والمتصفّح
+        يأخذ الأولى ويُهمل الثانية — فخرج الزرّ بلا أصنافٍ إطلاقًا: نصٌّ عارٍ
+        وأيقونةٌ في سطرٍ وحدها بدل زرّ. `hidden` مدموجةٌ هنا وتغلب `display` غيرها.
+    --}}
+    <button type="button" @click="open({!! $variantJs !!})"
             :disabled="!({!! $enabledExpr !!}) || !({!! $variantJs !!}) || busy"
             @class([
+                'hidden' => $triggerless,
                 'sf-btn-primary whitespace-nowrap shrink-0 min-h-10 !px-3 gap-1.5 text-[13px]' => $compact,
                 'sf-btn-outline sf-btn-block sf-btn-lg mt-2' => ! $compact,
             ])>
