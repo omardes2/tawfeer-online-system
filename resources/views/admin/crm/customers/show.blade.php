@@ -16,6 +16,21 @@
                 @can('update', $customer)
                     <a href="{{ route('admin.crm.customers.edit', $customer) }}" class="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-50">{{ __('تعديل') }}</a>
                 @endcan
+
+                @can('delete', $customer)
+                    {{--
+                        الحذف للمكرّر أو المُدخَل خطأً. نصُّ التأكيد يذكر عكسَ الرصيد
+                        الافتتاحي صراحةً: إخفاءُ فعلٍ محاسبي خلف زرّ «حذف» أسوأ من
+                        عدم وجود الزرّ.
+                    --}}
+                    <form method="POST" action="{{ route('admin.crm.customers.destroy', $customer) }}"
+                          onsubmit="return confirm(@js($customer->opening_entry_id
+                              ? __('سيُحذف العميل، ويُعكس رصيده الافتتاحي (:n) بقيد عاكس، ويُعطَّل حسابه المحاسبي. متابعة؟', ['n' => number_format((float) $customer->opening_balance, 2)])
+                              : __('حذف العميل؟ يُرفض إن كانت له طلبات أو حركة على حسابه المحاسبي.')))">
+                        @csrf @method('DELETE')
+                        <button class="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-rose-200 text-rose-600 text-sm rounded-lg hover:bg-rose-50">{{ __('حذف') }}</button>
+                    </form>
+                @endcan
             </div>
         </div>
 

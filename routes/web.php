@@ -523,6 +523,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
 
     // CRM/العملاء (Phase 2.10)
     Route::prefix('crm')->name('crm.')->group(function () {
+        // الحذف محروسٌ في الخدمة: لا طلبات ولا حركة دفترية غير الرصيد الافتتاحي.
         Route::resource('customers', AdminCustomerController::class);
         Route::post('customers/{customer}/notes', [AdminCustomerController::class, 'addNote'])->name('customers.notes.store');
         Route::post('customers/{customer}/block', [AdminCustomerController::class, 'block'])->name('customers.block');

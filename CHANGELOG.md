@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — a customer's own opening balance no longer blocks deleting it
+- The delete button, its route and its guards landed in the previous commit. Its
+  guard refused any customer whose ledger account had posted lines, and said
+  zeroing the balance would not lift the ban — a reversal leaves lines behind.
+  Correct as a principle, but it made the one case the button exists for
+  impossible: a duplicate record entered with an opening balance by mistake
+  could never be removed, by any route.
+- The guard now exempts **the customer's own opening-balance entry and its
+  reversal**, and nothing else. That entry is made by the customer screen itself,
+  and deleting reverses it inside the same transaction, so the account returns to
+  zero and nothing is orphaned. Everything else — a sale, a receipt, a manual
+  entry — still refuses the delete.
+- Exemption is matched by entry id, not by balance: a net of zero can hide a sale
+  and a return, and both are history that should keep its owner's name.
+- The GL account is deactivated on delete rather than dropped, since deleting it
+  would orphan posted journal lines.
+- The delete button is now on the customer page too, not only the list, and its
+  confirmation names the amount being reversed — hiding an accounting action
+  behind a "delete" button would be worse than having no button.
+- Noted, not built: `CustomerService::merge()` already exists — it moves phones,
+  addresses, contacts, notes and orders to the surviving record — but has no
+  route or screen. That is the right tool for a duplicate that has already sold,
+  and it does not move the GL balance today.
+
 ### Added — customer opening balance, posted as a real entry
 - A customer who owed money before the system existed had nowhere to record it.
   The customer form now takes an **opening balance**, posted as a balanced

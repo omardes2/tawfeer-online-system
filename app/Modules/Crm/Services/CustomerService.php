@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Services;
 
 use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Accounting\Services\AccountingService;
 use App\Modules\Accounting\Services\PostingAccountResolver;
 use App\Modules\Crm\Models\Customer;
@@ -83,12 +84,29 @@ class CustomerService
      *
      * فمن له تاريخ يُحظر (BR-CUST-12) لا يُحذف: الحظر يمنع الطلبات الجديدة
      * ويُبقي الدفاتر متّسقة.
+     *
+     * ويُستثنى من «التاريخ» **رصيدُ العميل الافتتاحي وحده**: هو من صنع شاشة
+     * العميل نفسها، ويُعكس هنا في المعاملة نفسها فيعود الحساب صفرًا. ولولا هذا
+     * الاستثناء لتعذّر حذف السجلّ المكرّر الذي أُدخل برصيدٍ خطأً — وهو أكثر ما
+     * يُحذف من أجله عميل، ولما نفعه تصفيرُ الرصيد يدويًا لأن القيد يُعكس ولا
+     * يُمحى فتبقى سطوره على الحساب.
      */
     public function delete(Customer $customer): void
     {
         $this->assertDeletable($customer);
 
-        $customer->delete();
+        $account = $customer->glAccount()->first();
+
+        DB::transaction(function () use ($customer, $account) {
+            if ($customer->opening_entry_id) {
+                $this->syncOpeningBalance($customer, 0); // عكسٌ لا محو (BR-ACC-09).
+            }
+
+            // الحساب يُعطَّل ولا يُحذف: حذفُه يترك قيودًا بلا حساب.
+            $account?->update(['is_active' => false]);
+
+            $customer->delete();
+        });
     }
 
     /**
@@ -106,18 +124,32 @@ class CustomerService
 
         $account = $customer->glAccount()->first();
 
-        if ($account && $account->lines()->whereHas('entry', fn ($q) => $q->where('status', 'posted'))->exists()) {
+        if ($account && $this->hasForeignEntries($customer, $account)) {
             throw ValidationException::withMessages([
                 'customer' => __('لا يمكن حذف عميل له حركات محاسبية مُرحّلة. يمكنك حظره بدلًا من ذلك.'),
             ]);
         }
+    }
 
-        // رصيدٌ افتتاحي أُدخل ولم يُرحّل بعد لا تلتقطه القيود أعلاه.
-        if (abs((float) $customer->opening_balance) >= 0.01) {
-            throw ValidationException::withMessages([
-                'customer' => __('لا يمكن حذف عميل له رصيد. سوِّ الرصيد أولًا أو احظره بدلًا من ذلك.'),
-            ]);
-        }
+    /**
+     * هل على حساب العميل قيودٌ غير رصيده الافتتاحي (وعكسِه)؟
+     *
+     * تُقاس بالمعرّفات لا بالرصيد: رصيدٌ صافيه صفر قد يخفي بيعًا ومرتجعًا،
+     * وكلاهما تاريخٌ لا يجوز أن يفقد اسم صاحبه في ميزان المراجعة.
+     */
+    private function hasForeignEntries(Customer $customer, Account $account): bool
+    {
+        $openingIds = JournalEntry::query()
+            ->where('source', 'customer_opening')
+            ->where('reference_type', 'customer')
+            ->where('reference_id', $customer->id)
+            ->pluck('id');
+
+        $exempt = $openingIds
+            ->merge(JournalEntry::whereIn('reverses_entry_id', $openingIds)->pluck('id'))
+            ->all();
+
+        return $account->lines()->whereNotIn('journal_entry_id', $exempt)->exists();
     }
 
     /**
