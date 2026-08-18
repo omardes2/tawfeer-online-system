@@ -35,7 +35,9 @@ class TreasuryService
                 'type' => $data['type'] ?? 'cash',
                 'gl_account_id' => $account->id,
                 'currency' => $data['currency'] ?? 'ILS',
-                'opening_balance' => round((float) ($data['opening_balance'] ?? 0), 2),
+                // يبقى صفرًا هنا ويُكتب من `syncOpeningBalance` مع قيده معًا،
+                // فلا يوجد لحظةٌ يحمل فيها العمودُ رقمًا لا قيد له.
+                'opening_balance' => 0,
                 'is_active' => $data['is_active'] ?? true,
                 'is_default' => $data['is_default'] ?? false,
                 'bank_name' => $data['bank_name'] ?? null,
@@ -46,20 +48,75 @@ class TreasuryService
                 'created_by' => auth()->id(),
             ]);
 
-            $opening = round((float) ($treasury->opening_balance), 2);
-            if ($opening > 0) {
-                $equity = config('accounting.treasury.opening_equity', '3010');
-                $this->accounting->postEntry([
+            $this->syncOpeningBalance($treasury, round((float) ($data['opening_balance'] ?? 0), 2));
+
+            return $treasury;
+        });
+    }
+
+    /**
+     * ترحيل الرصيد الافتتاحي للخزينة — أو تصحيحه بعد الإنشاء.
+     *
+     * كان يُرحَّل مرّة واحدة لحظة الإنشاء ثم يُغلق البابُ: من نسيه لم يجد له
+     * مدخلًا إلا قيدًا يدويًا يضبط الدفاتر ويترك عمود «افتتاحي» صفرًا، فيقرأ
+     * صاحبُه رقمين متناقضين عن خزينةٍ واحدة.
+     *
+     * والقيد: مدين حساب الخزينة (أصل) / دائن رأس المال. وتغييرُ الرقم بعد
+     * ترحيله **يعكس الأصل ويُرحّل مصحَّحًا** — المُرحّل لا يُعدَّل (BR-ACC-09).
+     */
+    public function syncOpeningBalance(Treasury $treasury, float $amount): Treasury
+    {
+        $amount = round($amount, 2);
+
+        if (abs($amount - (float) $treasury->opening_balance) < 0.01) {
+            return $treasury; // لا تغيير — ولا قيد بلا أثر.
+        }
+
+        $account = $treasury->glAccount()->first();
+        if (! $account) {
+            throw ValidationException::withMessages([
+                'opening_balance' => __('الخزينة بلا حساب محاسبي — لا يمكن ترحيل رصيد افتتاحي.'),
+            ]);
+        }
+
+        $equity = config('accounting.opening.equity_account', config('accounting.treasury.opening_equity', '3010'));
+
+        return DB::transaction(function () use ($treasury, $account, $amount, $equity) {
+            $existing = $treasury->openingEntry()->first();
+            if ($existing && ! $existing->isReversed()) {
+                $this->accounting->reverse($existing, [
+                    'description' => __('عكس رصيد افتتاحي — :name', ['name' => $treasury->name]),
+                ]);
+            }
+
+            $entry = null;
+            if (abs($amount) >= 0.01) {
+                $value = abs($amount);
+                // الشاشة لا تقبل سالبًا اليوم، لكن الإشارة تُحسم هنا لا هناك:
+                // صحّة القيد لا تُترك لتحقّقٍ في نموذج قد يتغيّر.
+                $lines = $amount > 0
+                    ? [
+                        ['account_code' => $account->code, 'debit' => $value, 'credit' => 0],
+                        ['account_code' => $equity, 'debit' => 0, 'credit' => $value],
+                    ]
+                    : [
+                        ['account_code' => $equity, 'debit' => $value, 'credit' => 0],
+                        ['account_code' => $account->code, 'debit' => 0, 'credit' => $value],
+                    ];
+
+                $entry = $this->accounting->postEntry([
                     'entry_date' => now()->toDateString(),
                     'description' => __('رصيد افتتاحي — :name', ['name' => $treasury->name]),
                     'source' => 'system',
                     'reference_type' => 'treasury_opening',
                     'reference_id' => $treasury->id,
-                ], [
-                    ['account_code' => $account->code, 'debit' => $opening, 'credit' => 0],
-                    ['account_code' => $equity, 'debit' => 0, 'credit' => $opening],
-                ]);
+                ], $lines);
             }
+
+            $treasury->forceFill([
+                'opening_balance' => $amount,
+                'opening_entry_id' => $entry?->id,
+            ])->save();
 
             return $treasury;
         });
@@ -76,6 +133,13 @@ class TreasuryService
             'name', 'name_en', 'currency', 'is_active', 'bank_name',
             'account_name', 'account_number', 'iban', 'swift',
         ])->all());
+
+        // غيابُ المفتاح يعني «لا تمسّه» لا «صفّره»: حفظٌ لا يحمل الحقل كان
+        // سيعكس قيدًا مُرحّلًا بلا أن يطلب أحدٌ ذلك.
+        if (array_key_exists('opening_balance', $data)) {
+            $value = $data['opening_balance'];
+            $this->syncOpeningBalance($treasury, $value === null || $value === '' ? 0.0 : (float) $value);
+        }
 
         return $treasury;
     }

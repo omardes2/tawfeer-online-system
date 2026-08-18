@@ -34,6 +34,18 @@ class Treasury extends Model
         return $this->belongsTo(Account::class, 'gl_account_id');
     }
 
+    /**
+     * قيد الرصيد الافتتاحي.
+     *
+     * خارج `$fillable` عمدًا: يُكتب من الخدمة مع قيده في معاملةٍ واحدة، فإسنادٌ
+     * جماعي يربط عمودًا بقيدٍ لم يُرحَّل — أو يفكّ ربطًا فيتضاعف الرصيد عند أول
+     * تعديل.
+     */
+    public function openingEntry(): BelongsTo
+    {
+        return $this->belongsTo(JournalEntry::class, 'opening_entry_id');
+    }
+
     public function vouchers(): HasMany
     {
         return $this->hasMany(FinancialVoucher::class, 'treasury_id');

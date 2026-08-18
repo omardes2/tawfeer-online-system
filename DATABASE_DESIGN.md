@@ -269,7 +269,18 @@
 `payable_type` · `payable_id` · `direction` (in/out) · `method` · `amount` · `account_id` → accounts · `paid_at`
 
 ### `treasuries` (خزائن/بنوك)
-`name` · `type` (cash/bank) · `account_id` → accounts · `balance`
+`name` · `type` (cash/bank) · `gl_account_id` → accounts · `opening_balance` · `opening_entry_id` → journal_entries
+> **لا رصيد مخزَّن:** رصيد الخزينة يُشتقّ دائمًا من سطور القيود المُرحّلة على
+> حسابها (`AccountingService::accountBalance`). و`opening_balance` ليس رصيدًا بل
+> **الرقم الافتتاحي المُدخَل** ومعه قيدُه: مدين حساب الخزينة / دائن رأس المال
+> (`ACC_OPENING_EQUITY`).
+>
+> `opening_entry_id` هو الحارس: بدونه لا يُعرف أن القيد رُحّل، فيُضاف قيدٌ ثانٍ
+> فوق الأول عند أول تعديل ويتضاعف الرصيد. وتغيير الرقم **يعكس الأصل ويُرحّل
+> مصحَّحًا** (BR-ACC-09)، وحفظٌ لا يحمل الحقل لا يمسّه.
+>
+> العمودان يُكتبان من الخدمة مع القيد في معاملةٍ واحدة، فلا لحظة يحمل فيها
+> العمودُ رقمًا بلا قيدٍ خلفه.
 
 ---
 

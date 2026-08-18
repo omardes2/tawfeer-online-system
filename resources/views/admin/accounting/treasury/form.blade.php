@@ -10,8 +10,19 @@
                     <x-admin.field :label="__('الاسم')" name="name"><input type="text" name="name" value="{{ old('name', $treasury->name) }}" required class="w-full rounded-md border-gray-300" /></x-admin.field>
                     <x-admin.field :label="__('الاسم (إنجليزي)')" name="name_en"><input type="text" name="name_en" value="{{ old('name_en', $treasury->name_en) }}" class="w-full rounded-md border-gray-300" /></x-admin.field>
                     <x-admin.field :label="__('العملة')" name="currency"><input type="text" name="currency" value="{{ old('currency', $treasury->currency ?: 'ILS') }}" maxlength="3" class="w-full rounded-md border-gray-300 uppercase" /></x-admin.field>
+                    {{--
+                        الرصيد الافتتاحي متاحٌ بعد الإنشاء أيضًا: من نسيه لحظة
+                        الإنشاء كان يلجأ إلى قيدٍ يدوي يضبط الدفاتر ويترك هذا
+                        العمود صفرًا، فيقرأ رقمين متناقضين عن خزينةٍ واحدة.
+                    --}}
+                    <x-admin.field :label="__('الرصيد الافتتاحي')" name="opening_balance"
+                                   :hint="$treasury->exists ? __('تغييره يعكس قيده الأصلي ويُرحّل قيدًا مصحَّحًا — لا يُعدَّل قيد مُرحّل.') : null">
+                        <input type="number" step="0.01" min="0" name="opening_balance"
+                               value="{{ old('opening_balance', $treasury->exists ? (float) $treasury->opening_balance : 0) }}"
+                               class="w-full rounded-md border-gray-300" />
+                    </x-admin.field>
+
                     @unless ($treasury->exists)
-                        <x-admin.field :label="__('الرصيد الافتتاحي')" name="opening_balance"><input type="number" step="0.01" min="0" name="opening_balance" value="{{ old('opening_balance', 0) }}" class="w-full rounded-md border-gray-300" /></x-admin.field>
                         <x-admin.field :label="__('حساب GL (اختياري — يُنشأ تلقائيًا)')" name="gl_account_id">
                             <select name="gl_account_id" class="w-full rounded-md border-gray-300">
                                 <option value="">{{ __('— إنشاء حساب مخصّص تلقائيًا —') }}</option>

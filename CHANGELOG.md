@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — a treasury's opening balance can be set after it was created
+- The opening balance posted once, at creation, and then the door shut: the field
+  was rendered only on the create form (`@unless ($treasury->exists)`) and
+  `TreasuryService::update()` never read it. Whoever forgot it had no way in, and
+  fell back to a manual journal entry — which fixes the books but leaves the
+  stored "opening" figure at zero, so one cashbox shows two contradicting numbers
+  and it looks like nothing was counted.
+- `treasuries.opening_entry_id` records the entry. Without it nothing knows the
+  balance was already posted, so editing would stack a second entry on top of the
+  first and double the cashbox. The migration back-links entries already posted as
+  `treasury_opening`, oldest first, so existing cashboxes are safe from that on
+  their first edit.
+- Changing the amount **reverses the original and posts a corrected entry**
+  (BR-ACC-09); clearing it reverses without posting anything new; saving the same
+  amount posts nothing; and a save that doesn't carry the field leaves it alone
+  rather than zeroing it.
+- The column and the entry are written together in one transaction, so there is no
+  moment where the stored figure has no entry behind it — which is exactly the
+  split that made this confusing in the first place.
+- Note for reading the treasury statement: **"رصيد أول المدّة" is not the
+  treasury's opening balance.** It sums movements *before the selected range*, so
+  an opening entry dated inside the current month correctly shows there as zero
+  and appears as a movement row instead. The balance itself is always derived from
+  posted journal lines.
+
 ### Changed — a customer's own opening balance no longer blocks deleting it
 - The delete button, its route and its guards landed in the previous commit. Its
   guard refused any customer whose ledger account had posted lines, and said
