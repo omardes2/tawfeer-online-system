@@ -179,7 +179,16 @@
                     <div class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">{{ __('العنوان') }}</span><span class="text-gray-800">{{ $supplier->address ?: '—' }}</span></div>
                     <div class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">{{ __('مهلة السداد (يوم)') }}</span><span class="text-gray-800">{{ $supplier->payment_terms_days ?? '—' }}</span></div>
                     <div class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">{{ __('سقف الائتمان') }}</span><span class="text-gray-800 tabular-nums">{{ number_format((float) $supplier->credit_limit, 2) }}</span></div>
-                    <div class="flex justify-between border-b border-gray-50 pb-2"><span class="text-gray-500">{{ __('الرصيد الافتتاحي') }}</span><span class="text-gray-800 tabular-nums">{{ number_format((float) $supplier->opening_balance, 2) }}</span></div>
+                    <div class="flex justify-between border-b border-gray-50 pb-2">
+                        <span class="text-gray-500">{{ __('الرصيد الافتتاحي') }}</span>
+                        <span class="text-gray-800 tabular-nums">
+                            {{ number_format((float) $supplier->opening_balance, 2) }}
+                            {{-- رقمٌ بلا قيد يُقرأ رصيدًا وهو ليس في الدفاتر — يُوسَم حتى يُرحَّل. --}}
+                            @if ($supplier->hasUnpostedOpening())
+                                <span class="ms-1 text-[11px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">{{ __('غير مُرحّل') }}</span>
+                            @endif
+                        </span>
+                    </div>
                 </div>
 
                 @if ($supplier->notes)

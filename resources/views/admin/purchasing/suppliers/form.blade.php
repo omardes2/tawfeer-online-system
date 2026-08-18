@@ -34,6 +34,30 @@
                     <textarea name="address" rows="2" class="w-full rounded-md border-gray-300 text-sm">{{ old('address', $supplier->address) }}</textarea>
                 </x-admin.field>
 
+                {{--
+                    رصيدٌ افتتاحي يُنشئ قيدًا في اليومية، فهو لمن يملك صلاحية
+                    القيود وحده — لا لكل من يُضيف موردًا.
+                --}}
+                @can('accounting.journal.create')
+                    <x-admin.field :label="__('رصيد افتتاحي')" name="opening_balance"
+                                   :hint="$supplier->exists
+                                       ? __('ما علينا للمورد قبل دخوله النظام. موجب = نحن مدينون له، سالب = دفعنا مقدَّمًا. تغييره يعكس قيده الأصلي ويُرحّل مصحَّحًا.')
+                                       : __('ما علينا للمورد قبل دخوله النظام. موجب = نحن مدينون له، سالب = دفعنا مقدَّمًا. يُرحَّل قيدًا: مدين رأس المال / دائن ذمّة المورد.')">
+                        <div class="relative">
+                            <input type="number" step="0.01" name="opening_balance"
+                                   value="{{ old('opening_balance', $supplier->exists ? (float) $supplier->opening_balance : null) }}"
+                                   placeholder="0.00" class="w-full rounded-md border-gray-300 text-sm pe-10" />
+                            <span class="absolute inset-y-0 end-0 flex items-center px-3 text-xs text-gray-400">₪</span>
+                        </div>
+                    </x-admin.field>
+
+                    @if ($supplier->hasUnpostedOpening())
+                        <p class="text-xs text-amber-600 -mt-2">
+                            {{ __('لهذا المورد رصيد افتتاحي مكتوب بلا قيد في الدفاتر (من قبل ترحيل الأرصدة). احفظ لتُرحَّل قيمته.') }}
+                        </p>
+                    @endif
+                @endcan
+
                 <label class="inline-flex items-center gap-2 text-sm">
                     <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $supplier->exists ? $supplier->is_active : true)) class="rounded border-gray-300" />
                     {{ __('نشط') }}

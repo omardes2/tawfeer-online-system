@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — a supplier's opening balance was never posted to the ledger
+- `suppliers.opening_balance` has existed since the beginning and both supplier
+  requests accepted it, but **nothing ever posted it**. It was mass-assigned onto
+  the row, shown in the supplier list and on the supplier page, and the chart of
+  accounts knew nothing about it. The table said the company owed money the trial
+  balance had never heard of.
+- It now posts an entry like the customer one, with the sign the other way round:
+  a positive opening balance means **we owe the supplier**, so it **credits the
+  supplier's sub-account under Accounts Payable (a liability) and debits
+  Capital**. Negative — money we paid in advance — reverses both sides.
+- `opening_entry_id` records the entry, so changing the amount **reverses the
+  original and posts a corrected one** instead of stacking a second entry on top
+  and doubling what we owe.
+- Both columns left `$fillable`: they are written by the service together with the
+  entry in one transaction. Mass assignment is exactly what produced a number with
+  no entry behind it.
+- **Legacy rows are handled without a migration writing to the books.** Posting
+  journal entries from a migration would write into periods that may be closed,
+  unasked. Instead, a stored amount with no linked entry is treated as needing
+  posting even when the value did not change, so it posts on the next save — and
+  until then the supplier page marks it «غير مُرحّل» rather than showing it as if
+  it were in the ledger.
+- The field is only shown to, and only accepted from, users with
+  `accounting.journal.create`; a save that doesn't carry it leaves the balance
+  alone rather than zeroing it.
+
 ### Added — a treasury's opening balance can be set after it was created
 - The opening balance posted once, at creation, and then the door shut: the field
   was rendered only on the create form (`@unless ($treasury->exists)`) and

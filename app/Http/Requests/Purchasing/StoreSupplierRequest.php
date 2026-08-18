@@ -11,6 +11,18 @@ class StoreSupplierRequest extends FormRequest
         return true;
     }
 
+    /**
+     * الرصيد الافتتاحي يُنشئ قيدًا في اليومية، فيُسقَط ممّن لا يملك صلاحية
+     * القيود. وإسقاطُه يعني «لا تمسّه» لا «صفّره» — فحفظُ موظّفٍ لبيانات المورد
+     * لا يمحو رصيدًا مُرحّلًا.
+     */
+    protected function prepareForValidation(): void
+    {
+        if (! $this->user()?->can('accounting.journal.create')) {
+            $this->request->remove('opening_balance');
+        }
+    }
+
     public function rules(): array
     {
         return [

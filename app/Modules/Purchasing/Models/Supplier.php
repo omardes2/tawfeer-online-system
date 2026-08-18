@@ -3,6 +3,7 @@
 namespace App\Modules\Purchasing\Models;
 
 use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Foundation\Models\Branch;
 use App\Support\Concerns\Auditable;
 use App\Support\Concerns\HasUuid;
@@ -24,7 +25,10 @@ class Supplier extends Model
     protected $fillable = [
         'branch_id', 'name', 'code', 'legal_name', 'tax_number', 'email', 'phone',
         'address', 'governorate_id', 'city_id', 'currency_id', 'gl_account_id',
-        'payment_terms_days', 'credit_limit', 'opening_balance', 'notes', 'is_active',
+        // `opening_balance` و`opening_entry_id` خارج القائمة عمدًا: يُكتبان من
+        // الخدمة مع قيدهما في معاملةٍ واحدة. وإسنادٌ جماعي كان يترك رقمًا على
+        // الصفّ لا يعرفه ميزان المراجعة — وهو ما كان يحدث فعلًا قبل هذا.
+        'payment_terms_days', 'credit_limit', 'notes', 'is_active',
     ];
 
     protected $casts = [
@@ -43,6 +47,23 @@ class Supplier extends Model
     public function glAccount(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'gl_account_id');
+    }
+
+    /** قيد الرصيد الافتتاحي — بمعرفته يُصحَّح الرقم بعكسٍ لا بقيدٍ ثانٍ فوقه. */
+    public function openingEntry(): BelongsTo
+    {
+        return $this->belongsTo(JournalEntry::class, 'opening_entry_id');
+    }
+
+    /**
+     * رصيدٌ افتتاحي مكتوبٌ على الصفّ بلا قيدٍ في الدفاتر.
+     *
+     * حالةُ ما قبل هذه المرحلة: الرقم كان يُقبل ويُعرض ولا يُرحَّل. يُعرض تنبيهًا
+     * في صفحة المورد، ويُرحَّل عند أول حفظ.
+     */
+    public function hasUnpostedOpening(): bool
+    {
+        return abs((float) $this->opening_balance) >= 0.01 && $this->opening_entry_id === null;
     }
 
     public function contacts(): HasMany
