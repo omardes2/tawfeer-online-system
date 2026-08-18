@@ -74,10 +74,50 @@ class CustomerService
         });
     }
 
+    /**
+     * حذف ناعم فقط لكيان مهم (BR-CUST-13) — ولمن لا تاريخ له.
+     *
+     * العميل ليس صفًّا معزولًا: له طلبات، وحسابٌ فرعي في «ذمم العملاء» بقيودٍ
+     * مُرحّلة، ورصيدٌ يظهر في كشف حسابه. وحذفه مع بقاء تلك القيود كان يترك
+     * حركاتٍ في الدفاتر بلا صاحبٍ ظاهر، ورصيدًا مستحقًّا لا يطالب به أحد.
+     *
+     * فمن له تاريخ يُحظر (BR-CUST-12) لا يُحذف: الحظر يمنع الطلبات الجديدة
+     * ويُبقي الدفاتر متّسقة.
+     */
     public function delete(Customer $customer): void
     {
-        // حذف ناعم فقط لكيان مهم (BR-CUST-13).
+        $this->assertDeletable($customer);
+
         $customer->delete();
+    }
+
+    /**
+     * يرفض الحذف إن كان للعميل أثرٌ لا يصحّ فقدان صاحبه.
+     *
+     * @throws ValidationException
+     */
+    private function assertDeletable(Customer $customer): void
+    {
+        if ($customer->orders()->exists()) {
+            throw ValidationException::withMessages([
+                'customer' => __('لا يمكن حذف عميل له طلبات. يمكنك حظره بدلًا من ذلك.'),
+            ]);
+        }
+
+        $account = $customer->glAccount()->first();
+
+        if ($account && $account->lines()->whereHas('entry', fn ($q) => $q->where('status', 'posted'))->exists()) {
+            throw ValidationException::withMessages([
+                'customer' => __('لا يمكن حذف عميل له حركات محاسبية مُرحّلة. يمكنك حظره بدلًا من ذلك.'),
+            ]);
+        }
+
+        // رصيدٌ افتتاحي أُدخل ولم يُرحّل بعد لا تلتقطه القيود أعلاه.
+        if (abs((float) $customer->opening_balance) >= 0.01) {
+            throw ValidationException::withMessages([
+                'customer' => __('لا يمكن حذف عميل له رصيد. سوِّ الرصيد أولًا أو احظره بدلًا من ذلك.'),
+            ]);
+        }
     }
 
     /**

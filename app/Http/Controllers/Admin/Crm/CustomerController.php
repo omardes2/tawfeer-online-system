@@ -79,6 +79,15 @@ class CustomerController extends Controller
         return redirect()->route('admin.crm.customers.show', $customer)->with('success', __('حُدّث العميل.'));
     }
 
+    public function destroy(Customer $customer): RedirectResponse
+    {
+        $this->authorize('delete', $customer);
+
+        $this->service->delete($customer);
+
+        return redirect()->route('admin.crm.customers.index')->with('success', __('حُذف العميل.'));
+    }
+
     public function show(Customer $customer): View
     {
         $this->authorize('view', $customer);

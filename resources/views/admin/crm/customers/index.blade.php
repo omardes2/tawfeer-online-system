@@ -36,7 +36,12 @@
                                     @elseif ($c->is_high_risk)<span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">{{ __('عالي الخطورة') }}</span>
                                     @else<span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-700">{{ __('نشط') }}</span>@endif
                                 </td>
-                                <td class="py-2 px-3"><a href="{{ route('admin.crm.customers.show', $c) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a></td>
+                                <td class="py-2 px-3"><div class="flex gap-3">
+                                    <a href="{{ route('admin.crm.customers.show', $c) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a>
+                                    @can('delete', $c)
+                                        <form method="POST" action="{{ route('admin.crm.customers.destroy', $c) }}" onsubmit="return confirm('{{ __('تأكيد حذف العميل؟') }}')">@csrf @method('DELETE')<button class="text-rose-600 hover:underline">{{ __('حذف') }}</button></form>
+                                    @endcan
+                                </div></td>
                             </tr>
                         @empty
                             <tr><td colspan="6" class="py-6 text-center text-gray-400">{{ __('لا يوجد عملاء.') }}</td></tr>

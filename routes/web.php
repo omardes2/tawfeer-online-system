@@ -523,7 +523,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
 
     // CRM/العملاء (Phase 2.10)
     Route::prefix('crm')->name('crm.')->group(function () {
-        Route::resource('customers', AdminCustomerController::class)->except('destroy');
+        Route::resource('customers', AdminCustomerController::class);
         Route::post('customers/{customer}/notes', [AdminCustomerController::class, 'addNote'])->name('customers.notes.store');
         Route::post('customers/{customer}/block', [AdminCustomerController::class, 'block'])->name('customers.block');
         Route::post('customers/{customer}/unblock', [AdminCustomerController::class, 'unblock'])->name('customers.unblock');
