@@ -21,14 +21,26 @@
             <x-admin.form-section :title="__('بيانات العميل والتوصيل')" :cols="2">
                 <x-admin.field :label="__('اسم العميل')" name="customer_name" :required="true">
                     <input type="text" name="customer_name" value="{{ old('customer_name') }}" required
+                           x-ref="nameInput"
                            class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
                 </x-admin.field>
 
                 <x-admin.field :label="__('رقم الهاتف')" name="customer_phone" :required="true">
+                    {{--
+                        عند اكتمال الرقم يُبحَث عن الزبون فتُعبَّأ بياناته من آخر
+                        طلب — لكل من يُنشئ الطلبات، عبر النظام كلّه لا طلباته وحده.
+                    --}}
                     <input type="text" name="customer_phone" value="{{ old('customer_phone') }}" required inputmode="tel"
+                           x-model="phone" @input.debounce.400ms="lookupCustomer()"
                            placeholder="0599123456"
                            class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
-                    <p class="mt-1 text-xs text-gray-400">{{ __('رقم فلسطيني من 10 أرقام (يبدأ بـ 05).') }}</p>
+                    <p class="mt-1 text-xs text-gray-400" x-show="!customerBanner">{{ __('رقم فلسطيني من 10 أرقام (يبدأ بـ 05).') }}</p>
+                    <div x-show="customerBanner" x-cloak
+                         class="mt-1.5 flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs text-emerald-800">
+                        <svg class="w-4 h-4 shrink-0 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>{{ __('تعرّفنا على الزبون:') }} <span class="font-bold" x-text="customerBanner"></span> — {{ __('عُبّئت بياناته من آخر طلب.') }}</span>
+                        <button type="button" @click="customerBanner = ''" class="ms-auto text-emerald-600 hover:text-emerald-800">{{ __('إخفاء') }}</button>
+                    </div>
                 </x-admin.field>
 
                 <x-admin.field :label="__('المدينة')" name="city_id" :required="true">
@@ -93,7 +105,7 @@
 
                 <div class="md:col-span-2">
                     <x-admin.field :label="__('العنوان التفصيلي')" name="shipping_address" :required="true">
-                        <textarea name="shipping_address" rows="2" required
+                        <textarea name="shipping_address" rows="2" required x-ref="addressInput"
                                   class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500"
                                   placeholder="{{ __('الشارع، رقم البناية، أقرب معلم…') }}">{{ old('shipping_address') }}</textarea>
                     </x-admin.field>
@@ -327,6 +339,57 @@
                     cityOpen: false,
                     areaSearch: '',
                     areaOpen: false,
+
+                    // تعرّف الزبون بالهاتف.
+                    phone: @js(old('customer_phone') ?? ''),
+                    customerBanner: '',
+                    lookupBusy: false,
+
+                    /**
+                     * يبحث عن الزبون حين يكتمل الرقم فيُعبّئ الحقول الفارغة.
+                     * صامتٌ عند الفشل: التعبئة راحةٌ لا شرط، ولا يجوز أن يعطّل
+                     * خطأُ الشبكة إدخالَ الطلب.
+                     */
+                    async lookupCustomer() {
+                        this.customerBanner = '';
+                        const digits = (this.phone || '').replace(/\D/g, '');
+                        if (digits.length < 9 || this.lookupBusy) return;
+
+                        this.lookupBusy = true;
+                        try {
+                            const url = '{{ route('admin.sales.orders.customer_lookup') }}?phone=' + encodeURIComponent(this.phone);
+                            const res = await fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+                            const data = await res.json().catch(() => ({}));
+                            if (res.ok && data.found) this.applyCustomer(data);
+                        } catch (e) {
+                            // صامت عمدًا.
+                        } finally {
+                            this.lookupBusy = false;
+                        }
+                    },
+
+                    /**
+                     * يملأ الفارغ فقط: ما كتبه الموظف لا يُمحى. والمدينة/المنطقة
+                     * تُوضَع كما لو اختارهما بنفسه، فتُحتسب رسوم التوصيل تلقائيًّا
+                     * بالمنطق القائم — بلا مساسٍ به.
+                     */
+                    applyCustomer(data) {
+                        const nameEl = this.$refs.nameInput;
+                        const addrEl = this.$refs.addressInput;
+                        if (nameEl && !nameEl.value.trim() && data.name) nameEl.value = data.name;
+                        if (addrEl && !addrEl.value.trim() && data.address) addrEl.value = data.address;
+
+                        if (!this.cityId && data.city_id) {
+                            this.cityId = Number(data.city_id);
+                            this.citySearch = data.city || '';
+                            if (data.area_id) {
+                                this.areaId = Number(data.area_id);
+                                this.areaSearch = data.area || '';
+                            }
+                        }
+
+                        this.customerBanner = data.name || '{{ __('زبون معروف') }}';
+                    },
 
                     // تهيئة نصوص البحث بأسماء المدينة/المنطقة المختارة سابقًا (عند خطأ تحقّق).
                     init() {

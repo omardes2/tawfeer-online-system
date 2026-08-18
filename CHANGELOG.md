@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — phone lookup pre-fills the new-order form
+- On the admin new-order form, typing a customer's phone now looks them up and
+  fills the empty name, city, area and detailed-address fields from their most
+  recent order, with a "we recognised this customer" banner.
+- **Shared across everyone who can create orders** — sales staff, affiliates and
+  managers alike. The search spans all orders in the system, not the current
+  user's own, so an affiliate recognises a customer whose earlier order a
+  different salesperson entered. The customer belongs to the company, not to one
+  employee.
+- Fills only empty fields, so anything the operator already typed is never
+  overwritten; the city and area are set exactly as if picked by hand, so the
+  existing delivery-fee calculation runs unchanged — the feature sets values, it
+  does not touch the delivery logic, its fees, or the shipment.
+- Phone matching is tolerant of the `0599…` / `970599…` split, since the app's
+  normaliser only strips non-digits and does not unify the two forms.
+- The lookup endpoint is read-only and gated by `sales.orders.create`; a failed
+  request is silent — the pre-fill is a convenience, never a blocker to entering
+  an order.
+
 ### Added — "Sales by city and area" report
 - A new read-only report under Reports: sales value, profit, and order count per
   area, grouped under each city, with the same date-range filter, CSV export and

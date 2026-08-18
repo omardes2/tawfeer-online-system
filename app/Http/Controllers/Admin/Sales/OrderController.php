@@ -27,6 +27,7 @@ use App\Modules\Shipping\Support\DeliveryStatus;
 use App\Modules\Shipping\Support\OpostStatus;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -133,6 +134,79 @@ class OrderController extends Controller
             // خريطة سعر التوصيل لكل مدينة (نمط Opost) لحساب حيّ في الواجهة.
             'cityRates' => DeliveryCityRate::where('is_active', true)->pluck('delivery_fee', 'city_id'),
         ]);
+    }
+
+    /**
+     * تعرّف الزبون برقم هاتفه — يعيد بيانات آخر طلب له لتعبئة النموذج.
+     *
+     * **مشترك بين الجميع عمدًا:** لا يُقصَر على طلبات المستخدم الحالي. أيُّ من
+     * يملك صلاحية إنشاء الطلب — موظف مبيعات أو مسوّق أو مدير — يتعرّف على أي زبون
+     * سبق أن طلب، بصرف النظر عمّن أدخل طلبه الأصلي. الزبون واحدٌ للشركة لا للموظف.
+     *
+     * قراءةٌ محضة لملء الحقول التي يملؤها الموظف يدويًا (الاسم/المدينة/المنطقة/
+     * العنوان) — لا تمسّ منطق التوصيل ولا رسومه ولا الشحنة: تضع القيم لا غير.
+     */
+    public function customerLookup(Request $request): JsonResponse
+    {
+        $this->authorize('create', Order::class);
+
+        $phone = $this->customerService->normalizePhone((string) $request->query('phone', ''));
+
+        // رقمٌ ناقص لا يُبحَث به: البحث بجزءٍ من رقم يعيد زبونًا غير المقصود.
+        if (strlen($phone) < 9) {
+            return response()->json(['found' => false]);
+        }
+
+        // صيغتا الرقم: التطبيع يزيل غير الأرقام فقط ولا يوحّد «0599» مع
+        // «970599»، فيُبحَث بالصيغتين كي يُطابَق الرقم كيفما خُزّن.
+        $variants = $this->phoneVariants($phone);
+
+        // آخر طلبٍ لصاحب هذا الرقم عبر النظام كلّه (لا طلبات المستخدم وحده):
+        // إمّا مرتبطٌ بعميلٍ رقمُه مطابق، أو محفوظٌ رقمُه على الطلب نفسه.
+        $order = Order::query()
+            ->whereNotNull('number')
+            ->where(function (Builder $q) use ($variants) {
+                $q->whereHas('customer', fn (Builder $c) => $c->whereIn('primary_phone', $variants)
+                    ->orWhereHas('phones', fn (Builder $p) => $p->whereIn('phone', $variants)))
+                    ->orWhereIn('customer_phone', $variants);
+            })
+            ->latest('id')
+            ->first(['customer_id', 'customer_name', 'city_id', 'area_id', 'shipping_address']);
+
+        if (! $order) {
+            return response()->json(['found' => false]);
+        }
+
+        return response()->json([
+            'found' => true,
+            'name' => $order->customer_name,
+            'city_id' => $order->city_id,
+            'area_id' => $order->area_id,
+            'city' => $order->city_id ? City::whereKey($order->city_id)->value('name') : null,
+            'area' => $order->area_id ? Area::whereKey($order->area_id)->value('name') : null,
+            'address' => $order->shipping_address,
+        ]);
+    }
+
+    /**
+     * صيغتا الرقم المحلّي والدولي لمطابقةٍ متسامحة مع طريقة تخزينه.
+     *
+     * `970599…` ⟷ `0599…`: النظام يخزّن أحيانًا هذه وأحيانًا تلك، والتطبيع لا
+     * يوحّدهما. يُبحَث بالصيغتين فلا يُفقَد زبونٌ لاختلاف الصيغة وحده.
+     *
+     * @return array<int, string>
+     */
+    private function phoneVariants(string $phone): array
+    {
+        $variants = [$phone];
+
+        if (str_starts_with($phone, '970')) {
+            $variants[] = '0'.substr($phone, 3);
+        } elseif (str_starts_with($phone, '0')) {
+            $variants[] = '970'.substr($phone, 1);
+        }
+
+        return array_values(array_unique($variants));
     }
 
     public function store(StoreOrderRequest $request): RedirectResponse

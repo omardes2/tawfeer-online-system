@@ -299,6 +299,8 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     // المبيعات (Phase 2.6)
     Route::prefix('sales')->name('sales.')->group(function () {
         // مبيعات مباشرة (بيع من المستودع بلا توصيل خارجي) — قبل مسارات المورد لتفادي التقاط {order}.
+        // تعرّف الزبون برقم الهاتف لتعبئة النموذج — مشترك بين كل من يُنشئ الطلبات.
+        Route::get('orders/customer-lookup', [AdminOrderController::class, 'customerLookup'])->name('orders.customer_lookup');
         Route::get('orders/direct/create', [AdminOrderController::class, 'createDirect'])->name('orders.direct.create');
         Route::post('orders/direct', [AdminOrderController::class, 'storeDirect'])->name('orders.direct.store');
         Route::resource('orders', AdminOrderController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
