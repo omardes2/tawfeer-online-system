@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — one ad, one budget, several products
+- The daily budget page could only attribute spend to a single product: the
+  spend row's `product_id` was required. A real Meta ad showing three products
+  on one budget had nowhere to live — you split it by guesswork, or (on sync,
+  where an ad set maps to exactly one product) its whole budget landed on that
+  one product. That single product then carried three products' worth of ad
+  cost and could read "stop" while profitable, while its siblings sold with no
+  spend attributed and read as organic profit that never existed. The decision
+  inverted on both sides.
+- A shared ad is now entered once — name, channel, budget, conversations, and
+  the products it shows — and stored as one row with no product, its products in
+  a join table. Existing single-product rows are untouched and read exactly as
+  before.
+- It is **split across its products by each one's share of sales** in the same
+  window, not evenly. An ad where one product sold 900 and another 100 would,
+  split evenly, make the second look catastrophic and the first heroic — and
+  you would kill the second unfairly. Proportional charging holds the
+  ad-cost-to-sales ratio equal across them, which is the honest reading: this ad
+  as a whole returned so much per shekel. If none of its products sold, it
+  splits evenly, otherwise the spend would vanish from the per-product view.
+- The allocated share is shown separately on the product row ("of which X
+  allocated from …"), never folded into the editable field — that field governs
+  the product's own spend, and the shared part is edited on the ad itself.
+- A shared ad also gets **its own verdict**, on its own table. With one ad
+  covering three products you cannot stop advertising one of them — you can only
+  stop the ad. A per-product verdict inside a shared ad is a number you cannot
+  act on; the ad-level one you can.
+- A product carried by a shared ad no longer reads "awaiting input": spend was
+  recorded for it, just not on a row of its own.
+
 ### Added — dealer price lists, assignable to specific marketers
 - A fourth pricing layer beside cost, retail and wholesale: named price lists
   holding a price per variant, assigned to individual users. Whoever holds a

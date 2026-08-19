@@ -536,6 +536,162 @@ class AdBudgetPageTest extends TestCase
             ->assertForbidden();
     }
 
+    // ────────── الإعلان المشترك بين أصناف ──────────
+
+    /** إعلانٌ بميزانيةٍ واحدة لعدّة أصناف. */
+    private function sharedSpend(array $products, float $usd, int $conversations, ?Carbon $on = null): AdDailySpend
+    {
+        $spend = AdDailySpend::create([
+            'spend_date' => ($on ?? $this->day)->toDateString(),
+            'ad_channel_id' => $this->channel->id,
+            'product_id' => null,
+            'label' => 'إعلان الشتاء',
+            'amount_usd' => $usd,
+            'fx_rate' => 4,
+            'conversations' => $conversations,
+        ]);
+
+        $spend->products()->sync(collect($products)->pluck('id')->all());
+
+        return $spend;
+    }
+
+    /**
+     * الصرف المشترك يُوزَّع بحصّة المبيعات لا بالتساوي.
+     *
+     * القسمة بالتساوي تجعل الصنف الضعيف كارثيًّا والقويّ بطلًا، فيُقتل الضعيف
+     * ظلمًا — والحصّة تُبقي نسبة الإعلان إلى المبيعات واحدةً عليهما.
+     */
+    public function test_a_shared_ad_is_split_by_sales_share(): void
+    {
+        $strong = $this->product('صنف قويّ');
+        $weak = $this->product('صنف ضعيف');
+
+        $this->sell($strong, qty: 3);   // 300 مبيعات
+        $this->sell($weak);             // 100 مبيعات
+        $this->sharedSpend([$strong, $weak], 10, 20); // 40 ₪
+
+        $report = $this->report();
+
+        // 300/400 و100/400 ⇒ 30 و10.
+        $this->assertEqualsWithDelta(30.0, $this->rowFor($report, $strong)['spend'], 0.01);
+        $this->assertEqualsWithDelta(10.0, $this->rowFor($report, $weak)['spend'], 0.01);
+    }
+
+    /** ومجموع الموزَّع يساوي المصروف — لا يضيع شيكل ولا يُحتسب مرّتين. */
+    public function test_the_allocation_preserves_the_total(): void
+    {
+        $a = $this->product('أ');
+        $b = $this->product('ب');
+        $this->sell($a, qty: 3);
+        $this->sell($b);
+        $this->sharedSpend([$a, $b], 10, 20);
+
+        $this->assertEqualsWithDelta(40.0, $this->report()['totals']['spend'], 0.01);
+    }
+
+    /** وإن لم يبع أيٌّ من أصنافه قُسم بالتساوي — وإلّا اختفى الصرف من اللوحة. */
+    public function test_a_shared_ad_with_no_sales_splits_evenly(): void
+    {
+        $a = $this->product('أ');
+        $b = $this->product('ب');
+        $this->sharedSpend([$a, $b], 10, 20);
+
+        $report = $this->report();
+
+        $this->assertEqualsWithDelta(20.0, $this->rowFor($report, $a)['spend'], 0.01);
+        $this->assertEqualsWithDelta(20.0, $this->rowFor($report, $b)['spend'], 0.01);
+    }
+
+    /** والحصّة الموزَّعة تُعلَّم بمصدرها فلا تُقرأ رقمًا مُدخَلًا باليد. */
+    public function test_the_allocated_share_is_labelled(): void
+    {
+        $product = $this->product();
+        $this->sell($product);
+        $this->sharedSpend([$product], 5, 10);
+
+        $row = $this->rowFor($this->report(), $product);
+
+        $this->assertEqualsWithDelta(20.0, $row['allocated'], 0.01);
+        $this->assertContains('إعلان الشتاء', $row['shared_labels']);
+    }
+
+    /** والصنف يجمع صرفه الخاصّ وحصّته من المشترك معًا. */
+    public function test_own_and_shared_spend_add_up_on_one_row(): void
+    {
+        $product = $this->product();
+        $this->sell($product);
+        $this->spend($product, 5, 10);          // 20 ₪ خاصّة
+        $this->sharedSpend([$product], 5, 10);  // 20 ₪ موزَّعة
+
+        $row = $this->rowFor($this->report(), $product);
+
+        $this->assertEqualsWithDelta(40.0, $row['spend'], 0.01);
+        $this->assertEqualsWithDelta(20.0, $row['allocated'], 0.01);
+    }
+
+    /** والحكم يصدر على الإعلان ككلّ — وهو الوحيد القابل للتنفيذ. */
+    public function test_a_shared_ad_gets_its_own_verdict(): void
+    {
+        Settings::set('ads.min_orders', 1, 'ads', 'integer');
+
+        $a = $this->product('أ');
+        $b = $this->product('ب');
+        $this->sell($a);
+        $this->sell($b);
+        $this->sharedSpend([$a, $b], 5, 10); // 20 ₪ على طلبين ⇒ تكلفة الطلب 10
+
+        $ads = app(AdBudgetService::class)->sharedAds($this->day);
+
+        $this->assertCount(1, $ads);
+        $this->assertSame('إعلان الشتاء', $ads->first()['label']);
+        $this->assertSame(2, $ads->first()['orders']);
+        $this->assertSame('increase', $ads->first()['verdict']['code']);
+    }
+
+    /** وتُحفظ الإعلانات المشتركة من الشاشة. */
+    public function test_the_shared_ad_form_saves(): void
+    {
+        $a = $this->product('أ');
+        $b = $this->product('ب');
+
+        $this->actingAs($this->admin())->post(route('admin.reports.ad_budget.shared_spend'), [
+            'spend_date' => $this->day->toDateString(),
+            'ad_channel_id' => $this->channel->id,
+            'label' => 'إعلان مشترك',
+            'product_ids' => [$a->id, $b->id],
+            'amount_usd' => 10,
+            'fx_rate' => 4,
+            'conversations' => 20,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame(2, AdDailySpend::whereNull('product_id')->first()->products()->count());
+    }
+
+    /** ويُرفض «المشترك» بصنفٍ واحد — مكانه صفّه في الجدول. */
+    public function test_a_shared_ad_needs_at_least_two_products(): void
+    {
+        $this->actingAs($this->admin())->post(route('admin.reports.ad_budget.shared_spend'), [
+            'spend_date' => $this->day->toDateString(),
+            'ad_channel_id' => $this->channel->id,
+            'label' => 'إعلان',
+            'product_ids' => [$this->product()->id],
+            'amount_usd' => 10,
+            'fx_rate' => 4,
+            'conversations' => 20,
+        ])->assertSessionHasErrors('product_ids');
+    }
+
+    /** والصنف في إعلانٍ مشترك لا يُقرأ «بانتظار الإدخال» وقد صُرف عليه فعلًا. */
+    public function test_a_product_in_a_shared_ad_is_never_awaiting_input(): void
+    {
+        $product = $this->product();
+        $this->sell($product);
+        $this->sharedSpend([$product], 5, 10);
+
+        $this->assertNotSame('blocked', $this->rowFor($this->report(), $product)['verdict']['code']);
+    }
+
     // ────────── الإقرار بعدم الإعلان ──────────
 
     /**

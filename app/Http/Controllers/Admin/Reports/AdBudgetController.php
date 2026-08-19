@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Reports\StoreAdSpendRequest;
 use App\Http\Requests\Reports\StoreAdThresholdsRequest;
 use App\Http\Requests\Reports\StoreOperatingCostRequest;
+use App\Http\Requests\Reports\StoreSharedAdSpendRequest;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Foundation\Services\Settings;
 use App\Modules\Marketing\Models\AdChannel;
@@ -48,6 +49,8 @@ class AdBudgetController extends Controller
             'currency' => (string) Settings::get('store.currency_symbol', '₪'),
             'company' => (string) Settings::get('store.name', 'توفير أونلاين'),
             'unlinkedChannels' => AdChannel::where('is_active', true)->whereNull('delivery_business_id')->count(),
+            // الإعلانات المشتركة بحكمٍ على مستواها — وهو الحكم القابل للتنفيذ.
+            'sharedAds' => $this->budget->sharedAds($day, $channelId),
         ]);
     }
 
@@ -73,6 +76,33 @@ class AdBudgetController extends Controller
         );
 
         return back()->with('success', __('حُفظ صرف الإعلان.'));
+    }
+
+    /**
+     * حفظ إعلانٍ بميزانيةٍ واحدة لعدّة أصناف.
+     *
+     * يُخزَّن صفًّا واحدًا بلا صنف، وأصنافُه في جدول الربط؛ ويُوزَّع على الأصناف
+     * عند القراءة بحصّة مبيعات كلٍّ منها. ولا يُجمَع مع صفّ صنفٍ مفرد في المفتاح
+     * الفريد، فيتعدّد الإعلان المشترك في اليوم الواحد وهو المطلوب.
+     */
+    public function storeSharedSpend(StoreSharedAdSpendRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+
+        $spend = AdDailySpend::create([
+            'spend_date' => Carbon::parse($data['spend_date'])->startOfDay(),
+            'ad_channel_id' => $data['ad_channel_id'],
+            'product_id' => null,
+            'label' => $data['label'],
+            'amount_usd' => $data['amount_usd'],
+            'fx_rate' => $data['fx_rate'],
+            'conversations' => $data['conversations'],
+            'entered_by' => $request->user()->id,
+        ]);
+
+        $spend->products()->sync($data['product_ids']);
+
+        return back()->with('success', __('حُفظ الإعلان المشترك — ويُوزَّع على أصنافه بحصّة مبيعاتها.'));
     }
 
     /** حذف صفّ صرف أُدخل خطأً — الصفر ليس كالغياب في مؤشّر الأيام الناقصة. */

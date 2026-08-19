@@ -417,6 +417,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('ad-budget/fixed-cost', [AdBudgetController::class, 'storeFixedCost'])->name('ad_budget.fixed_cost');
         Route::post('ad-budget/usd-rate', [AdBudgetController::class, 'storeRate'])->name('ad_budget.usd_rate');
         Route::post('ad-budget/thresholds', [AdBudgetController::class, 'storeThresholds'])->name('ad_budget.thresholds');
+        Route::post('ad-budget/shared-spend', [AdBudgetController::class, 'storeSharedSpend'])->name('ad_budget.shared_spend');
         // إقرار «لا إعلان على هذا الصنف» — المعاملات في المسار لأن نافذة التأكيد
         // تُرسل نموذجًا بلا حقول مخفية.
         Route::post('ad-budget/no-ads/{channel}/{product}/{day}', [AdBudgetController::class, 'markNoAds'])

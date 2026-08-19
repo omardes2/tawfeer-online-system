@@ -316,6 +316,21 @@
                         @else
                             <span class="tabular-nums text-gray-400">{{ $r['spend_usd'] > 0 ? '$'.number_format($r['spend_usd'], 2) : '—' }}</span>
                         @endif
+                        {{--
+                            حصّةٌ من إعلانٍ مشترك: تُعرَض منفصلةً لأن حقل الإدخال
+                            أعلاه يحكم صرف الصنف وحده — والموزَّع يُعدَّل من الإعلان
+                            نفسه لا من هنا.
+                        --}}
+                        @if ($r['allocated'] > 0)
+                            <span class="block mt-1 text-[11px] text-sky-700"
+                                  title="{{ implode('، ', $r['shared_labels']) }}">
+                                {{ __('منها :v :c موزَّعة من :l', [
+                                    'v' => number_format($r['allocated'], 2),
+                                    'c' => $currency,
+                                    'l' => implode('، ', $r['shared_labels']),
+                                ]) }}
+                            </span>
+                        @endif
                         {{-- المنصّة تقول رقمًا آخر: يُعرَض ولا يدهس اليدويّ — القرار للمستخدم. --}}
                         @if ($r['conflict'])
                             <span class="block mt-1 text-[11px] text-amber-600" title="{{ __('قيمة المنصّة تختلف عمّا أُدخل يدويًّا') }}">
@@ -508,6 +523,128 @@
                 </button>
             </form>
         </div>
+
+        {{--
+            إعلانٌ واحد بميزانيةٍ واحدة لعدّة أصناف — وهو ما يقع فعلًا في مدير
+            الإعلانات. يُدخَل مرّةً واحدة ويُوزَّع على أصنافه بحصّة مبيعاتها، بدل
+            أن يُقسَّم بالتخمين أو يقع كلُّه على صنفٍ واحد فيبدو خاسرًا ويبدو
+            إخوته «بلا إعلان».
+        --}}
+        <div class="admin-card p-4 mt-5 report-no-print" x-data="{ open: {{ $errors->has('product_ids') || $errors->has('label') ? 'true' : 'false' }} }">
+            <button type="button" x-on:click="open = ! open" class="flex items-center gap-2 font-semibold text-gray-800">
+                <svg class="w-4 h-4 text-gray-400 transition" :class="open && 'rotate-90'" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                {{ __('إضافة إعلان لعدّة أصناف') }}
+                <span class="text-xs font-normal text-gray-500">{{ __('ميزانية واحدة تُوزَّع بحصّة المبيعات') }}</span>
+            </button>
+
+            <form x-show="open" x-cloak method="POST" action="{{ route('admin.reports.ad_budget.shared_spend') }}" class="mt-4">
+                @csrf
+                <input type="hidden" name="spend_date" value="{{ $dayString }}" />
+                <input type="hidden" name="fx_rate" value="{{ $rate }}" />
+
+                <div class="flex flex-wrap items-end gap-3">
+                    <div>
+                        <label for="sh-label" class="block text-xs text-gray-500 mb-1">{{ __('اسم الإعلان') }}</label>
+                        <input id="sh-label" type="text" name="label" value="{{ old('label') }}" maxlength="120" required
+                               placeholder="{{ __('إعلان الشتاء') }}"
+                               class="w-48 rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+                    </div>
+                    <div>
+                        <label for="sh-channel" class="block text-xs text-gray-500 mb-1">{{ __('القناة') }}</label>
+                        <select id="sh-channel" name="ad_channel_id" required
+                                class="rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                            @foreach ($allChannels as $c)
+                                <option value="{{ $c->id }}" @selected((int) old('ad_channel_id') === $c->id)>{{ $c->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label for="sh-amount" class="block text-xs text-gray-500 mb-1">{{ __('الصرف $') }}</label>
+                        <input id="sh-amount" type="number" step="0.01" min="0" name="amount_usd" value="{{ old('amount_usd', 0) }}" required
+                               class="w-28 rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+                    </div>
+                    <div>
+                        <label for="sh-conv" class="block text-xs text-gray-500 mb-1">{{ __('المحادثات') }}</label>
+                        <input id="sh-conv" type="number" step="1" min="0" name="conversations" value="{{ old('conversations', 0) }}" required
+                               class="w-24 rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+                    </div>
+                    <button type="submit" class="btn-primary btn-sm">{{ __('حفظ') }}</button>
+                </div>
+
+                <div class="mt-3">
+                    <p class="text-xs text-gray-500 mb-1">{{ __('الأصناف التي يعرضها هذا الإعلان (صنفان فأكثر)') }}</p>
+                    <div class="max-h-56 overflow-y-auto rounded-lg border border-gray-200 p-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                        @foreach ($products as $p)
+                            <label class="flex items-center gap-2 text-sm text-gray-700 px-1 py-0.5 rounded hover:bg-gray-50">
+                                <input type="checkbox" name="product_ids[]" value="{{ $p->id }}"
+                                       @checked(in_array($p->id, (array) old('product_ids', [])))
+                                       class="rounded border-gray-300 text-emerald-600" />
+                                <span class="truncate">{{ $p->name }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                    @error('product_ids')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                </div>
+            </form>
+        </div>
+    @endif
+
+    {{-- حكمٌ على مستوى الإعلان: بإعلانٍ لثلاثة أصناف لا تُوقفه عن صنفٍ وحده. --}}
+    @if ($sharedAds->isNotEmpty())
+        <h3 class="font-semibold text-gray-800 mt-6 mb-3">{{ __('الإعلانات المشتركة') }}</h3>
+        <x-admin.table dense stack>
+            <thead>
+                <tr>
+                    <th>{{ __('الإعلان') }}</th>
+                    <th>{{ __('القناة') }}</th>
+                    <th class="text-start">{{ __('الصرف') }}</th>
+                    <th class="text-start">{{ __('المحادثات') }}</th>
+                    <th class="text-start">{{ __('الطلبات') }}</th>
+                    <th class="text-start">{{ __('المبيعات') }}</th>
+                    <th class="text-start">{{ __('صافي الربح') }}</th>
+                    <th class="text-start">{{ __('تكلفة الطلب') }}</th>
+                    <th>{{ __('التقييم') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($sharedAds as $ad)
+                    <tr>
+                        <td data-label="{{ __('الإعلان') }}" class="font-medium text-gray-800">
+                            {{ $ad['label'] }}
+                            <span class="block text-[11px] text-gray-500">{{ implode('، ', $ad['products']) }}</span>
+                        </td>
+                        <td data-label="{{ __('القناة') }}" class="text-gray-500">{{ $ad['channel'] }}</td>
+                        <td data-label="{{ __('الصرف') }}" class="text-start tabular-nums whitespace-nowrap">{{ number_format($ad['spend'], 2) }} {{ $currency }}</td>
+                        <td data-label="{{ __('المحادثات') }}" class="text-start tabular-nums">{{ number_format($ad['conversations']) }}</td>
+                        <td data-label="{{ __('الطلبات') }}" class="text-start tabular-nums">{{ number_format($ad['orders']) }}</td>
+                        <td data-label="{{ __('المبيعات') }}" class="text-start tabular-nums whitespace-nowrap">{{ number_format($ad['sales'], 2) }} {{ $currency }}</td>
+                        <td data-label="{{ __('صافي الربح') }}" class="text-start tabular-nums whitespace-nowrap font-medium {{ $ad['net_profit'] < 0 ? 'text-rose-600' : 'text-emerald-700' }}">
+                            {{ number_format($ad['net_profit'], 2) }} {{ $currency }}
+                        </td>
+                        <td data-label="{{ __('تكلفة الطلب') }}" class="text-start tabular-nums whitespace-nowrap">
+                            {{ $ad['cpa'] === null ? '—' : number_format($ad['cpa'], 2).' '.$currency }}
+                        </td>
+                        <td data-label="{{ __('التقييم') }}">
+                            <span class="inline-block rounded-md px-2 py-1 text-xs font-semibold ring-1 {{ $tones[$ad['verdict']['tone']] }}"
+                                  title="{{ $ad['verdict']['reason'] }}">{{ $ad['verdict']['label'] }}</span>
+                            <span class="block mt-1 text-[11px] text-gray-400 max-w-[18rem]">{{ $ad['verdict']['reason'] }}</span>
+                            @if ($can && $ad['today_id'])
+                                <span class="block mt-1">
+                                    <x-admin.confirm
+                                        :action="route('admin.reports.ad_budget.spend.destroy', $ad['today_id'])"
+                                        method="DELETE"
+                                        :trigger="__('حذف صرف اليوم')"
+                                        :message="__('حذف صرف «:l» ليوم :d؟', ['l' => $ad['label'], 'd' => $dayString])" />
+                                </span>
+                            @endif
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </x-admin.table>
+        <p class="mt-2 text-xs text-gray-400 leading-relaxed">
+            {{ __('الأرقام هنا على نافذة الحكم لا على اليوم وحده، والحكم على الإعلان ككلّ لأنك لا تستطيع إيقافه عن صنفٍ من أصنافه وحده. وصنفٌ يظهر في إعلانين تُحتسب مبيعاته في كليهما — فمجموع صفوف هذا الجدول ليس إجمالي اليوم.') }}
+        </p>
     @endif
 
     {{-- الملخّص المقلوب: أيّ صفحة تستحقّ التوسّع، لا أيّ صنف. --}}

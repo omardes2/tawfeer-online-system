@@ -71,8 +71,8 @@ class AdBudgetService
 
         $daySales = $this->sales($day, $day->copy()->endOfDay(), $channelId);
         $winSales = $this->sales($windowFrom, $day->copy()->endOfDay(), $channelId);
-        $daySpend = $this->spend($day, $day, $channelId);
-        $winSpend = $this->spend($windowFrom, $day, $channelId);
+        $daySpend = $this->spend($day, $day, $channelId, $daySales);
+        $winSpend = $this->spend($windowFrom, $day, $channelId, $winSales);
 
         $missing = $this->missingDays($windowFrom, $day, $channelId);
 
@@ -108,6 +108,10 @@ class AdBudgetService
                     'conflict' => $spend['conflict'],
                     'platform_usd' => $spend['platform_usd'],
                     'platform_conversations' => $spend['platform_conversations'],
+                    // الحصّة الموزَّعة من إعلانٍ مشترك: تُعرَض منفصلةً كي لا تُقرأ
+                    // رقمًا أدخله أحد، ولا يُظنّ أن حقل الإدخال يحكمها.
+                    'allocated' => $spend['allocated'],
+                    'shared_labels' => array_values(array_unique($spend['shared_labels'])),
                     'net_profit' => round($sale['profit'] - $spend['local'], 2),
                     'cpa' => $sale['orders'] > 0 ? round($spend['local'] / $sale['orders'], 2) : null,
                     'window' => $window,
@@ -128,6 +132,82 @@ class AdBudgetService
             'missing_days' => $missing,
             'thresholds' => $thresholds,
         ];
+    }
+
+    /**
+     * الإعلانات المشتركة في النافذة، مجموعةً بعنوانها، بحكمٍ على مستوى الإعلان.
+     *
+     * وهذا هو الصفّ **القابل للتنفيذ**: بإعلانٍ واحدٍ لثلاثة أصناف لا تستطيع
+     * إيقافه عن صنفٍ منها وحده — تستطيع إيقاف الإعلان كلّه. فالحكم على الصنف
+     * داخل إعلانٍ مشترك رقمٌ لا تملك تنفيذه، والحكم هنا تملكه.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function sharedAds(Carbon $day, ?int $channelId = null): Collection
+    {
+        $thresholds = $this->thresholds();
+        $day = $day->copy()->startOfDay();
+        $windowFrom = $day->copy()->subDays((int) $thresholds['window_days'] - 1);
+
+        $rows = $this->sharedSpend($windowFrom, $day, $channelId);
+        if ($rows->isEmpty()) {
+            return collect();
+        }
+
+        $sales = $this->sales($windowFrom, $day->copy()->endOfDay(), $channelId);
+        $channels = AdChannel::ordered()->get()->keyBy('id');
+        $names = Product::whereIn('id', $rows->flatMap->productIds()->unique())->pluck('name', 'id');
+
+        return $rows
+            ->groupBy(fn (AdDailySpend $r) => $r->ad_channel_id.'|'.($r->label ?: ''))
+            ->map(function (Collection $group) use ($sales, $channels, $names, $thresholds, $day) {
+                $first = $group->first();
+                $cid = (int) $first->ad_channel_id;
+                $productIds = $group->flatMap->productIds()->unique()->values();
+
+                $spend = round($group->sum(fn (AdDailySpend $r) => (float) $r->amount_usd * (float) $r->fx_rate), 2);
+                $conversations = (int) $group->sum('conversations');
+
+                $orders = 0;
+                $salesTotal = 0.0;
+                $profit = 0.0;
+                foreach ($productIds as $pid) {
+                    $bucket = $sales->get($cid.':'.$pid, $this->zeroSale());
+                    $orders += $bucket['orders'];
+                    $salesTotal += $bucket['sales'];
+                    $profit += $bucket['profit'];
+                }
+
+                $window = [
+                    'orders' => $orders,
+                    'sales' => round($salesTotal, 2),
+                    'profit' => round($profit, 2),
+                    'spend' => $spend,
+                    'entries' => $group->count(),
+                    'conversations' => $conversations,
+                    'net_profit' => round($profit - $spend, 2),
+                    'cpa' => $orders > 0 ? round($spend / $orders, 2) : 0.0,
+                    'conversion' => $conversations > 0 ? round($orders / $conversations * 100, 1) : null,
+                ];
+
+                return [
+                    'label' => $first->label ?: __('إعلان مشترك'),
+                    'channel_id' => $cid,
+                    'channel' => $channels[$cid]->name ?? '#'.$cid,
+                    'products' => $productIds->map(fn ($id) => $names[$id] ?? __('صنف محذوف'))->all(),
+                    'spend' => $spend,
+                    'conversations' => $conversations,
+                    'orders' => $orders,
+                    'sales' => $window['sales'],
+                    'net_profit' => $window['net_profit'],
+                    'cpa' => $orders > 0 ? $window['cpa'] : null,
+                    // معرّف صفّ اليوم المعروض — للحذف من الشاشة.
+                    'today_id' => $group->firstWhere(fn (AdDailySpend $r) => $r->spend_date->isSameDay($day))?->id,
+                    'verdict' => $this->verdict($window, [], $thresholds, $cid),
+                ];
+            })
+            ->sortByDesc('spend')
+            ->values();
     }
 
     /** العتبات وسعر الصرف من الإعدادات — أرقام عملٍ لا ثوابت كود. */
@@ -245,10 +325,23 @@ class AdBudgetService
      *
      * @return Collection<string, array<string, mixed>>
      */
-    private function spend(Carbon $from, Carbon $to, ?int $channelId): Collection
+    private function spend(Carbon $from, Carbon $to, ?int $channelId, Collection $sales): Collection
+    {
+        $own = $this->ownSpend($from, $to, $channelId);
+
+        return $this->mergeShared($own, $this->sharedSpend($from, $to, $channelId), $sales);
+    }
+
+    /**
+     * الصرف المنسوب إلى صنفٍ بعينه — الصفوف ذات الصنف الواحد وحدها.
+     *
+     * @return Collection<string, array<string, mixed>>
+     */
+    private function ownSpend(Carbon $from, Carbon $to, ?int $channelId): Collection
     {
         return AdDailySpend::query()
             ->whereBetween('spend_date', $this->dateSpan($from, $to))
+            ->whereNotNull('product_id')
             ->when($channelId, fn ($q) => $q->where('ad_channel_id', $channelId))
             ->groupBy('ad_channel_id', 'product_id')
             ->selectRaw('ad_channel_id as cid, product_id as pid, '
@@ -281,8 +374,105 @@ class AdBudgetService
                     'platform_conversations' => (int) $r->synced_conv,
                     'conflict' => (int) $r->manual_synced === 1
                         && (abs($usd - $syncedUsd) >= 0.01 || (int) $r->conversations !== (int) $r->synced_conv),
+                    'allocated' => 0.0,
+                    'shared_labels' => [],
                 ]];
             });
+    }
+
+    /**
+     * الإعلانات المشتركة في الفترة — صفٌّ بميزانيةٍ واحدة لعدّة أصناف.
+     *
+     * @return Collection<int, AdDailySpend>
+     */
+    private function sharedSpend(Carbon $from, Carbon $to, ?int $channelId): Collection
+    {
+        return AdDailySpend::query()
+            ->whereBetween('spend_date', $this->dateSpan($from, $to))
+            ->whereNull('product_id')
+            ->when($channelId, fn ($q) => $q->where('ad_channel_id', $channelId))
+            ->with('products:id')
+            ->get();
+    }
+
+    /**
+     * توزيع الإعلان المشترك على أصنافه **بحصّة مبيعات كلٍّ منها**.
+     *
+     * لا بالتساوي: إعلانٌ باع فيه صنفٌ بتسعمئة وآخر بمئة، قسمتُه نصفين تجعل
+     * الثاني كارثيًّا والأول بطلًا — فيُقتل الثاني ظلمًا. والتوزيع بالحصّة يُبقي
+     * نسبة الإعلان إلى المبيعات واحدةً عليهما، وهي القراءة الصادقة: هذا الإعلان
+     * ككلّ أعاد كذا لكل شيكل.
+     *
+     * وإن لم يبع أيٌّ من أصنافه قُسم بالتساوي — وإلّا اختفى الصرف من لوحة
+     * الأصناف كأنه لم يُنفَق.
+     *
+     * @param  Collection<string, array<string, mixed>>  $own
+     * @param  Collection<int, AdDailySpend>  $shared
+     * @param  Collection<string, array<string, mixed>>  $sales
+     * @return Collection<string, array<string, mixed>>
+     */
+    private function mergeShared(Collection $own, Collection $shared, Collection $sales): Collection
+    {
+        $merged = $own->all();
+
+        foreach ($shared as $row) {
+            $cid = (int) $row->ad_channel_id;
+            $productIds = $row->productIds();
+            if ($productIds === []) {
+                continue;
+            }
+
+            $weights = $this->allocationWeights($cid, $productIds, $sales);
+            $usd = (float) $row->amount_usd;
+            $local = $usd * (float) $row->fx_rate;
+            $conversations = (int) $row->conversations;
+
+            foreach ($productIds as $pid) {
+                $share = $weights[$pid] ?? 0.0;
+                $key = $cid.':'.$pid;
+                $bucket = $merged[$key] ?? $this->zeroSpend();
+
+                $bucket['usd'] = round($bucket['usd'] + $usd * $share, 2);
+                $bucket['local'] = round($bucket['local'] + $local * $share, 2);
+                $bucket['allocated'] = round($bucket['allocated'] + $local * $share, 2);
+                $bucket['conversations'] += (int) round($conversations * $share);
+                // الصفّ المشترك إقرارٌ بالإعلان كالصفّ المفرد: يُعدّ في «الإدخالات»
+                // كي لا يُقرأ الصنف «بانتظار الإدخال» وقد صُرف عليه فعلًا.
+                $bucket['entries']++;
+                $bucket['shared_labels'][] = $row->label ?: __('إعلان مشترك');
+                // تكلفة المنصّة تتبع المُدخَل في الصفّ المشترك — لا مقارنة هنا.
+                $bucket['platform_usd'] = round($bucket['platform_usd'] + $usd * $share, 2);
+
+                $merged[$key] = $bucket;
+            }
+        }
+
+        return collect($merged);
+    }
+
+    /**
+     * أوزان التوزيع: حصّة كل صنفٍ من مبيعات أصناف الإعلان في الفترة نفسها.
+     *
+     * @param  array<int, int>  $productIds
+     * @param  Collection<string, array<string, mixed>>  $sales
+     * @return array<int, float>
+     */
+    private function allocationWeights(int $channelId, array $productIds, Collection $sales): array
+    {
+        $values = [];
+        foreach ($productIds as $pid) {
+            $values[$pid] = max(0.0, (float) ($sales->get($channelId.':'.$pid)['sales'] ?? 0));
+        }
+
+        $total = array_sum($values);
+
+        if ($total <= 0) {
+            $equal = 1 / max(1, count($productIds));
+
+            return array_fill_keys($productIds, $equal);
+        }
+
+        return array_map(fn (float $v) => $v / $total, $values);
     }
 
     /**
@@ -428,6 +618,8 @@ class AdBudgetService
             'usd' => 0.0, 'local' => 0.0, 'fx_rate' => null, 'conversations' => 0, 'exists' => false,
             'entries' => 0, 'id' => null,
             'platform_usd' => 0.0, 'platform_conversations' => 0, 'conflict' => false,
+            // الحصّة الآتية من إعلانٍ مشترك — تُعرَض كي لا تُقرأ رقمًا مُدخَلًا.
+            'allocated' => 0.0, 'shared_labels' => [],
         ];
     }
 }

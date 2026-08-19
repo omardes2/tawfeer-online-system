@@ -6,14 +6,19 @@ use App\Models\User;
 use App\Modules\Catalog\Models\Product;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
- * صرفُ يومٍ واحد على صنفٍ واحد في قناةٍ واحدة، كما نُسخ من مدير إعلانات Meta.
+ * صرفُ يومٍ واحد في قناةٍ واحدة، كما نُسخ من مدير إعلانات Meta.
+ *
+ * الصفّ إمّا لصنفٍ واحد (`product_id`)، وإمّا **مشترَك** بين عدّة أصناف بميزانيةٍ
+ * واحدة — فيُترك `product_id` فارغًا وتُسجَّل أصنافه في `products()`. وهذا ما
+ * يقع فعلًا في مدير الإعلانات: إعلانٌ واحد يعرض ثلاثة أصناف بميزانيةٍ واحدة.
  */
 class AdDailySpend extends Model
 {
     protected $fillable = [
-        'spend_date', 'ad_channel_id', 'product_id',
+        'spend_date', 'ad_channel_id', 'product_id', 'label',
         'amount_usd', 'fx_rate', 'conversations', 'entered_by',
         'source', 'synced_amount_usd', 'synced_conversations', 'synced_at',
     ];
@@ -39,6 +44,32 @@ class AdDailySpend extends Model
             && $this->synced_at !== null
             && (abs((float) $this->amount_usd - (float) $this->synced_amount_usd) >= 0.01
                 || (int) $this->conversations !== (int) $this->synced_conversations);
+    }
+
+    /** أصناف الإعلان المشترك — فارغةٌ في الصفّ ذي الصنف الواحد. */
+    public function products(): BelongsToMany
+    {
+        return $this->belongsToMany(Product::class, 'ad_daily_spend_products');
+    }
+
+    /** الأصناف التي يخصّها هذا الصرف: أصناف الإعلان المشترك أو الصنف الوحيد. */
+    public function productIds(): array
+    {
+        $shared = $this->relationLoaded('products')
+            ? $this->products->pluck('id')->all()
+            : $this->products()->pluck('products.id')->all();
+
+        if ($shared !== []) {
+            return array_map('intval', $shared);
+        }
+
+        return $this->product_id ? [(int) $this->product_id] : [];
+    }
+
+    /** إعلانٌ بميزانيةٍ واحدة لأكثر من صنف. */
+    public function isShared(): bool
+    {
+        return count($this->productIds()) > 1;
     }
 
     public function channel(): BelongsTo
