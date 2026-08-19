@@ -45,6 +45,7 @@ use App\Http\Controllers\Admin\Reports\BusinessReportController;
 use App\Http\Controllers\Admin\Reports\ProductDecisionController;
 use App\Http\Controllers\Admin\Returns\ReturnController as AdminReturnController;
 use App\Http\Controllers\Admin\Roles\RoleController as AdminRoleController;
+use App\Http\Controllers\Admin\Sales\AbandonedCheckoutController;
 use App\Http\Controllers\Admin\Sales\OrderController as AdminOrderController;
 use App\Http\Controllers\Admin\Settings\AdChannelController;
 use App\Http\Controllers\Admin\Settings\AdExternalMapController;
@@ -302,6 +303,9 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         // مبيعات مباشرة (بيع من المستودع بلا توصيل خارجي) — قبل مسارات المورد لتفادي التقاط {order}.
         // تعرّف الزبون برقم الهاتف لتعبئة النموذج — مشترك بين كل من يُنشئ الطلبات.
         Route::get('orders/customer-lookup', [AdminOrderController::class, 'customerLookup'])->name('orders.customer_lookup');
+        // طلبات لم تكتمل — قائمة اتصال باسمٍ ورقمٍ لمن تردّد في خطوة الإتمام.
+        Route::get('abandoned-checkouts', [AbandonedCheckoutController::class, 'index'])->name('abandoned_checkouts.index');
+        Route::post('abandoned-checkouts/{uuid}/outcome', [AbandonedCheckoutController::class, 'outcome'])->name('abandoned_checkouts.outcome');
         Route::get('orders/direct/create', [AdminOrderController::class, 'createDirect'])->name('orders.direct.create');
         Route::post('orders/direct', [AdminOrderController::class, 'storeDirect'])->name('orders.direct.store');
         Route::resource('orders', AdminOrderController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);

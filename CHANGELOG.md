@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — "Incomplete orders" recovery list
+- A new screen under Sales listing storefront visitors who filled in their
+  details at checkout and then never placed the order: name, phone, city/area,
+  the cart they left, and its value.
+- These people were invisible before. The abandoned-cart follow-up reads the
+  `carts` table and requires `customer_id`, i.e. a registered customer — and
+  almost every buyer checks out as a guest. Their phone was sitting in
+  `checkout_sessions` with nobody looking at it, after the ad that brought them
+  had already been paid for.
+- Actions per row: call, WhatsApp with a pre-filled message, and "create order",
+  which opens the new-order form with the phone already in place so the existing
+  customer lookup fills in the rest.
+- Outcome tracking per row — not contacted / contacted / no answer / refused /
+  converted / ignored — with a note, the attempt count, and who called. Two
+  employees no longer call the same person, and nobody is skipped because each
+  assumed the other had called.
+- Anyone who placed an order with the same phone after abandoning is marked
+  "converted" automatically and drops out of the call list, whatever status was
+  recorded by hand. Calling someone who already bought is worse than not calling.
+  Phone matching uses the last nine digits, so `0599…` and `970599…` are the
+  same person.
+- One row per phone: a customer who came back three times without finishing is
+  one call, not three.
+- Sessions touched in the last 30 minutes are hidden (`store.abandoned_checkout_minutes`)
+  so nobody is phoned mid-purchase. That quiet window is lifted once an outcome
+  has been recorded, otherwise the row would vanish the moment it was saved.
+- Value shown is the cart subtotal, before delivery. Nothing here recalculates
+  or touches the delivery integration.
+- Gated by `sales.abandoned_checkouts.view` / `.manage`, granted to admin,
+  manager, sales supervisor and sales staff. **Not to affiliates** — this is the
+  store's whole customer list, not one affiliate's own.
+- Automated follow-up: `marketing:run-abandoned-checkouts` runs hourly and fires
+  an `abandoned_checkout` campaign trigger, but **only for phones that match an
+  existing customer record**, since consent and suppression are governed per
+  customer. Guests stay on the call list for a human, which converts better in a
+  cash-on-delivery market anyway. A checkout already handled by a person is
+  skipped, and the per-session reference keeps the message from repeating.
+- **Coverage limit, reported not fixed:** the phone only reaches the backend when
+  the checkout page syncs, which happens when the city or area is picked. Someone
+  who typed their phone and left before reaching the city step leaves no trace.
+  Capturing them would mean adding an event listener to a field inside the frozen
+  checkout sequence, so it was left alone and is stated on the screen itself.
+
 ### Added — "Product decision board" report
 - A new read-only report under Reports that answers the two questions the
   existing per-product report cannot: **what does this product actually earn**,

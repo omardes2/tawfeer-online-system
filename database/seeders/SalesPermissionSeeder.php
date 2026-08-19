@@ -17,6 +17,9 @@ class SalesPermissionSeeder extends Seeder
         // البيع المباشر: نقطة بيع كاملة (تحصيل فوري وخصم مخزون). صلاحية مستقلّة
         // عن الإنشاء العادي فلا يفتحها منحُ صلاحية أخرى بالمصادفة.
         'sales.orders.create_direct',
+        // طلبات لم تكتمل: قائمة اتصالٍ بمن تردّد في خطوة الإتمام. **ليست للمسوّق**
+        // — هي أرقام زبائن المتجر كلّه لا زبائنه هو.
+        'sales.abandoned_checkouts.view', 'sales.abandoned_checkouts.manage',
     ];
 
     private array $grants = [
@@ -26,11 +29,15 @@ class SalesPermissionSeeder extends Seeder
         'sales' => [
             'sales.orders.view_own', 'sales.orders.create', 'sales.orders.update',
             'sales.orders.reserve', 'sales.orders.cancel',
+            'sales.abandoned_checkouts.view', 'sales.abandoned_checkouts.manage',
         ],
         // المسوّق: ينشئ ويرى ويلغي طلباته هو فقط. لا بيع مباشر — لا يحصّل نقدًا
         // ولا يخصم مخزونًا؛ عمله جلب الطلبات لا تشغيل نقطة بيع.
         'affiliate' => [
             'sales.orders.view_own', 'sales.orders.create', 'sales.orders.cancel',
+        ],
+        'sales_supervisor' => [
+            'sales.abandoned_checkouts.view', 'sales.abandoned_checkouts.manage',
         ],
         'warehouse' => [
             'sales.orders.view', 'sales.orders.ship', 'sales.orders.deliver',

@@ -30,7 +30,7 @@
                         عند اكتمال الرقم يُبحَث عن الزبون فتُعبَّأ بياناته من آخر
                         طلب — لكل من يُنشئ الطلبات، عبر النظام كلّه لا طلباته وحده.
                     --}}
-                    <input type="text" name="customer_phone" value="{{ old('customer_phone') }}" required inputmode="tel"
+                    <input type="text" name="customer_phone" value="{{ old('customer_phone') ?? request('phone') }}" required inputmode="tel"
                            x-model="phone" @input.debounce.400ms="lookupCustomer()"
                            placeholder="0599123456"
                            class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
@@ -341,7 +341,9 @@
                     areaOpen: false,
 
                     // تعرّف الزبون بالهاتف.
-                    phone: @js(old('customer_phone') ?? ''),
+                    // `?phone=` يصل من «طلبات لم تكتمل»: الموظّف ضغط على زبونٍ
+                    // بعينه، فيبدأ النموذج برقمه ويتعرّف عليه من تلقاء نفسه.
+                    phone: @js(old('customer_phone') ?? request('phone') ?? ''),
                     customerBanner: '',
                     lookupBusy: false,
 
@@ -397,6 +399,10 @@
                         if (sc) this.citySearch = sc.name;
                         const sa = this.areas.find(a => Number(a.id) === Number(this.areaId));
                         if (sa) this.areaSearch = sa.name;
+
+                        // رقمٌ جاهزٌ عند الفتح (من قائمة الطلبات غير المكتملة) يُبحث
+                        // عنه فورًا، وإلّا لزم الموظفَ أن يمسّ الحقل ليعمل التعرّف.
+                        if (this.phone && !this.cityId) this.lookupCustomer();
                     },
 
                     get filteredCities() {

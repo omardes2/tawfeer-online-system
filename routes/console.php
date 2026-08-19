@@ -33,6 +33,7 @@ if (config('delivery.escalation.enabled')) {
 */
 Schedule::command('marketing:run-birthdays')->dailyAt('09:00')->withoutOverlapping();
 Schedule::command('marketing:run-abandoned-carts')->hourly()->withoutOverlapping();
+Schedule::command('marketing:run-abandoned-checkouts')->hourly()->withoutOverlapping();
 
 /*
 | سحب الصرف الإعلاني (ADR-052) — مفعّل بالإعداد فقط (config/ads.php)، وآمن بلا ربط

@@ -24,7 +24,20 @@ class CheckoutSession extends Model
         'customer_name', 'customer_phone', 'customer_email',
         'shipping_address', 'city_id', 'area_id',
         'payment_method_code', 'notes', 'order_id',
+        'recovery_status', 'recovery_note', 'recovery_contacted_at',
+        'recovery_attempts', 'recovery_user_id', 'recovery_order_id',
     ];
+
+    protected $casts = [
+        'recovery_contacted_at' => 'datetime',
+        'recovery_attempts' => 'integer',
+    ];
+
+    /** نتائج متابعة الاسترداد — `recovered` تُسنَد يدويًّا أو تُكشَف من طلبٍ لاحق. */
+    public const RECOVERY_STATUSES = ['new', 'contacted', 'no_answer', 'refused', 'recovered', 'ignored'];
+
+    /** حالاتٌ ما زال صاحبها يستحقّ اتصالًا. */
+    public const OPEN_RECOVERY_STATUSES = ['new', 'contacted', 'no_answer'];
 
     public function cart(): BelongsTo
     {
@@ -49,6 +62,16 @@ class CheckoutSession extends Model
     public function area(): BelongsTo
     {
         return $this->belongsTo(Area::class);
+    }
+
+    public function recoveryUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recovery_user_id');
+    }
+
+    public function recoveryOrder(): BelongsTo
+    {
+        return $this->belongsTo(Order::class, 'recovery_order_id');
     }
 
     /** اكتملت البيانات المطلوبة للإتمام؟ */

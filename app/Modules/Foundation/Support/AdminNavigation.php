@@ -33,6 +33,7 @@ final class AdminNavigation
                 ['admin.sales.orders.index', 'الطلبات', ['viewAny', $m('Sales\\Models\\Order')], 'admin.sales.orders.index'],
                 ['admin.sales.orders.create', 'طلب بيع جديد', ['create', $m('Sales\\Models\\Order')], 'admin.sales.orders.create'],
                 ['admin.sales.orders.direct.create', 'مبيعات مباشرة', ['createDirect', $m('Sales\\Models\\Order')], 'admin.sales.orders.direct.*'],
+                ['admin.sales.abandoned_checkouts.index', 'طلبات لم تكتمل', 'sales.abandoned_checkouts.view', 'admin.sales.abandoned_checkouts.*'],
                 ['admin.returns.index', 'مرتجعات المبيعات', 'returns.view', 'admin.returns.*'],
             ]],
             ['المنتجات', 'box', [

@@ -3,6 +3,7 @@
 namespace App\Modules\Marketing\Providers;
 
 use App\Modules\Marketing\Console\RunAbandonedCartsCommand;
+use App\Modules\Marketing\Console\RunAbandonedCheckoutsCommand;
 use App\Modules\Marketing\Console\RunBirthdayCampaignsCommand;
 use App\Modules\Marketing\Listeners\MarketingEventSubscriber;
 use Illuminate\Support\Facades\Event;
@@ -24,6 +25,7 @@ class MarketingServiceProvider extends ServiceProvider
             $this->commands([
                 RunBirthdayCampaignsCommand::class,
                 RunAbandonedCartsCommand::class,
+                RunAbandonedCheckoutsCommand::class,
             ]);
         }
     }

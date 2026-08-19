@@ -27,7 +27,7 @@
                     <x-admin.field :label="__('حدث المحفّز (لنوع event)')" name="trigger_event">
                         <select name="trigger_event" class="w-full rounded-md border-gray-300">
                             <option value="">—</option>
-                            @foreach (['order_delivered','return_requested','return_completed','delivery_status_changed','abandoned_cart'] as $e)<option value="{{ $e }}" @selected(old('trigger_event')===$e)>{{ $e }}</option>@endforeach
+                            @foreach (['order_delivered','return_requested','return_completed','delivery_status_changed','abandoned_cart','abandoned_checkout'] as $e)<option value="{{ $e }}" @selected(old('trigger_event')===$e)>{{ $e }}</option>@endforeach
                         </select>
                     </x-admin.field>
                     <x-admin.field :label="__('قالب (اختياري)')" name="template_id">
