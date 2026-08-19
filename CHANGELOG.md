@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — "no ads on this product" on the daily budget page
+- A product that sells with no ad spend recorded sat on "awaiting input"
+  forever, because the page could not tell "the spend hasn't been entered yet"
+  from "this product was never advertised". Both look like zero.
+- An entered zero now means the second. The verdict reads the **count** of
+  entered spend rows, not just their sum: rows present and summing to zero is a
+  statement — the product had no ads — and the row gets a "no ads" verdict
+  showing its organic profit. No rows at all still withholds the verdict.
+  (The screen already said as much next to its delete button — "a zero means it
+  wasn't advertised, an absent row means it hasn't been copied over yet" — the
+  verdict simply never honoured it.)
+- The button writes that zero across the window's **empty days only**. A day
+  with spend already entered is never overwritten, and the declaration is undone
+  by deleting its rows.
+- Gated by `reports.ad_budget.manage`, with a confirmation naming the product,
+  the channel and the window it covers.
+
 ### Changed — the daily budget page stops going quiet on most of its rows
 - The judgement window widens from 3 days to 7, and the minimum orders before a
   verdict drops from 10 to 5.

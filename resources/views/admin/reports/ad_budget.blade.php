@@ -362,6 +362,27 @@
                         <span class="inline-block rounded-md px-2 py-1 text-xs font-semibold ring-1 {{ $tones[$r['verdict']['tone']] }}"
                               title="{{ $r['verdict']['reason'] }}">{{ $r['verdict']['label'] }}</span>
                         <span class="block mt-1 text-[11px] text-gray-400 max-w-[18rem]">{{ $r['verdict']['reason'] }}</span>
+                        {{--
+                            صنفٌ باع بلا صرفٍ مُدخَل: إمّا لم يُدخل الرقم بعد، وإمّا
+                            لا إعلان عليه أصلًا. الزرّ يفصل الاحتمالين — يُسجّل صفرًا
+                            صريحًا في فجوات النافذة، فيتحوّل الصفّ من «لا أعرف» إلى
+                            حكمٍ يُظهر الربح العضويّ كما هو.
+                        --}}
+                        @if ($can && ! $r['unassigned'] && $r['verdict']['code'] === 'blocked' && $r['window']['spend'] <= 0)
+                            <div class="mt-1">
+                                <x-admin.confirm
+                                    :action="route('admin.reports.ad_budget.no_ads', [$r['channel_id'], $r['product_id'], $dayString])"
+                                    method="POST"
+                                    tone="green"
+                                    trigger-class="text-emerald-700 hover:text-emerald-800 text-[11px] font-medium underline"
+                                    :trigger="__('لا إعلان على هذا الصنف')"
+                                    :title="__('إقرار بعدم الإعلان')"
+                                    :confirm="__('نعم، بلا إعلان')"
+                                    :message="__('يُسجَّل صرفٌ صفريّ لـ«:p» على «:c» في أيام النافذة المنتهية بـ:d التي لا إدخال لها. الأيام المُدخَلة لا تُمسّ، والإقرار يُلغى بحذف صفوفه.', [
+                                        'p' => $r['product'], 'c' => $r['channel'], 'd' => $dayString,
+                                    ])" />
+                            </div>
+                        @endif
                     </td>
                 </tr>
             @empty
@@ -530,6 +551,7 @@
             'a' => $thresholds['increase_below'], 'b' => $thresholds['hold_below'],
             'c' => $thresholds['reduce_below'], 'm' => $thresholds['min_orders'],
         ]) }}</p>
+        <p class="mt-1">{{ __('صفرٌ مُدخَل ليس كغياب الصفّ: الغياب «لم يُنسخ الصرف بعد» فيُحجب الحكم، والصفر إقرارٌ بأن الصنف لم يُعلَن عليه فيظهر ربحه العضويّ بشارة «بلا إعلان». وزرّ «لا إعلان على هذا الصنف» يُسجّل ذلك الصفر في أيام النافذة الفارغة وحدها.') }}</p>
         <p class="mt-1">{{ __('البنود الحرّة (بلا صنف من الكتالوج) لا تظهر في الصفوف لأنها لا تُنسب إلى صنفٍ يُعلَن عليه، لكنّ طلباتها معدودة في إجمالي اليوم.') }}</p>
     </div>
 

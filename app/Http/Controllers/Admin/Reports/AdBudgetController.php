@@ -86,6 +86,39 @@ class AdBudgetController extends Controller
     }
 
     /**
+     * إقرارٌ بأن صنفًا لم يُعلَن عليه في النافذة.
+     *
+     * الفرق بين «صفر» و«لا شيء» هو الفرق بين حكمٍ وصمت: الصفّ الغائب يعني «لم
+     * يُنسخ الصرف بعد» فتُحجب النتيجة، والصفر المُدخَل يعني «لا إعلان على هذا
+     * الصنف» فيظهر ربحه العضويّ كما هو. وبلا هذا الزرّ يبقى الصنف الذي لا
+     * يُعلَن عليه أبدًا معلَّقًا بشارة «بانتظار الإدخال» بلا شيء يُنتظر.
+     *
+     * تُملأ **الفجوات وحدها**: يومٌ له صرفٌ مُدخَل لا يُدهَس بصفر.
+     */
+    public function markNoAds(Request $request, int $channel, int $product, string $day): RedirectResponse
+    {
+        abort_unless($request->user()->can('reports.ad_budget.manage'), 403);
+
+        abort_unless(AdChannel::whereKey($channel)->exists() && Product::whereKey($product)->exists(), 404);
+
+        $to = Carbon::parse($day)->startOfDay();
+        $windowDays = (int) $this->budget->thresholds()['window_days'];
+        $rate = (float) Settings::get('ads.usd_rate', 3.7);
+
+        $filled = 0;
+        for ($d = $to->copy()->subDays($windowDays - 1); $d->lte($to); $d->addDay()) {
+            $created = AdDailySpend::firstOrCreate(
+                ['spend_date' => $d->copy(), 'ad_channel_id' => $channel, 'product_id' => $product],
+                ['amount_usd' => 0, 'fx_rate' => $rate, 'conversations' => 0, 'entered_by' => $request->user()->id],
+            );
+
+            $filled += $created->wasRecentlyCreated ? 1 : 0;
+        }
+
+        return back()->with('success', __('سُجّل «لا إعلان» على :n من أيام النافذة.', ['n' => $filled]));
+    }
+
+    /**
      * ضبط عتبات الحكم ونافذته.
      *
      * كانت الخمسة محبوسة في جدول الإعدادات بلا شاشة، فتُغيَّر باستعلام SQL أو لا

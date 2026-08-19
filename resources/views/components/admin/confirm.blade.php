@@ -4,7 +4,9 @@
     given `method` (CSRF included). Preserves standard Laravel form posting.
 
     Props: action(url), method(DELETE|POST...), title, message, confirm(label),
-           tone(red|amber|green). Slot = trigger content (defaults to a label).
+           tone(red|amber|green), triggerClass (يُلوَّن الزرّ أحمر افتراضًا لأن
+           أغلب استعمالاته حذف؛ ويُبدَّل للإجراء غير المُتلِف فلا يبدو خطرًا).
+           Slot = trigger content (defaults to a label).
 --}}
 @props([
     'action',
@@ -14,12 +16,13 @@
     'confirm' => 'تأكيد',
     'tone' => 'red',
     'trigger' => 'حذف',
+    'triggerClass' => 'text-rose-600 hover:text-rose-700 text-sm font-medium',
 ])
 
 @php $btn = ['red' => 'btn-danger', 'amber' => 'btn bg-amber-500 text-white hover:bg-amber-600', 'green' => 'btn-primary'][$tone] ?? 'btn-danger'; @endphp
 
 <div x-data="{ open: false }" class="inline-block">
-    <button type="button" @click="open = true" class="text-rose-600 hover:text-rose-700 text-sm font-medium">{{ $trigger }}</button>
+    <button type="button" @click="open = true" class="{{ $triggerClass }}">{{ $trigger }}</button>
 
     <template x-teleport="body">
         <div x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4" x-transition.opacity>

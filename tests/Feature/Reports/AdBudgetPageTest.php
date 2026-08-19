@@ -536,6 +536,82 @@ class AdBudgetPageTest extends TestCase
             ->assertForbidden();
     }
 
+    // ────────── الإقرار بعدم الإعلان ──────────
+
+    /**
+     * صفرٌ مُدخَل صراحةً ليس كغياب الصفّ.
+     *
+     * الغياب «لم يُنسخ الصرف بعد» فيُحجب الحكم، والصفر «لا إعلان على هذا الصنف»
+     * فيظهر ربحه العضويّ. وبلا الفرق يبقى ما لا يُعلَن عليه صامتًا إلى الأبد
+     * بشارة «بانتظار الإدخال» بلا شيء يُنتظر.
+     */
+    public function test_an_entered_zero_means_no_ads_not_no_data(): void
+    {
+        $product = $this->product();
+        $this->sell($product);
+
+        $this->assertSame('blocked', $this->rowFor($this->report(), $product)['verdict']['code']);
+
+        $this->spend($product, 0, 0);
+
+        $this->assertSame('organic', $this->rowFor($this->report(), $product)['verdict']['code']);
+    }
+
+    /** والزرّ يملأ فجوات النافذة بصفرٍ صريح فيصدر الحكم. */
+    public function test_the_no_ads_button_fills_the_window_gaps(): void
+    {
+        $product = $this->product();
+        $this->sell($product);
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.reports.ad_budget.no_ads', [
+                $this->channel->id, $product->id, $this->day->toDateString(),
+            ]))
+            ->assertRedirect();
+
+        $verdict = $this->rowFor($this->report(), $product)['verdict'];
+
+        $this->assertSame('organic', $verdict['code']);
+        // النافذة كاملة: يومٌ لكل يوم فيها.
+        $this->assertSame(
+            (int) app(AdBudgetService::class)->thresholds()['window_days'],
+            AdDailySpend::where('product_id', $product->id)->count(),
+        );
+    }
+
+    /** ولا يدهس يومًا له صرفٌ مُدخَل. */
+    public function test_the_no_ads_button_never_overwrites_entered_spend(): void
+    {
+        $product = $this->product();
+        $this->sell($product);
+        $this->spend($product, 12, 5);
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.reports.ad_budget.no_ads', [
+                $this->channel->id, $product->id, $this->day->toDateString(),
+            ]))
+            ->assertRedirect();
+
+        $this->assertEqualsWithDelta(
+            12.0,
+            (float) AdDailySpend::where('product_id', $product->id)
+                ->whereDate('spend_date', $this->day->toDateString())->value('amount_usd'),
+            0.01,
+        );
+    }
+
+    /** ولا يُقرّه من لا يملك الإدارة. */
+    public function test_the_no_ads_button_is_gated_by_permission(): void
+    {
+        $product = $this->product();
+
+        $this->actingAs($this->withRole('affiliate'))
+            ->post(route('admin.reports.ad_budget.no_ads', [
+                $this->channel->id, $product->id, $this->day->toDateString(),
+            ]))
+            ->assertForbidden();
+    }
+
     // ────────── عتبات الحكم ──────────
 
     /**

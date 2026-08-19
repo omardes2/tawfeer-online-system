@@ -177,6 +177,16 @@ class AdBudgetService
         }
 
         if ($w['spend'] <= 0) {
+            // صفرٌ مُدخَل صراحةً ليس كغياب الصفّ: الأول إقرارٌ بأن الصنف لم
+            // يُعلَن عليه، والثاني «لم يُنسخ بعد». وبلا هذا الفرق يبقى البيع
+            // العضويّ صامتًا إلى الأبد بشارة «بانتظار الإدخال» بلا شيء يُنتظر.
+            if ($w['entries'] > 0) {
+                return $this->tone('organic', __('بلا إعلان'), $w['profit'] >= 0 ? 'green' : 'red',
+                    __('ربحٌ بلا صرف إعلاني: :p من :o طلبات على مدى :n أيام.', [
+                        'p' => $this->fmt($w['profit']), 'o' => $w['orders'], 'n' => (int) $t['window_days'],
+                    ]));
+            }
+
             return $this->tone('blocked', __('بانتظار الإدخال'), 'amber', __('مبيعات بلا صرف مُدخَل — أدخل قيمة الإعلان أولًا.'));
         }
 
@@ -246,7 +256,7 @@ class AdBudgetService
                 // سعر صرف الصفّ نفسه — يُعاد إلى الواجهة كي لا يدهسه الافتراضيُّ
                 // عند أول تعديل. صفٌّ واحد لكل مفتاح في اليوم، فالأقصى هو هو.
                 .'MAX(fx_rate) as fx_rate, '
-                .'SUM(conversations) as conversations, MIN(id) as row_id, '
+                .'SUM(conversations) as conversations, MIN(id) as row_id, COUNT(*) as rows_count, '
                 // قيمة المنصّة بجانب اليدوية — تُعرَض عند اختلافهما ولا تدهسها.
                 .'SUM(COALESCE(synced_amount_usd, amount_usd)) as synced_usd, '
                 .'SUM(COALESCE(synced_conversations, conversations)) as synced_conv, '
@@ -262,6 +272,9 @@ class AdBudgetService
                     'fx_rate' => (float) $r->fx_rate,
                     'conversations' => (int) $r->conversations,
                     'exists' => true,
+                    // عدد الصفوف المُدخَلة لا مجموعها: صفرٌ مُدخَل يعني «لم يُعلَن»،
+                    // وغيابُ الصفّ يعني «لم يُنسخ بعد» — والفرق بينهما حكمٌ أو صمت.
+                    'entries' => (int) $r->rows_count,
                     // صفٌّ واحد لكل مفتاح في اليوم الواحد (الفهرس الفريد)، فالأدنى هو هو.
                     'id' => (int) $r->row_id,
                     'platform_usd' => $syncedUsd,
@@ -348,6 +361,7 @@ class AdBudgetService
             'sales' => $sale['sales'],
             'profit' => $sale['profit'],
             'spend' => $spend['local'],
+            'entries' => $spend['entries'],
             'conversations' => $spend['conversations'],
             'net_profit' => round($sale['profit'] - $spend['local'], 2),
             'cpa' => $sale['orders'] > 0 ? round($spend['local'] / $sale['orders'], 2) : 0.0,
@@ -411,7 +425,8 @@ class AdBudgetService
     private function zeroSpend(): array
     {
         return [
-            'usd' => 0.0, 'local' => 0.0, 'fx_rate' => null, 'conversations' => 0, 'exists' => false, 'id' => null,
+            'usd' => 0.0, 'local' => 0.0, 'fx_rate' => null, 'conversations' => 0, 'exists' => false,
+            'entries' => 0, 'id' => null,
             'platform_usd' => 0.0, 'platform_conversations' => 0, 'conflict' => false,
         ];
     }
