@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — a page left open until the session expired
+- Leaving a page open past the session lifetime and then submitting produced
+  Laravel's bare English "Page Expired" screen: no explanation, no way back, and
+  the form's contents gone. Staff read it as the system breaking.
+- There is now an Arabic RTL 419 page that says what happened (the session ended,
+  nothing was saved, nothing broke), points to the right login — the admin login
+  for admin pages, the storefront login otherwise — and offers a link back. It is
+  a standalone page with inline styles and no layout: it renders for someone
+  whose session just ended and who may no longer be authenticated, so depending
+  on the current user would break it at the exact moment it has to explain itself.
+- The shipped session lifetime goes from 2 hours to 8 — a working day. The
+  idleness that expires a session is *request* idleness, not the operator's:
+  someone filling in a long order form sends nothing to the server, so their
+  session was expiring while they worked. Servers that pin `SESSION_LIFETIME` in
+  their own `.env` keep whatever they set; the new default and `.env.example`
+  both ship 480.
+
 ### Added — one ad, one budget, several products
 - The daily budget page could only attribute spend to a single product: the
   spend row's `product_id` was required. A real Meta ad showing three products
