@@ -10,6 +10,7 @@ use App\Http\Requests\Sales\UpdateOrderContactRequest;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Catalog\Services\PriceListService;
 use App\Modules\Crm\Models\Customer;
 use App\Modules\Crm\Services\CustomerService;
 use App\Modules\Foundation\Models\Area;
@@ -838,14 +839,23 @@ class OrderController extends Controller
         // بطاقة لكل **متغيّر قابل للبيع**: المنتج ذو المقاسات/الألوان يظهر بمقاساته
         // (كمية كل مقاس على حدة)، لا ببطاقة واحدة على المتغيّر الافتراضي — فكميته
         // تُوزَّع على المقاسات وتصبح صفرًا، وخصم المخزون يجب أن يقع على المقاس المُباع.
-        return Product::query()->active()
+        $products = Product::query()->active()
             // الصنف الممنوع على المسوّقين يختفي من بطاقاتهم — لا يُعرض ثم يُرفض
             // عند الحفظ. ولا يمسّ ذلك موظفي المبيعات ولا المدير.
             ->when(auth()->user()?->sellsAsAffiliate(), fn ($q) => $q->availableToAffiliates())
             ->with(['variants.attributeValues', 'defaultVariant', 'primaryImage'])
             ->orderBy('name')
-            ->get()
-            ->flatMap(function ($p) use ($availableByVariant) {
+            ->get();
+
+        // سعر شراء صاحب قائمة الأسعار — يراه على البطاقة فيعرف هامشه قبل أن
+        // يسعّر للزبون. فارغٌ لمن لا قائمة له، فلا يتغيّر شيء لأحد.
+        $buyPrices = app(PriceListService::class)->pricesFor(
+            auth()->user(),
+            $products->flatMap(fn ($p) => $p->variants->pluck('id'))->unique()->values()->all(),
+        );
+
+        return $products
+            ->flatMap(function ($p) use ($availableByVariant, $buyPrices) {
                 $optionVariants = $p->variants->filter(fn ($v) => $v->attributeValues->isNotEmpty())->values();
                 $hasOptions = $optionVariants->isNotEmpty();
 
@@ -858,6 +868,7 @@ class OrderController extends Controller
                     'sku' => $v->sku ?: $p->sku,
                     'variant' => $v->uuid,
                     'price' => (float) ($v->retail_price ?: $p->retail_price),
+                    'buy' => (float) ($buyPrices[$v->id] ?? 0),
                     'image' => $p->primaryImage?->url(),
                     'available' => (float) ($availableByVariant[$v->id] ?? 0),
                 ]);

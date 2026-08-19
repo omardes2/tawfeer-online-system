@@ -47,6 +47,7 @@ final class AdminNavigation
                 // شاشةٌ قائمة منذ بنائها ولم يكن لها بندٌ يقود إليها: التقييم
                 // المعلّق لا يُنشر حتى يُعتمد، ولا سبيل لاعتماده بلا رابط.
                 ['admin.reviews.index', 'تقييمات الزبائن', ['viewAny', $m('Catalog\\Models\\ProductReview')], 'admin.reviews.*'],
+                ['admin.price_lists.index', 'قوائم أسعار التجّار', 'catalog.price_lists.view', 'admin.price_lists.*'],
             ]],
             ['المخزون والمشتريات', 'inventory', [
                 ['admin.inventory.stocks', 'أرصدة المخزون', 'inventory.stocks.view', 'admin.inventory.stocks'],

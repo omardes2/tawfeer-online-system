@@ -60,5 +60,14 @@ class CatalogPermissionSeeder extends Seeder
         foreach (['admin', 'manager', 'affiliate'] as $roleName) {
             Role::where('name', $roleName)->first()?->givePermissionTo('catalog.price_list.view');
         }
+
+        // قوائم أسعار التجّار: للإدارة وحدها. القائمة تحدّد بكم يشتري التاجر،
+        // فهي قرار تسعيرٍ لا إدخال بيانات — ومن يعدّلها يتصرّف في هامش الشركة.
+        foreach (['catalog.price_lists.view', 'catalog.price_lists.manage'] as $permission) {
+            Permission::findOrCreate($permission, 'web');
+            foreach (['admin', 'manager'] as $roleName) {
+                Role::where('name', $roleName)->first()?->givePermissionTo($permission);
+            }
+        }
     }
 }

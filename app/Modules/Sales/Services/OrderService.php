@@ -2,7 +2,9 @@
 
 namespace App\Modules\Sales\Services;
 
+use App\Models\User;
 use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Catalog\Services\PriceListService;
 use App\Modules\Crm\Models\Customer;
 use App\Modules\Inventory\Models\StockReservation;
 use App\Modules\Inventory\Services\InventoryService;
@@ -23,7 +25,19 @@ class OrderService
         private readonly ReservationService $reservations,
         private readonly InventoryService $inventory,
         private readonly SalesPostingService $posting,
+        private readonly PriceListService $prices,
     ) {}
+
+    /**
+     * المشتري الذي تُحسم أسعاره: مسوّق الطلب.
+     *
+     * وهو نفسه من تُحسب له العمولة (`CommissionService`)، فيتّحد مَن يشتري بسعر
+     * القائمة ومَن يربح الفرق — ولا يُقاس ربحُ أحدٍ بسعرِ غيره.
+     */
+    private function buyerOf(Order $order): ?User
+    {
+        return $order->affiliate_id ? User::find($order->affiliate_id) : null;
+    }
 
     /**
      * @param  array<int, array{variant_id:int, qty:float, unit_price:float, discount?:float}>  $items
@@ -39,7 +53,7 @@ class OrderService
         }
 
         // يُمنع البيع بأقل من سعر الجملة لكل الأصناف ولجميع المستخدمين (كل قنوات البيع).
-        $this->assertPricesAboveWholesale($items);
+        $this->assertPricesAboveWholesale($items, $data['affiliate_id'] ?? null);
 
         return DB::transaction(function () use ($data, $items, $year) {
             $order = Order::create([
@@ -84,7 +98,7 @@ class OrderService
             ])));
 
             if ($items !== null) {
-                $this->assertPricesAboveWholesale($items);
+                $this->assertPricesAboveWholesale($items, $order->affiliate_id);
                 $order->items()->delete();
                 $this->syncItems($order, $items);
                 $this->recomputeTotals($order);
@@ -105,7 +119,7 @@ class OrderService
      */
     public function editPostedOrder(Order $order, array $data, array $items): Order
     {
-        $this->assertPricesAboveWholesale($items);
+        $this->assertPricesAboveWholesale($items, $order->affiliate_id);
 
         return DB::transaction(function () use ($order, $data, $items) {
             $order->loadMissing('items');
@@ -176,7 +190,7 @@ class OrderService
      *
      * @param  array<int, array<string, mixed>>  $items
      */
-    private function assertPricesAboveWholesale(array $items): void
+    private function assertPricesAboveWholesale(array $items, ?int $affiliateId = null): void
     {
         $variantIds = collect($items)->pluck('variant_id')->filter()->unique()->all();
         if (empty($variantIds)) {
@@ -185,14 +199,19 @@ class OrderService
 
         $variants = ProductVariant::with('product:id,name')->whereIn('id', $variantIds)->get()->keyBy('id');
 
+        // حدُّ التاجر سعرُ قائمته هو لا سعر الجملة العام: قائمته أدنى منه غالبًا
+        // — وهو سبب وجودها — فقياسُه بالجملة يمنعه من البيع بما اشترى به.
+        $buyer = $affiliateId ? User::find($affiliateId) : null;
+        $listPrices = $this->prices->pricesFor($buyer, $variantIds);
+
         foreach ($items as $item) {
             $variant = $variants->get($item['variant_id'] ?? null);
             if (! $variant) {
                 continue;
             }
-            $wholesale = (float) ($variant->wholesale_price ?? 0);
+            $wholesale = (float) ($listPrices[$variant->id] ?? $variant->wholesale_price ?? 0);
             if ($wholesale <= 0) {
-                continue; // لا سعر جملة محدَّد ⇒ لا قيد.
+                continue; // لا سعر محدَّد ⇒ لا قيد.
             }
             $qty = max((float) ($item['qty'] ?? 1), 0.0001);
             $netUnit = (float) ($item['unit_price'] ?? 0) - ((float) ($item['discount'] ?? 0) / $qty);
@@ -447,10 +466,16 @@ class OrderService
         //  • تكلفة الشراء (WAC) — أساس تكلفة البضاعة المباعة محاسبيًا.
         //  • سعر الجملة — أساس ربح المسوّق (سعر البيع − سعر الجملة). خلطهما كان يجعل
         //    ربح المسوّق يُحتسب على تكلفة الشراء بدل سعر الجملة.
-        $variants = ProductVariant::whereIn('id', array_column($items, 'variant_id'))
+        $variantIds = array_column($items, 'variant_id');
+        $variants = ProductVariant::whereIn('id', $variantIds)
             ->get(['id', 'average_cost', 'wholesale_price']);
         $costs = $variants->pluck('average_cost', 'id');
         $wholesale = $variants->pluck('wholesale_price', 'id');
+
+        // سعر قائمة التاجر يحلّ محلّ سعر الجملة في **اللقطة نفسها**، فيجري بعده
+        // حسابُ الهامش والعمولة والتقارير بلا حرفٍ يتغيّر: هامش التاجر = سعر
+        // البيع − سعر قائمته، كما كان هامش المسوّق = سعر البيع − سعر الجملة.
+        $listPrices = $this->prices->pricesFor($this->buyerOf($order), $variantIds);
 
         foreach ($items as $item) {
             $qty = (float) $item['qty'];
@@ -466,7 +491,10 @@ class OrderService
                 'tax_amount' => 0,
                 'line_total' => ($qty * $unitPrice) - $discount,
                 'wholesale_cost_snapshot' => round((float) ($item['wholesale_cost_snapshot'] ?? $costs[$item['variant_id']] ?? 0), 2),
-                'wholesale_price_snapshot' => round((float) ($item['wholesale_price_snapshot'] ?? $wholesale[$item['variant_id']] ?? 0), 2),
+                'wholesale_price_snapshot' => round((float) ($item['wholesale_price_snapshot']
+                    ?? $listPrices[$item['variant_id']]
+                    ?? $wholesale[$item['variant_id']]
+                    ?? 0), 2),
                 'qty_reserved' => 0,
                 'qty_shipped' => 0,
             ]);

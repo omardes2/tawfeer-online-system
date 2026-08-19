@@ -33,6 +33,15 @@
                         </select>
                         <p class="mt-1 text-xs text-gray-400">{{ __('تُدخَل طرود طلبات هذا المستخدم تحت هذا الحساب في شركة التوصيل. زامِن القائمة من زر «مزامنة حسابات التوصيل» في صفحة المستخدمين.') }}</p>
                     </x-admin.field>
+                    <x-admin.field :label="__('قائمة الأسعار')" name="price_list_id">
+                        <select name="price_list_id" class="w-full rounded-md border-gray-300">
+                            <option value="">{{ __('— سعر الجملة العام —') }}</option>
+                            @foreach ($priceLists as $list)
+                                <option value="{{ $list->id }}" @selected((int) old('price_list_id', $user->price_list_id) === $list->id)>{{ $list->name }}@unless($list->is_active) ({{ __('غير نشط') }})@endunless</option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-gray-400">{{ __('يشتري بأسعار هذه القائمة، ويكون ربحه فرقَ ما بين سعر بيعه وسعرها. بلا قائمة يبقى على سعر الجملة كما هو.') }}</p>
+                    </x-admin.field>
                     <label class="flex items-center gap-2 text-sm pb-2 pt-6">
                         <input type="hidden" name="is_active" value="0" />
                         <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $user->exists ? $user->is_active : true)) class="rounded border-gray-300 text-emerald-600" />

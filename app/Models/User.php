@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Modules\Catalog\Models\PriceList;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\DeliveryBusiness;
 use App\Modules\Store\Models\SocialIdentity;
@@ -20,7 +21,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'phone', 'department', 'job_title', 'password', 'branch_id', 'delivery_business_id', 'is_active', 'last_login_at', 'terms_accepted_at'])]
+#[Fillable(['name', 'email', 'phone', 'department', 'job_title', 'password', 'branch_id', 'delivery_business_id', 'price_list_id', 'is_active', 'last_login_at', 'terms_accepted_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -55,6 +56,16 @@ class User extends Authenticatable
     public function deliveryBusiness(): BelongsTo
     {
         return $this->belongsTo(DeliveryBusiness::class);
+    }
+
+    /**
+     * قائمة الأسعار المُسنَدة — يشتري صاحبها بأسعارها لا بسعر الجملة.
+     *
+     * فارغةٌ للأغلبية: من لا قائمة له يبقى على سعر الجملة تمامًا كما كان.
+     */
+    public function priceList(): BelongsTo
+    {
+        return $this->belongsTo(PriceList::class);
     }
 
     /** هويّات تسجيل الدخول الاجتماعي المربوطة (Phase 3.5). */

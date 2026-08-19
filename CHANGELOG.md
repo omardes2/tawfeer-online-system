@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — dealer price lists, assignable to specific marketers
+- A fourth pricing layer beside cost, retail and wholesale: named price lists
+  holding a price per variant, assigned to individual users. Whoever holds a
+  list buys at its prices, and their profit is the gap between what they sell
+  for and what their list charges — exactly how a marketer's profit is the gap
+  between the sale price and wholesale today.
+- **Nobody's price moves until a list is assigned by hand.** Resolution is
+  list price → parent list price → wholesale → cost, so a user with no list
+  behaves precisely as before. That was the binding constraint on the whole
+  design: adding a pricing layer to a system that is already selling must not
+  reprice anyone by accident.
+- Per-dealer customisation without duplication: every list may inherit from a
+  parent, nearest wins. A specific dealer gets their own list holding only the
+  items that differ for them, inheriting the rest from the general dealer list —
+  no copying a hundred products to change five. The edit screen shows inherited
+  rows alongside the list's own, so the manager sees what the dealer actually
+  pays rather than only what was typed into that list.
+- Inheritance cycles are rejected on save (a list cannot be its own ancestor,
+  and two lists cannot inherit from each other), with a second visited-guard in
+  the read path for data that predates the check — a cycle would otherwise spin
+  price resolution forever on every order.
+- Profit and commission needed no changes at all: the resolved price is frozen
+  into the order item's existing `wholesale_price_snapshot` at sale time, so
+  commission, margin and marketer reports read the same field they always did.
+  Editing a list later never moves the profit of an order already placed.
+- The minimum-price guard now follows the buyer: a dealer is blocked below
+  **their own list price**, not the general wholesale price. Measuring them
+  against wholesale would forbid them from selling at what they bought at, which
+  is the entire reason the list exists.
+- The dealer sees their own buy price where they need it — on the product cards
+  in the new-order form, and in the "products and prices" screen, whose wholesale
+  column becomes "your buy price" for anyone holding a list.
+- Company profit in reports is unchanged: still computed against real purchase
+  cost (WAC), not the dealer's list price. The list governs the dealer's profit
+  only.
+- Managing lists requires `catalog.price_lists.manage` (admin and manager only) —
+  a list decides what a dealer pays, so it is a pricing decision, not data entry.
+
 ### Added — "no ads on this product" on the daily budget page
 - A product that sells with no ad spend recorded sat on "awaiting input"
   forever, because the page could not tell "the spend hasn't been entered yet"

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreUserRequest;
 use App\Http\Requests\Admin\UpdateUserRequest;
 use App\Models\User;
+use App\Modules\Catalog\Models\PriceList;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\DeliveryBusiness;
 use App\Modules\Foundation\Services\UserAdminService;
@@ -127,6 +128,8 @@ class UserController extends Controller
             'branches' => Branch::orderBy('name')->get(),
             // حسابات البزنس لدى شركة التوصيل (للقائمة المنسدلة).
             'deliveryBusinesses' => DeliveryBusiness::orderByDesc('is_active')->orderBy('name')->get(),
+            // قوائم أسعار التجّار — من تُسنَد له قائمةٌ يشتري بأسعارها.
+            'priceLists' => PriceList::orderByDesc('is_active')->orderBy('name')->get(),
         ];
     }
 }

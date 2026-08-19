@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Catalog;
 use App\Http\Controllers\Controller;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Services\PriceListService;
 use App\Modules\Inventory\Models\InventoryStock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -60,12 +61,43 @@ class PriceListController extends Controller
             // «المتاح» = الموجود ناقص المحجوز: المحجوز مباعٌ فعلًا وإن لم يخرج بعد.
             'available' => $this->availableByVariant($products->getCollection()),
             'lowStock' => self::LOW_STOCK,
+            // سعر شراء صاحب القائمة إن كانت له قائمة — يرى ما يشتري به هو، لا
+            // سعر الجملة العام الذي لا يعنيه.
+            'dealerRange' => $this->dealerRange($request, $products->getCollection()),
             // الفئات التي فيها أصناف فعلًا: فئة فارغة في الفلتر تعطي صفحة خاوية.
             'categories' => Category::query()
                 ->whereIn('id', Product::query()->whereNotNull('category_id')->distinct()->pluck('category_id'))
                 ->orderBy('name')->get(['id', 'name']),
             'activeCategory' => $category,
         ]);
+    }
+
+    /**
+     * مدى سعر الشراء لكل منتج بحسب قائمة أسعار المستخدم.
+     *
+     * فارغٌ لمن لا قائمة له، فيبقى العمود على سعر الجملة تمامًا كما كان.
+     * والمتغيّر غير المسعَّر في القائمة يعود إلى سعر جملته — فالمدى يعكس ما
+     * يدفعه التاجر فعلًا لا ما كُتب في القائمة وحده.
+     *
+     * @param  Collection<int, Product>  $products
+     * @return Collection<int, array{min: float, max: float}>
+     */
+    private function dealerRange(Request $request, $products): Collection
+    {
+        $variantIds = $products->flatMap(fn (Product $p) => $p->variants->pluck('id'))->unique()->values()->all();
+        $prices = app(PriceListService::class)->pricesFor($request->user(), $variantIds);
+
+        if ($prices->isEmpty()) {
+            return collect();
+        }
+
+        return $products->mapWithKeys(function (Product $p) use ($prices) {
+            $values = $p->variants
+                ->map(fn ($v) => (float) ($prices[$v->id] ?? $v->wholesale_price ?? 0))
+                ->filter(fn (float $v) => $v > 0);
+
+            return $values->isEmpty() ? [] : [$p->id => ['min' => $values->min(), 'max' => $values->max()]];
+        });
     }
 
     /**

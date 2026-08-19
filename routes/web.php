@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\Ai\AiContentController;
 use App\Http\Controllers\Admin\Catalog\BrandController;
 use App\Http\Controllers\Admin\Catalog\CategoryController;
 use App\Http\Controllers\Admin\Catalog\PriceListController;
+use App\Http\Controllers\Admin\Catalog\PriceListsController;
 use App\Http\Controllers\Admin\Catalog\ProductAttributeController;
 use App\Http\Controllers\Admin\Catalog\ProductController;
 use App\Http\Controllers\Admin\Catalog\ProductImportController;
@@ -205,6 +206,18 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     // الأصناف والأسعار: قائمة أسعار للقراءة (للمسوّق أساسًا) — قبل الـresource
     // وإلّا ابتلعها products/{product}. صلاحيتها مستقلّة عن الكتالوج.
     Route::get('price-list', [PriceListController::class, 'index'])->name('price_list');
+
+    // قوائم أسعار التجّار — طبقة سعرٍ تُسنَد إلى أشخاص بعينهم.
+    Route::middleware('can:catalog.price_lists.view')->group(function () {
+        Route::get('price-lists', [PriceListsController::class, 'index'])->name('price_lists.index');
+        Route::get('price-lists/create', [PriceListsController::class, 'create'])->name('price_lists.create');
+        Route::post('price-lists', [PriceListsController::class, 'store'])->name('price_lists.store');
+        Route::get('price-lists/{priceList}/edit', [PriceListsController::class, 'edit'])->name('price_lists.edit');
+        Route::put('price-lists/{priceList}', [PriceListsController::class, 'update'])->name('price_lists.update');
+        Route::delete('price-lists/{priceList}', [PriceListsController::class, 'destroy'])->name('price_lists.destroy');
+        Route::post('price-lists/{priceList}/items', [PriceListsController::class, 'storeItem'])->name('price_lists.items.store');
+        Route::delete('price-lists/{priceList}/items/{item}', [PriceListsController::class, 'destroyItem'])->name('price_lists.items.destroy');
+    });
 
     Route::get('products/import', [ProductImportController::class, 'form'])->name('products.import');
     Route::post('products/import', [ProductImportController::class, 'upload'])->name('products.import.upload');

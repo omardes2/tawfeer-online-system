@@ -56,7 +56,7 @@
                 <th>{{ __('الصنف') }}</th>
                 <th>{{ __('الفئة') }}</th>
                 <th class="text-start">{{ __('سعر البيع') }}</th>
-                <th class="text-start">{{ __('سعر الجملة') }}</th>
+                <th class="text-start">{{ $dealerRange->isEmpty() ? __('سعر الجملة') : __('سعر شرائك') }}</th>
                 <th>{{ __('المقاسات المتوفّرة') }}</th>
             </tr>
         </thead>
@@ -89,8 +89,16 @@
                     <td class="text-start tabular-nums whitespace-nowrap font-medium text-gray-800">
                         {{ $priceCell($product->variants_min_retail_price, $product->variants_max_retail_price, $product->retail_price) }}
                     </td>
+                    {{--
+                        صاحب قائمة أسعارٍ يرى سعر شرائه هو، لا سعر الجملة العام
+                        الذي لا يشتري به — وربحه فرقُ ما بينه وبين سعر بيعه.
+                    --}}
                     <td class="text-start tabular-nums whitespace-nowrap text-gray-600">
-                        {{ $priceCell($product->variants_min_wholesale_price, $product->variants_max_wholesale_price, $product->wholesale_price) }}
+                        @if ($range = $dealerRange[$product->id] ?? null)
+                            {{ $priceCell($range['min'], $range['max'], $range['min']) }}
+                        @else
+                            {{ $priceCell($product->variants_min_wholesale_price, $product->variants_max_wholesale_price, $product->wholesale_price) }}
+                        @endif
                     </td>
                     {{--
                         التوفّر لا الكمية: المسوّق يحتاج أن يعرف أيّ مقاسٍ يستطيع

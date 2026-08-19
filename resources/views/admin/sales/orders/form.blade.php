@@ -153,6 +153,10 @@
                                         <span class="text-[11px] px-1.5 py-0.5 rounded-md tabular-nums"
                                               :class="(Number(p.available) > 0) ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-600'"
                                               x-text="'{{ __('المتوفر') }}: ' + Number(p.available ?? 0)"></span>
+                                        {{-- سعر شراء صاحب قائمة الأسعار: يعرف هامشه قبل أن يسعّر للزبون. --}}
+                                        <span class="text-[11px] px-1.5 py-0.5 rounded-md tabular-nums bg-sky-50 text-sky-700"
+                                              x-show="Number(p.buy ?? 0) > 0" x-cloak
+                                              x-text="'{{ __('شراؤك') }}: ' + Number(p.buy).toFixed(2)"></span>
                                         <span class="ms-auto text-sm font-semibold text-emerald-600 tabular-nums"
                                               x-text="p.price.toFixed(2) + ' {{ $sym }}'"></span>
                                     </span>
