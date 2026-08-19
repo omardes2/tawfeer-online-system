@@ -154,6 +154,67 @@
             </form>
         </div>
 
+        {{--
+            عتبات الحكم: خمسة أرقام تحكم كل شارة في الجدول، وكانت محبوسة في
+            الإعدادات بلا شاشة. العتبة العالية تُصمِت اللوحة عن أغلب الصفوف —
+            «بيانات غير كافية» — والمنخفضة تُصدر حكمًا على ضجيج. ضبطُها بيد
+            صاحب المتجر لأنها تتبع حجمه وهامشه لا تصميم النظام.
+        --}}
+        <div class="admin-card p-4 mb-5 report-no-print" x-data="{ open: {{ $errors->any() ? 'true' : 'false' }} }">
+            <button type="button" x-on:click="open = ! open" class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <svg class="w-4 h-4 text-gray-400 transition" :class="open && 'rotate-90'" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+                {{ __('عتبات الحكم') }}
+                <span class="text-xs font-normal text-gray-500">
+                    {{ __('نافذة :n أيام · لا حكم دون :m طلبات · :a / :b / :c', [
+                        'n' => (int) $thresholds['window_days'], 'm' => (int) $thresholds['min_orders'],
+                        'a' => (int) $thresholds['increase_below'], 'b' => (int) $thresholds['hold_below'],
+                        'c' => (int) $thresholds['reduce_below'],
+                    ]) }}
+                </span>
+            </button>
+            <form x-show="open" x-cloak method="POST" action="{{ route('admin.reports.ad_budget.thresholds') }}"
+                  class="mt-4 flex flex-wrap items-end gap-3">
+                @csrf
+                <div>
+                    <label for="th-window" class="block text-xs text-gray-500 mb-1">{{ __('نافذة الحكم (يوم)') }}</label>
+                    <input id="th-window" type="number" name="window_days" min="1" max="30" required
+                           value="{{ old('window_days', (int) $thresholds['window_days']) }}"
+                           class="w-28 rounded-lg border-gray-300 text-sm tabular-nums focus:border-emerald-500 focus:ring-emerald-500" />
+                </div>
+                <div>
+                    <label for="th-min" class="block text-xs text-gray-500 mb-1">{{ __('أقلّ عدد طلبات') }}</label>
+                    <input id="th-min" type="number" name="min_orders" min="1" max="100" required
+                           value="{{ old('min_orders', (int) $thresholds['min_orders']) }}"
+                           class="w-28 rounded-lg border-gray-300 text-sm tabular-nums focus:border-emerald-500 focus:ring-emerald-500" />
+                </div>
+                <div>
+                    <label for="th-inc" class="block text-xs text-gray-500 mb-1">{{ __('«زد» دون') }}</label>
+                    <input id="th-inc" type="number" step="0.01" name="cpa_increase_below" min="1" required
+                           value="{{ old('cpa_increase_below', $thresholds['increase_below']) }}"
+                           class="w-28 rounded-lg border-gray-300 text-sm tabular-nums focus:border-emerald-500 focus:ring-emerald-500" />
+                </div>
+                <div>
+                    <label for="th-hold" class="block text-xs text-gray-500 mb-1">{{ __('«ثبّت» دون') }}</label>
+                    <input id="th-hold" type="number" step="0.01" name="cpa_hold_below" min="1" required
+                           value="{{ old('cpa_hold_below', $thresholds['hold_below']) }}"
+                           class="w-28 rounded-lg border-gray-300 text-sm tabular-nums focus:border-emerald-500 focus:ring-emerald-500" />
+                </div>
+                <div>
+                    <label for="th-red" class="block text-xs text-gray-500 mb-1">{{ __('«أنقص» دون') }}</label>
+                    <input id="th-red" type="number" step="0.01" name="cpa_reduce_below" min="1" required
+                           value="{{ old('cpa_reduce_below', $thresholds['reduce_below']) }}"
+                           class="w-28 rounded-lg border-gray-300 text-sm tabular-nums focus:border-emerald-500 focus:ring-emerald-500" />
+                </div>
+                <button type="submit" class="btn-primary btn-sm">{{ __('حفظ') }}</button>
+                @error('cpa_hold_below')
+                    <p class="w-full text-xs text-rose-600">{{ $message }}</p>
+                @enderror
+                <p class="w-full text-xs text-gray-400 leading-relaxed">
+                    {{ __('نافذةٌ أطول تجمع طلباتٍ أكثر لكل صنف فتقلّ شارات «بيانات غير كافية»، لكنها تُبطئ ظهور أثر أي تغيير. وعتبةُ طلباتٍ منخفضة تُصدر حكمًا أسرع وأقلّ ثقة — بأربعة طلبات يحرّك الطلبُ الواحد تكلفةَ الطلب ربعًا. والتغيير يسري على الحساب فورًا ولا يمسّ بيانات الصرف المحفوظة.') }}
+                </p>
+            </form>
+        </div>
+
         {{-- ضبط المصروف الثابت — بتاريخ سريان فلا يُعاد كتابة ربح الماضي. --}}
         <div class="admin-card p-4 mb-5 report-no-print" x-data="{ open: false }">
             <button type="button" x-on:click="open = ! open" class="flex items-center gap-2 text-sm font-semibold text-gray-700">

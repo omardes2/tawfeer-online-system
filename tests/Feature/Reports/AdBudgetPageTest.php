@@ -535,4 +535,70 @@ class AdBudgetPageTest extends TestCase
             ->post(route('admin.reports.ad_budget.usd_rate'), ['usd_rate' => 3.05])
             ->assertForbidden();
     }
+
+    // ────────── عتبات الحكم ──────────
+
+    /**
+     * النافذة سبعة أيام وعتبة الطلبات خمسة.
+     *
+     * عتبةٌ لا تُبلَغ تُصمِت اللوحة عن أغلب صفوفها، فيبقى الصرف بلا قرار —
+     * والصمت الدائم ليس حمايةً من الضجيج.
+     */
+    public function test_the_shipped_window_and_order_floor(): void
+    {
+        $thresholds = app(AdBudgetService::class)->thresholds();
+
+        $this->assertSame(7, (int) $thresholds['window_days']);
+        $this->assertSame(5, (int) $thresholds['min_orders']);
+    }
+
+    /** وضبط العتبات من الشاشة يسري على الحكم فورًا. */
+    public function test_saving_the_thresholds_changes_the_verdict_at_once(): void
+    {
+        $product = $this->product();
+        $this->sell($product);
+        $this->spend($product, 5, 10); // 20 ₪ على طلبٍ واحد
+
+        $this->assertSame('insufficient', $this->rowFor($this->report(), $product)['verdict']['code']);
+
+        $this->actingAs($this->admin())->post(route('admin.reports.ad_budget.thresholds'), [
+            'window_days' => 7,
+            'min_orders' => 1,
+            'cpa_increase_below' => 30,
+            'cpa_hold_below' => 45,
+            'cpa_reduce_below' => 60,
+        ])->assertRedirect();
+
+        $this->assertSame('increase', $this->rowFor($this->report(), $product)['verdict']['code']);
+    }
+
+    /**
+     * وعتباتٌ غير متصاعدة تُرفَض.
+     *
+     * الحكم يفحصها بالترتيب، فلو ساوت «زد» عتبةَ «ثبّت» ابتلع الفرعُ الأول ما
+     * بعده فلا يصدر «ثبّت» أبدًا — خللٌ صامت لا رسالة خطأ له.
+     */
+    public function test_thresholds_must_ascend(): void
+    {
+        $this->actingAs($this->admin())->post(route('admin.reports.ad_budget.thresholds'), [
+            'window_days' => 7,
+            'min_orders' => 5,
+            'cpa_increase_below' => 50,
+            'cpa_hold_below' => 45,
+            'cpa_reduce_below' => 60,
+        ])->assertSessionHasErrors('cpa_hold_below');
+
+        $this->assertSame(5, (int) app(AdBudgetService::class)->thresholds()['min_orders']);
+    }
+
+    /** ولا يضبطها من لا يملك الإدارة. */
+    public function test_the_thresholds_are_gated_by_permission(): void
+    {
+        $this->actingAs($this->withRole('affiliate'))
+            ->post(route('admin.reports.ad_budget.thresholds'), [
+                'window_days' => 7, 'min_orders' => 1,
+                'cpa_increase_below' => 30, 'cpa_hold_below' => 45, 'cpa_reduce_below' => 60,
+            ])
+            ->assertForbidden();
+    }
 }

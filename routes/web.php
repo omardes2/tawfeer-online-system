@@ -403,6 +403,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::delete('ad-budget/spend/{spend}', [AdBudgetController::class, 'destroySpend'])->name('ad_budget.spend.destroy');
         Route::post('ad-budget/fixed-cost', [AdBudgetController::class, 'storeFixedCost'])->name('ad_budget.fixed_cost');
         Route::post('ad-budget/usd-rate', [AdBudgetController::class, 'storeRate'])->name('ad_budget.usd_rate');
+        Route::post('ad-budget/thresholds', [AdBudgetController::class, 'storeThresholds'])->name('ad_budget.thresholds');
     });
 
     // لوحة التحكّم التنفيذية (Production) — للقراءة فقط

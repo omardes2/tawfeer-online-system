@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — the daily budget page stops going quiet on most of its rows
+- The judgement window widens from 3 days to 7, and the minimum orders before a
+  verdict drops from 10 to 5.
+- The old floor was protecting the decision from noise, but in a store that
+  spreads its budget over many products it withheld the verdict on nearly every
+  row: a product selling four units in three days never reaches ten, so its badge
+  read "insufficient data" forever and the spend behind it never got a decision.
+  Permanent silence is not protection.
+- Widening the window first is what makes the lower floor safe: seven days
+  gathers roughly twice the orders, so 5-in-7 is a firmer sample than 10-in-3.
+- Both values are only changed where they still hold the original defaults, so a
+  figure someone had already tuned by hand is left alone.
+- The five judgement numbers — window, order floor, and the increase/hold/reduce
+  cost-per-order thresholds — are now editable from the page itself, behind
+  `reports.ad_budget.manage`. They lived in the settings table with no screen
+  reaching them, so changing them meant a SQL statement; they are business
+  numbers that follow the store's size and margin, not the system's design.
+- The three cost thresholds must ascend. The verdict tests them in order, so an
+  "increase" threshold at or above the "hold" one makes the first branch swallow
+  the rest and "hold" can never be reached — a silent breakage with no error of
+  its own, now rejected at validation.
+
 ### Added — "Incomplete orders" recovery list
 - A new screen under Sales listing storefront visitors who filled in their
   details at checkout and then never placed the order: name, phone, city/area,

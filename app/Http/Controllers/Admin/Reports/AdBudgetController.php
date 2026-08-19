@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin\Reports;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Reports\StoreAdSpendRequest;
+use App\Http\Requests\Reports\StoreAdThresholdsRequest;
 use App\Http\Requests\Reports\StoreOperatingCostRequest;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Foundation\Services\Settings;
@@ -82,6 +83,28 @@ class AdBudgetController extends Controller
         $spend->delete();
 
         return back()->with('success', __('حُذف صفّ الصرف.'));
+    }
+
+    /**
+     * ضبط عتبات الحكم ونافذته.
+     *
+     * كانت الخمسة محبوسة في جدول الإعدادات بلا شاشة، فتُغيَّر باستعلام SQL أو لا
+     * تُغيَّر — وهي أرقام عملٍ تتبع حجم المتجر وهامشه: متجرٌ يوزّع ميزانيته على
+     * أصنافٍ كثيرة لا يبلغ فيها الصنف عشرة طلبات في ثلاثة أيام، فتصمت اللوحة عن
+     * أكثر صفوفه ويبقى صاحبها بلا قرار.
+     */
+    public function storeThresholds(StoreAdThresholdsRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+
+        Settings::set('ads.window_days', (int) $data['window_days'], 'ads', 'integer');
+        Settings::set('ads.min_orders', (int) $data['min_orders'], 'ads', 'integer');
+
+        foreach (['cpa_increase_below', 'cpa_hold_below', 'cpa_reduce_below'] as $key) {
+            Settings::set('ads.'.$key, round((float) $data[$key], 2), 'ads', 'double');
+        }
+
+        return back()->with('success', __('حُدّثت عتبات الحكم — وتسري على الحساب فورًا.'));
     }
 
     /**
