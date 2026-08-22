@@ -21,6 +21,9 @@ class SyncVariantsRequest extends FormRequest
             'combos.*.values' => ['required', 'array', 'min:1'],
             'combos.*.values.*' => ['integer', 'exists:product_attribute_values,id'],
             'combos.*.price' => ['nullable', 'numeric', 'min:0'],
+            // سعر جملةٍ للمقاس: يُترك فارغًا فيرث سعر الصنف. المقاس الأكبر قد
+            // يكلّف أكثر، وإجبارُ كل المقاسات على سعرٍ واحد يُخفي ذلك في الربح.
+            'combos.*.wholesale' => ['nullable', 'numeric', 'min:0'],
             'combos.*.stock' => ['nullable', 'numeric', 'min:0'],
         ];
     }

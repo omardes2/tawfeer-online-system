@@ -202,7 +202,7 @@
         @if ($product->exists)
             <div class="admin-card p-5 md:p-6" x-data="variantMatrix(@js($variantMatrix))">
                 <h3 class="font-semibold text-gray-800 mb-1">{{ __('الخيارات والمتغيّرات') }}</h3>
-                <p class="text-xs text-gray-400 mb-5">{{ __('اختر القيم (مقاس/لون) فتظهر التركيبات فورًا. عدّل السعر والكمية لكل تركيبة ثم اضغط «حفظ المتغيّرات».') }}</p>
+                <p class="text-xs text-gray-400 mb-5">{{ __('اختر القيم (مقاس/لون) فتظهر التركيبات فورًا. عدّل السعر والكمية لكل تركيبة ثم اضغط «حفظ المتغيّرات». وخانة «الجملة» تُترك فارغة ليرث المقاس سعر جملة الصنف — تُملأ فقط حين يختلف.') }}</p>
 
                 @if (empty($variantMatrix['attributes']))
                     <div class="rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3">
@@ -235,13 +235,14 @@
                         <template x-if="rows.length > 0">
                             <div class="space-y-2">
                                 <div class="hidden sm:grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 px-2">
-                                    <span class="col-span-6">{{ __('الخيار') }}</span>
+                                    <span class="col-span-5">{{ __('الخيار') }}</span>
                                     <span class="col-span-3">{{ __('السعر') }}</span>
-                                    <span class="col-span-3">{{ __('الكمية') }}</span>
+                                    <span class="col-span-2">{{ __('الجملة') }}</span>
+                                    <span class="col-span-2">{{ __('الكمية') }}</span>
                                 </div>
                                 <template x-for="(row, i) in rows" :key="row.key">
                                     <div class="grid grid-cols-2 sm:grid-cols-12 gap-2 items-center border border-gray-100 rounded-lg p-2">
-                                        <div class="col-span-2 sm:col-span-6 text-sm font-medium text-gray-800" x-text="row.label"></div>
+                                        <div class="col-span-2 sm:col-span-5 text-sm font-medium text-gray-800" x-text="row.label"></div>
                                         <template x-for="vid in row.values" :key="vid">
                                             <input type="hidden" :name="`combos[${i}][values][]`" :value="vid" />
                                         </template>
@@ -249,7 +250,13 @@
                                             <input type="number" step="0.01" min="0" :name="`combos[${i}][price]`" x-model.number="cells[row.key].price"
                                                    class="w-full rounded-md border-gray-300 text-sm" placeholder="{{ __('السعر') }}" />
                                         </div>
-                                        <div class="sm:col-span-3">
+                                        <div class="sm:col-span-2">
+                                            {{-- الفراغ وراثة: يترك العمود فارغًا فيقرأ النظام سعر جملة الصنف. --}}
+                                            <input type="number" step="0.01" min="0" :name="`combos[${i}][wholesale]`" x-model="cells[row.key].wholesale"
+                                                   class="w-full rounded-md border-gray-300 text-sm" placeholder="{{ __('يرث') }}"
+                                                   title="{{ __('اتركه فارغًا ليرث سعر جملة الصنف.') }}" />
+                                        </div>
+                                        <div class="sm:col-span-2">
                                             <input type="number" step="1" min="0" :name="`combos[${i}][stock]`" x-model.number="cells[row.key].stock"
                                                    class="w-full rounded-md border-gray-300 text-sm" placeholder="{{ __('الكمية') }}" />
                                         </div>
@@ -486,7 +493,7 @@
                     this.attributes.forEach(a => { this.selected[a.id] = []; });
                     (config.existing || []).forEach(ex => {
                         const key = this.sig(ex.values);
-                        this.cells[key] = { price: ex.price, stock: ex.stock };
+                        this.cells[key] = { price: ex.price, wholesale: ex.wholesale, stock: ex.stock };
                         ex.values.forEach(vid => {
                             const attr = this.attributes.find(a => a.values.some(v => v.id === vid));
                             if (attr && !this.selected[attr.id].includes(vid)) this.selected[attr.id].push(vid);
@@ -515,7 +522,8 @@
                     });
                     this.rows = combos.map(vals => {
                         const key = this.sig(vals);
-                        if (!this.cells[key]) this.cells[key] = { price: this.defaultPrice, stock: 0 };
+                        // سعر الجملة يبدأ فارغًا لا بقيمة الصنف: الفراغ وراثة، وملؤه مسبقًا يجمّد الوراثة.
+                        if (!this.cells[key]) this.cells[key] = { price: this.defaultPrice, wholesale: null, stock: 0 };
                         return { key: key, values: vals, label: this.labelOf(vals) };
                     });
                 },

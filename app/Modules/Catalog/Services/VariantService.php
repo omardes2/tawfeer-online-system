@@ -99,10 +99,25 @@ class VariantService
 
                 $price = isset($combo['price']) && $combo['price'] !== '' ? (float) $combo['price'] : null;
 
+                // سعر الجملة للمقاس: **الفراغ يعني «كسعر الصنف» لا الصفر**.
+                //
+                // والصفر ممنوع هنا تحديدًا: يُقرأ في النظام «لا قيد»، فيسقط
+                // معه حارس البيع بأقلّ من الجملة ويهبط أساس عمولة المسوّق إلى
+                // التكلفة.
+                //
+                // ولا يُترك `null` أيضًا: العمود يُملأ عمدًا (هجرة
+                // `backfill_variant_wholesale_price_from_product`) ليستقيم مع
+                // من يقرؤه باستعلامٍ خام — تقريرٍ أو تصدير — ممّن لا يمرّ
+                // بالاحتياط في الكود.
+                $wholesale = isset($combo['wholesale']) && $combo['wholesale'] !== ''
+                    ? (float) $combo['wholesale']
+                    : $product->wholesale_price;
+
                 $variant = $existing->get($signature);
                 if ($variant) {
                     $variant->update([
                         'retail_price' => $price ?? $variant->retail_price,
+                        'wholesale_price' => $wholesale,
                         'is_active' => true,
                     ]);
                 } else {
@@ -114,6 +129,9 @@ class VariantService
                         'is_default' => false,
                         'is_active' => true,
                     ]));
+                    // بعد الإنشاء لا في مصفوفته: `priceDefaults` تضع الموروث،
+                    // وهذا يَغلِبه بما أُدخل صراحةً.
+                    $variant->update(['wholesale_price' => $wholesale]);
                     $variant->attributeValues()->sync($ids);
                 }
 

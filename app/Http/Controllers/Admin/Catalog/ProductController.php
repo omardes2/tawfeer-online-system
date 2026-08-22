@@ -279,6 +279,10 @@ class ProductController extends Controller
                 'existing' => $optionVariants->map(fn ($v) => [
                     'values' => $v->attributeValues->pluck('id')->map(fn ($i) => (int) $i)->values(),
                     'price' => (float) $v->retail_price,
+                    // سعر جملة المقاس **كما هو**: `null` تعني «يرث سعر الصنف»
+                    // لا صفرًا. والصفر يُقرأ «لا قيد» فيُسقط حارس البيع بأقلّ
+                    // من الجملة — فيُمرَّر الفراغ فراغًا.
+                    'wholesale' => $v->wholesale_price === null ? null : (float) $v->wholesale_price,
                     'stock' => (float) ($stock[$v->id] ?? 0),
                 ])->values(),
                 'defaultPrice' => (float) ($product->defaultVariant?->retail_price ?? $product->retail_price ?? 0),
