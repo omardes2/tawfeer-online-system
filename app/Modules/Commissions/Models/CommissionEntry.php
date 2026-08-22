@@ -3,6 +3,7 @@
 namespace App\Modules\Commissions\Models;
 
 use App\Models\User;
+use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Models\OrderItem;
 use App\Support\Concerns\HasUuid;
@@ -58,6 +59,12 @@ class CommissionEntry extends Model
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
+    }
+
+    /** الصنف المُباع — به يُميَّز سطران لطلبٍ واحد في كشف المستحقّات. */
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariant::class, 'variant_id');
     }
 
     public function orderItem(): BelongsTo

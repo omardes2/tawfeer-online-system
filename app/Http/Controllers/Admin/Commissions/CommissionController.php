@@ -150,7 +150,11 @@ class CommissionController extends Controller
             // uuid وتاريخ الطلب: رقم الطلب يقود إلى فاتورته (الربط بالـuuid)، ويُعرض تاريخه.
             'entries' => CommissionEntry::where('earner_id', $earnerId)->where('earner_type', $type)
                 ->whereBetween('created_at', $range)
-                ->with('order:id,uuid,number,created_at')->latest('id')->paginate(30)->withQueryString(),
+                // الصنف مع الطلب: الحركة **لكل بند** لا لكل طلب، فالطلب ذو
+                // الصنفين يعطي سطرين برقمٍ واحد — يبدوان تكرارًا لمن يقرأ
+                // الكشف، وهما بندان مختلفان.
+                ->with(['order:id,uuid,number,created_at', 'variant.product:id,name', 'variant.attributeValues'])
+                ->latest('id')->paginate(30)->withQueryString(),
             'payouts' => CommissionPayout::where('earner_id', $earnerId)->where('earner_type', $type)
                 ->with(['voucher:id,number,status,kind', 'treasury:id,name'])->latest('id')->get(),
             // البنوك أولًا (الصرف من الحسابات البنكية هو الأصل) ثم الخزائن النقدية.

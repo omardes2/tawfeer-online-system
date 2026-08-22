@@ -153,6 +153,12 @@
                 <table class="min-w-full text-sm text-right admin-table-stack">
                     <thead class="text-gray-500 border-b"><tr>
                         <th class="py-2 px-3 font-medium">{{ __('commissions.order') }}</th>
+                        {{--
+                            الصنف: الحركة لكل **بند** لا لكل طلب، فالطلب ذو
+                            الصنفين يعطي سطرين برقمٍ واحد. وبلا هذا العمود
+                            يبدوان تكرارًا وهما بندان مختلفان.
+                        --}}
+                        <th class="py-2 px-3 font-medium">{{ __('الصنف') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('commissions.order_date') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('commissions.entry_type') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('commissions.basis') }}</th>
@@ -169,6 +175,16 @@
                                            class="text-emerald-600 hover:underline font-medium">{{ $e->order->number }}</a>
                                     @else
                                         <span class="text-gray-400">—</span>
+                                    @endif
+                                </td>
+                                <td class="py-2 px-3 text-gray-600" data-label="{{ __('الصنف') }}">
+                                    @if ($e->variant)
+                                        {{ $e->variant->product?->name ?? $e->variant->sku }}
+                                        @if ($e->variant->attributeValues->isNotEmpty())
+                                            <span class="text-xs text-gray-400">— {{ $e->variant->optionLabel() }}</span>
+                                        @endif
+                                    @else
+                                        <span class="text-gray-300">—</span>
                                     @endif
                                 </td>
                                 <td class="py-2 px-3 text-gray-500 whitespace-nowrap" data-label="{{ __('commissions.order_date') }}">{{ $e->order?->created_at?->format('Y-m-d') ?? '—' }}</td>

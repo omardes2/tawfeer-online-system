@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Commissions\Models\CommissionEntry;
+use App\Modules\Commissions\Models\CommissionTransition;
 use App\Modules\Commissions\Services\CommissionService;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\Warehouse;
@@ -22,8 +23,12 @@ use Tests\TestCase;
  * إلى **التكلفة** بدل سعر الجملة — والتكلفة أدنى، فالهامش أوسع والعمولة أعلى
  * مما تستحقّ.
  *
- * والتصحيح **بحركةٍ جديدة لا بتعديل القديمة**: الدفتر يمنع تغيير المبالغ بعد
- * الإنشاء، ودفترٌ يُعدَّل بأثرٍ رجعيّ لا يُسأل عمّا جرى.
+ * والتصحيح **على الحركة نفسها** بقرار المالك: الكشف يجب أن يُقرأ سطرًا واحدًا
+ * صحيحًا لكل بند، لا استحقاقًا خاطئًا يليه تعديلٌ يصحّحه. والأثر يُدوَّن في
+ * `commission_transitions` فلا يضيع جواب «ماذا كان؟ ومتى تغيّر؟».
+ *
+ * وحدّان يبقيان: المدفوعة لا تُمسّ (سند الصرف يحمل مبلغها)، وذات التعديل
+ * السابق تُترك للمراجعة.
  */
 class WholesaleSnapshotRepairTest extends TestCase
 {
@@ -110,25 +115,39 @@ class WholesaleSnapshotRepairTest extends TestCase
     }
 
     /**
-     * والتنفيذ يضيف حركة تعديلٍ ولا يمسّ الأصل.
+     * والتنفيذ يصحّح الحركة نفسها ولا يضيف سطرًا.
      *
-     * الدفتر يمنع تغيير المبالغ، والأصل يجب أن يبقى ظاهرًا بجانب تصحيحه.
+     * الكشف يجب أن يُقرأ سطرًا واحدًا صحيحًا لكل بند، لا استحقاقًا خاطئًا
+     * يليه تعديلٌ يصحّحه.
      */
-    public function test_applying_adds_an_adjustment_and_leaves_the_original_intact(): void
+    public function test_applying_corrects_the_entry_in_place(): void
     {
         $item = $this->affectedItem();
         $original = CommissionEntry::where('entry_type', 'accrual')->firstOrFail();
 
         $this->service()->correctWholesaleSnapshot($item, null);
 
-        $adjustment = CommissionEntry::where('entry_type', 'adjustment')->firstOrFail();
-
-        $this->assertEqualsWithDelta(-30, (float) $adjustment->amount, 0.01);
-        $this->assertSame($original->id, $adjustment->adjusts_entry_id);
-        $this->assertEqualsWithDelta(60, (float) $original->fresh()->amount, 0.01);
+        $this->assertSame(0, CommissionEntry::where('entry_type', 'adjustment')->count());
+        $this->assertEqualsWithDelta(30, (float) $original->fresh()->amount, 0.01);
+        $this->assertEqualsWithDelta(30, (float) $original->fresh()->basis, 0.01);
     }
 
-    /** والرصيد الصافي يصير 30 — الاستحقاق ناقص التصحيح. */
+    /** والأثر يُدوَّن: القيمة السابقة والجديدة في سجلّ التحوّلات. */
+    public function test_the_correction_is_recorded_in_the_transition_log(): void
+    {
+        $item = $this->affectedItem();
+        $original = CommissionEntry::where('entry_type', 'accrual')->firstOrFail();
+
+        $this->service()->correctWholesaleSnapshot($item, null);
+
+        $log = CommissionTransition::where('commission_entry_id', $original->id)
+            ->where('reference', 'wholesale_snapshot_correction')->firstOrFail();
+
+        $this->assertStringContainsString('60.00', $log->note);
+        $this->assertStringContainsString('30.00', $log->note);
+    }
+
+    /** والرصيد الصافي يصير 30. */
     public function test_the_net_ledger_lands_on_the_correct_amount(): void
     {
         $this->service()->correctWholesaleSnapshot($this->affectedItem(), null);
@@ -149,21 +168,52 @@ class WholesaleSnapshotRepairTest extends TestCase
     }
 
     /**
-     * والحركة المدفوعة تُصحَّح كاسترداد `eligible` لا تُسحب من أحد.
+     * والحركة المدفوعة لا تُمسّ.
      *
-     * المال خرج فعلًا؛ فالتصحيح يُسجَّل رصيدًا سالبًا يُخصم من مستحقٍّ قادم،
-     * لا مطالبةً آليّة بردّ ما استُلم.
+     * سند الصرف يحمل مبلغها، وتغييرُه في الدفتر وحده يجعل الحساب يخالف ما خرج
+     * من الخزينة فعلًا.
      */
-    public function test_a_paid_entry_is_corrected_as_a_negative_eligible_refund(): void
+    public function test_a_paid_entry_is_never_touched(): void
     {
         $item = $this->affectedItem();
-        CommissionEntry::where('entry_type', 'accrual')->firstOrFail()->forceFill(['state' => 'paid'])->save();
+        $original = CommissionEntry::where('entry_type', 'accrual')->firstOrFail();
+        $original->forceFill(['state' => 'paid'])->save();
+
+        $changes = $this->service()->correctWholesaleSnapshot($item, null);
+
+        $this->assertSame('paid', $changes[0]['skipped']);
+        $this->assertEqualsWithDelta(60, (float) $original->fresh()->amount, 0.01);
+    }
+
+    /**
+     * وحركات التعديل التي كتبها تشغيلٌ سابق تُحذف ويُصحَّح الأصل.
+     *
+     * الأمر كان يكتب تعديلًا منفصلًا قبل أن يصير التصحيح على الحركة نفسها؛
+     * فبقاؤها مع تصحيح الأصل يخصم الفارق مرّتين.
+     */
+    public function test_it_removes_adjustment_rows_left_by_an_earlier_run(): void
+    {
+        $item = $this->affectedItem();
+        $original = CommissionEntry::where('entry_type', 'accrual')->firstOrFail();
+
+        CommissionEntry::create([
+            'earner_type' => 'affiliate', 'earner_id' => $this->affiliate->id,
+            'order_id' => $original->order_id, 'order_item_id' => $item->id,
+            'variant_id' => $item->variant_id,
+            'entry_type' => 'adjustment', 'basis' => -30, 'rate' => 1.0, 'amount' => -30,
+            'adjusts_entry_id' => $original->id,
+            'rule_snapshot' => ['method' => 'margin', 'correction' => 'wholesale_snapshot'],
+            'state' => 'pending',
+        ]);
 
         $this->service()->correctWholesaleSnapshot($item, null);
 
-        $adjustment = CommissionEntry::where('entry_type', 'adjustment')->firstOrFail();
-
-        $this->assertSame('eligible', $adjustment->state);
+        $this->assertSame(0, CommissionEntry::where('entry_type', 'adjustment')->count());
+        $this->assertEqualsWithDelta(
+            30,
+            (float) CommissionEntry::where('earner_id', $this->affiliate->id)->sum('amount'),
+            0.01,
+        );
     }
 
     /** ولا يُصحَّح ما لا مرجع له: صنفٌ بلا سعر جملةٍ في الموضعين. */
@@ -200,7 +250,7 @@ class WholesaleSnapshotRepairTest extends TestCase
         $this->service()->correctWholesaleSnapshot($item, null);
         $this->service()->correctWholesaleSnapshot($item->fresh(['variant.product']), null);
 
-        $this->assertSame(1, CommissionEntry::where('entry_type', 'adjustment')->count());
+        $this->assertSame(0, CommissionEntry::where('entry_type', 'adjustment')->count());
         $this->assertEqualsWithDelta(
             30,
             (float) CommissionEntry::where('earner_id', $this->affiliate->id)->sum('amount'),
@@ -256,7 +306,12 @@ class WholesaleSnapshotRepairTest extends TestCase
         $this->artisan('commissions:repair-wholesale-snapshots', ['--apply' => true])
             ->assertSuccessful();
 
-        $this->assertSame(1, CommissionEntry::where('entry_type', 'adjustment')->count());
+        $this->assertEqualsWithDelta(
+            30,
+            (float) CommissionEntry::where('entry_type', 'accrual')->firstOrFail()->amount,
+            0.01,
+        );
+        $this->assertSame(0, CommissionEntry::where('entry_type', 'adjustment')->count());
     }
 
     /** ويسكت حين لا شيء متأثّر. */
