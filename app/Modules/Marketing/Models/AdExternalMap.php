@@ -6,6 +6,7 @@ use App\Modules\Catalog\Models\Product;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * ربط معرّف خارجي (حملة أو مجموعة إعلانية) بكيان في النظام.
@@ -36,6 +37,38 @@ class AdExternalMap extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * أصناف المجموعة الإعلانية — واحدٌ أو أكثر.
+     *
+     * المجموعة الواحدة في مدير إعلانات ميتا قد تُعلن عن ثلاثة أصناف بميزانيةٍ
+     * واحدة، وربطُها بصنفٍ واحد يُحمّله إنفاقَ ثلاثة.
+     */
+    public function products(): BelongsToMany
+    {
+        return $this->belongsToMany(Product::class, 'ad_external_map_products');
+    }
+
+    /**
+     * معرّفات الأصناف المربوطة — الجدول أوّلًا ثم العمود القديم.
+     *
+     * العمود يبقى للحالة الشائعة (مجموعة لصنف) ولا يُحذف، فيُقرأ الاثنان معًا
+     * ولا يبقى ربطٌ خارج الحساب.
+     *
+     * @return array<int, int>
+     */
+    public function productIds(): array
+    {
+        $linked = $this->relationLoaded('products')
+            ? $this->products->pluck('id')->all()
+            : $this->products()->pluck('products.id')->all();
+
+        if ($linked !== []) {
+            return array_map('intval', $linked);
+        }
+
+        return $this->product_id ? [(int) $this->product_id] : [];
     }
 
     public function suggestedChannel(): BelongsTo

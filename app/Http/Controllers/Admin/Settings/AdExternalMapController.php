@@ -25,7 +25,7 @@ class AdExternalMapController extends Controller
 {
     public function index(): View
     {
-        $maps = AdExternalMap::with(['channel', 'product', 'suggestedChannel', 'suggestedProduct'])
+        $maps = AdExternalMap::with(['channel', 'product', 'products:id', 'suggestedChannel', 'suggestedProduct'])
             ->orderByDesc('last_seen_at')
             ->get();
 
@@ -45,16 +45,30 @@ class AdExternalMapController extends Controller
 
         $data = $request->validate([
             'ad_channel_id' => [Rule::requiredIf($isCampaign), 'nullable', 'integer', 'exists:ad_channels,id'],
-            'product_id' => [Rule::requiredIf(! $isCampaign), 'nullable', 'integer', 'exists:products,id'],
+            // مصفوفة لا رقمًا: المجموعة الواحدة تُعلن أحيانًا عن عدّة أصناف
+            // بميزانيةٍ واحدة، وربطُها بصنفٍ واحد يُحمّله إنفاق البقيّة.
+            'product_ids' => [Rule::requiredIf(! $isCampaign), 'nullable', 'array', 'min:1'],
+            'product_ids.*' => ['integer', 'exists:products,id'],
         ]);
+
+        $productIds = array_values(array_unique(array_map('intval', $data['product_ids'] ?? [])));
 
         $adExternalMap->update([
             'ad_channel_id' => $isCampaign ? $data['ad_channel_id'] : null,
-            'product_id' => $isCampaign ? null : $data['product_id'],
+            // العمود القديم يُملأ بالأوّل حين يكون صنفًا واحدًا، ويُفرَّغ عند
+            // التعدّد: صنفٌ واحد فيه من بين ثلاثة يُقرأ ربطًا مفردًا فيُحمّله
+            // كلَّ الإنفاق.
+            'product_id' => (! $isCampaign && count($productIds) === 1) ? $productIds[0] : null,
             'is_ignored' => false,
         ]);
 
-        return back()->with('success', __('حُفظ الربط.'));
+        $isCampaign
+            ? $adExternalMap->products()->detach()
+            : $adExternalMap->products()->sync($productIds);
+
+        return back()->with('success', count($productIds) > 1
+            ? __('حُفظ الربط — إنفاق هذه المجموعة يُوزَّع على :n أصناف بحصّة مبيعات كلٍّ منها.', ['n' => count($productIds)])
+            : __('حُفظ الربط.'));
     }
 
     /** تأكيد كل المقترحات دفعةً واحدة — الاقتراح صحيحٌ في الغالب، والمراجعة تبقى ممكنة. */
@@ -72,6 +86,11 @@ class AdExternalMapController extends Controller
             }
 
             $map->update($target);
+
+            if (isset($target['product_id'])) {
+                $map->products()->sync([$target['product_id']]);
+            }
+
             $count++;
         }
 

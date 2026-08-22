@@ -61,23 +61,42 @@ class AdSpendSyncService
         $summary['new_maps'] = $this->recordExternals($rows);
 
         $channels = $this->linkedIds(AdExternalMap::TYPE_CAMPAIGN, 'ad_channel_id');
-        $products = $this->linkedIds(AdExternalMap::TYPE_ADSET, 'product_id');
+        // المجموعة قد تُعلن عن عدّة أصناف بميزانيةٍ واحدة، فتُقرأ **قائمة**
+        // أصنافٍ لا صنفًا واحدًا.
+        $adsets = $this->adsetProducts();
 
         // الجمع على (يوم، قناة، صنف) قبل أي كتابة — القاعدة 2 أعلاه.
         $buckets = [];
 
         foreach ($rows as $row) {
             $channelId = $channels[$row->campaignId] ?? null;
-            $productId = $products[$row->adsetId] ?? null;
+            $adset = $adsets[$row->adsetId] ?? null;
 
-            if ($channelId === null || $productId === null) {
+            if ($channelId === null || $adset === null || $adset['products'] === []) {
                 $summary['unmapped']++;
 
                 continue;
             }
 
-            $key = $row->date.':'.$channelId.':'.$productId;
-            $buckets[$key] ??= ['date' => $row->date, 'channel' => $channelId, 'product' => $productId, 'spend' => 0.0, 'conversations' => 0];
+            $shared = count($adset['products']) > 1;
+
+            // المشترك يُجمَّع على **المجموعة** لا على الصنف: إنفاقٌ واحد
+            // بميزانيةٍ واحدة، وتوزيعُه على الأصناف يقع عند القراءة بحصّة
+            // المبيعات — لا هنا بقسمةٍ متساوية تُنتج ربحًا وهميًّا لصنفٍ لم
+            // يبع.
+            $key = $shared
+                ? $row->date.':'.$channelId.':adset:'.$row->adsetId
+                : $row->date.':'.$channelId.':'.$adset['products'][0];
+
+            $buckets[$key] ??= [
+                'date' => $row->date,
+                'channel' => $channelId,
+                'product' => $shared ? null : $adset['products'][0],
+                'products' => $adset['products'],
+                'label' => $shared ? ($adset['name'] ?: $row->adsetId) : null,
+                'spend' => 0.0,
+                'conversations' => 0,
+            ];
             $buckets[$key]['spend'] += $row->spend;
             $buckets[$key]['conversations'] += $row->conversations;
         }
@@ -96,16 +115,20 @@ class AdSpendSyncService
     /**
      * كتابة صفٍّ واحد — ويعيد أي عدّاد يزيد.
      *
-     * @param  array{date: string, channel: int, product: int, spend: float, conversations: int}  $bucket
+     * @param  array{date: string, channel: int, product: int|null, products: array<int, int>, label: string|null, spend: float, conversations: int}  $bucket
      */
     private function write(array $bucket, float $rate): string
     {
         $spend = round($bucket['spend'], 2);
+        $shared = $bucket['product'] === null;
 
         $existing = AdDailySpend::query()
             ->whereDate('spend_date', $bucket['date'])
             ->where('ad_channel_id', $bucket['channel'])
-            ->where('product_id', $bucket['product'])
+            // المشترك يُميَّز بعنوانه لا بصنفه: `product_id` فارغ فيه، ومطابقتُه
+            // بالصنف تجعل كل المشتركات صفًّا واحدًا يدهس بعضه.
+            ->when($shared, fn ($q) => $q->whereNull('product_id')->where('label', $bucket['label']))
+            ->when(! $shared, fn ($q) => $q->where('product_id', $bucket['product']))
             ->first();
 
         $synced = [
@@ -124,12 +147,13 @@ class AdSpendSyncService
             return $differs ? 'conflicts' : 'written';
         }
 
-        AdDailySpend::updateOrCreate(
-            [
+        $row = AdDailySpend::updateOrCreate(
+            array_filter([
                 'spend_date' => Carbon::parse($bucket['date'])->startOfDay(),
                 'ad_channel_id' => $bucket['channel'],
                 'product_id' => $bucket['product'],
-            ],
+                'label' => $bucket['label'],
+            ], fn ($v) => $v !== null),
             $synced + [
                 'amount_usd' => $spend,
                 'conversations' => $bucket['conversations'],
@@ -138,6 +162,10 @@ class AdSpendSyncService
                 'fx_rate' => $existing?->fx_rate ?? $rate,
             ],
         );
+
+        if ($shared) {
+            $row->products()->sync($bucket['products']);
+        }
 
         return 'written';
     }
@@ -296,6 +324,23 @@ class AdSpendSyncService
      *
      * @return array<string, int>
      */
+    /**
+     * أصناف كل مجموعةٍ إعلانية واسمُها، مفهرسةً بمعرّفها الخارجي.
+     *
+     * @return array<string, array{products: array<int, int>, name: string|null}>
+     */
+    private function adsetProducts(): array
+    {
+        return AdExternalMap::query()
+            ->where('external_type', AdExternalMap::TYPE_ADSET)
+            ->with('products:id')
+            ->get()
+            ->mapWithKeys(fn (AdExternalMap $map) => [
+                $map->external_id => ['products' => $map->productIds(), 'name' => $map->external_name],
+            ])
+            ->all();
+    }
+
     private function linkedIds(string $type, string $column): array
     {
         return AdExternalMap::query()

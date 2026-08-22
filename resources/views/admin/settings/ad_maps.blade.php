@@ -85,13 +85,14 @@
                                 @endforeach
                             </select>
                         @else
-                            <select name="product_id" form="map-{{ $map->id }}" required
+                            {{-- متعدّد: مجموعةٌ واحدة قد تُعلن عن عدّة أصناف بميزانيةٍ واحدة. --}}
+                            <select name="product_ids[]" form="map-{{ $map->id }}" required multiple size="4"
                                     class="min-w-[15rem] rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
-                                <option value="">{{ __('— اختر صنفًا —') }}</option>
                                 @foreach ($products as $p)
                                     <option value="{{ $p->id }}" @selected($map->suggested_product_id === $p->id)>{{ $p->name }}</option>
                                 @endforeach
                             </select>
+                            <span class="block mt-1 text-[11px] text-gray-400">{{ __('اختر أكثر من صنف إن كانت الميزانية واحدة لعدّة أصناف.') }}</span>
                         @endif
                         {{-- المقترح مُحدَّد سلفًا، ويُقال صراحةً إنه اقتراح لا ربط. --}}
                         @if ($map->suggestedChannel || $map->suggestedProduct)
@@ -153,12 +154,16 @@
                                     @endforeach
                                 </select>
                             @else
-                                <select name="product_id" form="linked-{{ $map->id }}"
+                                @php $linkedIds = $map->productIds(); @endphp
+                                <select name="product_ids[]" form="linked-{{ $map->id }}" multiple size="4"
                                         class="min-w-[15rem] rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
                                     @foreach ($products as $p)
-                                        <option value="{{ $p->id }}" @selected($map->product_id === $p->id)>{{ $p->name }}</option>
+                                        <option value="{{ $p->id }}" @selected(in_array($p->id, $linkedIds, true))>{{ $p->name }}</option>
                                     @endforeach
                                 </select>
+                                @if (count($linkedIds) > 1)
+                                    <span class="block mt-1 text-[11px] text-sky-700">{{ __('ميزانية مشتركة على :n أصناف', ['n' => count($linkedIds)]) }}</span>
+                                @endif
                             @endif
                         </td>
                         <td><button type="submit" form="linked-{{ $map->id }}" class="btn-secondary btn-sm">{{ __('تعديل') }}</button></td>
