@@ -2,6 +2,7 @@
 
 use App\Modules\Accounting\Providers\AccountingServiceProvider;
 use App\Modules\Ai\Providers\AiServiceProvider;
+use App\Modules\AiAgent\Providers\AiAgentServiceProvider;
 use App\Modules\Catalog\Providers\CatalogServiceProvider;
 use App\Modules\Commissions\Providers\CommissionsServiceProvider;
 use App\Modules\Crm\Providers\CrmServiceProvider;
@@ -31,6 +32,7 @@ return [
     CommissionsServiceProvider::class,
     // Phase 6 — الذكاء الاصطناعي والتوصيات والتسويق
     AiServiceProvider::class,
+    AiAgentServiceProvider::class,
     RecommendationsServiceProvider::class,
     MarketingServiceProvider::class,
 ];
