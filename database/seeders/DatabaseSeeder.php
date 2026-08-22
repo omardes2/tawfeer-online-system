@@ -63,6 +63,7 @@ class DatabaseSeeder extends Seeder
             SettlementsPermissionSeeder::class,
             // Phase 6 — الذكاء الاصطناعي والتوصيات والتسويق ولوحات المؤشّرات
             AiPermissionSeeder::class,
+            AiAgentPermissionSeeder::class,
             RecommendationsPermissionSeeder::class,
             MarketingPermissionSeeder::class,
             // الإدارة — المستخدمون/الأدوار/الإعدادات/لوحة التحكّم (Production)
