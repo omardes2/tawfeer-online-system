@@ -199,13 +199,23 @@ class AbandonedCheckoutRecoveryTest extends TestCase
 
     // ────────── الشاشة ──────────
 
-    /** الشاشة تفتح لموظف المبيعات — وهو من يتّصل. */
-    public function test_the_page_opens_for_a_sales_user(): void
+    /**
+     * الشاشة تفتح لمدير النظام وحده — مرحلة التجربة.
+     *
+     * وجهتها النهائية موظف المبيعات، وهو من يتّصل. لكنها تعرض أرقام زبائن
+     * المتجر كلّه ولم تُجرَّب بعد على بيانات حقيقية، فحُصرت بمدير النظام في
+     * هجرة `restrict_new_features_to_admin_during_trial` وتُفتح للمبيعات من
+     * شاشة الأدوار بعد الاعتماد.
+     */
+    public function test_the_page_opens_for_the_system_admin_only_during_the_trial(): void
     {
-        $user = User::factory()->create(['branch_id' => Branch::default()->id]);
-        $user->assignRole('sales');
+        $sales = User::factory()->create(['branch_id' => Branch::default()->id]);
+        $sales->assignRole('sales');
 
-        $this->actingAs($user)->get(route('admin.sales.abandoned_checkouts.index'))->assertOk();
+        $this->actingAs($sales)->get(route('admin.sales.abandoned_checkouts.index'))->assertForbidden();
+
+        $admin = User::where('email', 'admin@tawfeer.online')->firstOrFail();
+        $this->actingAs($admin)->get(route('admin.sales.abandoned_checkouts.index'))->assertOk();
     }
 
     /** وتُمنع عن المستودع. */

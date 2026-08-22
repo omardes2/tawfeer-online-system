@@ -163,20 +163,24 @@ class AgentAuditTrailTest extends TestCase
 
     // ────────── الصلاحيات ──────────
 
-    /** إيقاف الوكيل قرارٌ إداريّ لا عملُ خدمةٍ يومي. */
-    public function test_toggling_the_agent_is_an_admin_decision(): void
+    /**
+     * الوكيل كلّه بيد مدير النظام — مرحلة التجربة.
+     *
+     * التقسيم المقصود بعد الاعتماد: موظف المبيعات يردّ ويحوّل، والتشغيل
+     * والإيقاف وتحرير المعرفة لمدير النظام وحده. أمّا الآن فالوكيل يردّ على
+     * زبائن حقيقيين برسائل لم تُراجَع، فحُصر بابه كلّه بمدير النظام في هجرة
+     * `restrict_new_features_to_admin_during_trial`.
+     */
+    public function test_the_whole_agent_is_admin_only_during_the_trial(): void
     {
         $sales = User::factory()->create(['branch_id' => Branch::default()->id]);
         $sales->assignRole('sales');
 
         $admin = User::where('email', 'admin@tawfeer.online')->firstOrFail();
 
-        // موظف المبيعات يردّ ويحوّل، ولا يُشغّل الوكيل ولا يوقفه.
-        $this->assertTrue($sales->can('inbox.reply'));
-        $this->assertTrue($sales->can('ai_agent.handoff'));
-        $this->assertFalse($sales->can('ai_agent.toggle'));
-        $this->assertFalse($sales->can('ai_agent.knowledge.manage'));
-
-        $this->assertTrue($admin->can('ai_agent.toggle'));
+        foreach (['inbox.reply', 'ai_agent.handoff', 'ai_agent.toggle', 'ai_agent.knowledge.manage'] as $permission) {
+            $this->assertFalse($sales->can($permission), "موظف المبيعات يملك {$permission}");
+            $this->assertTrue($admin->can($permission), "مدير النظام لا يملك {$permission}");
+        }
     }
 }

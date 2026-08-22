@@ -124,10 +124,18 @@ class AdBudgetPageTest extends TestCase
 
     // ────────── الصلاحيات ──────────
 
-    public function test_admin_and_manager_can_open_it(): void
+    /**
+     * مدير النظام وحده — مرحلة التجربة.
+     *
+     * كانت تفتح للمدير أيضًا، وأُغلقت عنه في هجرة
+     * `restrict_new_features_to_admin_during_trial`: الصفحة تقترح قراراتِ إنفاق،
+     * وقرارٌ مبنيٌّ على شاشةٍ لم تُراجَع يُصرف مالًا حقيقيًّا. تُفتح للمدير من
+     * شاشة الأدوار بعد الاعتماد.
+     */
+    public function test_only_the_system_admin_can_open_it_during_the_trial(): void
     {
         $this->actingAs($this->admin())->get(route('admin.reports.ad_budget'))->assertOk();
-        $this->actingAs($this->withRole('manager'))->get(route('admin.reports.ad_budget'))->assertOk();
+        $this->actingAs($this->withRole('manager'))->get(route('admin.reports.ad_budget'))->assertForbidden();
     }
 
     /** الصفحة تكشف التكلفة والربح لكل صنف، فتُغلق دون من يبيع. */
