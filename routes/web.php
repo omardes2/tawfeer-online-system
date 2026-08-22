@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\Accounting\JournalEntryController as AdminJournal
 use App\Http\Controllers\Admin\Accounting\TransferController as AdminTransferController;
 use App\Http\Controllers\Admin\Accounting\VoucherController as AdminVoucherController;
 use App\Http\Controllers\Admin\Ai\AiContentController;
+use App\Http\Controllers\Admin\AiAgent\AgentControlController;
 use App\Http\Controllers\Admin\Catalog\BrandController;
 use App\Http\Controllers\Admin\Catalog\CategoryController;
 use App\Http\Controllers\Admin\Catalog\PriceListController;
@@ -217,6 +218,22 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::delete('price-lists/{priceList}', [PriceListsController::class, 'destroy'])->name('price_lists.destroy');
         Route::post('price-lists/{priceList}/items', [PriceListsController::class, 'storeItem'])->name('price_lists.items.store');
         Route::delete('price-lists/{priceList}/items/{item}', [PriceListsController::class, 'destroyItem'])->name('price_lists.items.destroy');
+    });
+
+    /*
+    | مفاتيح إيقاف وكيل المبيعات.
+    |
+    | الصلاحيتان مفترقتان عمدًا: `toggle` قرارٌ إداريّ على القناة كلّها،
+    | و`handoff` عملُ خدمةٍ يوميّ على محادثةٍ واحدة — ومن يردّ على الزبائن لا
+    | يلزم أن يملك إطفاء الوكيل عن المتجر كلّه.
+    */
+    Route::post('inbox/channels/{channel}/toggle-ai', [AgentControlController::class, 'toggleChannel'])
+        ->middleware('can:ai_agent.toggle')->name('inbox.channels.toggle_ai');
+    Route::middleware('can:ai_agent.handoff')->group(function () {
+        Route::post('inbox/conversations/{conversation}/handoff', [AgentControlController::class, 'handoff'])
+            ->name('inbox.conversations.handoff');
+        Route::post('inbox/conversations/{conversation}/resume', [AgentControlController::class, 'resume'])
+            ->name('inbox.conversations.resume');
     });
 
     Route::get('products/import', [ProductImportController::class, 'form'])->name('products.import');
