@@ -25,6 +25,7 @@ class UserAdminService
                 'job_title' => $data['job_title'] ?? null,
                 'branch_id' => $data['branch_id'] ?? null,
                 'delivery_business_id' => $data['delivery_business_id'] ?? null,
+                'price_list_id' => $data['price_list_id'] ?? null,
                 'is_active' => $data['is_active'] ?? true,
                 'password' => $data['password'] ?? Str::password(16),
                 'email_verified_at' => now(), // موظّف يُنشئه المدير — مُوثَّق.
@@ -50,6 +51,10 @@ class UserAdminService
                 'job_title' => $data['job_title'] ?? null,
                 'branch_id' => $data['branch_id'] ?? null,
                 'delivery_business_id' => $data['delivery_business_id'] ?? null,
+                // قائمة الأسعار تُكتب هنا لا تُترك للتعبئة الجماعية: القائمة
+                // بيضاء صريحة، وحقلٌ ساقطٌ منها يُتحقَّق ثم يُهمَل بصمت —
+                // فيظهر للمدير أن الحفظ نجح والقيمة لم تُخزَّن.
+                'price_list_id' => $data['price_list_id'] ?? null,
                 'is_active' => $data['is_active'] ?? $user->is_active,
             ]);
 
