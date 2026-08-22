@@ -2,8 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Modules\AiAgent\Services\RunSalesAgent;
 use App\Modules\AiAgent\Support\MessageBuffer;
 use App\Modules\Messaging\Models\Conversation;
+use App\Modules\Messaging\Models\Message;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -27,7 +29,7 @@ class DispatchAgentReply implements ShouldQueue
         public readonly int $generation,
     ) {}
 
-    public function handle(MessageBuffer $buffer): void
+    public function handle(MessageBuffer $buffer, RunSalesAgent $agent): void
     {
         if (! $buffer->isCurrent($this->conversationId, $this->generation)) {
             return; // جاءت رسالةٌ بعدها؛ الردّ لجيلٍ أحدث.
@@ -41,8 +43,18 @@ class DispatchAgentReply implements ShouldQueue
             return;
         }
 
-        // TODO(agent-runner): تشغيل الوكيل — يُضاف في كوميت «sales prompt builder
-        // and agent runner». حتى ذلك الحين يبقى الاستقبال والتخزين عاملين وحدهما.
-        $buffer->clear($this->conversationId);
+        // الرسائل التي أطلقت الدورة تُلتقط **قبل** التشغيل: بها يُعرف لاحقًا
+        // على أيّ سؤالٍ ردّ الوكيل، وبعد الردّ يختلط سؤالُ الزبون بجواب الوكيل.
+        $triggers = $conversation->messages()
+            ->where('direction', Message::IN)
+            ->latest('id')->limit(10)->pluck('id')->reverse()->values()->all();
+
+        try {
+            $agent->handle($conversation, $triggers);
+        } finally {
+            // يُفرَّغ في كل الأحوال: تركُ الرمز قائمًا بعد فشلٍ يمنع جدولة
+            // الردّ على الرسالة التالية، فتصمت المحادثة بلا سبب ظاهر.
+            $buffer->clear($this->conversationId);
+        }
     }
 }
