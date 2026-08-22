@@ -2,6 +2,7 @@
 
 namespace App\Modules\Catalog\Models;
 
+use App\Modules\AiAgent\Models\ProductKnowledge;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Inventory\Models\InventoryStock;
 use App\Modules\Sales\Models\OrderItem;
@@ -89,6 +90,18 @@ class Product extends Model
     public function primaryImage(): HasOne
     {
         return $this->hasOne(ProductImage::class)->where('is_primary', true);
+    }
+
+    /**
+     * المعرفة البيعية — ما يقوله وكيل المبيعات عن الصنف.
+     *
+     * منفصلةٌ عن الوصف عمدًا: الوصف للزبون يقرؤه في المتجر، وهذه للوكيل يبني
+     * عليها حواره. وخلطُهما يُنتج وصفًا تسويقيًّا في صفحة المنتج وردًّا جافًّا
+     * في واتساب — أو العكس.
+     */
+    public function knowledge(): HasOne
+    {
+        return $this->hasOne(ProductKnowledge::class);
     }
 
     public function variants(): HasMany

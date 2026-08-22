@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\Accounting\VoucherController as AdminVoucherContr
 use App\Http\Controllers\Admin\Ai\AiContentController;
 use App\Http\Controllers\Admin\AiAgent\AgentControlController;
 use App\Http\Controllers\Admin\AiAgent\InboxController;
+use App\Http\Controllers\Admin\AiAgent\ProductKnowledgeController;
 use App\Http\Controllers\Admin\Catalog\BrandController;
 use App\Http\Controllers\Admin\Catalog\CategoryController;
 use App\Http\Controllers\Admin\Catalog\PriceListController;
@@ -228,6 +229,13 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     | و`handoff` عملُ خدمةٍ يوميّ على محادثةٍ واحدة — ومن يردّ على الزبائن لا
     | يلزم أن يملك إطفاء الوكيل عن المتجر كلّه.
     */
+    // المعرفة البيعية — ما يقوله الوكيل عن كل صنف.
+    Route::middleware('can:ai_agent.knowledge.view')->group(function () {
+        Route::get('ai-agent/knowledge', [ProductKnowledgeController::class, 'index'])->name('ai_agent.knowledge.index');
+        Route::get('ai-agent/knowledge/{product}', [ProductKnowledgeController::class, 'edit'])->name('ai_agent.knowledge.edit');
+        Route::put('ai-agent/knowledge/{product}', [ProductKnowledgeController::class, 'update'])->name('ai_agent.knowledge.update');
+    });
+
     // الصندوق الموحّد — محادثات واتساب وما قاله الوكيل فيها.
     Route::middleware('can:inbox.view')->group(function () {
         Route::get('inbox', [InboxController::class, 'index'])->name('inbox.index');
