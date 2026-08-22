@@ -32,9 +32,19 @@ class RepairWholesaleSnapshotsCommand extends Command
         $apply = (bool) $this->option('apply');
 
         $items = OrderItem::with(['variant.product:id,wholesale_price', 'order:id,number,created_at'])
-            ->where(fn ($q) => $q->whereNull('wholesale_price_snapshot')->orWhere('wholesale_price_snapshot', '<=', 0))
             ->whereHas('commissionEntries', fn ($q) => $q->where('earner_type', 'affiliate')
                 ->where('entry_type', 'accrual')->whereNotIn('state', ['reversed', 'cancelled']))
+            ->where(fn ($q) => $q
+                // بندٌ لقطته صفر — الحالة الأصليّة.
+                ->whereNull('wholesale_price_snapshot')
+                ->orWhere('wholesale_price_snapshot', '<=', 0)
+                // أو بندٌ عليه حركة تعديلٍ من تشغيلٍ سابق للأمر: النسخة الأولى
+                // كانت تصحّح اللقطة **وتكتب تعديلًا**، فصار البند خارج الشرط
+                // الأوّل بينما تعديلُه باقٍ. ولولا هذا الفرع لتُركت تلك
+                // الحركات في الدفتر إلى الأبد ولا يجدها الأمر أبدًا.
+                ->orWhereHas('commissionEntries', fn ($a) => $a
+                    ->where('entry_type', 'adjustment')
+                    ->where('rule_snapshot', 'like', '%wholesale_snapshot%')))
             ->get();
 
         if ($items->isEmpty()) {

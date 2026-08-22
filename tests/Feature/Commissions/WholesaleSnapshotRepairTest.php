@@ -314,6 +314,37 @@ class WholesaleSnapshotRepairTest extends TestCase
         $this->assertSame(0, CommissionEntry::where('entry_type', 'adjustment')->count());
     }
 
+    /**
+     * ويجد البند الذي صحّحته النسخة الأولى من الأمر.
+     *
+     * تلك النسخة كانت تصحّح **اللقطة** وتكتب حركة تعديل. فالبند خرج من شرط
+     * «لقطته صفر» بينما تعديلُه باقٍ في الدفتر — ولولا التقاطه بحركة التعديل
+     * لبقيت تلك الأسطر إلى الأبد ولا يجدها الأمر أبدًا.
+     */
+    public function test_the_command_finds_items_left_half_corrected_by_the_first_version(): void
+    {
+        $item = $this->affectedItem();
+        $original = CommissionEntry::where('entry_type', 'accrual')->firstOrFail();
+
+        // ما تركته النسخة الأولى بالضبط: لقطةٌ مصحَّحة + حركة تعديل.
+        $item->forceFill(['wholesale_price_snapshot' => 70])->save();
+        CommissionEntry::create([
+            'earner_type' => 'affiliate', 'earner_id' => $this->affiliate->id,
+            'order_id' => $original->order_id, 'order_item_id' => $item->id,
+            'variant_id' => $item->variant_id,
+            'entry_type' => 'adjustment', 'basis' => -30, 'rate' => 1.0, 'amount' => -30,
+            'adjusts_entry_id' => $original->id,
+            'rule_snapshot' => ['method' => 'margin', 'correction' => 'wholesale_snapshot'],
+            'state' => 'pending',
+        ]);
+
+        $this->artisan('commissions:repair-wholesale-snapshots', ['--apply' => true])
+            ->assertSuccessful();
+
+        $this->assertSame(0, CommissionEntry::where('entry_type', 'adjustment')->count());
+        $this->assertEqualsWithDelta(30, (float) $original->fresh()->amount, 0.01);
+    }
+
     /** ويسكت حين لا شيء متأثّر. */
     public function test_the_command_is_quiet_when_nothing_is_affected(): void
     {
