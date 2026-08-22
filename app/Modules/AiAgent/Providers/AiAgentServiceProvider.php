@@ -3,8 +3,10 @@
 namespace App\Modules\AiAgent\Providers;
 
 use App\Modules\AiAgent\Tools\CheckStockTool;
+use App\Modules\AiAgent\Tools\CreateDraftOrderTool;
 use App\Modules\AiAgent\Tools\GetPriceTool;
 use App\Modules\AiAgent\Tools\GetProductDetailsTool;
+use App\Modules\AiAgent\Tools\ListDeliveryAreasTool;
 use App\Modules\AiAgent\Tools\SearchProductsTool;
 use App\Modules\AiAgent\Tools\ToolRegistry;
 use Illuminate\Support\ServiceProvider;
@@ -24,6 +26,8 @@ class AiAgentServiceProvider extends ServiceProvider
         GetProductDetailsTool::class,
         CheckStockTool::class,
         GetPriceTool::class,
+        ListDeliveryAreasTool::class,
+        CreateDraftOrderTool::class,
     ];
 
     public function register(): void

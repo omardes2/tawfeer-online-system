@@ -65,6 +65,10 @@ class RunSalesAgent
                 return $this->close($run, 'silent', $startedAt, 0, 0);
             }
 
+            // الأدوات تعرف في أيّ محادثة تعمل: من يكتب طلبًا يأخذ رقم الزبون
+            // من جهة الاتصال لا من النموذج.
+            $this->tools->forConversation($conversation);
+
             $maxCalls = (int) config('ai_agent.max_tool_calls', 6);
             $calls = 0;
 

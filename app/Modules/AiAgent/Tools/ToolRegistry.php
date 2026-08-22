@@ -4,6 +4,7 @@ namespace App\Modules\AiAgent\Tools;
 
 use App\Modules\AiAgent\Models\AgentRun;
 use App\Modules\AiAgent\Models\AgentToolCall;
+use App\Modules\Messaging\Models\Conversation;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -22,6 +23,16 @@ class ToolRegistry
 {
     /** @var array<string, ToolContract> */
     private array $tools = [];
+
+    /** المحادثة الجارية — تُمرَّر إلى الأدوات التي تحتاج هوية الزبون. */
+    private ?Conversation $conversation = null;
+
+    public function forConversation(Conversation $conversation): self
+    {
+        $this->conversation = $conversation;
+
+        return $this;
+    }
 
     /** @param  iterable<ToolContract>  $tools */
     public function __construct(iterable $tools = [])
@@ -81,7 +92,14 @@ class ToolRegistry
         }
 
         try {
-            $result = $this->tools[$name]->handle($arguments);
+            $tool = $this->tools[$name];
+
+            // من يكتب يحتاج هوية الزبون، وتأتيه من المحادثة لا من النموذج.
+            if ($tool instanceof ContextAwareTool && $this->conversation !== null) {
+                $tool->setConversation($this->conversation);
+            }
+
+            $result = $tool->handle($arguments);
             $status = 'ok';
         } catch (Throwable $e) {
             // الخطأ يُعاد إلى النموذج لا يُرفع: أداةٌ واحدة فشلت لا تُسقط
