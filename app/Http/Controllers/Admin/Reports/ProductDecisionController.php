@@ -23,7 +23,7 @@ class ProductDecisionController extends Controller
 
     public function index(Request $request): View|StreamedResponse
     {
-        $this->authorize('reports.sales_summary.view');
+        $this->authorize('reports.product_decision.view');
 
         $range = DateRange::resolve($request->query('range'), $request->query('from'), $request->query('to'));
         $rows = $this->service->board($range);

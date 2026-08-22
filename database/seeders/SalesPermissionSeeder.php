@@ -17,9 +17,22 @@ class SalesPermissionSeeder extends Seeder
         // البيع المباشر: نقطة بيع كاملة (تحصيل فوري وخصم مخزون). صلاحية مستقلّة
         // عن الإنشاء العادي فلا يفتحها منحُ صلاحية أخرى بالمصادفة.
         'sales.orders.create_direct',
-        // طلبات لم تكتمل: قائمة اتصالٍ بمن تردّد في خطوة الإتمام. **ليست للمسوّق**
-        // — هي أرقام زبائن المتجر كلّه لا زبائنه هو.
-        'sales.abandoned_checkouts.view', 'sales.abandoned_checkouts.manage',
+    ];
+
+    /**
+     * طلبات لم تكتمل — **خارج القائمة أعلاه عمدًا**.
+     *
+     * لأن `manager => ['*']` تمنح كل ما فيها، وهذه محصورةٌ بمدير النظام في
+     * مرحلة التجربة (هجرة `restrict_new_features_to_admin_during_trial`).
+     * وهي أصلًا ليست للمسوّق بحال: أرقام زبائن المتجر كلّه لا زبائنه هو.
+     *
+     * تُفتح للفريق بمنح الصلاحية من شاشة الأدوار بعد اعتماد الشاشة.
+     *
+     * @var array<int, string>
+     */
+    private array $trialOnly = [
+        'sales.abandoned_checkouts.view',
+        'sales.abandoned_checkouts.manage',
     ];
 
     private array $grants = [
@@ -29,15 +42,11 @@ class SalesPermissionSeeder extends Seeder
         'sales' => [
             'sales.orders.view_own', 'sales.orders.create', 'sales.orders.update',
             'sales.orders.reserve', 'sales.orders.cancel',
-            'sales.abandoned_checkouts.view', 'sales.abandoned_checkouts.manage',
         ],
         // المسوّق: ينشئ ويرى ويلغي طلباته هو فقط. لا بيع مباشر — لا يحصّل نقدًا
         // ولا يخصم مخزونًا؛ عمله جلب الطلبات لا تشغيل نقطة بيع.
         'affiliate' => [
             'sales.orders.view_own', 'sales.orders.create', 'sales.orders.cancel',
-        ],
-        'sales_supervisor' => [
-            'sales.abandoned_checkouts.view', 'sales.abandoned_checkouts.manage',
         ],
         'warehouse' => [
             'sales.orders.view', 'sales.orders.ship', 'sales.orders.deliver',
@@ -53,8 +62,12 @@ class SalesPermissionSeeder extends Seeder
             Permission::findOrCreate($permission, 'web');
         }
 
+        foreach ($this->trialOnly as $permission) {
+            Permission::findOrCreate($permission, 'web');
+        }
+
         if ($admin = Role::where('name', 'admin')->first()) {
-            $admin->givePermissionTo($this->permissions);
+            $admin->givePermissionTo(array_merge($this->permissions, $this->trialOnly));
         }
 
         foreach ($this->grants as $roleName => $abilities) {

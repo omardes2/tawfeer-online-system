@@ -22,8 +22,19 @@ class BusinessReportsPermissionSeeder extends Seeder
     private array $permissions = [
         'reports.sales_summary.view',
         'reports.statements.view',
+    ];
+
+    /**
+     * محصورةٌ بمدير النظام في **مرحلة التجربة** — خارج `$permissions` عمدًا لأن
+     * `manager => ['*']` تمنح كل ما فيها.
+     *
+     * @var array<int, string>
+     */
+    private array $trialOnly = [
         'reports.ad_budget.view',
         'reports.ad_budget.manage',
+        'reports.product_decision.view',
+        'reports.sales_by_location.view',
     ];
 
     private array $grants = [
@@ -39,8 +50,12 @@ class BusinessReportsPermissionSeeder extends Seeder
             Permission::findOrCreate($permission, 'web');
         }
 
+        foreach ($this->trialOnly as $permission) {
+            Permission::findOrCreate($permission, 'web');
+        }
+
         if ($admin = Role::where('name', 'admin')->first()) {
-            $admin->givePermissionTo($this->permissions);
+            $admin->givePermissionTo(array_merge($this->permissions, $this->trialOnly));
         }
 
         foreach ($this->grants as $roleName => $abilities) {

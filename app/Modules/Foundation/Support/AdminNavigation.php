@@ -105,10 +105,10 @@ final class AdminNavigation
                 ['admin.reports.sales.by_product', 'المبيعات حسب المنتج', 'reports.sales_summary.view', 'admin.reports.sales.by_product'],
                 ['admin.reports.sales.by_employee', 'المبيعات حسب موظف المبيعات', 'reports.sales_summary.view', 'admin.reports.sales.by_employee'],
                 ['admin.reports.sales.by_affiliate', 'المبيعات حسب المسوّقين', 'reports.sales_summary.view', 'admin.reports.sales.by_affiliate'],
-                ['admin.reports.sales.by_location', 'المبيعات حسب المدن والمناطق', 'reports.sales_summary.view', 'admin.reports.sales.by_location'],
+                ['admin.reports.sales.by_location', 'المبيعات حسب المدن والمناطق', 'reports.sales_by_location.view', 'admin.reports.sales.by_location'],
                 ['admin.reports.receivables.customers', 'كشف حساب العملاء', 'reports.statements.view', 'admin.reports.receivables.customers'],
                 ['admin.reports.receivables.suppliers', 'كشف حساب الموردين', 'reports.statements.view', 'admin.reports.receivables.suppliers'],
-                ['admin.reports.product_decision', 'لوحة قرار الصنف', 'reports.sales_summary.view', 'admin.reports.product_decision*'],
+                ['admin.reports.product_decision', 'لوحة قرار الصنف', 'reports.product_decision.view', 'admin.reports.product_decision*'],
                 ['admin.reports.ad_budget', 'الميزانية اليومية', 'reports.ad_budget.view', 'admin.reports.ad_budget*'],
             ]],
             ['الإعدادات', 'cog', [

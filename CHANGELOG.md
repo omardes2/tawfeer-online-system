@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — new features are restricted to the system admin during the trial
+- Everything built recently — incomplete-order recovery, dealer price lists, the
+  product decision board, sales by city/area, the daily budget page, and the
+  inbox/sales-agent permissions — is now reachable by the system admin only.
+  None of it has run against real data yet, and opening it to the team first
+  produces decisions made on an unreviewed screen: someone calling from a wrong
+  list, or a dealer buying at a price that was typed in as a test.
+- The two new reports were sharing `reports.sales_summary.view` with older
+  reports the team uses, so closing them would have closed those too. Each now
+  has its own permission, and the older sales reports stay open to whoever had
+  them — guarded by a test.
+- Permissions are revoked from **every** role except admin, not just the known
+  ones, so a custom role created from the roles screen is closed as well.
+- The sidebar hides them too, not just the routes: a visible item leading to a
+  403 reads as the system being broken rather than a permission boundary.
+- Seeders were changed to match the migration; otherwise any `db:seed` would
+  silently reopen what was closed.
+- **Reopening**: grant the permission to a role from `/admin/roles` for one
+  feature, or roll this migration back to restore the full designed
+  distribution (manager, sales supervisor and sales staff each by the nature of
+  their work), which is preserved in its `down`.
+
 ### Fixed — a page left open until the session expired
 - Leaving a page open past the session lifetime and then submitting produced
   Laravel's bare English "Page Expired" screen: no explanation, no way back, and

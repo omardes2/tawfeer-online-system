@@ -403,9 +403,9 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('sales/by-product', [BusinessReportController::class, 'salesByProduct'])->name('sales.by_product')->middleware('can:reports.sales_summary.view');
         Route::get('sales/by-employee', [BusinessReportController::class, 'salesByEmployee'])->name('sales.by_employee')->middleware('can:reports.sales_summary.view');
         Route::get('sales/by-affiliate', [BusinessReportController::class, 'salesByAffiliate'])->name('sales.by_affiliate')->middleware('can:reports.sales_summary.view');
-        Route::get('sales/by-location', [BusinessReportController::class, 'salesByLocation'])->name('sales.by_location')->middleware('can:reports.sales_summary.view');
+        Route::get('sales/by-location', [BusinessReportController::class, 'salesByLocation'])->name('sales.by_location')->middleware('can:reports.sales_by_location.view');
         // لوحة قرار الصنف: الربح الحقيقي بعد الإعلان والتوصيل + التغطية والشراء.
-        Route::get('product-decision', [ProductDecisionController::class, 'index'])->name('product_decision')->middleware('can:reports.sales_summary.view');
+        Route::get('product-decision', [ProductDecisionController::class, 'index'])->name('product_decision')->middleware('can:reports.product_decision.view');
         Route::post('product-decision/planning', [ProductDecisionController::class, 'updatePlanning'])->name('product_decision.planning')->middleware('can:reports.ad_budget.manage');
         Route::get('receivables/customers', [BusinessReportController::class, 'receivablesCustomers'])->name('receivables.customers')->middleware('can:reports.statements.view');
         Route::get('receivables/suppliers', [BusinessReportController::class, 'receivablesSuppliers'])->name('receivables.suppliers')->middleware('can:reports.statements.view');

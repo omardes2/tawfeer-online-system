@@ -63,11 +63,11 @@ class CatalogPermissionSeeder extends Seeder
 
         // قوائم أسعار التجّار: للإدارة وحدها. القائمة تحدّد بكم يشتري التاجر،
         // فهي قرار تسعيرٍ لا إدخال بيانات — ومن يعدّلها يتصرّف في هامش الشركة.
+        // ومحصورةٌ بمدير النظام في **مرحلة التجربة** — سعرٌ أُدخل تجريبًا يشتري
+        // به تاجرٌ فعلًا. تُفتح للمدير بعد الاعتماد من شاشة الأدوار.
         foreach (['catalog.price_lists.view', 'catalog.price_lists.manage'] as $permission) {
             Permission::findOrCreate($permission, 'web');
-            foreach (['admin', 'manager'] as $roleName) {
-                Role::where('name', $roleName)->first()?->givePermissionTo($permission);
-            }
+            Role::where('name', 'admin')->first()?->givePermissionTo($permission);
         }
     }
 }
