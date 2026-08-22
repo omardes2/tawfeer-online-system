@@ -3,8 +3,10 @@
 namespace App\Modules\Sales\Models;
 
 use App\Modules\Catalog\Models\ProductVariant;
+use App\Modules\Commissions\Models\CommissionEntry;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * بند طلب بيع (ADR-026). لقطة سعر ثابتة (BR-ORD-18). التكلفة/COGS يحسبها المحرّك بـ WAC.
@@ -42,6 +44,12 @@ class OrderItem extends Model
     public function variant(): BelongsTo
     {
         return $this->belongsTo(ProductVariant::class, 'variant_id');
+    }
+
+    /** حركات دفتر العمولة لهذا البند — استحقاقًا وتعديلًا وعكسًا. */
+    public function commissionEntries(): HasMany
+    {
+        return $this->hasMany(CommissionEntry::class, 'order_item_id');
     }
 
     /**

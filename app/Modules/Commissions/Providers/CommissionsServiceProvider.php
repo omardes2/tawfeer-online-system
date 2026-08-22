@@ -2,6 +2,7 @@
 
 namespace App\Modules\Commissions\Providers;
 
+use App\Modules\Commissions\Console\RepairWholesaleSnapshotsCommand;
 use App\Modules\Commissions\Listeners\AccrueCommissionsOnDelivery;
 use App\Modules\Sales\Events\OrderDelivered;
 use Illuminate\Support\Facades\Event;
@@ -15,5 +16,11 @@ class CommissionsServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::listen(OrderDelivered::class, AccrueCommissionsOnDelivery::class);
+
+        // غير مجدول عمدًا: أمرٌ يحرّك مستحقّات أشخاص يُشغَّل بيدٍ ويُقرأ ناتجه
+        // قبل اعتماده، لا يعمل وحده في الليل.
+        if ($this->app->runningInConsole()) {
+            $this->commands([RepairWholesaleSnapshotsCommand::class]);
+        }
     }
 }

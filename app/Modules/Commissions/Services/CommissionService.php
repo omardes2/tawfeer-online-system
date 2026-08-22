@@ -25,6 +25,15 @@ class CommissionService
 {
     private const DEFAULT_SALES_RATE = 0.01; // 1% افتراضي (BR-MKT/ADR-012).
 
+    /**
+     * وسمُ تصحيح لقطة الجملة داخل `rule_snapshot`.
+     *
+     * به يُعرَف ما صُحّح فلا يُصحَّح ثانيةً — والأمر يُشغَّل أكثر من مرّة
+     * بطبيعته: عرضٌ، ثم تنفيذ، ثم تحقّق. وبلا وسمٍ يخصم كلُّ تشغيلٍ الفارقَ
+     * من جديد.
+     */
+    private const WHOLESALE_CORRECTION = 'wholesale_snapshot';
+
     /** الانتقالات المسموحة لآلة الحالة. */
     private const TRANSITIONS = [
         'pending' => ['eligible', 'cancelled', 'reversed'],
@@ -305,6 +314,140 @@ class CommissionService
                 $this->logTransition($adjustment, null, $adjustment->state, 'adjustment');
                 CommissionAdjusted::dispatch($adjustment);
             }
+        });
+    }
+
+    /**
+     * تصحيح عمولة بندٍ حُسبت على لقطة جملةٍ صفر.
+     *
+     * البنود القديمة على منتجٍ ذي مقاسات جُمّدت لقطتها صفرًا (عمود المتغيّر كان
+     * فارغًا)، فهبط أساس العمولة إلى **التكلفة** بدل سعر الجملة — والتكلفة
+     * أدنى، فالهامش أوسع والعمولة أعلى مما تستحقّ.
+     *
+     * والتصحيح **بحركةٍ جديدة لا بتعديل القديمة**: الدفتر يمنع تغيير المبالغ
+     * بعد الإنشاء (حارس في `CommissionEntry`)، وهذا مقصود — دفترٌ يُعدَّل بأثرٍ
+     * رجعيّ لا يُسأل عمّا جرى. فتُضاف حركة `adjustment` بالفارق وتُنسب إلى
+     * أصلها، فيبقى الأصل والتصحيح ظاهرين معًا.
+     *
+     * ويُصحَّح **المسوّق وحده**: عمولة موظف المبيعات أساسها قيمة المبيعات لا
+     * الهامش، فلم تمسّها اللقطة أصلًا.
+     *
+     * @return array<int, array{entry: CommissionEntry, was: float, now: float, delta: float}>
+     */
+    public function correctWholesaleSnapshot(OrderItem $item, ?User $actor = null, bool $apply = true): array
+    {
+        $correctCost = $item->variant?->effectiveWholesalePrice() ?? 0.0;
+
+        // لا سعر جملةٍ فعّال ⇒ لا مرجع نصحّح إليه، فتُترك كما هي.
+        if ($correctCost <= 0) {
+            return [];
+        }
+
+        $margin = $this->itemMargin($item, $correctCost);
+
+        // القاعدة تُقرأ من `rule_snapshot` المحفوظة لا من القاعدة الحيّة: قاعدةٌ
+        // تغيّرت بعد البيع لا تحكم عمولةً استُحقّت قبلها.
+        $accruals = CommissionEntry::query()
+            ->where('order_item_id', $item->id)
+            ->where('earner_type', 'affiliate')
+            ->where('entry_type', 'accrual')
+            ->whereNotIn('state', ['reversed', 'cancelled'])
+            ->get();
+
+        $changes = [];
+
+        foreach ($accruals as $original) {
+            $method = $original->rule_snapshot['method'] ?? 'margin';
+
+            // العمولة الثابتة لا تتعلّق بالهامش أصلًا، فلا شيء يُصحَّح فيها.
+            if ($method === 'fixed') {
+                continue;
+            }
+
+            $priorAdjustments = CommissionEntry::where('adjusts_entry_id', $original->id)->get();
+
+            // صُحّحت من قبل ⇒ تُترك. الأمر يُشغَّل أكثر من مرّة بطبيعته (عرضٌ
+            // ثم تنفيذ، ثم تحقّق)، وتصحيحٌ يتكرّر يخصم الفارق مرّتين.
+            if ($priorAdjustments->contains(fn (CommissionEntry $a) => ($a->rule_snapshot['correction'] ?? null) === self::WHOLESALE_CORRECTION)) {
+                continue;
+            }
+
+            // عليها تعديلٌ آخر (مرتجع مثلًا) ⇒ تُترك للمراجعة اليدوية. تعديل
+            // المرتجع حُسب نسبةً من مبلغٍ خاطئ، وتصحيحُه آليًّا هنا يحتاج
+            // افتراضًا عن ترتيب الحركات لا يصحّ أن يُتَّخذ بلا إنسان.
+            if ($priorAdjustments->isNotEmpty()) {
+                $changes[] = ['entry' => $original, 'was' => (float) $original->amount, 'now' => null, 'delta' => 0.0, 'skipped' => 'has_prior_adjustment'];
+
+                continue;
+            }
+
+            $rate = $method === 'margin' ? 1.0 : (float) ($original->rate ?? 1.0);
+            $correctAmount = round($margin * $rate, 2);
+            $delta = round($correctAmount - (float) $original->amount, 2);
+
+            if (abs($delta) < 0.01) {
+                continue;
+            }
+
+            $changes[] = [
+                'entry' => $original,
+                'was' => (float) $original->amount,
+                'now' => $correctAmount,
+                'delta' => $delta,
+            ];
+        }
+
+        $writable = array_values(array_filter($changes, fn (array $c) => ! isset($c['skipped'])));
+
+        if ($apply && $writable !== []) {
+            $this->writeWholesaleCorrections($item, $margin, $correctCost, $writable, $actor);
+        }
+
+        return $changes;
+    }
+
+    /**
+     * كتابة التصحيحات ولقطة البند في معاملةٍ واحدة.
+     *
+     * اللقطة تُصحَّح مع الحركة لا بعدها: لقطةٌ مصحَّحة بلا حركةٍ تجعل الرصيد
+     * يخالف الدفتر، وحركةٌ بلا لقطةٍ مصحَّحة تُبقي أيّ إعادة احتسابٍ لاحقة
+     * تنتج الخطأ نفسه.
+     *
+     * @param  array<int, array{entry: CommissionEntry, was: float, now: float, delta: float}>  $changes
+     */
+    private function writeWholesaleCorrections(OrderItem $item, float $margin, float $cost, array $changes, ?User $actor): void
+    {
+        DB::transaction(function () use ($item, $margin, $cost, $changes, $actor) {
+            foreach ($changes as $change) {
+                $original = $change['entry'];
+
+                $adjustment = CommissionEntry::create([
+                    'earner_type' => $original->earner_type,
+                    'earner_id' => $original->earner_id,
+                    'order_id' => $original->order_id,
+                    'order_item_id' => $original->order_item_id,
+                    'variant_id' => $original->variant_id,
+                    'entry_type' => 'adjustment',
+                    'basis' => round($margin - (float) $original->basis, 2),
+                    'rate' => $original->rate,
+                    'amount' => $change['delta'],
+                    'wholesale_cost_snapshot' => $cost,
+                    'rule_id' => $original->rule_id,
+                    // الوسم داخل اللقطة لا في عمودٍ جديد: به يُعرف التصحيح فلا
+                    // يتكرّر، وبلا تغييرٍ في المخطّط.
+                    'rule_snapshot' => ($original->rule_snapshot ?? []) + ['correction' => self::WHOLESALE_CORRECTION],
+                    'adjusts_entry_id' => $original->id,
+                    // مدفوع ⇒ استرداد كـ`eligible` سالب؛ وإلّا فحالة الأصل —
+                    // كما في تصحيح المرتجع تمامًا.
+                    'state' => $original->state === 'paid' ? 'eligible' : $original->state,
+                    'created_by' => $actor?->id,
+                ]);
+
+                $this->logTransition($adjustment, null, $adjustment->state, 'wholesale_snapshot_correction');
+                CommissionAdjusted::dispatch($adjustment);
+            }
+
+            $item->forceFill(['wholesale_price_snapshot' => round($cost, 2)])->save();
         });
     }
 
