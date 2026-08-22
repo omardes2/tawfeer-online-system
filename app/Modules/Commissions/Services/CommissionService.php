@@ -4,6 +4,7 @@ namespace App\Modules\Commissions\Services;
 
 use App\Models\User;
 use App\Modules\Accounting\Services\VoucherService;
+use App\Modules\Catalog\Services\PriceListService;
 use App\Modules\Commissions\Events\CommissionAccrued;
 use App\Modules\Commissions\Events\CommissionAdjusted;
 use App\Modules\Commissions\Events\CommissionReversed;
@@ -33,6 +34,8 @@ class CommissionService
      * من جديد.
      */
     private const WHOLESALE_CORRECTION = 'wholesale_snapshot';
+
+    public function __construct(private readonly PriceListService $prices) {}
 
     /** الانتقالات المسموحة لآلة الحالة. */
     private const TRANSITIONS = [
@@ -345,13 +348,38 @@ class CommissionService
      */
     public function correctWholesaleSnapshot(OrderItem $item, ?User $actor = null, bool $apply = true): array
     {
-        $correctCost = $item->variant?->effectiveWholesalePrice() ?? 0.0;
+        return $this->recomputeItemCommissions(
+            $item,
+            $item->variant?->effectiveWholesalePrice() ?? 0.0,
+            $actor,
+            $apply,
+        );
+    }
 
-        // لا سعر جملةٍ فعّال ⇒ لا مرجع نصحّح إليه، فتُترك كما هي.
-        if ($correctCost <= 0) {
+    /**
+     * إعادة احتساب عمولات بندٍ على سعر شراءٍ معطى.
+     *
+     * النواة المشتركة بين تصحيحين: تصحيح لقطة الجملة الصفرية، وإعادة التسعير
+     * على قائمة أسعار تاجرٍ أُسندت بعد البيع. كلاهما يسأل السؤال نفسه — «بكم
+     * اشترى هذا المشتري فعلًا؟» — ويختلفان في مصدر الجواب وحده.
+     *
+     * @param  float  $cost  سعر شراء المستفيد: سعر قائمته أو سعر الجملة
+     * @param  int|null  $earnerId  حصرُ التصحيح بمستفيدٍ واحد، أو `null` للجميع
+     * @return array<int, array{entry: CommissionEntry, was: float, now: float|null, delta: float, skipped?: string}>
+     */
+    public function recomputeItemCommissions(
+        OrderItem $item,
+        float $cost,
+        ?User $actor = null,
+        bool $apply = true,
+        ?int $earnerId = null,
+    ): array {
+        // لا سعر شراءٍ معروف ⇒ لا مرجع نصحّح إليه، فتُترك كما هي.
+        if ($cost <= 0) {
             return [];
         }
 
+        $correctCost = $cost;
         $margin = $this->itemMargin($item, $correctCost);
 
         // القاعدة تُقرأ من `rule_snapshot` المحفوظة لا من القاعدة الحيّة: قاعدةٌ
@@ -361,6 +389,7 @@ class CommissionService
             ->where('earner_type', 'affiliate')
             ->where('entry_type', 'accrual')
             ->whereNotIn('state', ['reversed', 'cancelled'])
+            ->when($earnerId, fn ($q) => $q->where('earner_id', $earnerId))
             ->get();
 
         $changes = [];
@@ -437,6 +466,62 @@ class CommissionService
      *
      * @param  array<int, array{entry: CommissionEntry, was: float, now: float, delta: float, stale: mixed, basis: float}>  $changes
      */
+    /**
+     * إعادة تسعير عمولات مسوّقٍ واحد على قائمة أسعاره.
+     *
+     * قائمة التاجر تُسند بعد أن يكون قد باع، فعمولاته القديمة محسوبةٌ على سعر
+     * الجملة العام لا على ما يشتري به فعلًا. والفرق حقيقي: من يشتري بـ٦٥ لا
+     * يُحسب ربحه كأنه اشترى بـ٨٠.
+     *
+     * ويُحصر بمستفيدٍ واحد لأن القائمة شخصيّة: الطلب الواحد قد يحمل عمولةً
+     * لغيره لا تخضع لقائمته.
+     *
+     * الصنف غير المسعَّر في قائمته يعود إلى سعر جملته الفعّال — كما يفعل حسم
+     * السعر في الطلب تمامًا، فلا يختلف الكشف عن المصدر.
+     *
+     * @return array<int, array{item: OrderItem, cost: float} & array<string, mixed>>
+     */
+    public function repriceForEarner(User $earner, ?User $actor = null, bool $apply = true): array
+    {
+        $list = $this->prices->listFor($earner);
+
+        if ($list === null) {
+            return [];
+        }
+
+        $items = OrderItem::with(['variant.product:id,wholesale_price', 'order:id,number,created_at'])
+            ->whereHas('commissionEntries', fn ($q) => $q
+                ->where('earner_type', 'affiliate')
+                ->where('earner_id', $earner->id)
+                ->where('entry_type', 'accrual')
+                ->whereNotIn('state', ['reversed', 'cancelled']))
+            ->get();
+
+        if ($items->isEmpty()) {
+            return [];
+        }
+
+        // أسعار القائمة لكل المتغيّرات دفعةً واحدة — لا استعلامًا لكل بند.
+        $listPrices = $this->prices->pricesForList(
+            $list,
+            $items->pluck('variant_id')->filter()->unique()->values()->all(),
+        );
+
+        $changes = [];
+
+        foreach ($items as $item) {
+            $cost = (float) ($listPrices[$item->variant_id]
+                ?? $item->variant?->effectiveWholesalePrice()
+                ?? 0);
+
+            foreach ($this->recomputeItemCommissions($item, $cost, $actor, $apply, $earner->id) as $change) {
+                $changes[] = $change + ['item' => $item, 'cost' => $cost];
+            }
+        }
+
+        return $changes;
+    }
+
     private function writeWholesaleCorrections(OrderItem $item, float $margin, float $cost, array $changes, ?User $actor): void
     {
         DB::transaction(function () use ($item, $cost, $changes, $actor) {

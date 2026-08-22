@@ -3,6 +3,7 @@
 namespace App\Modules\Commissions\Providers;
 
 use App\Modules\Commissions\Console\RepairWholesaleSnapshotsCommand;
+use App\Modules\Commissions\Console\RepriceEarnerCommand;
 use App\Modules\Commissions\Listeners\AccrueCommissionsOnDelivery;
 use App\Modules\Sales\Events\OrderDelivered;
 use Illuminate\Support\Facades\Event;
@@ -20,7 +21,10 @@ class CommissionsServiceProvider extends ServiceProvider
         // غير مجدول عمدًا: أمرٌ يحرّك مستحقّات أشخاص يُشغَّل بيدٍ ويُقرأ ناتجه
         // قبل اعتماده، لا يعمل وحده في الليل.
         if ($this->app->runningInConsole()) {
-            $this->commands([RepairWholesaleSnapshotsCommand::class]);
+            $this->commands([
+                RepairWholesaleSnapshotsCommand::class,
+                RepriceEarnerCommand::class,
+            ]);
         }
     }
 }
