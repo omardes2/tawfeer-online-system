@@ -93,7 +93,7 @@ class PriceListController extends Controller
 
         return $products->mapWithKeys(function (Product $p) use ($prices) {
             $values = $p->variants
-                ->map(fn ($v) => (float) ($prices[$v->id] ?? $v->wholesale_price ?? 0))
+                ->map(fn ($v) => (float) ($prices[$v->id] ?? $v->setRelation('product', $p)->effectiveWholesalePrice()))
                 ->filter(fn (float $v) => $v > 0);
 
             return $values->isEmpty() ? [] : [$p->id => ['min' => $values->min(), 'max' => $values->max()]];

@@ -88,7 +88,7 @@ class PriceListService
             return (float) $listPrice;
         }
 
-        $wholesale = (float) ($variant->wholesale_price ?? 0);
+        $wholesale = $variant->effectiveWholesalePrice();
 
         return $wholesale > 0 ? $wholesale : (float) ($variant->average_cost ?? 0);
     }

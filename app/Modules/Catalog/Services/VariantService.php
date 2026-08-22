@@ -201,6 +201,10 @@ class VariantService
             'retail_price' => $base?->retail_price ?? $product->retail_price ?? 0,
             'promo_price' => $base?->promo_price,
             'cost_price' => $base?->cost_price ?? 0,
+            // سعر الجملة كان ساقطًا من هنا، فيولد كل متغيّرٍ جديد بعمودٍ فارغ.
+            // وأثره ليس عرضًا: حارس البيع بأقل من الجملة يتخطّى الصفر، وعمولة
+            // المسوّق تهبط إلى التكلفة فتُحتسب أعلى مما تستحقّ.
+            'wholesale_price' => $base?->wholesale_price ?? $product->wholesale_price,
         ];
     }
 

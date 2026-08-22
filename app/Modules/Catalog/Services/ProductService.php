@@ -98,6 +98,35 @@ class ProductService
         }
         $variant = $product->defaultVariant()->first();
         $variant?->update($priceData);
+
+        $this->fillEmptyVariantWholesale($product, $data);
+    }
+
+    /**
+     * سعر جملة المنتج يملأ **الفارغ** من متغيّراته لا يسحق المُسعَّر منها.
+     *
+     * المزامنة أعلاه تصيب المتغيّر الافتراضي وحده، فمنتجٌ بمقاسات تبقى بقيّة
+     * متغيّراته بعمودٍ فارغ يُقرأ صفرًا — يسقط معه حارس البيع بأقل من الجملة،
+     * وتُحسب عمولة المسوّق على التكلفة فتعلو عمّا تستحقّ.
+     *
+     * والسحق ممنوع: مقاسٌ أكبر سُعِّر بيدٍ صريحة لا يجوز أن تعيده تعبئةٌ
+     * جماعية إلى سعر المنتج العام. ولذلك `whereNull` لا تحديثٌ شامل.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function fillEmptyVariantWholesale(Product $product, array $data): void
+    {
+        if (! array_key_exists('wholesale_price', $data)) {
+            return;
+        }
+
+        $wholesale = $data['wholesale_price'];
+
+        if ($wholesale === null || (float) $wholesale <= 0) {
+            return;
+        }
+
+        $product->variants()->whereNull('wholesale_price')->update(['wholesale_price' => $wholesale]);
     }
 
     public function delete(Product $product): void

@@ -101,7 +101,7 @@
                             <span class="block text-[11px] text-gray-400 font-mono">{{ $variant?->sku }}</span>
                         </td>
                         <td data-label="{{ __('سعر التاجر') }}" class="text-start tabular-nums font-semibold">{{ number_format((float) $item->price, 2) }}</td>
-                        <td data-label="{{ __('سعر الجملة') }}" class="text-start tabular-nums text-gray-500">{{ number_format((float) ($variant->wholesale_price ?? 0), 2) }}</td>
+                        <td data-label="{{ __('سعر الجملة') }}" class="text-start tabular-nums text-gray-500">{{ number_format($variant?->effectiveWholesalePrice() ?? 0, 2) }}</td>
                         <td data-label="{{ __('سعر البيع') }}" class="text-start tabular-nums text-gray-500">{{ number_format((float) ($variant->retail_price ?? 0), 2) }}</td>
                         <td data-label="{{ __('المصدر') }}" class="text-center">
                             <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] ring-1 bg-emerald-50 text-emerald-700 ring-emerald-200">{{ __('هذه القائمة') }}</span>
@@ -135,7 +135,7 @@
                             <span class="block text-[11px] text-gray-400 font-mono">{{ $variant?->sku }}</span>
                         </td>
                         <td data-label="{{ __('سعر التاجر') }}" class="text-start tabular-nums">{{ number_format((float) $price, 2) }}</td>
-                        <td data-label="{{ __('سعر الجملة') }}" class="text-start tabular-nums text-gray-500">{{ number_format((float) ($variant->wholesale_price ?? 0), 2) }}</td>
+                        <td data-label="{{ __('سعر الجملة') }}" class="text-start tabular-nums text-gray-500">{{ number_format($variant?->effectiveWholesalePrice() ?? 0, 2) }}</td>
                         <td data-label="{{ __('سعر البيع') }}" class="text-start tabular-nums text-gray-500">{{ number_format((float) ($variant->retail_price ?? 0), 2) }}</td>
                         <td data-label="{{ __('المصدر') }}" class="text-center">
                             <span class="inline-flex px-2 py-0.5 rounded-full text-[11px] ring-1 bg-sky-50 text-sky-700 ring-sky-200">{{ __('موروث') }}</span>

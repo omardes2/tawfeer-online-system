@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — a variant with no wholesale price of its own was read as "no price at all"
+
+The product form carries a single wholesale field at the **product** level, and
+the system copied it to the default variant only. Every size or colour added
+afterwards was born with an empty column, and each reader took that empty column
+at face value.
+
+Zero there does not mean "free" — it means **"no limit"**, and three things
+followed from it:
+
+- The guard against selling below wholesale skipped those variants entirely
+  (`$wholesale <= 0 ⇒ continue`), so any product with sizes could be sold at any
+  price with no warning.
+- The frozen `wholesale_price_snapshot` was `0.00`, so marketer commission fell
+  back to **cost** instead of wholesale — a lower base, a wider margin, and a
+  commission higher than earned.
+- The dealer price-list screens showed `0.00` next to a real dealer price, which
+  is how this surfaced.
+
+Both halves are fixed: reads go through `ProductVariant::effectiveWholesalePrice()`
+(variant, then product), and the column itself is filled — by a backfill migration
+and on every product save. **Only empty columns are filled**, so a variant priced
+by hand is never overwritten.
+
+Past order snapshots are left untouched: correcting them would move commissions
+that may already have been paid, and that is a separate decision.
+
 ### Changed — new features are restricted to the system admin during the trial
 - Everything built recently — incomplete-order recovery, dealer price lists, the
   product decision board, sales by city/area, the daily budget page, and the

@@ -60,7 +60,7 @@ class PriceListsController extends Controller
         $this->authorize('catalog.price_lists.manage');
 
         $items = $priceList->items()
-            ->with(['variant.product:id,name', 'variant.attributeValues'])
+            ->with(['variant.product:id,name,wholesale_price', 'variant.attributeValues'])
             ->get()
             ->sortBy(fn (PriceListItem $i) => $i->variant?->product?->name ?? '')
             ->values();
@@ -75,7 +75,7 @@ class PriceListsController extends Controller
         return view('admin.catalog.price_lists.form', $this->formData($priceList) + [
             'items' => $items,
             'inherited' => $inherited,
-            'inheritedVariants' => $inherited->isEmpty() ? collect() : ProductVariant::with('product:id,name', 'attributeValues')
+            'inheritedVariants' => $inherited->isEmpty() ? collect() : ProductVariant::with('product:id,name,wholesale_price', 'attributeValues')
                 ->whereIn('id', $inherited->keys())->get()->keyBy('id'),
         ]);
     }
@@ -177,7 +177,7 @@ class PriceListsController extends Controller
                     'id' => $v->id,
                     'label' => $withOptions->isNotEmpty() ? $p->name.' — '.$v->optionLabel() : $p->name,
                     'sku' => $v->sku ?: $p->sku,
-                    'wholesale' => (float) ($v->wholesale_price ?? 0),
+                    'wholesale' => $v->setRelation('product', $p)->effectiveWholesalePrice(),
                     'retail' => (float) ($v->retail_price ?: $p->retail_price),
                 ]);
             })->values();

@@ -126,7 +126,12 @@ class CommissionService
      */
     private function itemCost(OrderItem $item): float
     {
-        $wholesale = $item->wholesale_price_snapshot ?? $item->variant?->wholesale_price;
+        // الاحتياط يشمل سعر المنتج: بنودٌ قديمة جُمّدت بلقطةٍ صفرًا لأن عمود
+        // المتغيّر كان فارغًا، فكانت العمولة تُحسب على التكلفة — والتكلفة أدنى
+        // من الجملة، فالهامش أكبر والعمولة أعلى مما تستحقّ.
+        $wholesale = $item->wholesale_price_snapshot > 0
+            ? $item->wholesale_price_snapshot
+            : $item->variant?->effectiveWholesalePrice();
 
         return (float) ($wholesale > 0
             ? $wholesale

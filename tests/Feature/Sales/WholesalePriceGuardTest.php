@@ -87,4 +87,67 @@ class WholesalePriceGuardTest extends TestCase
         $order = $this->order(['variant_id' => $variant->id, 'qty' => 1, 'unit_price' => 1]);
         $this->assertNotNull($order->id);
     }
+
+    // ────────── المنتج ذو المقاسات ──────────
+
+    /**
+     * والحارس يحمي متغيّرًا عمودُه فارغ بسعر منتجه.
+     *
+     * كانت الشاشة تُدخل سعر الجملة على مستوى المنتج وتنسخه إلى المتغيّر
+     * الافتراضي وحده، فيولد كل مقاسٍ إضافيّ بعمودٍ فارغ يُقرأ صفرًا —
+     * فيتخطّاه الحارس بـ`continue` ويُباع بأي سعر بلا رسالة.
+     */
+    public function test_the_guard_protects_a_blank_variant_by_its_product_price(): void
+    {
+        $variant = $this->sizedVariant();
+
+        $this->expectException(ValidationException::class);
+        $this->order(['variant_id' => $variant->id, 'qty' => 1, 'unit_price' => 40]);
+    }
+
+    /** ويسمح عند سعر المنتج فما فوق. */
+    public function test_a_blank_variant_sells_at_its_product_price(): void
+    {
+        $variant = $this->sizedVariant();
+
+        $order = $this->order(['variant_id' => $variant->id, 'qty' => 1, 'unit_price' => 70]);
+
+        $this->assertNotNull($order->id);
+    }
+
+    /**
+     * واللقطة تُجمَّد بالسعر الفعّال لا بصفر.
+     *
+     * اللقطة أساسُ الهامش والعمولة بعدها، فصفرٌ فيها خطأٌ يصير تاريخًا.
+     */
+    public function test_the_snapshot_freezes_the_effective_price_not_zero(): void
+    {
+        $variant = $this->sizedVariant();
+
+        $order = $this->order(['variant_id' => $variant->id, 'qty' => 1, 'unit_price' => 100]);
+
+        $this->assertEqualsWithDelta(
+            70,
+            (float) $order->fresh('items')->items->first()->wholesale_price_snapshot,
+            0.01,
+        );
+    }
+
+    /** متغيّر مقاسٍ بعمودٍ فارغ، وسعر الجملة على منتجه (70). */
+    private function sizedVariant(): ProductVariant
+    {
+        $warehouse = Warehouse::where('code', 'WH-MAIN')->firstOrFail();
+
+        $product = Product::factory()->create(['retail_price' => 100, 'wholesale_price' => 70]);
+        $variant = ProductVariant::factory()->create([
+            'product_id' => $product->id,
+            'sku' => 'V-SIZED-1',
+            'is_default' => false,
+            'retail_price' => 100,
+            'wholesale_price' => null,
+        ]);
+        app(InventoryService::class)->receive($variant, $warehouse, 20, 50);
+
+        return $variant;
+    }
 }

@@ -197,7 +197,10 @@ class OrderService
             return;
         }
 
-        $variants = ProductVariant::with('product:id,name')->whereIn('id', $variantIds)->get()->keyBy('id');
+        // `wholesale_price` في الاختيار: الاحتياط يقرأه من المنتج، وعمودٌ غير
+        // مُختار يعود `null` صامتًا فيسقط الحارس من حيث أُريد له أن يقوم.
+        $variants = ProductVariant::with('product:id,name,wholesale_price')
+            ->whereIn('id', $variantIds)->get()->keyBy('id');
 
         // حدُّ التاجر سعرُ قائمته هو لا سعر الجملة العام: قائمته أدنى منه غالبًا
         // — وهو سبب وجودها — فقياسُه بالجملة يمنعه من البيع بما اشترى به.
@@ -209,7 +212,10 @@ class OrderService
             if (! $variant) {
                 continue;
             }
-            $wholesale = (float) ($listPrices[$variant->id] ?? $variant->wholesale_price ?? 0);
+            // سعر الجملة الفعّال لا العمود: متغيّرات المنتج ذي المقاسات عمودُها
+            // فارغ، فكان الحارس يتخطّاها كلّها بـ`continue` — يُباع بأي سعر
+            // وبلا رسالة.
+            $wholesale = (float) ($listPrices[$variant->id] ?? $variant->effectiveWholesalePrice());
             if ($wholesale <= 0) {
                 continue; // لا سعر محدَّد ⇒ لا قيد.
             }
@@ -467,10 +473,16 @@ class OrderService
         //  • سعر الجملة — أساس ربح المسوّق (سعر البيع − سعر الجملة). خلطهما كان يجعل
         //    ربح المسوّق يُحتسب على تكلفة الشراء بدل سعر الجملة.
         $variantIds = array_column($items, 'variant_id');
-        $variants = ProductVariant::whereIn('id', $variantIds)
-            ->get(['id', 'average_cost', 'wholesale_price']);
+        $variants = ProductVariant::with('product:id,wholesale_price')
+            ->whereIn('id', $variantIds)
+            ->get(['id', 'product_id', 'average_cost', 'wholesale_price']);
         $costs = $variants->pluck('average_cost', 'id');
-        $wholesale = $variants->pluck('wholesale_price', 'id');
+        // اللقطة تُجمَّد على البند ويُحسب عليها الهامش والعمولة بعدها بلا تغيير،
+        // فصفرٌ هنا خطأٌ يصير تاريخًا: العمولة تهبط إلى التكلفة فتُحتسب أعلى
+        // مما يجب، ولا شيء في الطلب يدلّ على السبب.
+        $wholesale = $variants->mapWithKeys(
+            fn (ProductVariant $v) => [$v->id => $v->effectiveWholesalePrice()]
+        );
 
         // سعر قائمة التاجر يحلّ محلّ سعر الجملة في **اللقطة نفسها**، فيجري بعده
         // حسابُ الهامش والعمولة والتقارير بلا حرفٍ يتغيّر: هامش التاجر = سعر
