@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\Webhooks;
 
 use App\Http\Controllers\Controller;
+use App\Modules\AiAgent\Support\MessageBuffer;
 use App\Modules\Marketing\Services\WhatsAppStatusService;
+use App\Modules\Messaging\Services\InboundMessageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -22,7 +24,11 @@ use Illuminate\Support\Facades\Log;
  */
 class WhatsAppWebhookController extends Controller
 {
-    public function __construct(private readonly WhatsAppStatusService $statuses) {}
+    public function __construct(
+        private readonly WhatsAppStatusService $statuses,
+        private readonly InboundMessageService $inbound,
+        private readonly MessageBuffer $agent,
+    ) {}
 
     /**
      * تحقّق ميتا عند ربط الـwebhook — تُعيد التحدّي نصًّا خامًا.
@@ -49,7 +55,24 @@ class WhatsAppWebhookController extends Controller
             return response()->json(['status' => 'rejected'], 403);
         }
 
-        $summary = $this->statuses->apply($request->json()->all());
+        $payload = $request->json()->all();
+
+        $summary = $this->statuses->apply($payload);
+
+        /*
+        | الرسائل الواردة بجانب الحالات في النقطة نفسها: ميتا ترسل الاثنين إلى
+        | عنوانٍ واحد، ولا سبيل لفصلهما إلّا بمحتوى الحمولة.
+        |
+        | والتخزين هنا لا على الطابور: الحمولة نفسها هي الرسالة، وتأجيلُها يعني
+        | فقدانها إن سقط العامل قبل أن يلتقطها. أمّا **الردّ** فمؤجَّل بالكامل —
+        | والـwebhook يُرجع 200 دون أن ينتظر النموذج.
+        */
+        $inbound = $this->inbound->apply($payload);
+        $summary += ['messages' => $inbound['stored'], 'duplicates' => $inbound['duplicates']];
+
+        foreach ($inbound['conversations'] as $conversationId) {
+            $this->agent->schedule($conversationId);
+        }
 
         /*
         | 200 دائمًا بعد قبول التوقيع: المنصّة تُعيد المحاولة على كل استجابةٍ
