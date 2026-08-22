@@ -258,17 +258,45 @@ class AgentToolsTest extends TestCase
         $this->assertSame('unknown_tool', $result['error']);
     }
 
-    /** والسجلّ لا يعرض للنموذج إلّا أدوات القراءة في هذه المرحلة. */
-    public function test_only_read_tools_are_exposed(): void
+    /**
+     * وسطحُ الأدوات مقفلٌ على قائمةٍ معلومة.
+     *
+     * السجلّ يُبنى من قائمةٍ صريحة في مزوّد الخدمة، وهذا الاختبار حارسُها:
+     * إضافة أداةٍ تمنح ذكاءً اصطناعيًّا قدرةً جديدة على نظامٍ يبيع، فلا تمرّ
+     * بلا أن تُكسر هذه المصفوفة ويُعاد النظر فيها عن قصد.
+     */
+    public function test_the_exposed_tool_surface_is_exactly_the_approved_list(): void
     {
         $names = array_column($this->tools->definitions(), 'name');
 
         sort($names);
 
-        $this->assertSame(
-            ['check_stock', 'get_price', 'get_product_details', 'search_products'],
-            $names,
-        );
+        $this->assertSame([
+            'check_stock',
+            'create_draft_order',
+            'escalate_to_human',
+            'get_price',
+            'get_product_details',
+            'list_delivery_areas',
+            'search_products',
+        ], $names);
+    }
+
+    /**
+     * ولا أداةَ تُخرج بضاعةً أو تمسّ طلبًا قائمًا.
+     *
+     * **Protected Delivery Integration — Do Not Modify.** التأكيد يُدخل الطلب
+     * في مدى مكنسة الشحن، فيُنشأ له طردٌ حقيقيّ خلال دقيقة. وصلاحية الوكيل
+     * محصورة بـ«قراءة + مسودّة + تحويل».
+     */
+    public function test_no_tool_can_confirm_ship_or_destroy(): void
+    {
+        $names = array_column($this->tools->definitions(), 'name');
+
+        foreach (['confirm_order', 'ship_order', 'dispatch_shipment', 'cancel_order',
+            'refund_order', 'update_order', 'delete_order', 'apply_discount'] as $forbidden) {
+            $this->assertNotContains($forbidden, $names, "أداةٌ محظورة معروضة: {$forbidden}");
+        }
     }
 
     private function conversation(): Conversation
