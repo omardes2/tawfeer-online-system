@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\Accounting\TransferController as AdminTransferCon
 use App\Http\Controllers\Admin\Accounting\VoucherController as AdminVoucherController;
 use App\Http\Controllers\Admin\Ai\AiContentController;
 use App\Http\Controllers\Admin\AiAgent\AgentControlController;
+use App\Http\Controllers\Admin\AiAgent\InboxController;
 use App\Http\Controllers\Admin\Catalog\BrandController;
 use App\Http\Controllers\Admin\Catalog\CategoryController;
 use App\Http\Controllers\Admin\Catalog\PriceListController;
@@ -227,6 +228,15 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     | و`handoff` عملُ خدمةٍ يوميّ على محادثةٍ واحدة — ومن يردّ على الزبائن لا
     | يلزم أن يملك إطفاء الوكيل عن المتجر كلّه.
     */
+    // الصندوق الموحّد — محادثات واتساب وما قاله الوكيل فيها.
+    Route::middleware('can:inbox.view')->group(function () {
+        Route::get('inbox', [InboxController::class, 'index'])->name('inbox.index');
+        Route::get('inbox/{conversation}', [InboxController::class, 'show'])->name('inbox.show');
+        Route::post('inbox/{conversation}/reply', [InboxController::class, 'reply'])->name('inbox.reply');
+        Route::post('inbox/{conversation}/assign', [InboxController::class, 'assign'])->name('inbox.assign');
+        Route::post('inbox/{conversation}/status', [InboxController::class, 'status'])->name('inbox.status');
+    });
+
     Route::post('inbox/channels/{channel}/toggle-ai', [AgentControlController::class, 'toggleChannel'])
         ->middleware('can:ai_agent.toggle')->name('inbox.channels.toggle_ai');
     Route::middleware('can:ai_agent.handoff')->group(function () {

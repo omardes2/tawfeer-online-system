@@ -95,6 +95,9 @@ final class AdminNavigation
                 ['admin.roles.index', 'الأدوار والصلاحيات', 'settings.roles.view', 'admin.roles.*'],
             ]],
             ['التسويق', 'sparkles', [
+                // الصندوق أوّل بند: هو الشاشة التي يُراقَب فيها الوكيل، ومن
+                // يرى ردًّا سيّئًا يجب أن يصل إليها بلا بحث.
+                ['admin.inbox.index', 'الصندوق الموحّد', 'inbox.view', 'admin.inbox.*'],
                 ['admin.marketing.contacts.index', 'جهات الاتصال التسويقية', 'marketing.contacts.view', 'admin.marketing.contacts.*'],
                 ['admin.marketing.campaigns.index', 'الحملات التسويقية', 'marketing.campaigns.view', 'admin.marketing.campaigns.*'],
                 ['admin.marketing.templates.index', 'قوالب الرسائل', 'marketing.templates.manage', 'admin.marketing.templates.*'],
