@@ -332,14 +332,28 @@
 
 ## 8. الصندوق الموحّد (Messaging)
 
-### `channels`
-`type` (whatsapp/messenger/instagram) · `config (json)` · `is_active`
+### `messaging_channels`
+`provider` (whatsapp/messenger/instagram) · `name` · `external_id` (phone_number_id) · `waba_id` · `credentials` (مشفّر) · `is_active` · `ai_enabled`. **فريد (provider, external_id)**.
+
+الاسم `messaging_channels` لا `channels`: المجرّد يلتبس بـ`ad_channels` (صفحات الإعلان) وبـ`orders.channel` (مصدر الطلب)، وثلاثتها مفاهيم مختلفة. و`ai_enabled` مفتاح إطفاء وكيل المبيعات لكل قناة — الإيقاف قرارٌ إداريّ يُنفَّذ من اللوحة في ثانية لا بنشر كود.
+
+### `channel_contacts`
+`channel_id` → messaging_channels · `external_id` (E.164) · `display_name` · `customer_id` → customers (nullable) · `last_inbound_at`. **فريد (channel_id, external_id)**.
+
+منفصلٌ عن `customers` عمدًا: المحادثة تسبق العميل، ومن يسأل عن منتجٍ ليس عميلًا بعد وقد لا يصير — وربطُه من اللحظة الأولى يملأ قاعدة العملاء بمن لم يشترِ فيُفسد كل عدٍّ وتقرير. و`last_inbound_at` أساس **نافذة الأربع والعشرين ساعة** التي تسمح بها ميتا للنصّ الحرّ.
+
+### `conversation_statuses`
+حالات المحادثة القابلة للإدارة (المبدأ 10) — بنفس بنية `order_statuses`.
 
 ### `conversations`
-`channel_id` → channels · `customer_id` → customers (nullable) · `external_id` · `status` · `assigned_to` → users
+`channel_contact_id` → channel_contacts · `status_id` → conversation_statuses · `assigned_user_id` → users · `ai_mode` (active/paused/handed_off) · `handoff_reason` · `handoff_at` · `last_message_at` · `order_id` → orders (nullable) · softDeletes.
+
+`ai_mode` ثلاثيٌّ لا ثنائي: `paused` أوقفه إنسانٌ مؤقتًا فيعود بانتهاء السبب، و`handed_off` سُلّم لموظفة فلا يعود إلّا بقرارٍ صريح — وخلطُهما يعيد الوكيل إلى محادثةٍ حُوّلت لغضب الزبون. و`order_id` هو ما يجعل قياس التحويل ممكنًا.
 
 ### `messages`
-`conversation_id` → conversations · `direction` (in/out) · `body` · `type` (text/image/file) · `sent_at` · `is_read`
+`conversation_id` → conversations · `external_id` (wamid) · `direction` (inbound/outbound) · `sender_type` (customer/ai/agent/system) · `sender_user_id` · `type` · `body` · `media_path` · `payload (json)` · `delivery_status` · `failed_reason` · `sent_at`.
+
+`external_id` **فريد وهو أساس منع التكرار**: ميتا تُعيد الـwebhook عند أي تأخّر، والحارس البرمجيّ وحده يُنقَض بسباق تنفيذٍ متزامن — فتُخزَّن الرسالة مرّتين ويردّ الوكيل مرّتين على سؤالٍ واحد. ويقبل `null` للصادر قبل أن يعود معرّفه من المنصّة.
 
 ### `message_templates`
 `channel_type` · `name` · `body`
@@ -448,7 +462,7 @@ accounts ──< journal_lines >── journal_entries
 payments >── accounts
 leads ──< opportunities ──< activities
 affiliates ──< referrals / commissions / payout_requests
-channels ──< conversations ──< messages
+messaging_channels ──< channel_contacts ──< conversations ──< messages
 customers ──< loyalty_transactions
 ```
 
