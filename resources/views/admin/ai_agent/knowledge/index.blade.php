@@ -59,7 +59,9 @@
                         <tr>
                             <td data-label="{{ __('الصورة') }}">
                                 @if ($product->primaryImage)
-                                    <img src="{{ $product->primaryImage->url }}" alt=""
+                                    {{-- `url()` دالّة لا خاصّية: `->url` يجعل Eloquent يبحث عن عمودٍ
+                                         ثم علاقةٍ بهذا الاسم، فيرمي LogicException. --}}
+                                    <img src="{{ $product->primaryImage->url() }}" alt=""
                                          class="w-11 h-11 rounded-md object-cover" loading="lazy" />
                                 @else
                                     <span class="grid place-items-center w-11 h-11 rounded-md bg-gray-100 text-gray-300 text-xs">—</span>

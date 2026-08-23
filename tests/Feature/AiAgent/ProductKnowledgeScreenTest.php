@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\AiAgent\Models\ProductKnowledge;
 use App\Modules\AiAgent\Tools\SearchProductsTool;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\ProductImage;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Support\AdminNavigation;
 use Database\Seeders\DatabaseSeeder;
@@ -69,6 +70,30 @@ class ProductKnowledgeScreenTest extends TestCase
     {
         $this->actingAs($this->admin())->get(route('admin.ai_agent.knowledge.index'))->assertOk();
         $this->actingAs($this->admin())->get(route('admin.ai_agent.knowledge.edit', $this->product))->assertOk();
+    }
+
+    /**
+     * وتفتحان **وللصنف صورة**.
+     *
+     * هذا ليس تكرارًا للاختبار أعلاه: أصناف المصنع بلا صور، فسطرُ عرض الصورة
+     * لم يكن يُنفَّذ في أيّ اختبار — ومرّ فيه `->url` بدل `->url()` إلى الإنتاج،
+     * فسقطت الشاشة عند أول صنفٍ له صورة (وكلّها كذلك عمليًّا).
+     *
+     * فالفرع الذي لا يمرّ به اختبار ليس مغطًّى مهما كثرت الاختبارات حوله.
+     */
+    public function test_the_index_opens_for_a_product_that_has_an_image(): void
+    {
+        ProductImage::create([
+            'product_id' => $this->product->id,
+            'path' => 'products/broom.jpg',
+            'is_primary' => true,
+            'sort_order' => 0,
+        ]);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.ai_agent.knowledge.index'))
+            ->assertOk()
+            ->assertSee('products/broom.jpg', false);
     }
 
     /** والحفظ يُنشئ المعرفة كاملةً. */
