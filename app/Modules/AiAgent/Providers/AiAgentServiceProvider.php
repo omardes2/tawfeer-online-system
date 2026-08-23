@@ -2,6 +2,7 @@
 
 namespace App\Modules\AiAgent\Providers;
 
+use App\Modules\AiAgent\Console\AgentCheckCommand;
 use App\Modules\AiAgent\Tools\CheckStockTool;
 use App\Modules\AiAgent\Tools\CreateDraftOrderTool;
 use App\Modules\AiAgent\Tools\EscalateToHumanTool;
@@ -31,6 +32,14 @@ class AiAgentServiceProvider extends ServiceProvider
         CreateDraftOrderTool::class,
         EscalateToHumanTool::class,
     ];
+
+    public function boot(): void
+    {
+        // غير مجدول: أمرُ فحصٍ يُشغَّل بيدٍ عند التجربة أو حين لا يردّ الوكيل.
+        if ($this->app->runningInConsole()) {
+            $this->commands([AgentCheckCommand::class]);
+        }
+    }
 
     public function register(): void
     {
