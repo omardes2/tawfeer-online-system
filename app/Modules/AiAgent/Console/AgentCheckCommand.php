@@ -42,54 +42,60 @@ class AgentCheckCommand extends Command
         $ready = ProductKnowledge::where('is_ready', true)->count();
         $queue = (string) config('queue.default');
 
+        // العمود الأول **لاتينيّ دائمًا**: طرفيّات الخوادم كثيرًا ما تعجز عن
+        // عرض العربية، وأمرُ تشخيصٍ لا يُقرأ لا يُشخّص شيئًا. فيقود كلَّ سطرٍ
+        // مفتاحُ البيئة أو الأمر المطلوب، والشرح العربيّ يتبعه.
         $rows = [
-            $this->row('مفتاح النموذج (ANTHROPIC_API_KEY)', filled(config('ai_agent.api_key')),
-                'مضبوط', 'غير مضبوط — كل دورة تفشل وتُحوَّل'),
+            $this->row('ANTHROPIC_API_KEY', filled(config('ai_agent.api_key')),
+                'set', 'MISSING — كل دورة تفشل وتُحوَّل'),
 
-            $this->row('المفتاح العام (AI_AGENT_ENABLED)', (bool) config('ai_agent.enabled'),
-                'مشغّل', 'مطفأ — الاستقبال يعمل والردّ لا'),
+            $this->row('AI_AGENT_ENABLED', (bool) config('ai_agent.enabled'),
+                'true', 'false — الاستقبال يعمل والردّ لا'),
 
-            $this->row('رقم واتساب (WHATSAPP_PHONE_NUMBER_ID)', $phoneNumberId !== '',
-                $phoneNumberId, 'غير مضبوط'),
+            $this->row('WHATSAPP_PHONE_NUMBER_ID', $phoneNumberId !== '',
+                $phoneNumberId, 'MISSING — بدونه لا قناة ولا استقبال'),
 
-            $this->row('رمز واتساب (WHATSAPP_TOKEN)', filled(config('messaging.whatsapp.token')),
-                'مضبوط', 'غير مضبوط — لا إرسال'),
+            $this->row('WHATSAPP_TOKEN', filled(config('messaging.whatsapp.token')),
+                'set', 'MISSING — لا إرسال'),
 
-            $this->row('تحقّق الـwebhook (WHATSAPP_VERIFY_TOKEN)', filled(config('messaging.webhooks.verify_token')),
-                'مضبوط', 'غير مضبوط — ميتا لن تُفعّل الـwebhook'),
+            $this->row('WHATSAPP_VERIFY_TOKEN', filled(config('messaging.webhooks.verify_token')),
+                'set', 'MISSING — ميتا لن تُفعّل الـwebhook'),
 
-            $this->row('توقيع الـwebhook (WHATSAPP_APP_SECRET)', filled(config('messaging.webhooks.app_secret')),
-                'مضبوط', 'غير مضبوط — الرسائل الواردة تُرفض'),
+            $this->row('WHATSAPP_APP_SECRET', filled(config('messaging.webhooks.app_secret')),
+                'set', 'MISSING — الرسائل الواردة تُرفض'),
 
-            $this->row('قناة واتساب في النظام', $channel !== null,
-                $channel?->name ?? '', 'غير موجودة — شغّل الأمر بـ--create-channel'),
+            $this->row('MESSAGING_WHATSAPP (driver)', config('messaging.channels.whatsapp') === 'whatsapp_cloud',
+                'whatsapp_cloud', (string) config('messaging.channels.whatsapp').' — يجب أن يكون whatsapp_cloud'),
 
-            $this->row('مفتاح القناة', (bool) $channel?->ai_enabled,
-                'مشغّل', 'مطفأ — شغّله من الصندوق الموحّد'),
+            $this->row('messaging_channels row', $channel !== null,
+                $channel?->name ?? '', 'MISSING — php artisan ai-agent:check --create-channel'),
+
+            $this->row('channel ai_enabled', (bool) $channel?->ai_enabled,
+                'true', 'false — شغّله من: التسويق ← الصندوق الموحّد'),
 
             // `sync` يعني أن الردّ يجري داخل الـwebhook: يتجاوز المهلة وتُعيد
             // ميتا الإرسال، فيردّ الوكيل مرّتين.
-            $this->row('محرّك الطابور', $queue !== 'sync',
-                $queue, 'sync — الوكيل يحتاج عامل طابور: php artisan queue:work'),
+            $this->row('QUEUE_CONNECTION', $queue !== 'sync',
+                $queue, 'sync — يلزم: php artisan queue:work'),
 
-            $this->row('أصناف جاهزة للبيع', $ready > 0,
-                $ready.' من '.Product::count(), 'لا صنف جاهز — الوكيل سيحوّل كل سؤال'),
+            $this->row('ready products', $ready > 0,
+                $ready.' / '.Product::count(), '0 — الوكيل سيحوّل كل سؤال'),
         ];
 
-        $this->table(['الفحص', 'الحالة', 'النتيجة'], $rows);
+        $this->table(['CHECK', 'OK', 'RESULT'], $rows);
 
         $failed = collect($rows)->filter(fn (array $r) => $r[1] === '✗')->count();
 
         $this->line('');
 
         if ($failed === 0) {
-            $this->info('✓ كل شيء جاهز — أرسل رسالة إلى رقم المتجر وراقب الصندوق الموحّد.');
+            $this->info('ALL OK — أرسل رسالة إلى رقم المتجر وراقب الصندوق الموحّد.');
 
             return self::SUCCESS;
         }
 
-        $this->warn("يحتاج انتباهًا: {$failed}.");
-        $this->line('التفصيل في docs/AI_AGENT_OPERATIONS.md');
+        $this->warn("{$failed} check(s) need attention — راجع عمود RESULT أعلاه.");
+        $this->line('docs/AI_AGENT_OPERATIONS.md');
 
         return self::SUCCESS;
     }
@@ -110,7 +116,7 @@ class AgentCheckCommand extends Command
     private function createChannel(string $phoneNumberId): void
     {
         if ($phoneNumberId === '') {
-            $this->error('WHATSAPP_PHONE_NUMBER_ID غير مضبوط — لا يمكن إنشاء القناة.');
+            $this->error('WHATSAPP_PHONE_NUMBER_ID is MISSING — لا يمكن إنشاء القناة بدونه.');
 
             return;
         }
@@ -119,7 +125,7 @@ class AgentCheckCommand extends Command
             ->where('external_id', $phoneNumberId)->first();
 
         if ($existing) {
-            $this->info("✓ القناة موجودة أصلًا: {$existing->name}");
+            $this->info("channel exists: {$existing->name}");
 
             return;
         }
@@ -134,7 +140,7 @@ class AgentCheckCommand extends Command
             'ai_enabled' => false,
         ]);
 
-        $this->info("✓ أُنشئت القناة: {$channel->name}");
-        $this->line('  وهي **مطفأة** — شغّلها من: التسويق ← الصندوق الموحّد.');
+        $this->info("channel created: {$channel->name} (ai_enabled = false)");
+        $this->line('  شغّلها من: التسويق ← الصندوق الموحّد.');
     }
 }

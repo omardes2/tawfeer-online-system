@@ -79,7 +79,7 @@ class AgentCheckCommandTest extends TestCase
         config(['messaging.whatsapp.phone_number_id' => '']);
 
         $this->artisan('ai-agent:check', ['--create-channel' => true])
-            ->expectsOutputToContain('غير مضبوط')
+            ->expectsOutputToContain('is MISSING')
             ->assertSuccessful();
 
         $this->assertSame(0, MessagingChannel::count());
@@ -91,7 +91,7 @@ class AgentCheckCommandTest extends TestCase
         config(['ai_agent.api_key' => null, 'ai_agent.enabled' => false]);
 
         $this->artisan('ai-agent:check')
-            ->expectsOutputToContain('يحتاج انتباهًا')
+            ->expectsOutputToContain('need attention')
             ->assertSuccessful();
     }
 
@@ -108,10 +108,10 @@ class AgentCheckCommandTest extends TestCase
             'selling_points' => ['نقطة'], 'is_ready' => true,
         ]);
 
-        config(['queue.default' => 'database']);
+        config(['queue.default' => 'database', 'messaging.channels.whatsapp' => 'whatsapp_cloud']);
 
         $this->artisan('ai-agent:check')
-            ->expectsOutputToContain('كل شيء جاهز')
+            ->expectsOutputToContain('ALL OK')
             ->assertSuccessful();
     }
 
