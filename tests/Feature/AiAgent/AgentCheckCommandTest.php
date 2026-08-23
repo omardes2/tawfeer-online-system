@@ -27,11 +27,13 @@ class AgentCheckCommandTest extends TestCase
         parent::setUp();
         $this->seed(DatabaseSeeder::class);
 
+        // المسارات كما يقرؤها متحكّم الـwebhook نفسه. وضبطُ مسارٍ آخر هنا يجعل
+        // الاختبار يوافق أمرًا يقرأ مفتاحًا غير موجود، فيمرّ وهو معطوب.
         config([
             'messaging.whatsapp.phone_number_id' => '123456789',
             'messaging.whatsapp.token' => 'tok',
-            'messaging.webhooks.verify_token' => 'vt',
-            'messaging.webhooks.app_secret' => 'sec',
+            'messaging.whatsapp.verify_token' => 'vt',
+            'messaging.whatsapp.app_secret' => 'sec',
             'ai_agent.api_key' => 'sk-test',
             'ai_agent.enabled' => true,
         ]);
@@ -98,6 +100,45 @@ class AgentCheckCommandTest extends TestCase
     /** ويعلن الجاهزية حين يكتمل كل شيء. */
     public function test_it_reports_readiness_when_everything_is_set(): void
     {
+        $this->makeEverythingReady();
+
+        $this->artisan('ai-agent:check')
+            ->expectsOutputToContain('ALL OK')
+            ->assertSuccessful();
+    }
+
+    /**
+     * ويقرأ مفتاحَي الـwebhook من حيث يقرؤهما المتحكّم.
+     *
+     * الأمر كان يقرأ `messaging.webhooks.*` والمتحكّم يقرأ
+     * `messaging.whatsapp.*` — مفتاحٌ غير موجود يقول MISSING إلى الأبد مهما
+     * ضُبطت البيئة، فيُطارَد العطل في لوحة ميتا وهو هنا.
+     *
+     * وهذا مع اختبار الجاهزية أعلاه يُثبّت المسار من طرفيه: المضبوط يُقرأ،
+     * والمفرَّغ يُشتكى منه.
+     */
+    public function test_it_reads_the_webhook_keys_where_the_controller_reads_them(): void
+    {
+        $this->makeEverythingReady();
+
+        config(['messaging.whatsapp.app_secret' => null]);
+
+        $this->artisan('ai-agent:check')
+            ->expectsOutputToContain('1 check(s) need attention')
+            ->assertSuccessful();
+    }
+
+    /** ويذكر عنوان الـwebhook ليُلصَق في ميتا بلا تخمين. */
+    public function test_it_prints_the_webhook_callback_url(): void
+    {
+        $this->artisan('ai-agent:check')
+            ->expectsOutputToContain('/api/webhooks/whatsapp')
+            ->assertSuccessful();
+    }
+
+    /** كلُّ ما يحتاجه الفحص ليقول ALL OK. */
+    private function makeEverythingReady(): void
+    {
         MessagingChannel::create([
             'provider' => 'whatsapp', 'name' => 'واتساب المتجر', 'external_id' => '123456789',
             'is_active' => true, 'ai_enabled' => true,
@@ -109,10 +150,6 @@ class AgentCheckCommandTest extends TestCase
         ]);
 
         config(['queue.default' => 'database', 'messaging.channels.whatsapp' => 'whatsapp_cloud']);
-
-        $this->artisan('ai-agent:check')
-            ->expectsOutputToContain('ALL OK')
-            ->assertSuccessful();
     }
 
     /**

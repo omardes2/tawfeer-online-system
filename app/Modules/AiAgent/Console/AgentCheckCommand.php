@@ -58,10 +58,13 @@ class AgentCheckCommand extends Command
             $this->row('WHATSAPP_TOKEN', filled(config('messaging.whatsapp.token')),
                 'set', 'MISSING — لا إرسال'),
 
-            $this->row('WHATSAPP_VERIFY_TOKEN', filled(config('messaging.webhooks.verify_token')),
+            // المسار `messaging.whatsapp.*` لا `messaging.webhooks.*`: هو ما يقرؤه
+            // متحكّم الـwebhook فعلًا. وفحصٌ يقرأ مفتاحًا غير موجود يقول MISSING
+            // إلى الأبد — فيُطارَد عطلٌ ليس هناك.
+            $this->row('WHATSAPP_VERIFY_TOKEN', filled(config('messaging.whatsapp.verify_token')),
                 'set', 'MISSING — ميتا لن تُفعّل الـwebhook'),
 
-            $this->row('WHATSAPP_APP_SECRET', filled(config('messaging.webhooks.app_secret')),
+            $this->row('WHATSAPP_APP_SECRET', filled(config('messaging.whatsapp.app_secret')),
                 'set', 'MISSING — الرسائل الواردة تُرفض'),
 
             $this->row('MESSAGING_WHATSAPP (driver)', config('messaging.channels.whatsapp') === 'whatsapp_cloud',
@@ -84,6 +87,8 @@ class AgentCheckCommand extends Command
 
         $this->table(['CHECK', 'OK', 'RESULT'], $rows);
 
+        $this->printWebhookSetup();
+
         $failed = collect($rows)->filter(fn (array $r) => $r[1] === '✗')->count();
 
         $this->line('');
@@ -104,6 +109,25 @@ class AgentCheckCommand extends Command
     private function row(string $label, bool $ok, string $good, string $bad): array
     {
         return [$label, $ok ? '✓' : '✗', $ok ? $good : $bad];
+    }
+
+    /**
+     * ما يُلصَق في لوحة ميتا.
+     *
+     * الجدول يقول ما ينقص في `.env`، ولا يقول شيئًا عن **الطرف الآخر**: عنوانٌ
+     * يُكتب في ميتا وحقلٌ يُفعَّل هناك. وتخمينُ العنوان أو نسيانُ الحقل يُنتج
+     * الصمت نفسه — الرسائل لا تصل أصلًا فيُفتَّش عن العطل في الوكيل.
+     *
+     * ولا يُطبع الرمز نفسه: هو في `.env`، وطباعتُه في طرفيّةٍ تُصوَّر وتُرسَل
+     * تُخرجه من هناك.
+     */
+    private function printWebhookSetup(): void
+    {
+        $this->line('');
+        $this->line('WEBHOOK (paste into Meta → WhatsApp → Configuration):');
+        $this->line('  Callback URL:  '.rtrim((string) config('app.url'), '/').'/api/webhooks/whatsapp');
+        $this->line('  Verify token:  = WHATSAPP_VERIFY_TOKEN (من .env — لا يُطبع هنا)');
+        $this->line('  Webhook fields: messages  ← فعّله، وإلّا لا تصل رسالة واحدة');
     }
 
     /**
