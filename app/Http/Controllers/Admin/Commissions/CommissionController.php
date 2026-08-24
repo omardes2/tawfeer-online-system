@@ -17,6 +17,7 @@ use App\Modules\Foundation\Models\Branch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * لوحة العمولات/الأرباح (Phase 4.2) — واجهات إدارة RTL: الدفتر (فلترة بالحالة)،
@@ -40,9 +41,10 @@ class CommissionController extends Controller
         $people = fn (array $roles, string $type) => User::whereHas('roles', fn ($q) => $q->whereIn('name', $roles))
             ->orderBy('name')->get()
             ->map(function (User $u) use ($type, $range) {
-                $period = (float) CommissionEntry::where('earner_id', $u->id)->where('earner_type', $type)
-                    ->whereIn('state', ['eligible', 'approved', 'paid'])
-                    ->whereBetween('created_at', $range)->sum('amount');
+                // بتاريخ الطلب كما في الكشف تمامًا — وإلّا اختلف رقم القائمة عن
+                // رقم كشف الشخص نفسه للفترة نفسها، وهو أسوأ من خطأٍ ظاهر.
+                $period = (float) $this->inPeriod($u->id, $type, $range)
+                    ->whereIn('state', ['eligible', 'approved', 'paid'])->sum('amount');
 
                 return ['user' => $u, 'period' => round($period, 2)] + $this->commissions->balance($u->id, $type);
             })->values();
@@ -63,6 +65,86 @@ class CommissionController extends Controller
             ->where('state', $state)->latest('id')->paginate(25)->withQueryString();
 
         return view('admin.commissions.ledger', ['entries' => $entries, 'state' => $state]);
+    }
+
+    /**
+     * تصدير كشف الفترة — **كل حركاتها لا صفحةً منها**.
+     *
+     * الشاشة مقسّمة إلى صفحاتٍ من ثلاثين، والتصدير للمحاسبة والمراجعة: صفحةٌ
+     * واحدة تُنتج كشفًا ناقصًا يُبنى عليه صرفٌ خاطئ. فيُبثّ الصفّ تلو الآخر
+     * (`chunk`) بلا تحميل الكل في الذاكرة.
+     *
+     * و`BOM` في أوله شرطُ قراءة العربية في Excel — بدونه تظهر مربّعات.
+     */
+    private function statementCsv(int $earnerId, string $type, array $range, string $from, string $to): StreamedResponse
+    {
+        $earner = User::find($earnerId);
+
+        $head = [
+            __('commissions.order'), __('رقم التتبّع'), __('الصنف'), __('commissions.order_date'),
+            __('commissions.entry_type'), __('commissions.basis'), __('commissions.amount'),
+            __('commissions.state'),
+        ];
+
+        $query = $this->inPeriod($earnerId, $type, $range)
+            ->with(['order:id,number,created_at,tracking_number', 'variant.product:id,name', 'variant.attributeValues'])
+            ->orderBy('id');
+
+        $name = 'commission-statement-'.($earner?->id ?? $earnerId).'-'.$from.'_'.$to.'.csv';
+
+        return response()->streamDownload(function () use ($query, $head, $earner, $from, $to) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+
+            // ترويسةٌ تعرّف الكشف: ملفٌّ بلا اسم صاحبه ولا فترته لا يصلح مستندًا.
+            fputcsv($out, [__('كشف حساب'), $earner?->name ?? '—']);
+            fputcsv($out, [__('من'), $from, __('إلى'), $to]);
+            fputcsv($out, []);
+            fputcsv($out, $head);
+
+            $total = 0.0;
+
+            $query->chunk(500, function ($chunk) use ($out, &$total) {
+                foreach ($chunk as $e) {
+                    $total += (float) $e->amount;
+
+                    fputcsv($out, [
+                        $e->order?->number ?? '—',
+                        $e->order?->tracking_number ?? '',
+                        $e->variant?->product?->name ?? $e->variant?->sku ?? '—',
+                        $e->order?->created_at?->format('Y-m-d') ?? '',
+                        __('commissions.'.$e->entry_type),
+                        number_format((float) $e->basis, 2, '.', ''),
+                        number_format((float) $e->amount, 2, '.', ''),
+                        __('commissions.'.$e->state),
+                    ]);
+                }
+            });
+
+            fputcsv($out, []);
+            fputcsv($out, [__('الإجمالي'), '', '', '', '', '', number_format($total, 2, '.', '')]);
+
+            fclose($out);
+        }, $name, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * حركات مستفيدٍ ضمن فترة — **بتاريخ الطلب** لا بتاريخ تسجيل الحركة.
+     *
+     * الكشف يعرض عمود «تاريخ الطلب»، وكان الفلتر يُصفّي على `created_at` الحركة.
+     * وهما يتطابقان في الحالة العادية (تُنشأ الحركة عند تأكيد الطلب) **ويفترقان
+     * عند التصحيح وإعادة الاحتساب**: حركةٌ لطلبِ تمّوز تُسجَّل في آب فتظهر في
+     * فلتر آب وتغيب عن تمّوز — بينما السطر نفسه يقول «تاريخ الطلب: تمّوز».
+     * فالمستخدم يرى تناقضًا ولا يجد له سببًا.
+     *
+     * و`order_id` غير قابل للفراغ في المخطّط، فلا حركة بلا طلب ولا حالة تسقط
+     * من كل فترة.
+     */
+    private function inPeriod(int $earnerId, string $type, array $range)
+    {
+        return CommissionEntry::where('earner_id', $earnerId)
+            ->where('earner_type', $type)
+            ->whereHas('order', fn ($o) => $o->whereBetween('orders.created_at', $range));
     }
 
     /** @return array{0: string, 1: string, 2: array} from/to (نصًّا) والمدى الزمني للاستعلام */
@@ -127,16 +209,18 @@ class CommissionController extends Controller
         return back()->with('status', __('commissions.paid_total', ['total' => number_format((float) $payout->total, 2)]));
     }
 
-    public function statement(Request $request, int $earnerId): View
+    public function statement(Request $request, int $earnerId): View|StreamedResponse
     {
         $type = $request->query('earner_type', 'sales');
         [$fromStr, $toStr, $range] = $this->period($request);
-        [$from, $to] = [$range[0], $range[1]];
 
         // مستحقّات الفترة (الأرباح المؤهّلة صافيةً ضمن المدى الزمني).
-        $periodEarned = (float) CommissionEntry::where('earner_id', $earnerId)->where('earner_type', $type)
-            ->whereIn('state', ['eligible', 'approved', 'paid'])
-            ->whereBetween('created_at', $range)->sum('amount');
+        $periodEarned = (float) $this->inPeriod($earnerId, $type, $range)
+            ->whereIn('state', ['eligible', 'approved', 'paid'])->sum('amount');
+
+        if ($request->query('export') === 'csv') {
+            return $this->statementCsv($earnerId, $type, $range, $fromStr, $toStr);
+        }
 
         return view('admin.commissions.statement', [
             'earnerId' => $earnerId,
@@ -148,12 +232,17 @@ class CommissionController extends Controller
             'from' => $fromStr,
             'to' => $toStr,
             // uuid وتاريخ الطلب: رقم الطلب يقود إلى فاتورته (الربط بالـuuid)، ويُعرض تاريخه.
-            'entries' => CommissionEntry::where('earner_id', $earnerId)->where('earner_type', $type)
-                ->whereBetween('created_at', $range)
+            'entries' => $this->inPeriod($earnerId, $type, $range)
                 // الصنف مع الطلب: الحركة **لكل بند** لا لكل طلب، فالطلب ذو
                 // الصنفين يعطي سطرين برقمٍ واحد — يبدوان تكرارًا لمن يقرأ
                 // الكشف، وهما بندان مختلفان.
-                ->with(['order:id,uuid,number,created_at', 'variant.product:id,name', 'variant.attributeValues'])
+                //
+                // ورقم التتبّع يُقرأ من الطلب عرضًا فقط — Protected Delivery
+                // Integration — Do Not Modify: لا يُكتب ولا يُطلب من الشركة.
+                ->with([
+                    'order:id,uuid,number,created_at,tracking_number',
+                    'variant.product:id,name', 'variant.attributeValues',
+                ])
                 ->latest('id')->paginate(30)->withQueryString(),
             'payouts' => CommissionPayout::where('earner_id', $earnerId)->where('earner_type', $type)
                 ->with(['voucher:id,number,status,kind', 'treasury:id,name'])->latest('id')->get(),

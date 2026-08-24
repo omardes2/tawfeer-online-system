@@ -47,6 +47,17 @@
                 <input type="date" name="to" value="{{ $to }}" class="rounded-md border-gray-300 text-sm">
             </div>
             <button type="submit" class="px-4 py-2 bg-gray-700 text-white text-sm rounded-md hover:bg-gray-800">{{ __('commissions.apply_filter') }}</button>
+
+            {{--
+                التصدير يحمل الفترة المعروضة نفسها، ويُصدّر **كل حركاتها** لا
+                الصفحة الظاهرة: الملفّ يُبنى عليه صرفٌ ومراجعة، وكشفٌ ناقص أسوأ
+                من لا كشف.
+            --}}
+            <a href="{{ request()->fullUrlWithQuery(['export' => 'csv']) }}"
+               class="px-4 py-2 border border-emerald-600 text-emerald-700 text-sm rounded-md hover:bg-emerald-50">
+                {{ __('تصدير Excel') }}
+            </a>
+
             <div class="ms-auto text-sm text-gray-600">
                 {{ __('commissions.period_earned') }}: <span class="font-bold text-gray-900">{{ number_format($periodEarned, 2) }}</span>
             </div>
@@ -154,6 +165,12 @@
                     <thead class="text-gray-500 border-b"><tr>
                         <th class="py-2 px-3 font-medium">{{ __('commissions.order') }}</th>
                         {{--
+                            رقم التتبّع بجانب الطلب: به يُطابَق السطر مع كشف شركة
+                            التوصيل عند المراجعة. يُقرأ عرضًا فقط — Protected
+                            Delivery Integration — Do Not Modify.
+                        --}}
+                        <th class="py-2 px-3 font-medium">{{ __('رقم التتبّع') }}</th>
+                        {{--
                             الصنف: الحركة لكل **بند** لا لكل طلب، فالطلب ذو
                             الصنفين يعطي سطرين برقمٍ واحد. وبلا هذا العمود
                             يبدوان تكرارًا وهما بندان مختلفان.
@@ -176,6 +193,9 @@
                                     @else
                                         <span class="text-gray-400">—</span>
                                     @endif
+                                </td>
+                                <td class="py-2 px-3 text-gray-500 font-mono text-xs" data-label="{{ __('رقم التتبّع') }}">
+                                    {{ $e->order?->tracking_number ?: '—' }}
                                 </td>
                                 <td class="py-2 px-3 text-gray-600" data-label="{{ __('الصنف') }}">
                                     @if ($e->variant)
