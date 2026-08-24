@@ -16,9 +16,10 @@ use Tests\TestCase;
 /**
  * شاشة المعرفة البيعية — ما يقوله الوكيل عن كل صنف.
  *
- * و`is_ready` **إذنٌ بالبيع لا علامةُ اكتمال**: بها يخرج الصنف في بحث الوكيل
- * ويتكلّم عنه، وبدونها يُحوَّل السؤال عنه إلى موظفة. فالفحص الحاسم هنا ليس
- * «هل حُفظ الحقل؟» بل **«هل تغيّر ما يبيعه الوكيل فعلًا؟»**
+ * و`is_ready` **ترقيةٌ لا بوّابة**: الوكيل يبيع كلّ صنفٍ نشطٍ مرئيّ بوصف
+ * الكتالوج، وبها ينتقل من موظّف استعلامات إلى بائع — يعرف نقاط البيع ويردّ على
+ * الاعتراض. فالفحص الحاسم هنا ليس «هل حُفظ الحقل؟» بل **«هل تغيّر ما يقوله
+ * الوكيل فعلًا؟»**
  */
 class ProductKnowledgeScreenTest extends TestCase
 {
@@ -112,25 +113,26 @@ class ProductKnowledgeScreenTest extends TestCase
     }
 
     /**
-     * والجاهزية تُغيّر ما يبيعه الوكيل فعلًا.
+     * والجاهزية تُغيّر ما يقوله الوكيل فعلًا.
      *
-     * هذا هو الفحص الذي يعني شيئًا: الصنف غير الجاهز لا يظهر في بحث الوكيل
-     * أصلًا.
+     * هذا هو الفحص الذي يعني شيئًا. والصنف يظهر في البحث قبلها وبعدها — لكن
+     * `has_sales_notes` هي ما يتغيّر: بها يقرأ الوكيل نقاط البيع والاعتراضات،
+     * وبدونها يلتزم الوصف ويحوّل عند الاعتراض.
      */
-    public function test_readiness_changes_what_the_agent_can_sell(): void
+    public function test_readiness_changes_what_the_agent_can_say(): void
     {
-        $search = fn () => app(SearchProductsTool::class)->handle(['query' => 'مكنسة']);
+        $search = fn () => app(SearchProductsTool::class)->handle(['query' => 'مكنسة'])['products'];
 
-        $this->assertSame([], $search()['products'] ?? []);
+        $this->assertFalse($search()[0]['has_sales_notes']);
 
         $this->actingAs($this->admin())
             ->put(route('admin.ai_agent.knowledge.update', $this->product), $this->payload());
 
-        $this->assertNotEmpty($search()['products'] ?? []);
+        $this->assertTrue($search()[0]['has_sales_notes']);
     }
 
-    /** وإطفاء الجاهزية يُخرجه من بحث الوكيل ثانيةً. */
-    public function test_unsetting_readiness_hides_it_again(): void
+    /** وإطفاؤها يُعيده إلى الوصف وحده. */
+    public function test_unsetting_readiness_drops_the_sales_notes(): void
     {
         $this->actingAs($this->admin())
             ->put(route('admin.ai_agent.knowledge.update', $this->product), $this->payload());
@@ -138,7 +140,9 @@ class ProductKnowledgeScreenTest extends TestCase
         $this->actingAs($this->admin())
             ->put(route('admin.ai_agent.knowledge.update', $this->product), $this->payload(['is_ready' => 0]));
 
-        $this->assertSame([], app(SearchProductsTool::class)->handle(['query' => 'مكنسة'])['products'] ?? []);
+        $found = app(SearchProductsTool::class)->handle(['query' => 'مكنسة'])['products'];
+
+        $this->assertFalse($found[0]['has_sales_notes']);
     }
 
     /**

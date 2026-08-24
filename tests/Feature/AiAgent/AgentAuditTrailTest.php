@@ -127,8 +127,8 @@ class AgentAuditTrailTest extends TestCase
 
     // ────────── المعرفة البيعية ──────────
 
-    /** صنفٌ بلا معرفةٍ جاهزة لا يبيعه الوكيل. */
-    public function test_a_product_without_ready_knowledge_is_not_sellable_by_the_agent(): void
+    /** معرفةٌ غير مُعلَّمة «جاهز» لا يقرؤها الوكيل — يبيع الصنف بوصفه وحده. */
+    public function test_unready_knowledge_stays_out_of_the_ready_scope(): void
     {
         $product = Product::factory()->create();
 

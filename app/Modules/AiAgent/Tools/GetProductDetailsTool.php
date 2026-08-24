@@ -9,11 +9,14 @@ use App\Modules\Store\Services\CartService;
 /**
  * تفاصيل صنفٍ ومعرفتُه البيعية ومتغيّراته.
  *
- * تُرجع **المعرفة البيعية** لا المواصفات وحدها: نقاط البيع والاعتراضات
- * والأسئلة الشائعة هي ما يبيع، والمواصفة وحدها لا تُقنع أحدًا.
+ * تُرجع **المعرفة البيعية** حين تُوجد: نقاط البيع والاعتراضات والأسئلة الشائعة
+ * هي ما يبيع، والمواصفة وحدها لا تُقنع أحدًا.
  *
- * وصنفٌ بلا معرفةٍ جاهزة تُرجع له `is_ready = false` صراحةً، والبرومبت يأمر
- * بالتحويل عندها — فالصمت أفضل من كلامٍ مخترَع باسم الشركة.
+ * وحين لا تُوجد **لا تُرفض الأداة**، بل يُعطى الوكيل ما يعرفه الكتالوج فعلًا:
+ * الوصف والمتغيّرات والتوفّر. كان الردّ سابقًا أمرًا بالتحويل، فأسكت الوكيل عن
+ * ١٥١ صنفًا من ١٥٢. والحدّ الآن على **مصدر الكلام** لا على وجوده: `is_ready`
+ * تبقى في الردّ ليعرف النموذج أنه بلا نقاط بيعٍ مكتوبة فيلزم الوصف حرفيًّا ولا
+ * ينسب للصنف ما ليس فيه.
  */
 class GetProductDetailsTool implements ToolContract
 {
@@ -38,6 +41,25 @@ class GetProductDetailsTool implements ToolContract
         ];
     }
 
+    /**
+     * وصف الصنف كما يقرأه الوكيل.
+     *
+     * الوصف المختصر أولًا فهو المكتوب للزبون، والمطوّل يليه. والوسوم تُزال:
+     * الوصف مُدخَل بمحرّرٍ غنيّ، و`<p>` و`<strong>` تصل إلى واتساب حرفيًّا إن
+     * نسخها النموذج.
+     */
+    private function describe(Product $product): string
+    {
+        $parts = array_filter([
+            trim(strip_tags((string) $product->short_description)),
+            trim(strip_tags((string) $product->description)),
+        ]);
+
+        $text = trim(preg_replace('/\s+/u', ' ', implode(' — ', $parts)) ?? '');
+
+        return $text === '' ? 'لا يوجد وصف مكتوب لهذا الصنف.' : $text;
+    }
+
     public function handle(array $arguments): array
     {
         $product = Product::with(['variants.attributeValues', 'variants.inventoryStocks'])
@@ -48,30 +70,37 @@ class GetProductDetailsTool implements ToolContract
         }
 
         $knowledge = ProductKnowledge::where('product_id', $product->id)->first();
+        $ready = $knowledge !== null && $knowledge->is_ready;
 
-        if ($knowledge === null || ! $knowledge->is_ready) {
-            return [
-                'product_id' => $product->id,
-                'name' => $product->name,
-                'is_ready' => false,
-                'message' => 'لا توجد معرفة بيعية جاهزة لهذا الصنف — حوّل المحادثة إلى موظفة.',
-            ];
-        }
-
-        return [
+        $details = [
             'product_id' => $product->id,
             'name' => $product->name,
-            'is_ready' => true,
-            'selling_points' => $knowledge->selling_points ?? [],
-            'use_cases' => $knowledge->use_cases ?? [],
-            'objections' => $knowledge->objections ?? [],
-            'faq' => $knowledge->faq ?? [],
-            'tone_notes' => $knowledge->tone_notes,
+            // وصف الكتالوج **دائمًا**: هو كلّ ما يملكه الوكيل عن صنفٍ بلا معرفة،
+            // وهو مرجعُ الصدق للصنف الذي له معرفة.
+            'description' => $this->describe($product),
+            'is_ready' => $ready,
             'variants' => $product->variants->map(fn ($v) => [
                 'variant_id' => $v->id,
                 'label' => $v->attributeValues->isNotEmpty() ? $v->optionLabel() : $product->name,
                 'available_qty' => (string) $this->carts->availableQty($v),
             ])->all(),
+        ];
+
+        if (! $ready) {
+            // ليست رسالة خطأ بل حدُّ صلاحية: بِعْ بما في الوصف، ولا تخترع.
+            $details['note'] = 'لا نقاط بيع مكتوبة لهذا الصنف. التزم بالوصف أعلاه'
+                .' حرفيًّا، ولا تنسب له ميزةً غير مذكورة فيه. إن سأل الزبون عمّا'
+                .' لا يجيب عنه الوصف، حوّل إلى موظفة.';
+
+            return $details;
+        }
+
+        return $details + [
+            'selling_points' => $knowledge->selling_points ?? [],
+            'use_cases' => $knowledge->use_cases ?? [],
+            'objections' => $knowledge->objections ?? [],
+            'faq' => $knowledge->faq ?? [],
+            'tone_notes' => $knowledge->tone_notes,
         ];
     }
 }

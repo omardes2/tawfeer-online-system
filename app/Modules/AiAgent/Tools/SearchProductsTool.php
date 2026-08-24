@@ -9,9 +9,15 @@ use App\Modules\Store\Services\CartService;
 /**
  * البحث عن أصناف يبيعها الوكيل.
  *
- * لا تُرجع إلّا ما **كُتبت له معرفةٌ بيعية جاهزة**: صنفٌ بلا `is_ready` لا
- * يعرف الوكيل كيف يبيعه، فيرتجل — وارتجالُه في الاعتراض هو ما يُفقد الثقة.
- * والصنف غير الجاهز يبقى للموظفة عبر `escalate_to_human`.
+ * **كل صنفٍ نشطٍ مرئيّ يظهر** — لا الجاهز وحده. البوّابة السابقة (`is_ready`
+ * شرطًا للظهور) كانت تحمي من الارتجال، لكنها عمليًّا أسكتت الوكيل: متجرٌ فيه
+ * ١٥٢ صنفًا وواحدٌ مجهَّز يعني تحويل كل سؤالٍ تقريبًا، فيبدو الوكيل معطوبًا وهو
+ * يعمل كما صُمِّم.
+ *
+ * والحماية انتقلت من **الحجب** إلى **مصدر الكلام**: ما يقوله الوكيل عن أيّ صنف
+ * يأتي من الكتالوج والأدوات لا من عنده، والبرومبت يمنع نسبة خاصّيةٍ لا تَرِد في
+ * الوصف. والمعرفة البيعية صارت **إضافةً تُقوّي** لا بوّابةً تمنع — يُعلَّم الصنف
+ * الذي لها بـ`has_sales_notes` ليقرأها الوكيل قبل أن يبيعه.
  */
 class SearchProductsTool implements ToolContract
 {
@@ -50,15 +56,17 @@ class SearchProductsTool implements ToolContract
             return ['products' => []];
         }
 
-        $readyIds = ProductKnowledge::ready()->pluck('product_id');
-
         $products = Product::query()->active()
-            ->whereIn('id', $readyIds)
             ->where('visibility', 'visible')
             ->where(fn ($q) => $q->where('name', 'like', '%'.$query.'%')->orWhere('sku', 'like', '%'.$query.'%'))
             ->with(['defaultVariant.inventoryStocks', 'variants.inventoryStocks'])
             ->limit($limit)
             ->get();
+
+        $withNotes = ProductKnowledge::ready()
+            ->whereIn('product_id', $products->pluck('id'))
+            ->pluck('product_id')
+            ->flip();
 
         return ['products' => $products->map(fn (Product $p) => [
             'product_id' => $p->id,
@@ -66,6 +74,8 @@ class SearchProductsTool implements ToolContract
             // السعر من الكتالوج نفسه لا من حسابٍ هنا؛ والسعر النهائي من `get_price`.
             'price_from' => number_format($this->priceFrom($p), 2, '.', ''),
             'in_stock' => $this->inStock($p),
+            // إشارةٌ للنموذج لا حجب: ما له نقاط بيعٍ مكتوبة يُقرأ أولًا.
+            'has_sales_notes' => $withNotes->has($p->id),
         ])->all()];
     }
 

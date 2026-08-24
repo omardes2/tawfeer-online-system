@@ -159,25 +159,34 @@ class AgentToolsTest extends TestCase
 
     // ────────── المعرفة البيعية ──────────
 
-    /** الصنف غير الجاهز لا يظهر في البحث أصلًا. */
-    public function test_an_unready_product_is_never_searchable(): void
+    /**
+     * الصنف غير الجاهز **يظهر** في البحث — مُعلَّمًا.
+     *
+     * كان محجوبًا، فكان متجرٌ فيه صنفٌ مجهَّز واحد يعني تحويل كل سؤال. والحماية
+     * انتقلت من الحجب إلى مصدر الكلام: يبيعه الوكيل بوصف الكتالوج ولا ينسب له
+     * ما ليس فيه.
+     */
+    public function test_an_unready_product_is_searchable_but_flagged(): void
     {
-        $this->product('صنف بلا معرفة', ready: false);
+        $product = $this->product('صنف بلا معرفة', ready: false);
 
-        $result = $this->tools->call('search_products', ['query' => 'صنف']);
+        $found = $this->tools->call('search_products', ['query' => 'صنف'])['products'];
 
-        $this->assertSame([], $result['products']);
+        $this->assertCount(1, $found);
+        $this->assertSame($product->id, $found[0]['product_id']);
+        $this->assertFalse($found[0]['has_sales_notes']);
     }
 
-    /** وتفاصيله تقول صراحةً «حوّل» بدل أن ترتجل. */
-    public function test_unready_details_order_a_handoff(): void
+    /** وتفاصيله تُعطي الوصف وحدَّه، لا أمرًا بالتحويل. */
+    public function test_unready_details_return_the_description_with_a_limit(): void
     {
         $product = $this->product('صنف بلا معرفة', ready: false);
 
         $result = $this->tools->call('get_product_details', ['product_id' => $product->id]);
 
         $this->assertFalse($result['is_ready']);
-        $this->assertStringContainsString('موظفة', $result['message']);
+        $this->assertArrayHasKey('description', $result);
+        $this->assertStringContainsString('لا تنسب', $result['note']);
         $this->assertArrayNotHasKey('selling_points', $result);
     }
 

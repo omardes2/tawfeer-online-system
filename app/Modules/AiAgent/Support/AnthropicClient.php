@@ -37,8 +37,9 @@ class AnthropicClient
         $payload = [
             'model' => config('ai_agent.model'),
             'max_tokens' => (int) config('ai_agent.max_tokens', 1024),
-            'system' => $system,
-            'messages' => $messages,
+            // التعليمات كتلةً لا نصًّا: الكتلة وحدها تقبل `cache_control`.
+            'system' => [$this->cached(['type' => 'text', 'text' => $system])],
+            'messages' => $this->withHistoryBreakpoint($messages),
         ];
 
         if ($tools !== []) {
@@ -60,5 +61,62 @@ class AnthropicClient
         }
 
         return $response->json() ?? [];
+    }
+
+    /**
+     * علامة التخزين المؤقّت على كتلة.
+     *
+     * @param  array<string, mixed>  $block
+     * @return array<string, mixed>
+     */
+    private function cached(array $block): array
+    {
+        return $block + ['cache_control' => ['type' => 'ephemeral']];
+    }
+
+    /**
+     * نقطة تخزينٍ ثانية عند آخر رسالة.
+     *
+     * التخزين **مطابقةُ بادئة**: ما قبل العلامة يُخزَّن، وما بعدها يُحتسب كاملًا.
+     * فوضعُها عند آخر رسالة يجعل كلّ نداءٍ يقرأ ما بناه النداء السابق — والدورة
+     * الواحدة تنادي النموذج ثلاث مرّات أو أربعًا بتاريخٍ ينمو في كلّ مرّة، فيُدفع
+     * ثمن التاريخ نفسه مرارًا بلا هذه العلامة.
+     *
+     * وهي تنفع بين الدورات أيضًا: زبونٌ يكتب ثانيةً خلال دقائق يجد تاريخه
+     * مخزّنًا.
+     *
+     * ونصُّ السلسلة يُحوَّل إلى كتلة — `cache_control` لا توضع على نصٍّ خام.
+     *
+     * @param  array<int, array<string, mixed>>  $messages
+     * @return array<int, array<string, mixed>>
+     */
+    private function withHistoryBreakpoint(array $messages): array
+    {
+        $last = array_key_last($messages);
+
+        if ($last === null) {
+            return $messages;
+        }
+
+        $content = $messages[$last]['content'] ?? null;
+
+        if (is_string($content)) {
+            $messages[$last]['content'] = [$this->cached(['type' => 'text', 'text' => $content])];
+
+            return $messages;
+        }
+
+        if (! is_array($content) || $content === []) {
+            return $messages;
+        }
+
+        $lastBlock = array_key_last($content);
+
+        if (is_array($content[$lastBlock])) {
+            $content[$lastBlock] = $this->cached($content[$lastBlock]);
+            $messages[$last]['content'] = $content;
+        }
+
+        return $messages;
     }
 }

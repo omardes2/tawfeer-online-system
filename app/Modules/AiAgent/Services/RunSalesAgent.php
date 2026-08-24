@@ -4,6 +4,7 @@ namespace App\Modules\AiAgent\Services;
 
 use App\Modules\AiAgent\Models\AgentRun;
 use App\Modules\AiAgent\Support\AnthropicClient;
+use App\Modules\AiAgent\Support\TokenUsage;
 use App\Modules\AiAgent\Tools\ToolRegistry;
 use App\Modules\Messaging\Models\Conversation;
 use App\Modules\Messaging\Services\OutboundMessageService;
@@ -47,8 +48,7 @@ class RunSalesAgent
     {
         $startedAt = microtime(true);
         $model = (string) config('ai_agent.model');
-        $inputTokens = 0;
-        $outputTokens = 0;
+        $usage = new TokenUsage;
 
         $run = AgentRun::create([
             'conversation_id' => $conversation->id,
@@ -62,7 +62,7 @@ class RunSalesAgent
             $messages = $this->prompt->history($conversation);
 
             if ($messages === []) {
-                return $this->close($run, 'silent', $startedAt, 0, 0);
+                return $this->close($run, 'silent', $startedAt, $usage);
             }
 
             // الأدوات تعرف في أيّ محادثة تعمل: من يكتب طلبًا يأخذ رقم الزبون
@@ -79,14 +79,13 @@ class RunSalesAgent
                     $this->tools->definitions(),
                 );
 
-                $inputTokens += (int) data_get($response, 'usage.input_tokens', 0);
-                $outputTokens += (int) data_get($response, 'usage.output_tokens', 0);
+                $usage->add($response);
 
                 $content = data_get($response, 'content', []);
                 $toolUses = $this->toolUses($content);
 
                 if ($toolUses === []) {
-                    return $this->reply($conversation, $run, $content, $startedAt, $inputTokens, $outputTokens);
+                    return $this->reply($conversation, $run, $content, $startedAt, $usage);
                 }
 
                 $calls += count($toolUses);
@@ -95,7 +94,7 @@ class RunSalesAgent
                     // السقف تجاوزَته الدورة، فلا نتيجة بيدنا نردّ بها.
                     $this->handoff->handoff($conversation, 'tool_limit', $this->apology());
 
-                    return $this->close($run, 'escalated', $startedAt, $inputTokens, $outputTokens);
+                    return $this->close($run, 'escalated', $startedAt, $usage);
                 }
 
                 $messages[] = ['role' => 'assistant', 'content' => $content];
@@ -109,7 +108,7 @@ class RunSalesAgent
 
             $this->handoff->handoff($conversation, 'agent_error', $this->apology());
 
-            return $this->close($run, 'failed', $startedAt, $inputTokens, $outputTokens, $e->getMessage());
+            return $this->close($run, 'failed', $startedAt, $usage, $e->getMessage());
         }
     }
 
@@ -126,20 +125,19 @@ class RunSalesAgent
         AgentRun $run,
         array $content,
         float $startedAt,
-        int $inputTokens,
-        int $outputTokens,
+        TokenUsage $usage,
     ): AgentRun {
         $text = $this->text($content);
 
         if ($text === '') {
             $this->handoff->handoff($conversation, 'empty_reply', $this->apology());
 
-            return $this->close($run, 'escalated', $startedAt, $inputTokens, $outputTokens);
+            return $this->close($run, 'escalated', $startedAt, $usage);
         }
 
         $this->outbound->sendText($conversation, $text);
 
-        return $this->close($run, 'replied', $startedAt, $inputTokens, $outputTokens);
+        return $this->close($run, 'replied', $startedAt, $usage);
     }
 
     /**
@@ -212,16 +210,12 @@ class RunSalesAgent
         AgentRun $run,
         string $outcome,
         float $startedAt,
-        int $inputTokens,
-        int $outputTokens,
+        TokenUsage $usage,
         ?string $error = null,
     ): AgentRun {
         // السجلّ يمنع `update` عمدًا (append-only)، فيُكتب بالاستعلام مباشرةً
         // مرّةً واحدة عند الختم — لا تعديلًا لسجلٍّ منشور بل إتمامًا لكتابته.
-        $attributes = [
-            'input_tokens' => $inputTokens,
-            'output_tokens' => $outputTokens,
-            'cost' => $this->cost($inputTokens, $outputTokens),
+        $attributes = $usage->attributes() + [
             'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
             'outcome' => $outcome,
             'error' => $error === null ? null : mb_substr($error, 0, 1000),
@@ -230,24 +224,5 @@ class RunSalesAgent
         $run->newQuery()->whereKey($run->getKey())->toBase()->update($attributes);
 
         return $run->forceFill($attributes)->syncOriginal();
-    }
-
-    /**
-     * تكلفة الاستدعاء بالدولار.
-     *
-     * الأسعار في `config/ai_agent.php` لا في الكود: تتغيّر بقرار المزوّد لا
-     * بقرارنا، وتغييرها يجب ألّا يحتاج نشرًا. ونموذجٌ لا سعر له يُحسب على
-     * `default` — تقديرٌ خاطئ أنفع من صفرٍ يخفي الإنفاق كلّه.
-     */
-    private function cost(int $inputTokens, int $outputTokens): string
-    {
-        $prices = config('ai_agent.pricing');
-        $model = (string) config('ai_agent.model');
-        $rate = $prices[$model] ?? $prices['default'];
-
-        $cost = ($inputTokens / 1_000_000) * (float) $rate['input']
-            + ($outputTokens / 1_000_000) * (float) $rate['output'];
-
-        return number_format($cost, 4, '.', '');
     }
 }

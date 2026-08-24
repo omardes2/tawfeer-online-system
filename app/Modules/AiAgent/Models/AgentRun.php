@@ -21,12 +21,15 @@ class AgentRun extends Model
 
     protected $fillable = [
         'conversation_id', 'trigger_message_ids', 'model',
-        'input_tokens', 'output_tokens', 'cost', 'latency_ms', 'outcome', 'error',
+        'input_tokens', 'cache_write_tokens', 'cache_read_tokens',
+        'output_tokens', 'cost', 'latency_ms', 'outcome', 'error',
     ];
 
     protected $casts = [
         'trigger_message_ids' => 'array',
         'input_tokens' => 'integer',
+        'cache_write_tokens' => 'integer',
+        'cache_read_tokens' => 'integer',
         'output_tokens' => 'integer',
         'cost' => 'decimal:4',
         'latency_ms' => 'integer',
