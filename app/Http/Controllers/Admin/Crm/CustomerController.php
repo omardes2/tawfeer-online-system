@@ -23,7 +23,7 @@ class CustomerController extends Controller
     {
         $this->authorize('viewAny', Customer::class);
 
-        $query = Customer::query()->withCount('orders');
+        $query = Customer::query()->withCount('orders')->withOutstandingBalance();
         if ($request->filled('search')) {
             $term = '%'.$request->string('search').'%';
             $normalized = $this->service->normalizePhone((string) $request->string('search'));

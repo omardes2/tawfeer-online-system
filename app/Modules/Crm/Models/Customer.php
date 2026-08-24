@@ -5,12 +5,14 @@ namespace App\Modules\Crm\Models;
 use App\Models\User;
 use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Models\JournalEntry;
+use App\Modules\Accounting\Models\JournalLine;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Sales\Models\Order;
 use App\Modules\Store\Models\WishlistItem;
 use App\Support\Concerns\Auditable;
 use App\Support\Concerns\HasUuid;
 use Database\Factories\Crm\CustomerFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -71,6 +73,43 @@ class Customer extends Model
     public function glAccount(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'gl_account_id');
+    }
+
+    /**
+     * الرصيد المتبقّي على العميل، في عمودٍ محسوب `outstanding_balance`.
+     *
+     * **استعلامٌ فرعيّ واحد لا استعلامٌ لكل عميل**: قراءة الرصيد من العلاقة
+     * داخل حلقة العرض تعني عشرين استعلامًا في صفحةٍ من عشرين صفًّا، ومئاتٍ عند
+     * ترقيم أوسع.
+     *
+     * والحساب هو نفسه حسابُ كشف الحساب في صفحة العميل — `مدين ناقص دائن` على
+     * سطور حسابه الفرعيّ في «ذمم العملاء» — كي لا يختلف رقمُ القائمة عن رقم
+     * البطاقة فيفقد الاثنان مصداقيّتهما.
+     *
+     * و**المُرحَّلة وحدها** تُحتسب (`status = posted`): قيدٌ مسوّدة لم يدخل
+     * الدفاتر بعد، وإدخالُه في رصيدٍ يُطالَب به العميل مطالبةٌ بما لم يُعتمد.
+     *
+     * الموجب = على العميل، والسالب = له.
+     */
+    public function scopeWithOutstandingBalance(Builder $query): Builder
+    {
+        return $query->addSelect(['outstanding_balance' => JournalLine::query()
+            ->selectRaw('COALESCE(SUM(journal_lines.debit - journal_lines.credit), 0)')
+            ->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
+            ->whereColumn('journal_lines.account_id', 'customers.gl_account_id')
+            ->where('journal_entries.status', 'posted'),
+        ]);
+    }
+
+    /**
+     * الرصيد رقمًا — من العمود المحسوب إن وُجد، وإلّا صفر.
+     *
+     * صفرٌ لا `null`: عميلٌ بلا حسابٍ فرعيّ (لم يشترِ على الحساب قطّ) رصيدُه
+     * صفرٌ فعلًا، وفراغٌ في العمود يُقرأ «مجهول» وهو معلوم.
+     */
+    public function outstandingBalance(): float
+    {
+        return round((float) ($this->outstanding_balance ?? 0), 2);
     }
 
     /**

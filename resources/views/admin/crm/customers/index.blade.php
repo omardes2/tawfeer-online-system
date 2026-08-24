@@ -21,6 +21,7 @@
                         <th class="py-2 px-3 font-medium">{{ __('الهاتف') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('التصنيف') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('الطلبات') }}</th>
+                        <th class="py-2 px-3 font-medium">{{ __('الرصيد المتبقي') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('الحالة') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('إجراء') }}</th>
                     </tr></thead>
@@ -31,6 +32,25 @@
                                 <td class="py-2 px-3 text-gray-500">{{ $c->primary_phone }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ $c->category }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ $c->orders_count }}</td>
+                                {{--
+                                    الموجب على العميل والسالب له، واللون يفرّق بينهما
+                                    في لمحة: «٧٠−» على شاشةٍ رماديّة تُقرأ دَينًا وهي
+                                    رصيدٌ **لصالحه**.
+                                --}}
+                                @php $balance = $c->outstandingBalance(); @endphp
+                                <td class="py-2 px-3 tabular-nums whitespace-nowrap
+                                    @if ($balance > 0) text-rose-600 font-medium
+                                    @elseif ($balance < 0) text-emerald-600
+                                    @else text-gray-400 @endif">
+                                    @if ($balance == 0)
+                                        —
+                                    @else
+                                        {{ number_format(abs($balance), 2) }}
+                                        <span class="text-[11px] text-gray-400">
+                                            {{ $balance > 0 ? __('عليه') : __('له') }}
+                                        </span>
+                                    @endif
+                                </td>
                                 <td class="py-2 px-3">
                                     @if ($c->is_blocked)<span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-rose-100 text-rose-700">{{ __('محظور') }}</span>
                                     @elseif ($c->is_high_risk)<span class="inline-flex px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700">{{ __('عالي الخطورة') }}</span>
@@ -44,7 +64,7 @@
                                 </div></td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="py-6 text-center text-gray-400">{{ __('لا يوجد عملاء.') }}</td></tr>
+                            <tr><td colspan="7" class="py-6 text-center text-gray-400">{{ __('لا يوجد عملاء.') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
