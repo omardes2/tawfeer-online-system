@@ -41,7 +41,11 @@ class ProductDecisionController extends Controller
             'totals' => [
                 'sales' => round($rows->sum('sales'), 2),
                 'ad_spend' => round($rows->sum('ad_spend'), 2),
-                'delivery' => round($rows->sum('delivery_cost'), 2),
+                // صافي التوصيل = المدفوع للشركة − المُحصَّل من الزبون. البطاقة
+                // كانت تعرض المدفوع وحده، فيُخصم من الربح بلا إيراده المقابل.
+                'delivery' => round($rows->sum('delivery_net'), 2),
+                'delivery_cost' => round($rows->sum('delivery_cost'), 2),
+                'delivery_revenue' => round($rows->sum('delivery_revenue'), 2),
                 'net_profit' => round($rows->sum('net_profit'), 2),
             ],
         ]);
@@ -72,7 +76,10 @@ class ProductDecisionController extends Controller
     {
         $head = [
             __('الصنف'), __('SKU'), __('الطلبات'), __('الكمية المباعة'), __('المرتجع'), __('نسبة الارتجاع %'),
-            __('المبيعات'), __('تكلفة البضاعة'), __('صرف الإعلان'), __('تكلفة التوصيل'),
+            // الطرفان منفصلان في الملفّ ومعهما صافيهما: المراجعة المحاسبية
+            // تحتاج المدفوع والمُحصَّل كلًّا على حدة، والشاشة تكفيها النتيجة.
+            __('المبيعات'), __('تكلفة البضاعة'), __('صرف الإعلان'),
+            __('تكلفة التوصيل المدفوعة'), __('رسوم التوصيل المُحصَّلة'), __('صافي التوصيل'),
             __('صافي الربح'), __('الهامش %'),
             __('المتوفّر'), __('البيع اليومي'), __('أيام التغطية'), __('في الطريق'), __('الكمية المقترحة'), __('الحكم'),
         ];
@@ -85,7 +92,10 @@ class ProductDecisionController extends Controller
                 fputcsv($out, [
                     $r['product'], $r['sku'], $r['orders_count'], $r['qty_sold'], $r['returned_qty'], $r['return_rate'],
                     number_format($r['sales'], 2, '.', ''), number_format($r['cogs'], 2, '.', ''),
-                    number_format($r['ad_spend'], 2, '.', ''), number_format($r['delivery_cost'], 2, '.', ''),
+                    number_format($r['ad_spend'], 2, '.', ''),
+                    number_format($r['delivery_cost'], 2, '.', ''),
+                    number_format($r['delivery_revenue'], 2, '.', ''),
+                    number_format($r['delivery_net'], 2, '.', ''),
                     number_format($r['net_profit'], 2, '.', ''), $r['margin_pct'],
                     $r['available'], $r['velocity'], $r['days_of_cover'], $r['incoming'], $r['suggested_qty'],
                     $r['verdict']['label'],

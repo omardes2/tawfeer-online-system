@@ -128,12 +128,9 @@ class ProductDecisionBoardTest extends TestCase
         $this->assertSame('losing', $row['verdict']['key']);
     }
 
-    /** وتكلفة التوصيل الفعلية تُخصَم أيضًا. */
-    public function test_actual_delivery_cost_is_subtracted(): void
+    /** شحنةٌ بتكلفةٍ محدّدة على طلب. */
+    private function ship(Order $order, float $cost): void
     {
-        $p = $this->product('مبخرة', cost: 40);
-        $order = $this->sell($p, 100);
-
         Shipment::create([
             'number' => 'SHP-PD-'.$order->id,
             'order_id' => $order->id,
@@ -143,13 +140,80 @@ class ProductDecisionBoardTest extends TestCase
             'kind' => 'outbound',
             'recipient_name' => 'زبون',
             'recipient_phone' => '0599000000',
-            'shipping_cost' => 20,
+            'shipping_cost' => $cost,
         ]);
+    }
+
+    /**
+     * التوصيل يُخصَم **صافيًا**: المدفوع للشركة ناقص المُحصَّل من الزبون.
+     *
+     * كان المدفوع يُخصم وحده بلا إيراده المقابل، فيظهر نصف الربح تقريبًا —
+     * و«الحكم» على الصنف مبنيٌّ على هذا الرقم، فيُوقَف صنفٌ رابح.
+     */
+    public function test_delivery_is_subtracted_net_of_what_the_customer_paid(): void
+    {
+        $p = $this->product('مبخرة', cost: 40);
+        $order = $this->sell($p, 100, attrs: ['shipping_total' => 15]);
+        $this->ship($order, cost: 20);
 
         $row = $this->row($p);
 
         $this->assertEqualsWithDelta(20.0, $row['delivery_cost'], 0.01);
-        $this->assertEqualsWithDelta(40.0, $row['net_profit'], 0.01); // 100 − 40 − 20
+        $this->assertEqualsWithDelta(15.0, $row['delivery_revenue'], 0.01);
+        $this->assertEqualsWithDelta(5.0, $row['delivery_net'], 0.01);       // 20 − 15
+        $this->assertEqualsWithDelta(55.0, $row['net_profit'], 0.01);        // 100 − 40 − 5
+    }
+
+    /** ولو لم يدفع الزبون شيئًا، خُصمت التكلفة كاملةً كما كانت. */
+    public function test_free_delivery_still_costs_the_full_amount(): void
+    {
+        $p = $this->product('مبخرة', cost: 40);
+        $order = $this->sell($p, 100);
+        $this->ship($order, cost: 20);
+
+        $row = $this->row($p);
+
+        $this->assertEqualsWithDelta(20.0, $row['delivery_net'], 0.01);
+        $this->assertEqualsWithDelta(40.0, $row['net_profit'], 0.01);        // 100 − 40 − 20
+    }
+
+    /** ورسومٌ تفوق التكلفة تُنتج صافيًا سالبًا — ربحٌ من التوصيل يزيد الربح. */
+    public function test_charging_more_than_the_cost_adds_to_profit(): void
+    {
+        $p = $this->product('مبخرة', cost: 40);
+        $order = $this->sell($p, 100, attrs: ['shipping_total' => 30]);
+        $this->ship($order, cost: 20);
+
+        $row = $this->row($p);
+
+        $this->assertEqualsWithDelta(-10.0, $row['delivery_net'], 0.01);
+        $this->assertEqualsWithDelta(70.0, $row['net_profit'], 0.01);        // 100 − 40 + 10
+    }
+
+    /** والطرفان يُوزَّعان بنفس النسبة حين يحمل الطلب صنفين. */
+    public function test_both_sides_split_by_the_same_share(): void
+    {
+        $cheap = $this->product('رخيص', cost: 0);
+        $dear = $this->product('غالٍ', cost: 0);
+
+        $order = app(OrderService::class)->create([
+            'branch_id' => Branch::default()->id,
+            'warehouse_id' => $this->warehouse->id,
+            'customer_name' => 'زبون',
+            'customer_phone' => '0599000000',
+        ], [
+            ['variant_id' => $cheap->defaultVariant->id, 'qty' => 1, 'unit_price' => 25],
+            ['variant_id' => $dear->defaultVariant->id, 'qty' => 1, 'unit_price' => 75],
+        ], 2026);
+
+        $order->update(['status' => 'delivered', 'shipping_total' => 20]);
+        $this->ship($order->refresh(), cost: 40);
+
+        // الحصص ٢٥٪ و٧٥٪ من ١٠٠.
+        $this->assertEqualsWithDelta(10.0, $this->row($cheap)['delivery_cost'], 0.01);
+        $this->assertEqualsWithDelta(5.0, $this->row($cheap)['delivery_revenue'], 0.01);
+        $this->assertEqualsWithDelta(30.0, $this->row($dear)['delivery_cost'], 0.01);
+        $this->assertEqualsWithDelta(15.0, $this->row($dear)['delivery_revenue'], 0.01);
     }
 
     // ────────── التغطية والشراء ──────────

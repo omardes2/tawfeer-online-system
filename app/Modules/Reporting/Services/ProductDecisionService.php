@@ -9,6 +9,7 @@ use App\Modules\Marketing\Models\AdDailySpend;
 use App\Modules\Purchasing\Models\ImportShipment;
 use App\Modules\Purchasing\Models\PurchaseInvoiceItem;
 use App\Modules\Reporting\Support\DateRange;
+use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Models\OrderItem;
 use App\Modules\Shipping\Models\Shipment;
 use Illuminate\Database\Eloquent\Builder;
@@ -67,7 +68,7 @@ class ProductDecisionService
 
         $sales = $this->salesByProduct($range);
         $adSpend = $this->adSpendByProduct($range);
-        $delivery = $this->deliveryCostByProduct($range);
+        $delivery = $this->deliveryByProduct($range);
 
         $ids = $sales->keys()->merge($adSpend->keys())->unique()->values();
         $names = Product::whereIn('id', $ids)->pluck('name', 'id');
@@ -79,8 +80,15 @@ class ProductDecisionService
             ->map(function (int $id) use ($sales, $adSpend, $delivery, $names, $skus, $available, $incoming, $days, $plan) {
                 $s = $sales->get($id, ['qty' => 0.0, 'returned' => 0.0, 'sale' => 0.0, 'cost' => 0.0, 'orders' => 0]);
                 $ads = round((float) $adSpend->get($id, 0.0), 2);
-                $ship = round((float) $delivery->get($id, 0.0), 2);
-                $net = round($s['sale'] - $s['cost'] - $ads - $ship, 2);
+
+                // التوصيل **نشاطٌ له طرفان**: ما تدفعه للشركة وما تقبضه من
+                // الزبون. وخصمُ المدفوع وحده كان يُسقط الإيراد المقابل فيُظهر
+                // نصف الربح — والحكم على الصنف مبنيٌّ على هذا الرقم.
+                $ship = round((float) $delivery['cost']->get($id, 0.0), 2);
+                $shipRevenue = round((float) $delivery['revenue']->get($id, 0.0), 2);
+                $shipNet = round($ship - $shipRevenue, 2);
+
+                $net = round($s['sale'] - $s['cost'] - $ads - $shipNet, 2);
 
                 $onHand = round((float) $available->get($id, 0.0), 3);
                 $velocity = round($s['qty'] / $days, 3);
@@ -101,6 +109,9 @@ class ProductDecisionService
                     'cogs' => round($s['cost'], 2),
                     'ad_spend' => $ads,
                     'delivery_cost' => $ship,
+                    'delivery_revenue' => $shipRevenue,
+                    // موجبٌ = التوصيل يكلّفك · سالبٌ = تربح منه.
+                    'delivery_net' => $shipNet,
                     'net_profit' => $net,
                     'margin_pct' => $s['sale'] > 0 ? round($net / $s['sale'] * 100, 1) : null,
 
@@ -228,7 +239,7 @@ class ProductDecisionService
      * كلّه قيمتُه الصافية صفر، فالقسمة عليها تسقط — وتكلفة توصيله دُفعت فعلًا
      * ويجب أن تظهر. وهذا بالضبط ما يكشف أن المرتجعات تأكل ربح الصنف.
      */
-    private function deliveryCostByProduct(DateRange $range): Collection
+    private function deliveryByProduct(DateRange $range): array
     {
         // حصّة كل صنف من كل طلب (بالقيمة الإجمالية قبل المرتجع).
         $shares = $this->soldGoods($range)
@@ -238,29 +249,53 @@ class ProductDecisionService
             ->get();
 
         if ($shares->isEmpty()) {
-            return collect();
+            return ['cost' => collect(), 'revenue' => collect()];
         }
 
-        // تكلفة التوصيل المدفوعة لشركة التوصيل عن كل طلب (لا ما دفعه الزبون).
+        $orderIds = $shares->pluck('oid')->unique();
+
+        // ما دُفع لشركة التوصيل عن كل طلب.
         $costs = Shipment::query()
-            ->whereIn('order_id', $shares->pluck('oid')->unique())
+            ->whereIn('order_id', $orderIds)
             ->groupBy('order_id')
             ->selectRaw('order_id, SUM(COALESCE(shipping_cost, 0)) as cost')
             ->pluck('cost', 'order_id');
 
+        // وما قُبض من الزبون مقابله — `shipping_total` على الطلب.
+        $revenue = Order::whereIn('id', $orderIds)->pluck('shipping_total', 'id');
+
         $orderTotals = $shares->groupBy('oid')->map(fn ($rows) => (float) $rows->sum('gross'));
 
-        $out = [];
-        foreach ($shares as $row) {
-            $orderCost = (float) ($costs[$row->oid] ?? 0);
-            $orderGross = (float) ($orderTotals[$row->oid] ?? 0);
+        return [
+            'cost' => $this->allocate($shares, $costs, $orderTotals),
+            // بنفس نسبة توزيع التكلفة تمامًا — وإلّا اختلف مقاما الطرفين فصار
+            // الصافي بلا معنى.
+            'revenue' => $this->allocate($shares, $revenue, $orderTotals),
+        ];
+    }
 
-            if ($orderCost <= 0 || $orderGross <= 0) {
+    /**
+     * توزيع مبلغِ طلبٍ على أصنافه بحصّة كلٍّ منها من قيمته.
+     *
+     * @param  Collection<int, object>  $shares
+     * @param  Collection<int, mixed>  $amounts  المبلغ لكل طلب
+     * @param  Collection<int, float>  $orderTotals
+     * @return Collection<int, float>
+     */
+    private function allocate(Collection $shares, Collection $amounts, Collection $orderTotals): Collection
+    {
+        $out = [];
+
+        foreach ($shares as $row) {
+            $amount = (float) ($amounts[$row->oid] ?? 0);
+            $gross = (float) ($orderTotals[$row->oid] ?? 0);
+
+            if ($amount <= 0 || $gross <= 0) {
                 continue;
             }
 
             $pid = (int) $row->pid;
-            $out[$pid] = ($out[$pid] ?? 0) + $orderCost * ((float) $row->gross / $orderGross);
+            $out[$pid] = ($out[$pid] ?? 0) + $amount * ((float) $row->gross / $gross);
         }
 
         return collect($out);

@@ -25,7 +25,11 @@
     <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 mb-5">
         <x-admin.stat-card :label="__('المبيعات')" :value="$totals['sales']" money tone="blue" />
         <x-admin.stat-card :label="__('صرف الإعلان')" :value="$totals['ad_spend']" money tone="amber" />
-        <x-admin.stat-card :label="__('تكلفة التوصيل')" :value="$totals['delivery']" money tone="amber" />
+        <x-admin.stat-card :label="__('صافي التوصيل')" :value="$totals['delivery']" money tone="amber"
+                           :hint="__('المدفوع :cost − المُحصَّل :revenue', [
+                               'cost' => number_format($totals['delivery_cost'], 2),
+                               'revenue' => number_format($totals['delivery_revenue'], 2),
+                           ])" />
         <x-admin.stat-card :label="__('صافي الربح')" :value="$totals['net_profit']" money
                            :tone="$totals['net_profit'] < 0 ? 'red' : 'green'"
                            :hint="__('بعد تكلفة البضاعة والإعلان والتوصيل')" />
@@ -65,7 +69,7 @@
                 <th class="text-start">{{ __('المبيعات') }}</th>
                 <th class="text-start">{{ __('التكلفة') }}</th>
                 <th class="text-start">{{ __('الإعلان') }}</th>
-                <th class="text-start">{{ __('التوصيل') }}</th>
+                <th class="text-start">{{ __('التوصيل (صافي)') }}</th>
                 <th class="text-start">{{ __('صافي الربح') }}</th>
                 <th class="text-center">{{ __('الارتجاع') }}</th>
                 <th class="text-center">{{ __('المتوفّر') }}</th>
@@ -91,7 +95,13 @@
                     <td class="text-start tabular-nums whitespace-nowrap">{{ number_format($r['sales'], 2) }}</td>
                     <td class="text-start tabular-nums whitespace-nowrap text-gray-500">{{ number_format($r['cogs'], 2) }}</td>
                     <td class="text-start tabular-nums whitespace-nowrap {{ $r['ad_spend'] > 0 ? 'text-amber-700' : 'text-gray-300' }}">{{ number_format($r['ad_spend'], 2) }}</td>
-                    <td class="text-start tabular-nums whitespace-nowrap {{ $r['delivery_cost'] > 0 ? 'text-amber-700' : 'text-gray-300' }}">{{ number_format($r['delivery_cost'], 2) }}</td>
+                    {{--
+                        صافي التوصيل: المدفوع للشركة ناقص المُحصَّل من الزبون.
+                        موجبٌ = يكلّفك (كهرمان) · سالبٌ = تربح منه (أخضر).
+                        والطرفان في `title` لمن أراد التفصيل.
+                    --}}
+                    <td class="text-start tabular-nums whitespace-nowrap {{ $r['delivery_net'] > 0 ? 'text-amber-700' : ($r['delivery_net'] < 0 ? 'text-emerald-700' : 'text-gray-300') }}"
+                        title="{{ __('المدفوع') }}: {{ number_format($r['delivery_cost'], 2) }} · {{ __('المُحصَّل') }}: {{ number_format($r['delivery_revenue'], 2) }}">{{ number_format($r['delivery_net'], 2) }}</td>
                     <td class="text-start tabular-nums whitespace-nowrap font-bold {{ $r['net_profit'] < 0 ? 'text-rose-600' : 'text-emerald-700' }}">
                         {{ number_format($r['net_profit'], 2) }}
                         @if ($r['margin_pct'] !== null)
@@ -131,7 +141,7 @@
             __('سعر بيع البضاعة بعد الخصم وصافي المرتجع'),
             __('تكلفة شراء البضاعة'),
             __('صرف الإعلان المُدخَل على الصنف نفسه'),
-            __('تكلفة التوصيل الفعلية المدفوعة لشركة التوصيل، موزَّعةً بحصّة الصنف من قيمة الطلب'),
+            __('صافي التوصيل = المدفوع لشركة التوصيل − المُحصَّل من الزبون، كلاهما موزَّعٌ بحصّة الصنف من قيمة الطلب. موجبٌ يعني أنك تدعم التوصيل، وسالبٌ يعني أنك تربح منه'),
         ],
         'basisExcludes' => [
             __('عمولات الموظفين والمسوّقين'),
