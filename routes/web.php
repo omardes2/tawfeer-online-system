@@ -46,6 +46,7 @@ use App\Http\Controllers\Admin\Purchasing\SupplierReturnController as AdminSuppl
 use App\Http\Controllers\Admin\Recommendations\RecommendationRuleController as AdminRecommendationRuleController;
 use App\Http\Controllers\Admin\Reports\AdBudgetController;
 use App\Http\Controllers\Admin\Reports\BusinessReportController;
+use App\Http\Controllers\Admin\Reports\DeliveryCostController;
 use App\Http\Controllers\Admin\Reports\ProductDecisionController;
 use App\Http\Controllers\Admin\Returns\ReturnController as AdminReturnController;
 use App\Http\Controllers\Admin\Roles\RoleController as AdminRoleController;
@@ -440,6 +441,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('sales/by-affiliate', [BusinessReportController::class, 'salesByAffiliate'])->name('sales.by_affiliate')->middleware('can:reports.sales_summary.view');
         Route::get('sales/by-location', [BusinessReportController::class, 'salesByLocation'])->name('sales.by_location')->middleware('can:reports.sales_by_location.view');
         // لوحة قرار الصنف: الربح الحقيقي بعد الإعلان والتوصيل + التغطية والشراء.
+        Route::get('delivery-cost', [DeliveryCostController::class, 'index'])->name('delivery_cost')->middleware('can:reports.delivery_cost.view');
         Route::get('product-decision', [ProductDecisionController::class, 'index'])->name('product_decision')->middleware('can:reports.product_decision.view');
         Route::post('product-decision/planning', [ProductDecisionController::class, 'updatePlanning'])->name('product_decision.planning')->middleware('can:reports.ad_budget.manage');
         Route::get('receivables/customers', [BusinessReportController::class, 'receivablesCustomers'])->name('receivables.customers')->middleware('can:reports.statements.view');

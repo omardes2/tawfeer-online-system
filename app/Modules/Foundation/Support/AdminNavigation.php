@@ -110,6 +110,7 @@ final class AdminNavigation
                 ['admin.reports.sales.by_employee', 'المبيعات حسب موظف المبيعات', 'reports.sales_summary.view', 'admin.reports.sales.by_employee'],
                 ['admin.reports.sales.by_affiliate', 'المبيعات حسب المسوّقين', 'reports.sales_summary.view', 'admin.reports.sales.by_affiliate'],
                 ['admin.reports.sales.by_location', 'المبيعات حسب المدن والمناطق', 'reports.sales_by_location.view', 'admin.reports.sales.by_location'],
+                ['admin.reports.delivery_cost', 'تكلفة التوصيل', 'reports.delivery_cost.view', 'admin.reports.delivery_cost*'],
                 ['admin.reports.receivables.customers', 'كشف حساب العملاء', 'reports.statements.view', 'admin.reports.receivables.customers'],
                 ['admin.reports.receivables.suppliers', 'كشف حساب الموردين', 'reports.statements.view', 'admin.reports.receivables.suppliers'],
                 ['admin.reports.product_decision', 'لوحة قرار الصنف', 'reports.product_decision.view', 'admin.reports.product_decision*'],

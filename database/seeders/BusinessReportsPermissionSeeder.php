@@ -35,6 +35,8 @@ class BusinessReportsPermissionSeeder extends Seeder
         'reports.ad_budget.manage',
         'reports.product_decision.view',
         'reports.sales_by_location.view',
+        // تكلفة التوصيل: رقمٌ تفاوضيّ مع الشركة، لا يُفتح لمن يقرأ المبيعات.
+        'reports.delivery_cost.view',
     ];
 
     private array $grants = [
