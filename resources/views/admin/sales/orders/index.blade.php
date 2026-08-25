@@ -310,7 +310,9 @@
                     <td class="text-start font-medium tabular-nums whitespace-nowrap" data-label="{{ __('الإجمالي') }}">{{ number_format($o->total, 2) }} {{ \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪') }}</td>
                     <td class="text-end">
                         @php
-                            $isEditable = \App\Http\Controllers\Admin\Sales\OrderController::isEditable($o);
+                            // المبيعة المباشرة تُعدَّل ولو سُلّمت: لا طرد لها ولا شركة توصيل.
+                            $isEditable = \App\Http\Controllers\Admin\Sales\OrderController::isEditable($o)
+                                || \App\Http\Controllers\Admin\Sales\OrderController::isDirectSaleEditable($o, auth()->user());
                             $isCancellable = ! in_array($o->status, ['cancelled', 'delivered', 'returned'], true);
                         @endphp
                         <div class="flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5">

@@ -12,6 +12,7 @@ use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Catalog\Services\PriceListService;
+use App\Modules\Commissions\Services\CommissionService;
 use App\Modules\Crm\Models\Customer;
 use App\Modules\Crm\Services\CustomerService;
 use App\Modules\Foundation\Models\Area;
@@ -44,6 +45,7 @@ class OrderController extends Controller
     public function __construct(
         private readonly OrderService $service,
         private readonly CustomerService $customerService,
+        private readonly CommissionService $commissions,
     ) {}
 
     public function index(Request $request): View|StreamedResponse
@@ -507,7 +509,11 @@ class OrderController extends Controller
     {
         $this->authorize('update', $order);
 
-        abort_unless(self::isEditable($order), 403, __('لا يمكن تعديل هذا الطلب بعد إرساله لشركة التوصيل أو إلغائه/تسليمه.'));
+        abort_unless(
+            self::isEditable($order) || self::isDirectSaleEditable($order, request()->user()),
+            403,
+            __('لا يمكن تعديل هذا الطلب بعد إرساله لشركة التوصيل أو إلغائه/تسليمه.'),
+        );
 
         return view('admin.sales.orders.edit', [
             'order' => $order->load('items.variant.product'),
@@ -519,7 +525,9 @@ class OrderController extends Controller
     {
         $this->authorize('update', $order);
 
-        if (! self::isEditable($order)) {
+        $directSale = self::isDirectSaleEditable($order, $request->user());
+
+        if (! self::isEditable($order) && ! $directSale) {
             return redirect()->route('admin.sales.orders.show', $order)
                 ->with('error', __('لا يمكن تعديل هذا الطلب بعد إرساله لشركة التوصيل أو إلغائه/تسليمه.'));
         }
@@ -533,27 +541,70 @@ class OrderController extends Controller
 
         // تعديل بيانات التواصل + الأصناف: تُزامَن الحركة المخزونية ويُحدَّث القيد المحاسبي
         // الموجود في مكانه (لا قيد جديد) للطلب المُرحّل.
+        $data = [
+            'customer_name' => $request->validated('customer_name'),
+            'customer_phone' => $request->validated('customer_phone'),
+            'customer_email' => $request->validated('customer_email'),
+            'shipping_address' => $request->validated('shipping_address'),
+            'notes' => $request->validated('notes'),
+            'parcels_count' => (int) ($request->validated('parcels_count') ?: $order->parcels_count ?: 1),
+        ];
+
         try {
-            $this->service->editPostedOrder($order, [
-                'customer_name' => $request->validated('customer_name'),
-                'customer_phone' => $request->validated('customer_phone'),
-                'customer_email' => $request->validated('customer_email'),
-                'shipping_address' => $request->validated('shipping_address'),
-                'notes' => $request->validated('notes'),
-                'parcels_count' => (int) ($request->validated('parcels_count') ?: $order->parcels_count ?: 1),
-            ], $items);
+            /*
+            | التعديل والعمولة في معاملةٍ واحدة.
+            |
+            | `editPostedOrder` يحذف البنود ويُنشئها، و`commission_entries.order_item_id`
+            | على `nullOnDelete` — فتبقى الحركات القديمة معلّقةً بمبالغ بنودٍ لم
+            | تعد موجودة. فتُعكس أولًا (عكسٌ محاسبيّ لا حذف: المدفوعة تُقابَل
+            | بحركةٍ سالبة، وغير المدفوعة تُعلَّم `reversed`)، ثم يُعاد الاستحقاق
+            | على البنود الجديدة.
+            |
+            | وبلا هذا تُعدَّل الفاتورة ويبقى البائع على عمولة الفاتورة القديمة.
+            */
+            DB::transaction(function () use ($order, $data, $items, $request) {
+                $this->commissions->reverseForOrder($order, $request->user());
+
+                $this->service->editPostedOrder($order, $data, $items);
+
+                $this->commissions->reaccrueForOrder($order->fresh(['items.variant']));
+            });
         } catch (ValidationException $e) {
             return back()->withInput()->with('error', collect($e->errors())->flatten()->first());
         }
 
         return redirect()->route('admin.sales.orders.show', $order)
-            ->with('success', __('تم تحديث الطلب وتحديث قيده المحاسبي وحركته المخزونية.'));
+            ->with('success', __('حُدِّث الطلب: البنود والمخزون والقيد المحاسبي وعمولة البائع.'));
     }
 
     /**
      * الطلب قابل للتعديل (بيانات التواصل/التوصيل) ما لم يُرسَل لشركة التوصيل بعد
      * (لا رقم تتبّع ولا معرّف خارجي) ولم يُلغَ ولم يُسلَّم — فبعد الإرسال لن تتزامن التعديلات مع أوبتيموس.
      */
+    /**
+     * المبيعة المباشرة قابلة للتعديل ولو سُلّمت — لمن يرى طلبات الجميع.
+     *
+     * المبيعة المباشرة تُنشأ وتُسلَّم في خطوةٍ واحدة (`fulfillDirect`)، فتصير
+     * `delivered` فورًا وتخرج من `isEditable`. لكن **لا شركة توصيل فيها ولا
+     * طرد**: لا شيء يفترق عن الخارج إن عُدّلت، بخلاف الطلب المُرسَل الذي
+     * تحمل الشركة نسخته.
+     *
+     * والحصر بـ`restrictedToOwnOrders` — بالصلاحية لا بالاسم (المبدأ 11):
+     * تعديل فاتورةٍ مُرحّلة يحرّك المخزون والقيد والعمولة معًا، وهو قرار إدارة.
+     *
+     * والملغاة والمرتجعة تبقيان خارجه: لهما حركاتٌ عكسية قائمة يُخالفها تعديلٌ
+     * يجري فوقها.
+     */
+    public static function isDirectSaleEditable(Order $order, ?User $user): bool
+    {
+        return $order->channel === 'pos'
+            && ! in_array($order->status, ['cancelled', 'returned'], true)
+            && blank($order->tracking_number)
+            && blank($order->delivery_external_id)
+            && $user !== null
+            && ! $user->restrictedToOwnOrders();
+    }
+
     public static function isEditable(Order $order): bool
     {
         return ! in_array($order->status, ['cancelled', 'delivered', 'returned'], true)

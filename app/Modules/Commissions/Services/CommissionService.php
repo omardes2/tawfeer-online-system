@@ -99,6 +99,35 @@ class CommissionService
             return; // لا استحقاق مزدوج.
         }
 
+        $this->accrueItems($order);
+    }
+
+    /**
+     * إعادة استحقاق عمولات طلبٍ عُدِّلت بنوده — بعد عكس القديمة.
+     *
+     * `accrueForOrder` تحرس نفسها بوجود **أيّ** استحقاق ولو كان معكوسًا، وهو
+     * الصحيح لمنع الازدواج — لكنه يمنع إعادة الاحتساب بعد تعديل الفاتورة، فتبقى
+     * الحركات معكوسةً بلا بديل ويخسر البائع عمولته كلَّها.
+     *
+     * فهذه تقرأ **الحيّ وحده**: إن بقي استحقاقٌ غير معكوس فلا شيء يُعاد.
+     */
+    public function reaccrueForOrder(Order $order): void
+    {
+        $live = CommissionEntry::where('order_id', $order->id)
+            ->where('entry_type', 'accrual')
+            ->whereNotIn('state', ['reversed', 'cancelled'])
+            ->exists();
+
+        if ($live) {
+            return;
+        }
+
+        $this->accrueItems($order);
+    }
+
+    /** جسم الاستحقاق — يُقرأ من موضعٍ واحد فلا يفترق الأول عن الإعادة. */
+    private function accrueItems(Order $order): void
+    {
         $order->loadMissing('items.variant');
 
         DB::transaction(function () use ($order) {

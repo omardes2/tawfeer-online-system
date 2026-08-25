@@ -20,9 +20,13 @@ class UpdateOrderContactRequest extends FormRequest
         return [
             'customer_name' => ['required', 'string', 'max:180'],
             // رقم فلسطيني صحيح 10 خانات (يُطبَّع في prepareForValidation) — شرط Opost.
-            'customer_phone' => ['required', 'string', 'max:40', 'regex:/^\d{10}$/'],
+            // المبيعة المباشرة تُنشأ أحيانًا بلا هاتف ولا عنوان — لا توصيل لها
+            // ولا شرط لدى شركة الشحن. فاشتراطهما عليها يمنع تصحيح سعرٍ أو كمية.
+            'customer_phone' => $this->isDirectSale()
+                ? ['nullable', 'string', 'max:40']
+                : ['required', 'string', 'max:40', 'regex:/^\d{10}$/'],
             'customer_email' => ['nullable', 'email', 'max:180'],
-            'shipping_address' => ['required', 'string', 'max:1000'],
+            'shipping_address' => [$this->isDirectSale() ? 'nullable' : 'required', 'string', 'max:1000'],
             // عدد الطرود لا القطع — يُصحَّح قبل الإرسال، فبعده لا تتزامن التعديلات.
             'parcels_count' => ['sometimes', 'integer', 'min:1', 'max:'.config('shipping.max_parcels_per_shipment', 12)],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -33,6 +37,12 @@ class UpdateOrderContactRequest extends FormRequest
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.discount' => ['nullable', 'numeric', 'min:0'],
         ];
+    }
+
+    /** الطلب مبيعةٌ مباشرة (نقطة بيع) — لا شحنة له ولا عنوان توصيل. */
+    private function isDirectSale(): bool
+    {
+        return $this->route('order')?->channel === 'pos';
     }
 
     /** رسائل خطأ عربية واضحة لكل حقل. */

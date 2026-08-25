@@ -77,7 +77,8 @@
                     @endcan
                 @endif
                 {{-- تعديل بيانات التواصل/التوصيل (تصحيح بيانات خاطئة) قبل الإرسال لشركة التوصيل --}}
-                @if (\App\Http\Controllers\Admin\Sales\OrderController::isEditable($order))
+                @if (\App\Http\Controllers\Admin\Sales\OrderController::isEditable($order)
+                    || \App\Http\Controllers\Admin\Sales\OrderController::isDirectSaleEditable($order, auth()->user()))
                     @can('update', $order)
                         <a href="{{ route('admin.sales.orders.edit', $order) }}" class="px-4 py-2 bg-amber-100 text-amber-800 text-sm rounded-md hover:bg-amber-200">{{ __('تعديل الطلب') }}</a>
                     @endcan
