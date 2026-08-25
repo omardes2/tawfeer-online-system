@@ -26,7 +26,7 @@
         $canBulk = $canBulkDelete || $canBulkConfirm;
 
         $selectCls = 'rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500 min-w-[10rem]';
-        $hasFilter = ($activeStatus ?? null) || ($activeDeliveryStatus ?? null) || ($activePaymentStatus ?? null) || ($activeSearch ?? null) || ($activeSaleType ?? null);
+        $hasFilter = ($activeStatus ?? null) || ($activeDeliveryStatus ?? null) || ($activePaymentStatus ?? null) || ($activeSearch ?? null) || ($activeSaleType ?? null) || ($activeFrom ?? null) || ($activeTo ?? null) || ($activeUserId ?? null);
     @endphp
 
     {{--
@@ -106,6 +106,38 @@
                 <option value="partial" @selected(($activePaymentStatus ?? null) === 'partial')>{{ __('مدفوع جزئيًا') }}</option>
             </select>
         </div>
+
+        {{-- فلتر التاريخ: الطرفان مستقلّان، فيصحّ «من» وحدها أو «إلى» وحدها. --}}
+        <div class="flex items-end gap-2">
+            <div>
+                <label class="block text-[11px] text-gray-500 mb-1">{{ __('من تاريخ') }}</label>
+                <input type="date" name="from" value="{{ $activeFrom ?? '' }}" class="{{ $selectCls }}">
+            </div>
+            <div>
+                <label class="block text-[11px] text-gray-500 mb-1">{{ __('إلى تاريخ') }}</label>
+                <input type="date" name="to" value="{{ $activeTo ?? '' }}" class="{{ $selectCls }}">
+            </div>
+        </div>
+
+        {{--
+            فلتر المستخدم لمدير النظام وحده: القائمة تكشف من يبيع كم، وهو ما لا
+            يُفتح لموظفي المبيعات بعضهم على بعض.
+        --}}
+        @if ($canFilterByUser ?? false)
+            <div>
+                <select name="user_id" onchange="this.form.submit()" class="{{ $selectCls }}">
+                    <option value="">{{ __('كل المستخدمين') }}</option>
+                    @foreach ($staffOptions as $staffUser)
+                        <option value="{{ $staffUser->id }}" @selected(($activeUserId ?? null) === $staffUser->id)>{{ $staffUser->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+        @endif
+
+        {{-- التصدير يحمل الفلاتر المعروضة نفسها، ويُصدّر كلّ نتائجها لا الصفحة. --}}
+        <a href="{{ request()->fullUrlWithQuery(['export' => 'csv']) }}" class="btn-secondary btn-sm shrink-0">
+            {{ __('تصدير Excel') }}
+        </a>
 
         @if ($hasFilter)
             <a href="{{ route('admin.sales.orders.index') }}" class="btn-secondary btn-sm">{{ __('مسح الفلاتر') }}</a>
@@ -217,8 +249,11 @@
                             $staffLabel = $o->affiliate_id ? __('المسوّق') : __('موظف المبيعات');
                         @endphp
                         @if ($staff || $o->channel === 'manual')
-                            <span class="block text-xs text-gray-400">{{ $staffLabel }}</span>
-                            <span class="text-gray-700">{{ $staff?->name ?? '—' }}</span>
+                            {{-- المسوّق أخضر صفةً واسمًا: صفوف القائمة متشابهة،
+                                 وطلبات المسوّقين لها متابعةٌ ومستحقّاتٌ مختلفة
+                                 فتُميَّز بلمحة بدل قراءة كل سطر. --}}
+                            <span class="block text-xs {{ $o->affiliate_id ? 'text-emerald-600 font-medium' : 'text-gray-400' }}">{{ $staffLabel }}</span>
+                            <span class="{{ $o->affiliate_id ? 'text-emerald-700 font-medium' : 'text-gray-700' }}">{{ $staff?->name ?? '—' }}</span>
                         @elseif ($o->customer?->user_id)
                             <span class="text-gray-700">{{ $o->customer->name }}</span>
                         @else

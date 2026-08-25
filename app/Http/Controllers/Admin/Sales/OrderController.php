@@ -7,6 +7,7 @@ use App\Http\Requests\Sales\CancelOrderRequest;
 use App\Http\Requests\Sales\StoreDirectSaleRequest;
 use App\Http\Requests\Sales\StoreOrderRequest;
 use App\Http\Requests\Sales\UpdateOrderContactRequest;
+use App\Models\User;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Catalog\Models\Product;
 use App\Modules\Catalog\Models\ProductVariant;
@@ -33,6 +34,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrderController extends Controller
 {
@@ -44,7 +46,7 @@ class OrderController extends Controller
         private readonly CustomerService $customerService,
     ) {}
 
-    public function index(Request $request): View
+    public function index(Request $request): View|StreamedResponse
     {
         $this->authorize('viewAny', Order::class);
 
@@ -63,6 +65,23 @@ class OrderController extends Controller
         // نوع البيع: مباشر (channel=pos) أو عادي.
         $saleType = $request->query('sale_type');
         $saleType = in_array($saleType, ['direct', 'normal'], true) ? $saleType : null;
+
+        // فلتر التاريخ على تاريخ الطلب — الطرفان اختياريّان ومستقلّان.
+        $from = $request->date('from');
+        $to = $request->date('to');
+
+        /*
+        | فلتر المستخدم لمن يرى طلبات الجميع وحده.
+        |
+        | القائمة تكشف من يبيع كم، وهو ما لا يُفتح لموظفي المبيعات بعضهم على
+        | بعض. والحكم بـ`restrictedToOwnOrders` نفسها التي تحكم نطاق الرؤية في
+        | `visibleOrders` — **بالصلاحية لا بالاسم** (المبدأ 11)، وبمحدِّدٍ واحد
+        | فلا يفترق الفلتر عن الرؤية إن تغيّرت قواعدها.
+        |
+        | والفلتر لا يوسّع رؤيةً بل يضيّقها داخل ما يُرى أصلًا.
+        */
+        $canFilterByUser = ! ($request->user()?->restrictedToOwnOrders() ?? true);
+        $userId = $canFilterByUser ? ($request->integer('user_id') ?: null) : null;
 
         // affiliate ضمن التحميل المسبق: عمود «المستخدم» يعرض المسوّق بصفته لا كموظف مبيعات.
         $query = $this->visibleOrders($request)->with(['affiliate', 'assignee', 'creator', 'customer', 'latestShipment'])->latest('id');
@@ -85,6 +104,22 @@ class OrderController extends Controller
             });
         }
 
+        if ($from) {
+            $query->where('orders.created_at', '>=', $from->copy()->startOfDay());
+        }
+        if ($to) {
+            $query->where('orders.created_at', '<=', $to->copy()->endOfDay());
+        }
+
+        // المستخدم: المسوّق أو الموظف المُسنَد أو المنشئ — الثلاثة هي ما يعرضه
+        // عمود «المستخدم»، فيطابق الفلترُ ما يراه القارئ.
+        if ($userId !== null) {
+            $query->where(fn ($q) => $q
+                ->where('affiliate_id', $userId)
+                ->orWhere('assigned_to', $userId)
+                ->orWhere('created_by', $userId));
+        }
+
         if ($status !== null) {
             $query->where('status', $status);
         }
@@ -95,6 +130,10 @@ class OrderController extends Controller
             $paymentStatus === 'unpaid'
                 ? $query->where(fn ($q) => $q->where('payment_status', 'unpaid')->orWhereNull('payment_status'))
                 : $query->where('payment_status', $paymentStatus);
+        }
+
+        if ($request->query('export') === 'csv') {
+            return $this->csv($query);
         }
 
         return view('admin.sales.orders.index', [
@@ -108,6 +147,15 @@ class OrderController extends Controller
             'activePaymentStatus' => $paymentStatus,
             'activeSearch' => $search,
             'activeSaleType' => $saleType,
+            'activeFrom' => $from?->toDateString(),
+            'activeTo' => $to?->toDateString(),
+            'activeUserId' => $userId,
+            'canFilterByUser' => $canFilterByUser,
+            // من يظهر في عمود «المستخدم» فعلًا: مسوّقون وموظفو مبيعات.
+            'staffOptions' => $canFilterByUser
+                ? User::whereHas('roles', fn ($q) => $q->whereIn('name', ['affiliate', 'sales', 'sales_supervisor']))
+                    ->orderBy('name')->get(['id', 'name'])
+                : collect(),
             'deliveryLabels' => OpostStatus::options(),
             // خزائن التحصيل (نقدية/بنكية) لنافذة الدفع — مربوطة بحساب GL فقط.
             'treasuries' => Treasury::query()
@@ -115,6 +163,64 @@ class OrderController extends Controller
                 ->orderByDesc('is_default')->orderBy('type')->orderBy('name')
                 ->get(['id', 'name', 'type']),
         ]);
+    }
+
+    /**
+     * تصدير الطلبات المعروضة — **بالفلاتر المطبَّقة وكلَّها لا صفحةً منها**.
+     *
+     * الشاشة خمسون صفًّا، والملفّ يُفتح في إكسل للمطابقة والتحصيل. فتصديرُ
+     * الصفحة وحدها يُنتج كشفًا ناقصًا يُبنى عليه قرار.
+     *
+     * ويُبثّ بـ`chunk` لا بتحميل الكل: فلترةٌ واسعة قد تعني عشرات الآلاف.
+     */
+    private function csv(Builder $query): StreamedResponse
+    {
+        $head = [
+            __('رقم الطلب'), __('رقم التتبّع'), __('التاريخ'), __('اسم المستلم'),
+            __('الهاتف'), __('المستخدم'), __('الصفة'), __('حالة أوبتيموس'),
+            __('حالة الدفع'), __('رسوم التوصيل'), __('الإجمالي'),
+        ];
+
+        $labels = OpostStatus::options();
+
+        $payment = [
+            'paid' => __('مدفوع'), 'unpaid' => __('غير مدفوع'), 'partial' => __('مدفوع جزئيًا'),
+        ];
+
+        return response()->streamDownload(function () use ($query, $head, $labels, $payment) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF"); // BOM لعرض العربية في Excel.
+            fputcsv($out, $head);
+
+            $total = 0.0;
+
+            $query->reorder('orders.id')->chunk(500, function ($orders) use ($out, $labels, $payment, &$total) {
+                foreach ($orders as $o) {
+                    $total += (float) $o->total;
+
+                    $staff = $o->affiliate ?? $o->assignee ?? ($o->channel === 'manual' ? $o->creator : null);
+
+                    fputcsv($out, [
+                        $o->number,
+                        $o->tracking_number ?? $o->latestShipment?->tracking_number ?? '',
+                        $o->created_at?->format('Y-m-d H:i') ?? '',
+                        $o->latestShipment?->recipient_name ?: ($o->customer_name ?: ''),
+                        $o->customer_phone ?? '',
+                        $staff?->name ?? '',
+                        $staff ? ($o->affiliate_id ? __('المسوّق') : __('موظف المبيعات')) : '',
+                        $labels[$o->latestShipment?->provider_status] ?? '',
+                        $payment[$o->payment_status] ?? __('غير مدفوع'),
+                        number_format((float) $o->shipping_total, 2, '.', ''),
+                        number_format((float) $o->total, 2, '.', ''),
+                    ]);
+                }
+            });
+
+            fputcsv($out, []);
+            fputcsv($out, [__('الإجمالي'), '', '', '', '', '', '', '', '', '', number_format($total, 2, '.', '')]);
+
+            fclose($out);
+        }, 'orders-'.now()->toDateString().'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function create(): View
