@@ -182,8 +182,12 @@ class ProfitLossReportTest extends TestCase
         $this->assertEqualsWithDelta(700.0, $this->report('2026-07-01', '2026-07-31')['revenue']['goods'], 0.01);
     }
 
-    /** ورسوم التوصيل المُحصَّلة إيرادٌ مستقلّ عن البضاعة. */
-    public function test_collected_delivery_fees_are_their_own_line(): void
+    /**
+     * **ورسوم التوصيل المُحصَّلة ليست إيرادًا.**
+     *
+     * هي مال شركة التوصيل يمرّ بنا، فإدخالها يُضخّم المبيعات بما لم يُبَع.
+     */
+    public function test_collected_delivery_fees_are_not_revenue(): void
     {
         $order = $this->order(['assigned_to' => $this->seller->id], price: 300);
         $order->newQuery()->whereKey($order->id)->toBase()->update(['shipping_total' => 20]);
@@ -191,8 +195,8 @@ class ProfitLossReportTest extends TestCase
         $revenue = $this->report()['revenue'];
 
         $this->assertEqualsWithDelta(300.0, $revenue['goods'], 0.01);
-        $this->assertEqualsWithDelta(20.0, $revenue['delivery_collected'], 0.01);
-        $this->assertEqualsWithDelta(320.0, $revenue['total'], 0.01);
+        $this->assertEqualsWithDelta(300.0, $revenue['total'], 0.01);
+        $this->assertArrayNotHasKey('delivery_collected', $revenue);
     }
 
     // ────────── المرتجع ──────────
@@ -247,10 +251,16 @@ class ProfitLossReportTest extends TestCase
         $this->assertEqualsWithDelta(35.0, $this->report()['expenses']['ads'], 0.01);
     }
 
-    /** وتكلفة التوصيل من الشحنات. */
-    public function test_delivery_paid_comes_from_shipments(): void
+    /**
+     * **وأجرة الطرود ليست مصروفًا هنا.**
+     *
+     * التوصيل خرج من الطرفين معًا. وإخراجُه من الإيراد وحده كان سيترك تكلفته
+     * مصروفًا بلا مقابل — فيُظهر خسارةً وهمية. مكانُه تقرير تكلفة التوصيل.
+     */
+    public function test_delivery_paid_is_not_an_expense(): void
     {
-        $order = $this->order(['assigned_to' => $this->seller->id], price: 100);
+        $order = $this->order(['assigned_to' => $this->seller->id], price: 100, cost: 60);
+        $order->newQuery()->whereKey($order->id)->toBase()->update(['shipping_total' => 20]);
 
         $shipment = Shipment::create([
             'number' => 'SHP-'.uniqid(),
@@ -267,7 +277,12 @@ class ProfitLossReportTest extends TestCase
         $shipment->newQuery()->whereKey($shipment->id)->toBase()
             ->update(['created_at' => Carbon::parse(self::FROM.' 10:00:00')]);
 
-        $this->assertEqualsWithDelta(18.0, $this->report()['expenses']['delivery_paid'], 0.01);
+        $report = $this->report();
+
+        $this->assertArrayNotHasKey('delivery_paid', $report['expenses']);
+        $this->assertEqualsWithDelta(0.0, $report['expenses']['total'], 0.01);
+        // ٤٠ ربحُ البضاعة وحدها: لا ٢٠ مضافةً ولا ١٨ مخصومة.
+        $this->assertEqualsWithDelta(40.0, $report['net_income'], 0.01);
     }
 
     /** وسندات الصرف المُرحَّلة تظهر بتصنيفاتها. */

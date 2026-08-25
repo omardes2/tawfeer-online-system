@@ -61,18 +61,10 @@
                         </td>
                         <td class="text-start tabular-nums">{{ $money($report['revenue']['store']) }}</td>
                     </tr>
-                    <tr class="bg-gray-50/60 font-semibold">
-                        <td class="ps-4">{{ __('إجمالي مبيعات البضاعة') }}</td>
-                        <td class="text-start tabular-nums">{{ $money($report['revenue']['goods']) }}</td>
-                    </tr>
-                    <tr>
-                        <td class="ps-8">{{ __('رسوم التوصيل المُحصَّلة') }}
-                            <span class="text-[11px] text-gray-400">{{ __('(تقابلها تكلفة الطرود في المصاريف)') }}</span>
-                        </td>
-                        <td class="text-start tabular-nums">{{ $money($report['revenue']['delivery_collected']) }}</td>
-                    </tr>
                     <tr class="bg-emerald-50 font-bold text-emerald-800">
-                        <td>{{ __('إجمالي الإيرادات') }}</td>
+                        <td>{{ __('إجمالي الإيرادات') }}
+                            <span class="text-[11px] font-normal text-emerald-600">{{ __('(بلا رسوم التوصيل)') }}</span>
+                        </td>
                         <td class="text-start tabular-nums">{{ $money($report['revenue']['total']) }}</td>
                     </tr>
                 </tbody>
@@ -103,12 +95,6 @@
                 <tbody class="border-t-4 border-gray-100">
                     <tr class="bg-gray-50">
                         <th colspan="2" class="text-start font-bold text-gray-700">{{ __('المصاريف') }}</th>
-                    </tr>
-                    <tr>
-                        <td class="ps-8">{{ __('تكلفة التوصيل المدفوعة') }}
-                            <span class="text-[11px] text-gray-400">{{ __('(لشركة التوصيل)') }}</span>
-                        </td>
-                        <td class="text-start tabular-nums">({{ $money($report['expenses']['delivery_paid']) }})</td>
                     </tr>
                     <tr>
                         <td class="ps-8">{{ __('الإعلانات') }}
@@ -170,7 +156,11 @@
             <li>{{ __('طلبٌ لمسوّقٍ ومُسنَدٌ لموظف يُحتسب للمسوّق وحده — فلا يُعدّ مرّتين.') }}</li>
             <li>{{ __('العمولة تُحتسب باستحقاق الفترة سواءٌ صُرفت أم لا، ودفعاتها لا تتكرّر في سندات الصرف.') }}</li>
             <li>{{ __('الإعلانات تُقرأ من جدول الصرف الإعلاني — وهو خارج القيود المحاسبية، فلا يظهر في ميزان المراجعة.') }}</li>
-            <li>{{ __('تكلفة التوصيل من الشحنات لا من سندات الصرف؛ فإن سُجِّلت دفعة الشركة سندَ مصروفٍ أيضًا فستظهر مرّتين.') }}</li>
+            <li>
+                {{ __('التوصيل خارج القائمة من طرفيه: لا رسومَ محصَّلة في الإيرادات ولا أجرةَ طرودٍ في المصاريف — فهي مال شركة التوصيل يمرّ بنا.') }}
+                <a href="{{ route('admin.reports.delivery_cost') }}" class="text-emerald-600 hover:underline">{{ __('تقرير تكلفة التوصيل') }}</a>
+                {{ __('يعرض المدفوع للشركة على حدة.') }}
+            </li>
         </ul>
     </div>
 </x-app-layout>

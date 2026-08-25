@@ -74,12 +74,9 @@ class ProfitLossController extends Controller
             [__('المبيعات المباشرة'), $report['revenue']['direct']],
             [__('مبيعات المسوّقين'), $report['revenue']['affiliates']],
             [__('مبيعات المتجر'), $report['revenue']['store']],
-            [__('إجمالي مبيعات البضاعة'), $report['revenue']['goods']],
-            [__('رسوم التوصيل المُحصَّلة'), $report['revenue']['delivery_collected']],
             [__('إجمالي الإيرادات'), $report['revenue']['total']],
             [__('تكلفة البضاعة المباعة'), $report['cogs']],
             [__('مجمل الربح'), $report['gross_profit']],
-            [__('تكلفة التوصيل المدفوعة'), $report['expenses']['delivery_paid']],
             [__('الإعلانات'), $report['expenses']['ads']],
             [__('عمولات المبيعات والتسويق'), $report['expenses']['commissions']],
         ];
