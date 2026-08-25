@@ -78,6 +78,11 @@ class DashboardController extends Controller
             'todayOrders' => $todayKpis['sales']['orders'],
             'month' => $monthKpis,
             'salesDaily' => $this->reports->sales($month)['daily'],
+            // مبيعات اليوم مفصولةً: موظفون ومسوّقون، بلا رسوم التوصيل.
+            'todayByEarner' => $this->reports->todaySalesByEarnerType(),
+            // اثنا عشر شهرًا كاملة للسنة الجارية — الفارغة منها تظهر صفرًا.
+            'monthlySales' => $this->reports->monthlySales((int) today()->year),
+            'chartYear' => (int) today()->year,
             'deliveryByStatus' => $deliveryByStatus,
             'latestOrders' => $latestOrders,
             'warehouse' => $mainWarehouse ? $this->warehouses->dashboard($mainWarehouse) : null,

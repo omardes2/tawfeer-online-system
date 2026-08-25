@@ -107,15 +107,23 @@
             </select>
         </div>
 
-        {{-- فلتر التاريخ: الطرفان مستقلّان، فيصحّ «من» وحدها أو «إلى» وحدها. --}}
+        {{--
+            فلتر التاريخ: الطرفان مستقلّان، فيصحّ «من» وحدها أو «إلى» وحدها.
+
+            و`onchange` يُرسل النموذج كالقوائم المنسدلة تمامًا: بدونه يختار
+            المستخدم تاريخًا ولا يحدث شيء، فيبدو الفلتر معطوبًا وهو لم يُرسَل
+            أصلًا.
+        --}}
         <div class="flex items-end gap-2">
             <div>
                 <label class="block text-[11px] text-gray-500 mb-1">{{ __('من تاريخ') }}</label>
-                <input type="date" name="from" value="{{ $activeFrom ?? '' }}" class="{{ $selectCls }}">
+                <input type="date" name="from" value="{{ $activeFrom ?? '' }}"
+                       onchange="this.form.submit()" class="{{ $selectCls }}">
             </div>
             <div>
                 <label class="block text-[11px] text-gray-500 mb-1">{{ __('إلى تاريخ') }}</label>
-                <input type="date" name="to" value="{{ $activeTo ?? '' }}" class="{{ $selectCls }}">
+                <input type="date" name="to" value="{{ $activeTo ?? '' }}"
+                       onchange="this.form.submit()" class="{{ $selectCls }}">
             </div>
         </div>
 

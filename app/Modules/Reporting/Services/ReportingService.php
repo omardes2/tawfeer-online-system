@@ -5,6 +5,7 @@ namespace App\Modules\Reporting\Services;
 use App\Modules\Inventory\Services\WarehouseService;
 use App\Modules\Reporting\Support\DateRange;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -32,6 +33,58 @@ class ReportingService
     private function ordersTable(): Builder
     {
         return DB::table('orders')->whereNull('orders.deleted_at');
+    }
+
+    /**
+     * مبيعات اليوم لكل فئةٍ من البائعين — بلا رسوم التوصيل.
+     *
+     * الفئة تُحدَّد بعمود الربط لا بالدور: طلبٌ عليه `affiliate_id` مبيعاتُ
+     * مسوّق، وما عداه بـ`assigned_to` مبيعاتُ موظف. وقراءةُ الدور بدلًا من ذلك
+     * تُخطئ حين يحمل الشخص دورين.
+     *
+     * والملغاة مستثناة: لم تُبَع.
+     */
+    public function todaySalesByEarnerType(): array
+    {
+        $base = fn () => $this->ordersTable()
+            ->whereBetween('created_at', [today()->startOfDay(), today()->endOfDay()])
+            ->where('status', '!=', 'cancelled');
+
+        return [
+            'staff' => $this->money((clone $base())
+                ->whereNull('affiliate_id')->whereNotNull('assigned_to')
+                ->sum(DB::raw(self::NET_SALES))),
+            'affiliates' => $this->money((clone $base())
+                ->whereNotNull('affiliate_id')
+                ->sum(DB::raw(self::NET_SALES))),
+        ];
+    }
+
+    /**
+     * مبيعات السنة شهرًا شهرًا — بلا رسوم التوصيل.
+     *
+     * **الاثنا عشر شهرًا كلّها تُرجَع** ولو كانت بلا مبيعات: رسمٌ بيانيّ يحذف
+     * الشهور الفارغة يُظهر تمّوزًا بجانب تشرين فيبدو النمو متّصلًا وهو منقطع.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function monthlySales(int $year): Collection
+    {
+        $totals = $this->ordersTable()
+            ->whereBetween('created_at', [
+                Carbon::create($year, 1, 1)->startOfDay(),
+                Carbon::create($year, 12, 31)->endOfDay(),
+            ])
+            ->where('status', '!=', 'cancelled')
+            ->selectRaw('SUBSTR(created_at, 6, 2) as m, COALESCE(SUM('.self::NET_SALES.'), 0) as t')
+            ->groupBy('m')
+            ->pluck('t', 'm');
+
+        return collect(range(1, 12))->map(fn (int $m) => [
+            'month' => $m,
+            'label' => Carbon::create($year, $m, 1)->translatedFormat('M'),
+            'total' => $this->money($totals[str_pad((string) $m, 2, '0', STR_PAD_LEFT)] ?? 0),
+        ]);
     }
 
     /** @return array<string, float|int> */
