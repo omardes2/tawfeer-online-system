@@ -37,6 +37,8 @@ class BusinessReportsPermissionSeeder extends Seeder
         'reports.sales_by_location.view',
         // تكلفة التوصيل: رقمٌ تفاوضيّ مع الشركة، لا يُفتح لمن يقرأ المبيعات.
         'reports.delivery_cost.view',
+        // الأرباح والخسائر: بنية ربح الشركة كاملةً في صفحة.
+        'reports.profit_loss.view',
     ];
 
     private array $grants = [

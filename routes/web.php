@@ -48,6 +48,7 @@ use App\Http\Controllers\Admin\Reports\AdBudgetController;
 use App\Http\Controllers\Admin\Reports\BusinessReportController;
 use App\Http\Controllers\Admin\Reports\DeliveryCostController;
 use App\Http\Controllers\Admin\Reports\ProductDecisionController;
+use App\Http\Controllers\Admin\Reports\ProfitLossController;
 use App\Http\Controllers\Admin\Returns\ReturnController as AdminReturnController;
 use App\Http\Controllers\Admin\Roles\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\Sales\AbandonedCheckoutController;
@@ -442,6 +443,8 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('sales/by-location', [BusinessReportController::class, 'salesByLocation'])->name('sales.by_location')->middleware('can:reports.sales_by_location.view');
         // لوحة قرار الصنف: الربح الحقيقي بعد الإعلان والتوصيل + التغطية والشراء.
         Route::get('delivery-cost', [DeliveryCostController::class, 'index'])->name('delivery_cost')->middleware('can:reports.delivery_cost.view');
+        // الأرباح والخسائر: الإيراد والتكلفة والمصروف حتى صافي الدخل.
+        Route::get('profit-loss', [ProfitLossController::class, 'index'])->name('profit_loss')->middleware('can:reports.profit_loss.view');
         Route::get('product-decision', [ProductDecisionController::class, 'index'])->name('product_decision')->middleware('can:reports.product_decision.view');
         Route::post('product-decision/planning', [ProductDecisionController::class, 'updatePlanning'])->name('product_decision.planning')->middleware('can:reports.ad_budget.manage');
         Route::get('receivables/customers', [BusinessReportController::class, 'receivablesCustomers'])->name('receivables.customers')->middleware('can:reports.statements.view');
