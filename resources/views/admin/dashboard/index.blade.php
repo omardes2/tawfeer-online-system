@@ -67,7 +67,12 @@
                     <x-admin.stat-card :label="__('صرف اليوم')" :value="$finance['today_payments']" money tone="red" />
                     <x-admin.stat-card :label="__('المبالغ المُحصّلة (شهر)')" :value="$month['sales']['collected']" money tone="green" />
                     @if ($pendingCommissions !== null)
-                        <x-admin.stat-card :label="__('عمولات مستحقّة')" :value="$pendingCommissions" money tone="amber" />
+                        {{-- المستحقّ الآن، وتحته ما لم يُستحقّ بعد — فلا يظنّ
+                             القارئ أن الفرق ضاع. --}}
+                        <x-admin.stat-card :label="__('عمولات مستحقّة')" :value="$pendingCommissions" money tone="amber"
+                                           :hint="($notYetDueCommissions ?? 0) > 0
+                                               ? __('و :v قيد التحصيل لم تُستحقّ بعد', ['v' => number_format($notYetDueCommissions, 2)])
+                                               : __('استُحقّت ولم تُصرف')" />
                     @endif
                 </div>
             </div>

@@ -90,8 +90,22 @@ class DashboardController extends Controller
             // لوحتا الأداء اليومي: موظفو المبيعات والمسوّقون، كلٌّ في جدوله.
             'salesBoard' => $this->reports->earnerBoard('assigned_to', ['sales', 'sales_supervisor']),
             'affiliateBoard' => $this->reports->earnerBoard('affiliate_id', ['affiliate']),
+            /**
+             * ما على الشركة للمسوّقين والموظفين الآن.
+             *
+             * `eligible` و`approved` وحدهما: الأولى استُحقّت بتحصيل مال الطلب
+             * ولم تُعتمد بعد، والثانية اعتُمدت ولم تُصرف. و`paid` خرجت،
+             * و`reversed`/`cancelled` سقطت.
+             *
+             * و`pending` **خارجها**: عمولةٌ على طلبٍ سُلّم ولم يصل مالُه من
+             * شركة التوصيل بعد — لم تُستحقّ، فعدُّها ديْنًا قائمًا يُظهر على
+             * الشركة ما لا تدين به اليوم. وتُعرض بجانبها كي لا تختفي.
+             */
             'pendingCommissions' => Gate::allows('commissions.view_team')
-                ? (float) CommissionEntry::whereIn('state', ['pending', 'approved'])->sum('amount')
+                ? (float) CommissionEntry::whereIn('state', ['eligible', 'approved'])->sum('amount')
+                : null,
+            'notYetDueCommissions' => Gate::allows('commissions.view_team')
+                ? (float) CommissionEntry::where('state', 'pending')->sum('amount')
                 : null,
         ], ['finance' => $this->financeSection($from, $to)]));
     }
