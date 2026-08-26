@@ -37,10 +37,13 @@ class LocalShippingQuoteProvider implements ShippingQuoteProviderInterface
             return null;
         }
 
+        // رقمان لا رقم: التكلفة لدى المزوّد، وسعرُ البيع للزبون. ومن لم يُضبط
+        // له سعرُ بيعٍ يبقى الاثنان متساويين تمامًا كما كان.
         return new ShippingQuote(
-            cost: (float) $rate->delivery_fee,
+            cost: $rate->providerCost(),
             currency: $rate->currency ?: 'ILS',
             provider: 'local',
+            customerFee: $rate->customerFee(),
         );
     }
 

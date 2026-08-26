@@ -252,16 +252,68 @@ class ProfitLossReportTest extends TestCase
     }
 
     /**
-     * **وأجرة الطرود ليست مصروفًا هنا.**
+     * **والتوصيل يدخل بصافيه لا بطرفيه.**
      *
-     * التوصيل خرج من الطرفين معًا. وإخراجُه من الإيراد وحده كان سيترك تكلفته
-     * مصروفًا بلا مقابل — فيُظهر خسارةً وهمية. مكانُه تقرير تكلفة التوصيل.
+     * الرسومُ ليست إيرادًا والأجرةُ ليست مصروفًا، بل **الفرق** بينهما ربحُ
+     * خدمةٍ بيعت بأكثر من كلفتها. وإدخالُ المُحصَّل كاملًا يُضخّم المبيعات،
+     * وإخراجُ الطرفين معًا يُضيّع الهامش الحقيقيّ.
      */
-    public function test_delivery_paid_is_not_an_expense(): void
+    public function test_delivery_enters_as_a_net_margin(): void
     {
         $order = $this->order(['assigned_to' => $this->seller->id], price: 100, cost: 60);
         $order->newQuery()->whereKey($order->id)->toBase()->update(['shipping_total' => 20]);
 
+        $this->ship($order, 17);
+
+        $report = $this->report();
+
+        // المبيعات بلا رسوم، والمصاريف بلا أجرة طرود.
+        $this->assertEqualsWithDelta(100.0, $report['revenue']['total'], 0.01);
+        $this->assertArrayNotHasKey('delivery_paid', $report['expenses']);
+        $this->assertEqualsWithDelta(0.0, $report['expenses']['total'], 0.01);
+
+        // والفرق سطرٌ مستقلّ: ٢٠ − ١٧ = ٣.
+        $this->assertEqualsWithDelta(20.0, $report['delivery']['collected'], 0.01);
+        $this->assertEqualsWithDelta(17.0, $report['delivery']['paid'], 0.01);
+        $this->assertEqualsWithDelta(3.0, $report['delivery']['net'], 0.01);
+
+        // ٤٠ ربح البضاعة + ٣ ربح التوصيل.
+        $this->assertEqualsWithDelta(40.0, $report['gross_profit'], 0.01);
+        $this->assertEqualsWithDelta(43.0, $report['net_income'], 0.01);
+    }
+
+    /** ومدينةٌ بلا هامش تُدخل صفرًا فلا تُحرّك شيئًا. */
+    public function test_a_pass_through_city_adds_nothing(): void
+    {
+        $order = $this->order(['assigned_to' => $this->seller->id], price: 100, cost: 60);
+        $order->newQuery()->whereKey($order->id)->toBase()->update(['shipping_total' => 17]);
+
+        $this->ship($order, 17);
+
+        $report = $this->report();
+
+        $this->assertEqualsWithDelta(0.0, $report['delivery']['net'], 0.01);
+        $this->assertEqualsWithDelta(40.0, $report['net_income'], 0.01);
+    }
+
+    /** ومجمل الربح يبقى على البضاعة وحدها — الهامش لا يتسرّب إليه. */
+    public function test_the_gross_profit_stays_on_goods_only(): void
+    {
+        $order = $this->order(['assigned_to' => $this->seller->id], price: 100, cost: 60);
+        $order->newQuery()->whereKey($order->id)->toBase()->update(['shipping_total' => 50]);
+
+        $this->ship($order, 17);
+
+        $report = $this->report();
+
+        $this->assertEqualsWithDelta(40.0, $report['gross_profit'], 0.01);
+        $this->assertEqualsWithDelta(40.0, $report['gross_margin'], 0.1);
+        $this->assertEqualsWithDelta(33.0, $report['delivery']['net'], 0.01);
+    }
+
+    /** شحنةٌ بتكلفة مُعطاة على طلبٍ قائم. */
+    private function ship(Order $order, float $cost): Shipment
+    {
         $shipment = Shipment::create([
             'number' => 'SHP-'.uniqid(),
             'order_id' => $order->id,
@@ -271,18 +323,13 @@ class ProfitLossReportTest extends TestCase
             'kind' => 'outbound',
             'recipient_name' => 'زبون',
             'recipient_phone' => '0599000000',
-            'shipping_cost' => 18,
+            'shipping_cost' => $cost,
         ]);
 
         $shipment->newQuery()->whereKey($shipment->id)->toBase()
             ->update(['created_at' => Carbon::parse(self::FROM.' 10:00:00')]);
 
-        $report = $this->report();
-
-        $this->assertArrayNotHasKey('delivery_paid', $report['expenses']);
-        $this->assertEqualsWithDelta(0.0, $report['expenses']['total'], 0.01);
-        // ٤٠ ربحُ البضاعة وحدها: لا ٢٠ مضافةً ولا ١٨ مخصومة.
-        $this->assertEqualsWithDelta(40.0, $report['net_income'], 0.01);
+        return $shipment->refresh();
     }
 
     /** وسندات الصرف المُرحَّلة تظهر بتصنيفاتها. */

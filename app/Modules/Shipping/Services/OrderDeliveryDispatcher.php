@@ -4,6 +4,7 @@ namespace App\Modules\Shipping\Services;
 
 use App\Modules\Foundation\Models\Area;
 use App\Modules\Foundation\Models\City;
+use App\Modules\Foundation\Models\DeliveryCityRate;
 use App\Modules\Foundation\Models\DeliveryProvider;
 use App\Modules\Foundation\Models\GeoProviderMapping;
 use App\Modules\Sales\Models\Order;
@@ -207,6 +208,20 @@ class OrderDeliveryDispatcher
         ])->saveQuietly();
     }
 
+    /**
+     * تكلفة توصيل مدينة الطلب لدى شركة التوصيل.
+     *
+     * قراءةٌ فقط من جدول الأسعار — لا مساس بحمولة الإرسال ولا بعقد الاستجابة.
+     */
+    private function providerCostFor(Order $order): float
+    {
+        $rate = $order->city_id
+            ? DeliveryCityRate::where('is_active', true)->where('city_id', $order->city_id)->first()
+            : null;
+
+        return $rate ? $rate->providerCost() : (float) $order->shipping_total;
+    }
+
     private function persist(Order $order, ?int $providerId, ?string $tracking, ?string $externalId, array $result): void
     {
         DB::transaction(function () use ($order, $providerId, $tracking, $externalId, $result) {
@@ -231,7 +246,12 @@ class OrderDeliveryDispatcher
                 'address_text' => $order->shipping_address,
                 'city_id' => $order->city_id,
                 'area_id' => $order->area_id,
-                'shipping_cost' => (float) $order->shipping_total,
+                // تكلفةُ المدينة لدى شركة التوصيل — لا ما تقاضيناه من الزبون.
+                // كان يُكتب هنا `shipping_total`، فيحمل الحقلُ المسمّى «تكلفة»
+                // سعرَ البيع: يستوي الرقمان ما دام الهامش صفرًا، ويصير خطأً
+                // صريحًا فور ضبط سعر بيعٍ للمدينة. والاحتياط إلى الطلب لمدينةٍ
+                // بلا سعر مضبوط — أقربُ تقديرٍ متاح.
+                'shipping_cost' => $this->providerCostFor($order),
                 'cost_source' => 'provider_live',
                 'cost_currency' => 'ILS',
                 'delivery_provider_id' => $providerId,

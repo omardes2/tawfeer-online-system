@@ -241,7 +241,10 @@ class OrderController extends Controller
             'areas' => Area::whereIn('city_id', DeliveryCityRate::where('is_active', true)->pluck('city_id')->filter())
                 ->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'city_id']),
             // خريطة سعر التوصيل لكل مدينة (نمط Opost) لحساب حيّ في الواجهة.
-            'cityRates' => DeliveryCityRate::where('is_active', true)->pluck('delivery_fee', 'city_id'),
+            // القيمة سعرُ البيع للزبون لا تكلفةُ الشركة — والمفتاح والشكل كما
+            // هما، فلا يتغيّر عقدُ الـJS الذي يقرؤها.
+            'cityRates' => DeliveryCityRate::where('is_active', true)->get()
+                ->mapWithKeys(fn (DeliveryCityRate $r) => [$r->city_id => $r->customerFee()]),
         ]);
     }
 

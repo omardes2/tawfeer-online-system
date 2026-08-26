@@ -15,6 +15,9 @@
         <x-admin.stat-card :label="__('إجمالي الإيرادات')" :value="$report['revenue']['total']" money tone="blue" />
         <x-admin.stat-card :label="__('مجمل الربح')" :value="$report['gross_profit']" money tone="gray"
                            :hint="$report['gross_margin'] === null ? null : __('الهامش :p%', ['p' => $report['gross_margin']])" />
+        <x-admin.stat-card :label="__('صافي ربح التوصيل')" :value="$report['delivery']['net']" money
+                           :tone="$report['delivery']['net'] > 0 ? 'green' : 'gray'"
+                           :hint="__('مُحصَّل :c − مدفوع :p', ['c' => number_format($report['delivery']['collected'], 2), 'p' => number_format($report['delivery']['paid'], 2)])" />
         <x-admin.stat-card :label="__('إجمالي المصاريف')" :value="$report['expenses']['total']" money tone="amber" />
         <x-admin.stat-card :label="__('صافي الدخل')" :value="$report['net_income']" money
                            :tone="$report['net_income'] >= 0 ? 'green' : 'red'"
@@ -91,7 +94,26 @@
                     </tr>
                 </tbody>
 
-                {{-- ③ المصاريف: الثلاثة الثابتة ثم تصنيفات سندات الصرف. --}}
+                {{-- ③ صافي ربح التوصيل — خدمةٌ بيعت بأكثر من كلفتها. --}}
+                <tbody class="border-t-4 border-gray-100">
+                    <tr class="bg-gray-50">
+                        <th colspan="2" class="text-start font-bold text-gray-700">{{ __('صافي ربح التوصيل') }}</th>
+                    </tr>
+                    <tr>
+                        <td class="ps-8">{{ __('رسوم التوصيل المُحصَّلة من الزبائن') }}</td>
+                        <td class="text-start tabular-nums">{{ $money($report['delivery']['collected']) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="ps-8">{{ __('المدفوع لشركة التوصيل') }}</td>
+                        <td class="text-start tabular-nums">({{ $money($report['delivery']['paid']) }})</td>
+                    </tr>
+                    <tr class="font-bold {{ $report['delivery']['net'] >= 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800' }}">
+                        <td>{{ __('صافي ربح التوصيل') }}</td>
+                        <td class="text-start tabular-nums">{{ $money($report['delivery']['net']) }}</td>
+                    </tr>
+                </tbody>
+
+                {{-- ④ المصاريف: الثلاثة الثابتة ثم تصنيفات سندات الصرف. --}}
                 <tbody class="border-t-4 border-gray-100">
                     <tr class="bg-gray-50">
                         <th colspan="2" class="text-start font-bold text-gray-700">{{ __('المصاريف') }}</th>
@@ -140,7 +162,7 @@
                     </tr>
                 </tbody>
 
-                {{-- ④ النتيجة. --}}
+                {{-- ⑤ النتيجة. --}}
                 <tbody class="border-t-4 border-gray-100">
                     <tr class="{{ $report['net_income'] >= 0 ? 'bg-emerald-100 text-emerald-900' : 'bg-red-100 text-red-900' }} font-bold text-base">
                         <td>{{ $report['net_income'] >= 0 ? __('صافي الدخل') : __('صافي الخسارة') }}</td>
@@ -170,10 +192,11 @@
             <li>{{ __('الإعلانات تُقرأ من جدول الصرف الإعلاني — وهو خارج القيود المحاسبية، فلا يظهر في ميزان المراجعة.') }}</li>
             <li>{{ __('الرواتب ومكافأة نهاية الخدمة تُقرآن من قيود المسيّرات المُرحَّلة — فالمسودّة لا تدخل، والمعكوس يُلغي نفسه.') }}</li>
             <li>
-                {{ __('التوصيل خارج القائمة من طرفيه: لا رسومَ محصَّلة في الإيرادات ولا أجرةَ طرودٍ في المصاريف — فهي مال شركة التوصيل يمرّ بنا.') }}
+                {{ __('التوصيل يدخل بصافيه لا بطرفيه: رسومُه ليست إيرادًا ولا أجرتُه مصروفًا، بل الفرق بينهما ربحُ خدمةٍ بيعت بأكثر من كلفتها.') }}
                 <a href="{{ route('admin.reports.delivery_cost') }}" class="text-emerald-600 hover:underline">{{ __('تقرير تكلفة التوصيل') }}</a>
                 {{ __('يعرض المدفوع للشركة على حدة.') }}
             </li>
+            <li>{{ __('ومجمل الربح على البضاعة وحدها — هامش التوصيل خدمةٌ لا بضاعة، وضمُّه يُفسد الهامش الذي تُقاس به قرارات الشراء.') }}</li>
         </ul>
     </div>
 </x-app-layout>

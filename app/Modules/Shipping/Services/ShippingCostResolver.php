@@ -32,7 +32,9 @@ class ShippingCostResolver
             weight: (float) ($context['weight'] ?? 0),
         ));
         if ($quote !== null) {
-            return new ShippingCostResult($quote->cost, 'provider_live', $quote->currency);
+            // يُمرَّر سعرُ البيع كما هو من العرض: التكلفة تُكتب على الشحنة
+            // وسعرُ البيع على الطلب، وطيُّهما في رقمٍ واحد هنا يُلغي الهامش.
+            return new ShippingCostResult($quote->cost, 'provider_live', $quote->currency, $quote->customerFee());
         }
 
         // (2) أحدث سعر مُزامَن، (3) سعر المنطقة المحلي — مؤجّلان (Phase 3): لا محرّك تسعير الآن.

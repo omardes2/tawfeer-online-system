@@ -45,6 +45,7 @@ class DeliveryRateController extends Controller
         $data = $request->validate([
             'city_id' => ['required', 'integer', 'exists:cities,id'],
             'delivery_fee' => ['required', 'numeric', 'min:0'],
+            'customer_fee' => ['nullable', 'numeric', 'min:0'],
             'return_fee' => ['nullable', 'numeric', 'min:0'],
             'currency' => ['nullable', 'string', 'size:3'],
         ]);
@@ -61,6 +62,7 @@ class DeliveryRateController extends Controller
                 'name' => $city->name,
                 'name_en' => $city->name_en,
                 'delivery_fee' => $data['delivery_fee'],
+                'customer_fee' => $data['customer_fee'] ?? null,
                 'return_fee' => $data['return_fee'] ?? 0,
                 'currency' => strtoupper($data['currency'] ?? 'ILS'),
                 'is_active' => true,
@@ -78,6 +80,9 @@ class DeliveryRateController extends Controller
         $rows = $request->validate([
             'rates' => ['array'],
             'rates.*.delivery_fee' => ['nullable', 'numeric', 'min:0'],
+            // سعر البيع: الفراغ يعني «بلا هامش» فتبقى المدينة على تكلفتها.
+            // ولا حدَّ أدنى فوق الصفر — المجّانيّة قرارُ تسعيرٍ لا خطأ إدخال.
+            'rates.*.customer_fee' => ['nullable', 'numeric', 'min:0'],
             'rates.*.return_fee' => ['nullable', 'numeric', 'min:0'],
             'rates.*.is_active' => ['nullable', 'boolean'],
         ])['rates'] ?? [];
@@ -89,6 +94,11 @@ class DeliveryRateController extends Controller
             }
             $rate->update([
                 'delivery_fee' => $vals['delivery_fee'] ?? $rate->delivery_fee,
+                // `''` تُفرَّق عن الغياب: الحقل الفارغ في النموذج يُلغي سعر
+                // البيع ويُعيد المدينة إلى تكلفتها، والغيابُ يُبقيه كما هو.
+                'customer_fee' => array_key_exists('customer_fee', $vals)
+                    ? ($vals['customer_fee'] === null || $vals['customer_fee'] === '' ? null : (float) $vals['customer_fee'])
+                    : $rate->customer_fee,
                 'return_fee' => $vals['return_fee'] ?? $rate->return_fee,
                 'is_active' => (bool) ($vals['is_active'] ?? false),
             ]);

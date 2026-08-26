@@ -68,7 +68,9 @@ class ShipmentService
                 'created_by' => auth()->id(),
             ]);
 
-            $this->orders->applyShippingTotal($order, (float) $cost->cost);
+            // الشحنة تحمل التكلفة (أعلاه)، والطلب يحمل سعر البيع. ومن لم يُضبط
+            // له سعرُ بيعٍ يعودان متساويين — فلا يتحرّك طلبٌ قائم.
+            $this->orders->applyShippingTotal($order, $cost->customerFee());
             $this->recordEvent($shipment, null, 'not_shipped', 'system');
 
             return $shipment;

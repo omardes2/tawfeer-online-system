@@ -188,8 +188,10 @@ class CreateDraftOrderTool implements ContextAwareTool, ToolContract
      */
     private function deliveryFee(int $cityId): float
     {
+        // سعر البيع للزبون لا تكلفة الشركة — ما يقوله الوكيل للزبون هو ما
+        // سيُقيَّد على طلبه.
         return (float) (DeliveryCityRate::where('is_active', true)
             ->where('city_id', $cityId)
-            ->value('delivery_fee') ?? 0);
+            ->first()?->customerFee() ?? 0);
     }
 }

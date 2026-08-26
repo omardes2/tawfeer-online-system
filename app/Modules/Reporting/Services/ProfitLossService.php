@@ -42,13 +42,16 @@ use Illuminate\Support\Facades\DB;
  * `expense`، فجمعُ سندات المصروف لا يلتقطها. والمحتسَب هنا **استحقاق الفترة**
  * — وهو تكلفة مبيعاتها سواءٌ صُرف أم لا.
  *
- * **٥. التوصيل خارج القائمة من طرفيه.** رسومُه مالُ شركة التوصيل يمرّ بنا لا
- * إيرادُنا، فإدخاله يُضخّم المبيعات بما لم يُبَع. وإخراجُه من الإيراد وحده كان
- * سيترك تكلفتَه مصروفًا بلا مقابل فيُظهر خسارةً وهمية — فخرج الطرفان معًا:
- * لا رسومَ محصَّلة في الإيراد ولا أجرةَ طرودٍ في المصاريف.
+ * **٥. التوصيل بصافيه لا بطرفيه.** رسومُه مالُ شركة التوصيل يمرّ بنا لا
+ * إيرادُنا، فإدخالُ المُحصَّل كاملًا يُضخّم المبيعات بما لم يُبَع. وإخراجُه من
+ * الإيراد وحده كان سيترك تكلفتَه مصروفًا بلا مقابل فيُظهر خسارةً وهمية.
  *
- * ولهذا ثمن يجب أن يُعرَف: **الفرق** بين المُحصَّل والمدفوع — إن حُصِّل ٢٠
- * ودُفع ١٨ — لم يعد يظهر في صافي الدخل. مكانُه تقرير «تكلفة التوصيل».
+ * فخرج الطرفان من مكانَيهما، ودخل **الفرق** وحده سطرًا مستقلًّا: ما حُصِّل من
+ * الزبائن ناقص ما دُفع للشركة. فمدينةٌ تُكلّف ١٧ وتُباع بـ٢٠ تُدخل ٣ ربحًا
+ * حقيقيًّا، ومدينةٌ بلا هامش تُدخل صفرًا فلا تُحرّك شيئًا.
+ *
+ * وهو **إيرادٌ لا خصمٌ من مصروف**: خدمةُ توصيلٍ بيعت بأكثر من كلفتها، لا
+ * تخفيضٌ في أجرة الطرود.
  *
  * ## حدٌّ يجب أن يُعرَف
  *
@@ -74,13 +77,15 @@ class ProfitLossService
         $revenue = $this->revenueByEarner($from, $to);
         $cogs = $this->cogs($from, $to);
 
-        // الإجمالي هو المبيعات نفسها: لا سطر ثانيًا يُضاف إليها بعد خروج
-        // التوصيل. ويبقى المفتاحان معًا كي لا تحتاج الشاشة أن تعرف ذلك.
         $goods = round(array_sum($revenue), 2);
+        $deliveryMargin = $this->deliveryMargin($from, $to);
+
+        // مجمل الربح على البضاعة وحدها: هامشُ التوصيل خدمةٌ لا بضاعةٌ، وضمُّه
+        // إلى المبيعات يُفسد هامش البضاعة الذي تُقاس به قرارات الشراء.
         $grossProfit = round($goods - $cogs, 2);
 
         $expenses = $this->expenses($from, $to);
-        $netIncome = round($grossProfit - $expenses['total'], 2);
+        $netIncome = round($grossProfit + $deliveryMargin['net'] - $expenses['total'], 2);
 
         return [
             'revenue' => $revenue + [
@@ -90,9 +95,44 @@ class ProfitLossService
             'cogs' => $cogs,
             'gross_profit' => $grossProfit,
             'gross_margin' => $goods > 0 ? round($grossProfit / $goods * 100, 1) : null,
+            'delivery' => $deliveryMargin,
             'expenses' => $expenses,
             'net_income' => $netIncome,
             'net_margin' => $goods > 0 ? round($netIncome / $goods * 100, 1) : null,
+        ];
+    }
+
+    /**
+     * صافي ربح التوصيل: ما حُصِّل من الزبائن ناقص ما دُفع لشركة التوصيل.
+     *
+     * الطرفان من مصدرين مختلفين عمدًا: المُحصَّل من `orders.shipping_total`
+     * (ما قُيِّد على الطلب)، والمدفوع من `shipments.shipping_cost` (تكلفة
+     * المدينة لدى الشركة). وقراءتُهما من مكانٍ واحد كانت ستُعطي صفرًا دائمًا.
+     *
+     * ويُقاسان على تاريخ الطلب لا تاريخ الشحنة كي يقعا في الفترة نفسها،
+     * فالطرد يُشحن بعد طلبه بأيام وقد يقع في شهرٍ تالٍ.
+     *
+     * @return array{collected: float, paid: float, net: float}
+     */
+    private function deliveryMargin(string $from, string $to): array
+    {
+        $collected = round((float) DB::table('orders')
+            ->whereNull('deleted_at')
+            ->where('status', '!=', 'cancelled')
+            ->whereBetween('created_at', [$from, $to])
+            ->sum('shipping_total'), 2);
+
+        $paid = round((float) DB::table('shipments')
+            ->join('orders', 'shipments.order_id', '=', 'orders.id')
+            ->whereNull('orders.deleted_at')
+            ->where('orders.status', '!=', 'cancelled')
+            ->whereBetween('orders.created_at', [$from, $to])
+            ->sum('shipments.shipping_cost'), 2);
+
+        return [
+            'collected' => $collected,
+            'paid' => $paid,
+            'net' => round($collected - $paid, 2),
         ];
     }
 

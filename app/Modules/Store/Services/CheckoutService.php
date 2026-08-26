@@ -222,9 +222,12 @@ class CheckoutService
             //     ضروري لأن مُحلّل التكلفة يصمت حين يكون المزوّد `null`، فكان
             //     طلب الويب يخرج بلا رسوم بينما الطلب اليدوي لنفس المدينة يحملها.
             if ($fee <= 0) {
+                // `customerFee()` لا `delivery_fee`: الأوّل سعرُ البيع إن ضُبط
+                // للمدينة، والثاني تكلفتُها لدى شركة التوصيل. والزبون يدفع
+                // الأوّل. ومن لم يُضبط له سعرُ بيعٍ يبقى على التكلفة كما كان.
                 $fee = (float) (DeliveryCityRate::where('is_active', true)
                     ->where('city_id', $session->city_id)
-                    ->value('delivery_fee') ?? 0);
+                    ->first()?->customerFee() ?? 0);
             }
         }
 

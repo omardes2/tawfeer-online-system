@@ -46,6 +46,9 @@
                     <x-admin.field :label="__('رسوم التوصيل')" name="delivery_fee" required>
                         <input type="number" step="0.01" min="0" name="delivery_fee" value="0" required class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
                     </x-admin.field>
+                    <x-admin.field :label="__('سعر البيع للزبون')" name="customer_fee">
+                        <input type="number" step="0.01" min="0" name="customer_fee" placeholder="{{ __('اتركه فارغًا = كالتكلفة') }}" class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
+                    </x-admin.field>
                     <x-admin.field :label="__('رسوم الإرجاع')" name="return_fee">
                         <input type="number" step="0.01" min="0" name="return_fee" value="0" class="w-full rounded-lg border-gray-300 focus:border-emerald-500 focus:ring-emerald-500" />
                     </x-admin.field>
@@ -64,7 +67,9 @@
                 <tr>
                     <th>{{ __('المدينة') }}</th>
                     <th>{{ __('كود المزوّد') }}</th>
-                    <th>{{ __('رسوم التوصيل') }}</th>
+                    <th>{{ __('تكلفة الشركة') }}</th>
+                    <th>{{ __('سعر البيع للزبون') }}</th>
+                    <th>{{ __('الهامش') }}</th>
                     <th>{{ __('رسوم الإرجاع') }}</th>
                     <th>{{ __('العملة') }}</th>
                     <th>{{ __('مفعّل') }}</th>
@@ -82,6 +87,22 @@
                             @else
                                 {{ number_format($rate->delivery_fee, 2) }}
                             @endcan
+                        </td>
+                        {{-- سعر البيع: الفراغ يعني «بلا هامش» فتبقى المدينة على
+                             تكلفتها. ولذلك لا `value="0"` هنا — الصفر يعني
+                             توصيلًا مجّانيًّا وهو قرارٌ آخر تمامًا. --}}
+                        <td>
+                            @can('settings.geography.manage')
+                                <input type="number" step="0.01" min="0" name="rates[{{ $rate->id }}][customer_fee]"
+                                       value="{{ $rate->customer_fee === null ? '' : rtrim(rtrim(number_format($rate->customer_fee, 2, '.', ''), '0'), '.') }}"
+                                       placeholder="{{ __('كالتكلفة') }}"
+                                       class="w-28 rounded-md border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500" />
+                            @else
+                                {{ $rate->customer_fee === null ? __('كالتكلفة') : number_format($rate->customer_fee, 2) }}
+                            @endcan
+                        </td>
+                        <td class="tabular-nums {{ $rate->margin() > 0 ? 'text-emerald-700 font-semibold' : ($rate->margin() < 0 ? 'text-rose-600 font-semibold' : 'text-gray-400') }}">
+                            {{ $rate->margin() == 0.0 ? '—' : number_format($rate->margin(), 2) }}
                         </td>
                         <td>
                             @can('settings.geography.manage')
