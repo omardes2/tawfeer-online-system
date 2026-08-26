@@ -2,6 +2,7 @@
 
 namespace App\Modules\Commissions\Providers;
 
+use App\Modules\Commissions\Console\AuditEarnerPricesCommand;
 use App\Modules\Commissions\Console\RepairWholesaleSnapshotsCommand;
 use App\Modules\Commissions\Console\RepriceEarnerCommand;
 use App\Modules\Commissions\Listeners\AccrueCommissionsOnDelivery;
@@ -22,6 +23,8 @@ class CommissionsServiceProvider extends ServiceProvider
         // قبل اعتماده، لا يعمل وحده في الليل.
         if ($this->app->runningInConsole()) {
             $this->commands([
+                // الفحص يقرأ ولا يكتب — يُشغَّل قبل الإصلاح ليُعرف حجمُه.
+                AuditEarnerPricesCommand::class,
                 RepairWholesaleSnapshotsCommand::class,
                 RepriceEarnerCommand::class,
             ]);
