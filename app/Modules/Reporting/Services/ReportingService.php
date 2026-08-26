@@ -2,6 +2,7 @@
 
 namespace App\Modules\Reporting\Services;
 
+use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Inventory\Services\WarehouseService;
 use App\Modules\Reporting\Support\DateRange;
 use Illuminate\Database\Query\Builder;
@@ -300,11 +301,51 @@ class ReportingService
             ->selectRaw('product_variants.id, COALESCE(products.name, product_variants.sku) as name, SUM(order_items.qty) as qty, SUM(order_items.line_total) as revenue, SUM(order_items.returned_qty) as returned')
             ->groupBy('product_variants.id', 'products.name', 'product_variants.sku')->orderByDesc('revenue')->limit($limit)
             ->get()
-            ->map(function ($row) {
-                $row->revenue = $this->money($row->revenue);
+            ->pipe(function (Collection $rows) {
+                // التجميع بالمتغيّر لا بالصنف: أيّ لونٍ يُباع سؤالٌ حقيقيّ.
+                // لكنّ الاسم وحده يجعل «جهاز تعطير» صفّين متطابقين في الشاشة،
+                // فيُقرآن تكرارًا. فيُلحَق وصفُ المتغيّر بالاسم ليفترقا.
+                $labels = $this->variantLabels($rows->pluck('id')->filter()->all());
 
-                return $row;
+                return $rows->map(function ($row) use ($labels) {
+                    $row->revenue = $this->money($row->revenue);
+                    $row->variant_label = $labels[$row->id] ?? null;
+
+                    if ($row->variant_label) {
+                        $row->name = $row->name.' — '.$row->variant_label;
+                    }
+
+                    return $row;
+                });
             });
+    }
+
+    /**
+     * وصفُ كل متغيّر من قيم سماته — استعلامٌ واحد لا استعلامٌ لكل صفّ.
+     *
+     * ويُترك فارغًا لصنفٍ بلا سمات: إلحاق اسمه بنفسه يُطيل السطر بلا فائدة.
+     *
+     * @param  array<int, int>  $variantIds
+     * @return array<int, string>
+     */
+    private function variantLabels(array $variantIds): array
+    {
+        if ($variantIds === []) {
+            return [];
+        }
+
+        return ProductVariant::with('attributeValues')
+            ->whereIn('id', $variantIds)
+            ->get()
+            ->mapWithKeys(function (ProductVariant $variant) {
+                $label = $variant->attributeValues->isEmpty()
+                    ? ''
+                    : $variant->optionLabel();
+
+                return [$variant->id => $label];
+            })
+            ->filter()
+            ->all();
     }
 
     /** إحصاءات العملاء. @return array<string, mixed> */
