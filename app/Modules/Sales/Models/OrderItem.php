@@ -77,6 +77,31 @@ class OrderItem extends Model
     }
 
     /**
+     * **سعر شراء المسوّق** للبند: سعر قائمته المخصّصة أو سعر الجملة، مُجمَّدًا
+     * وقت البيع.
+     *
+     * هو الخطّ الفاصل بين الربحين: ما فوقه ربحُ المسوّق (باع بأعلى ممّا اشترى)،
+     * وما بينه وبين تكلفة الشراء ربحُ الشركة منه. ونظيرُه المنطقيّ في
+     * `CommissionService::itemCost()` — أساس العمولة نفسه، فلا يفترق ما يُعرَض
+     * في التقرير عمّا يُحتسب في الدفتر.
+     *
+     * والاحتياط بترتيبه: لقطةُ البند، ثم سعر الجملة الحالي للمتغيّر، ثم
+     * التكلفة. فبندٌ قديم بلقطةٍ صفرٍ كان سيُظهر كامل الهامش ربحًا للمسوّق.
+     */
+    public function goodsWholesale(): float
+    {
+        $unit = (float) $this->wholesale_price_snapshot > 0
+            ? (float) $this->wholesale_price_snapshot
+            : (float) ($this->variant?->effectiveWholesalePrice() ?? 0);
+
+        if ($unit <= 0) {
+            $unit = (float) ($this->wholesale_cost_snapshot ?? $this->variant?->average_cost ?? 0);
+        }
+
+        return (float) $this->qty * $unit;
+    }
+
+    /**
      * خيارات المتغيّر (لون/مقاس) كنصّ واحد، أو `''` لصنفٍ بلا خيارات.
      *
      * موضعٌ واحد تقرأ منه الفاتورةُ وحمولةُ الشحنة معًا: بند «قميص» بلا لونه

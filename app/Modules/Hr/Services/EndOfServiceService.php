@@ -49,10 +49,14 @@ class EndOfServiceService
      * تراكم شهرٍ واحد لموظف — راتبه الأساسيّ الساري ÷ ١٢.
      *
      * ومن انتهت خدمته لا يتراكم له: لا عملَ في الشهر فلا التزام جديد.
+     *
+     * **والدوام الكامل وحده يستحقّ.** العقد والدوام الجزئيّ أجرٌ مقابل عمل بلا
+     * مكافأة نهاية خدمة، فتراكمُها لهما يُنشئ في الميزانية التزامًا لا يقوم
+     * على اتفاق.
      */
     public function monthlyAccrual(EmployeeProfile $profile, float $basicSalary): float
     {
-        if ($profile->status !== 'active') {
+        if ($profile->status !== 'active' || ! $profile->accruesBenefits()) {
             return 0.0;
         }
 

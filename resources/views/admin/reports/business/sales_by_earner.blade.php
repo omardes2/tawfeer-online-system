@@ -3,6 +3,8 @@
         $sym = \App\Modules\Foundation\Services\Settings::get('store.currency_symbol', '₪');
         // كمية بلا أصفار زائدة: «2» لا «2.00»، و«1.5» تبقى كما هي.
         $qty = fn ($n) => rtrim(rtrim(number_format((float) $n, 2), '0'), '.');
+        // عمودٌ للربح أو عمودان — والعدد يضبط `colspan` في صفّي التفصيل والفراغ.
+        $cols = ($splitProfit ?? false) ? 5 : 4;
     @endphp
     <div class="report-no-print">
         <x-admin.header
@@ -18,7 +20,10 @@
                 <th>{{ $personLabel }}</th>
                 <th class="text-start">{{ __('عدد الطلبات') }}</th>
                 <th class="text-start">{{ __('سعر البيع') }}</th>
-                <th class="text-start">{{ __('الربح') }}</th>
+                <th class="text-start">{{ $earnerProfitLabel ?? __('الربح') }}</th>
+                @if ($splitProfit ?? false)
+                    <th class="text-start">{{ $companyProfitLabel }}</th>
+                @endif
             </tr>
         </thead>
 
@@ -42,10 +47,14 @@
                     </td>
                     <td class="text-start tabular-nums">{{ number_format($r['orders_count']) }}</td>
                     <td class="text-start font-medium tabular-nums whitespace-nowrap">{{ number_format($r['sales'], 2) }} {{ $sym }}</td>
-                    <td class="text-start tabular-nums whitespace-nowrap {{ $r['profit'] < 0 ? 'text-rose-600' : 'text-emerald-700' }}">{{ number_format($r['profit'], 2) }} {{ $sym }}</td>
+                    @php $summaryProfit = ($splitProfit ?? false) ? $r['earner_profit'] : $r['profit']; @endphp
+                    <td class="text-start tabular-nums whitespace-nowrap {{ $summaryProfit < 0 ? 'text-rose-600' : 'text-emerald-700' }}">{{ number_format($summaryProfit, 2) }} {{ $sym }}</td>
+                    @if ($splitProfit ?? false)
+                        <td class="text-start tabular-nums whitespace-nowrap {{ $r['company_profit'] < 0 ? 'text-rose-600' : 'text-sky-700' }}">{{ number_format($r['company_profit'], 2) }} {{ $sym }}</td>
+                    @endif
                 </tr>
                 <tr x-show="open" x-cloak>
-                    <td colspan="4" class="!p-0 bg-gray-50">
+                    <td colspan="{{ $cols }}" class="!p-0 bg-gray-50">
                         <div class="p-3">
                             <table class="w-full text-xs bg-white rounded-lg overflow-hidden ring-1 ring-gray-200">
                                 <thead>
@@ -55,7 +64,10 @@
                                         <th class="text-start font-medium py-2 px-2.5">{{ __('المنتج المباع') }}</th>
                                         <th class="text-start font-medium py-2 px-2.5">{{ __('الكمية') }}</th>
                                         <th class="text-start font-medium py-2 px-2.5">{{ __('سعر البيع') }}</th>
-                                        <th class="text-start font-medium py-2 px-2.5">{{ __('الربح') }}</th>
+                                        <th class="text-start font-medium py-2 px-2.5">{{ $earnerProfitLabel ?? __('الربح') }}</th>
+                                        @if ($splitProfit ?? false)
+                                            <th class="text-start font-medium py-2 px-2.5">{{ $companyProfitLabel }}</th>
+                                        @endif
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -76,7 +88,11 @@
                                             </td>
                                             <td class="py-2 px-2.5 tabular-nums text-gray-700">{{ $qty($o['qty']) }}</td>
                                             <td class="py-2 px-2.5 tabular-nums text-gray-700 whitespace-nowrap">{{ number_format($o['sale'], 2) }} {{ $sym }}</td>
-                                            <td class="py-2 px-2.5 tabular-nums whitespace-nowrap {{ $o['profit'] < 0 ? 'text-rose-600' : 'text-emerald-700' }}">{{ number_format($o['profit'], 2) }} {{ $sym }}</td>
+                                            @php $lineProfit = ($splitProfit ?? false) ? $o['earner_profit'] : $o['profit']; @endphp
+                                            <td class="py-2 px-2.5 tabular-nums whitespace-nowrap {{ $lineProfit < 0 ? 'text-rose-600' : 'text-emerald-700' }}">{{ number_format($lineProfit, 2) }} {{ $sym }}</td>
+                                            @if ($splitProfit ?? false)
+                                                <td class="py-2 px-2.5 tabular-nums whitespace-nowrap {{ $o['company_profit'] < 0 ? 'text-rose-600' : 'text-sky-700' }}">{{ number_format($o['company_profit'], 2) }} {{ $sym }}</td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -87,7 +103,7 @@
             </tbody>
         @empty
             <tbody>
-                <tr><td colspan="4" class="!p-0">
+                <tr><td colspan="{{ $cols }}" class="!p-0">
                     <x-admin.empty-state :title="__('لا توجد مبيعات')" :description="$emptyDescription" />
                 </td></tr>
             </tbody>
@@ -99,11 +115,29 @@
                     <td>{{ __('الإجمالي') }}</td>
                     <td class="text-start tabular-nums">{{ number_format($totalOrders) }}</td>
                     <td class="text-start tabular-nums whitespace-nowrap">{{ number_format($totalSales, 2) }} {{ $sym }}</td>
-                    <td class="text-start tabular-nums whitespace-nowrap {{ $totalProfit < 0 ? 'text-rose-600' : 'text-emerald-700' }}">{{ number_format($totalProfit, 2) }} {{ $sym }}</td>
+                    @php $footProfit = ($splitProfit ?? false) ? $totalEarnerProfit : $totalProfit; @endphp
+                    <td class="text-start tabular-nums whitespace-nowrap {{ $footProfit < 0 ? 'text-rose-600' : 'text-emerald-700' }}">{{ number_format($footProfit, 2) }} {{ $sym }}</td>
+                    @if ($splitProfit ?? false)
+                        <td class="text-start tabular-nums whitespace-nowrap {{ $totalCompanyProfit < 0 ? 'text-rose-600' : 'text-sky-700' }}">{{ number_format($totalCompanyProfit, 2) }} {{ $sym }}</td>
+                    @endif
                 </tr>
             </tfoot>
         @endif
     </x-admin.table>
+
+    {{-- تفسير القسمة: من يقرأ عمودين للربح يجب أن يعرف أين يقع الخطّ بينهما. --}}
+    @if ($splitProfit ?? false)
+        <div class="admin-card admin-card-pad mt-5 text-sm text-gray-600 leading-7">
+            <h3 class="font-semibold text-gray-800 mb-2">{{ __('كيف قُسم الربح') }}</h3>
+            <ul class="list-disc ps-5 space-y-1">
+                <li>{{ __('الخطّ الفاصل هو سعر شراء المسوّق: سعر قائمته المخصّصة إن أُسنِدت له، وإلّا سعر الجملة — مُجمَّدًا وقت البيع.') }}</li>
+                <li><strong>{{ __('ربح المسوّق') }}</strong> = {{ __('سعر البيع − سعر شرائه.') }}</li>
+                <li><strong>{{ __('ربح توفير') }}</strong> = {{ __('سعر شراء المسوّق − تكلفة الشراء الفعلية (متوسط التكلفة).') }}</li>
+                <li>{{ __('الاثنان بلا رسوم التوصيل: الأرقام من بنود الفاتورة وحدها، والرسوم على الطلب لا على البند.') }}</li>
+                <li>{{ __('ومجموعهما يساوي ربح الطلب كاملًا — فلا يضيع شيء في القسمة ولا يُحتسب مرّتين.') }}</li>
+            </ul>
+        </div>
+    @endif
 
     @include('admin.reports.business._basis', [
         'basisNote' => $rows->contains('unassigned', true)

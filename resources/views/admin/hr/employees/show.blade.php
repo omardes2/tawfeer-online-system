@@ -10,6 +10,18 @@
 
     <x-admin.flash />
 
+    {{--
+        نوعُ التعاقد يحكم الاستحقاقات، فيُقال في أعلى الملفّ لا في حاشية: من
+        يفتح الصفحة ويرى الإجازة صفرًا يجب أن يعرف السبب قبل أن يظنّه خللًا.
+    --}}
+    @unless ($employee->accruesBenefits())
+        <div class="admin-card admin-card-pad mb-5 border-s-4 border-amber-400 bg-amber-50 text-sm text-amber-800">
+            {{ __('تعاقدٌ :t — أجرٌ مقابل عمل: لا رصيد إجازةٍ سنوية ولا مكافأة نهاية خدمة.', [
+                't' => ['part_time' => __('بدوام جزئي'), 'contract' => __('بعقد')][$employee->employment_type] ?? $employee->employment_type,
+            ]) }}
+        </div>
+    @endunless
+
     @if ($employee->status === 'ended')
         <div class="admin-card admin-card-pad mb-5 border-s-4 border-gray-400 bg-gray-50 text-sm text-gray-700">
             {{ __('انتهت خدمته في :d — لا يدخل المسيّرات ولا يتراكم له مخصّص.', ['d' => $employee->end_date?->toDateString()]) }}
@@ -20,11 +32,19 @@
     <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 mb-5">
         <x-admin.stat-card :label="__('الراتب الشهريّ')" :value="$currentSalary?->gross() ?? 0" money tone="blue"
                            :hint="$currentSalary ? __('أساسيّ :b + بدلات :a', ['b' => number_format((float) $currentSalary->basic_salary, 2), 'a' => number_format((float) $currentSalary->allowances, 2)]) : __('لا راتب مسجَّل')" />
-        <x-admin.stat-card :label="__('رصيد الإجازة :y', ['y' => $year])" :value="number_format($leave['remaining'], 1).' '.__('يوم')"
-                           :tone="$leave['remaining'] < 0 ? 'red' : 'green'"
-                           :hint="__('المستحقّ :e · المأخوذ :t', ['e' => $leave['entitlement'], 't' => $leave['taken']])" />
-        <x-admin.stat-card :label="__('مخصّص نهاية الخدمة')" :value="$eosBalance" money tone="amber"
-                           :hint="__(':m شهر خدمة', ['m' => number_format($serviceMonths, 1)])" />
+        <x-admin.stat-card :label="__('رصيد الإجازة :y', ['y' => $year])"
+                           :value="$employee->accruesBenefits() ? number_format($leave['remaining'], 1).' '.__('يوم') : '—'"
+                           :tone="! $employee->accruesBenefits() ? 'gray' : ($leave['remaining'] < 0 ? 'red' : 'green')"
+                           :hint="$employee->accruesBenefits()
+                               ? __('المستحقّ :e · المأخوذ :t', ['e' => $leave['entitlement'], 't' => $leave['taken']])
+                               : __('لا إجازة سنوية لهذا التعاقد')" />
+        <x-admin.stat-card :label="__('مخصّص نهاية الخدمة')"
+                           :value="$employee->accruesBenefits() || $eosBalance != 0 ? $eosBalance : '—'"
+                           :money="$employee->accruesBenefits() || $eosBalance != 0"
+                           :tone="$employee->accruesBenefits() ? 'amber' : 'gray'"
+                           :hint="$employee->accruesBenefits()
+                               ? __(':m شهر خدمة', ['m' => number_format($serviceMonths, 1)])
+                               : __('لا مكافأة نهاية خدمة لهذا التعاقد')" />
         <x-admin.stat-card :label="__('رصيد العمولات')" :value="$commissions['outstanding'] ?? 0" money tone="gray"
                            :hint="__('للاطّلاع — تُصرف من شاشة العمولات')" />
     </div>
@@ -88,8 +108,10 @@
         <div class="admin-card overflow-hidden">
             <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                 <h3 class="font-semibold text-gray-800">{{ __('الإجازات :y', ['y' => $year]) }}</h3>
-                <span class="text-[11px] text-gray-400">
-                    {{ __('بلا راتب :u · مرضية :s', ['u' => $leave['unpaid'], 's' => $leave['sick']]) }}
+                <span class="text-[11px] {{ $employee->accruesBenefits() ? 'text-gray-400' : 'text-amber-600' }}">
+                    {{ $employee->accruesBenefits()
+                        ? __('بلا راتب :u · مرضية :s', ['u' => $leave['unpaid'], 's' => $leave['sick']])
+                        : __('لا رصيد سنويّ — التسجيل للسجلّ وخصمِ ما بلا راتب') }}
                 </span>
             </div>
             <table class="admin-table">
@@ -164,8 +186,10 @@
         <div class="admin-card overflow-hidden">
             <div class="px-4 py-3 border-b border-gray-100">
                 <h3 class="font-semibold text-gray-800">{{ __('مكافأة نهاية الخدمة') }}</h3>
-                <p class="text-[11px] text-gray-400 mt-0.5">
-                    {{ __('شهرٌ عن كل سنة خدمة — يتراكم مع كل مسيّر بمقدار الراتب الأساسيّ ÷ ١٢.') }}
+                <p class="text-[11px] mt-0.5 {{ $employee->accruesBenefits() ? 'text-gray-400' : 'text-amber-600' }}">
+                    {{ $employee->accruesBenefits()
+                        ? __('شهرٌ عن كل سنة خدمة — يتراكم مع كل مسيّر بمقدار الراتب الأساسيّ ÷ ١٢.')
+                        : __('لا تراكم لهذا التعاقد. ويبقى الدفتر ظاهرًا لحركاتٍ سابقة إن وُجدت.') }}
                 </p>
             </div>
             <table class="admin-table">

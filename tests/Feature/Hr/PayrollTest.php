@@ -46,14 +46,19 @@ class PayrollTest extends TestCase
     }
 
     /** موظفٌ براتبٍ ساري منذ بداية العام الماضي. */
-    private function employee(float $basic = 3000, float $allowances = 0, string $hire = '2025-01-01'): EmployeeProfile
-    {
+    private function employee(
+        float $basic = 3000,
+        float $allowances = 0,
+        string $hire = '2025-01-01',
+        string $type = 'full_time',
+    ): EmployeeProfile {
         $user = User::factory()->create(['name' => 'موظف '.uniqid()]);
 
         $profile = EmployeeProfile::create([
             'user_id' => $user->id,
             'hire_date' => $hire,
             'status' => 'active',
+            'employment_type' => $type,
             'annual_leave_days' => 14,
             'created_by' => $this->admin->id,
         ]);
@@ -314,6 +319,48 @@ class PayrollTest extends TestCase
         $profile->update(['status' => 'ended', 'end_date' => '2025-12-31']);
 
         $this->assertEqualsWithDelta(0.0, app(EndOfServiceService::class)->monthlyAccrual($profile, 3600), 0.01);
+    }
+
+    /**
+     * **والعقد والدوام الجزئيّ لا يتراكم لهما.**
+     *
+     * أجرٌ مقابل عمل بلا مكافأة نهاية خدمة — فتراكمُها لهما يُنشئ في الميزانية
+     * التزامًا لا يقوم على اتفاق.
+     */
+    public function test_contract_and_part_time_accrue_nothing(): void
+    {
+        $eos = app(EndOfServiceService::class);
+
+        foreach (['contract', 'part_time'] as $type) {
+            $profile = $this->employee(basic: 3600, type: $type);
+
+            $this->assertEqualsWithDelta(0.0, $eos->monthlyAccrual($profile, 3600), 0.01, $type);
+        }
+    }
+
+    /** ومسيّرٌ كلّه عقودٌ يُرحَّل بقيد الرواتب وحده — بلا قيد مخصّص. */
+    public function test_a_run_of_contractors_posts_no_provision_entry(): void
+    {
+        $this->employee(basic: 3600, type: 'contract');
+
+        $run = $this->service()->post($this->generate(), $this->admin);
+
+        $this->assertEqualsWithDelta(0.0, (float) $run->total_eos, 0.01);
+        $this->assertNull($run->eos_journal_entry_id);
+        $this->assertEqualsWithDelta(3600.0, $this->accountBalance(PayrollService::SALARY_EXPENSE_ACCOUNT), 0.01);
+        $this->assertEqualsWithDelta(0.0, $this->accountBalance(EndOfServiceService::EXPENSE_ACCOUNT), 0.01);
+    }
+
+    /** ويُخلَط النوعان في مسيّرٍ واحد بلا خطأ: المخصّص للدوام الكامل وحده. */
+    public function test_a_mixed_run_accrues_only_for_full_timers(): void
+    {
+        $this->employee(basic: 3600, type: 'full_time');
+        $this->employee(basic: 3600, type: 'contract');
+
+        $run = $this->service()->post($this->generate(), $this->admin);
+
+        $this->assertEqualsWithDelta(7200.0, (float) $run->total_net, 0.01);
+        $this->assertEqualsWithDelta(300.0, (float) $run->total_eos, 0.01);
     }
 
     // ────────── الصرف ──────────

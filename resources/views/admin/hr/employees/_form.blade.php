@@ -56,21 +56,41 @@
             <x-input-error :messages="$errors->get('end_date')" class="mt-1" />
         </div>
 
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('نوع التعاقد') }}</label>
-            <select name="employment_type" class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
-                @foreach (['full_time' => __('دوام كامل'), 'part_time' => __('دوام جزئي'), 'contract' => __('عقد')] as $k => $label)
-                    <option value="{{ $k }}" @selected(old('employment_type', $e?->employment_type ?? 'full_time') === $k)>{{ $label }}</option>
-                @endforeach
-            </select>
-        </div>
+        {{--
+            نوع التعاقد يحكم الاستحقاقات، فالحقلان مربوطان بـAlpine: اختيارُ
+            «عقد» أو «دوام جزئي» يُعطّل حقل الإجازة ويقول السبب في مكانه —
+            أوضح من تركِ الحقل يقبل رقمًا لا أثر له.
+        --}}
+        <div x-data="{ type: '{{ old('employment_type', $e?->employment_type ?? 'full_time') }}' }" class="contents">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('نوع التعاقد') }}</label>
+                <select name="employment_type" x-model="type"
+                        class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                    @foreach (['full_time' => __('دوام كامل'), 'part_time' => __('دوام جزئي'), 'contract' => __('عقد')] as $k => $label)
+                        <option value="{{ $k }}" @selected(old('employment_type', $e?->employment_type ?? 'full_time') === $k)>{{ $label }}</option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs" x-bind:class="type === 'full_time' ? 'text-gray-400' : 'text-amber-600'"
+                   x-text="type === 'full_time'
+                       ? '{{ __('يستحقّ الإجازة السنوية ومكافأة نهاية الخدمة (شهر عن كل سنة).') }}'
+                       : '{{ __('أجرٌ مقابل عمل: لا إجازة سنوية ولا مكافأة نهاية خدمة.') }}'"></p>
+            </div>
 
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('الإجازة السنوية (أيام)') }}</label>
-            <input type="number" step="0.5" min="0" name="annual_leave_days"
-                   value="{{ old('annual_leave_days', $e?->annual_leave_days ?? 14) }}"
-                   class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
-            <p class="mt-1 text-xs text-gray-400">{{ __('تُحتسب بالتناسب في سنة التعيين.') }}</p>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('الإجازة السنوية (أيام)') }}</label>
+                <input type="number" step="0.5" min="0" name="annual_leave_days"
+                       value="{{ old('annual_leave_days', $e?->annual_leave_days ?? 14) }}"
+                       {{-- `readonly` لا `disabled`: المعطَّل لا يُرسَل فيسقط الحقل
+                            من الطلب ويرفضه التحقّق. والقيمة تبقى محفوظةً كي لا
+                            تضيع إن عاد النوع إلى دوامٍ كامل. --}}
+                       x-bind:readonly="type !== 'full_time'"
+                       x-bind:class="type !== 'full_time' && 'bg-gray-100 text-gray-400'"
+                       class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                <p class="mt-1 text-xs text-gray-400"
+                   x-text="type === 'full_time'
+                       ? '{{ __('تُحتسب بالتناسب في سنة التعيين.') }}'
+                       : '{{ __('لا رصيد إجازة لهذا النوع.') }}'"></p>
+            </div>
         </div>
 
         <div>

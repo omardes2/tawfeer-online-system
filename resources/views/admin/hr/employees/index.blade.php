@@ -79,7 +79,14 @@
                                     <span class="block text-[11px] text-gray-400">{{ $p->branch->name }}</span>
                                 @endif
                             </td>
-                            <td class="text-gray-600">{{ $p->user?->job_title ?: '—' }}</td>
+                            <td class="text-gray-600">
+                                {{ $p->user?->job_title ?: '—' }}
+                                @unless ($p->accruesBenefits())
+                                    <span class="block text-[11px] text-amber-600">
+                                        {{ ['part_time' => __('دوام جزئي'), 'contract' => __('عقد')][$p->employment_type] ?? $p->employment_type }}
+                                    </span>
+                                @endunless
+                            </td>
                             <td class="text-gray-600 tabular-nums">{{ $p->hire_date->toDateString() }}</td>
 
                             @if ($r['basic'] === null)
@@ -91,11 +98,17 @@
                                 <td class="text-start tabular-nums font-semibold">{{ number_format($r['gross'], 2) }}</td>
                             @endif
 
-                            <td class="text-start tabular-nums {{ $r['leave_remaining'] < 0 ? 'text-rose-600 font-semibold' : 'text-gray-700' }}">
-                                {{ number_format($r['leave_remaining'], 1) }}
-                                <span class="text-[11px] text-gray-400">{{ __('يوم') }}</span>
-                            </td>
-                            <td class="text-start tabular-nums text-amber-700">{{ number_format($r['eos'], 2) }}</td>
+                            {{-- شرطةٌ لا صفر لمن لا يستحقّ: الصفر يُقرأ «استُهلك رصيده». --}}
+                            @if (! $p->accruesBenefits())
+                                <td class="text-start text-gray-400" title="{{ __('لا إجازة سنوية لهذا التعاقد') }}">—</td>
+                                <td class="text-start text-gray-400" title="{{ __('لا مكافأة نهاية خدمة لهذا التعاقد') }}">—</td>
+                            @else
+                                <td class="text-start tabular-nums {{ $r['leave_remaining'] < 0 ? 'text-rose-600 font-semibold' : 'text-gray-700' }}">
+                                    {{ number_format($r['leave_remaining'], 1) }}
+                                    <span class="text-[11px] text-gray-400">{{ __('يوم') }}</span>
+                                </td>
+                                <td class="text-start tabular-nums text-amber-700">{{ number_format($r['eos'], 2) }}</td>
+                            @endif
                             <td class="text-end">
                                 <a href="{{ route('admin.hr.employees.show', $p) }}" class="btn-secondary btn-sm">{{ __('الملفّ') }}</a>
                             </td>

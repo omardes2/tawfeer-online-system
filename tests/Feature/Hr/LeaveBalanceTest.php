@@ -29,13 +29,18 @@ class LeaveBalanceTest extends TestCase
         $this->admin = User::where('email', 'admin@tawfeer.online')->firstOrFail();
     }
 
-    private function employee(string $hire = '2025-01-01', float $days = 14, ?string $end = null): EmployeeProfile
-    {
+    private function employee(
+        string $hire = '2025-01-01',
+        float $days = 14,
+        ?string $end = null,
+        string $type = 'full_time',
+    ): EmployeeProfile {
         return EmployeeProfile::create([
             'user_id' => User::factory()->create()->id,
             'hire_date' => $hire,
             'end_date' => $end,
             'status' => $end ? 'ended' : 'active',
+            'employment_type' => $type,
             'annual_leave_days' => $days,
             'created_by' => $this->admin->id,
         ]);
@@ -157,6 +162,54 @@ class LeaveBalanceTest extends TestCase
         ]);
 
         $this->assertEqualsWithDelta(-6.0, $this->service()->balance($profile, 2026)['remaining'], 0.01);
+    }
+
+    // ────────── نوع التعاقد ──────────
+
+    /**
+     * **العقد والدوام الجزئيّ بلا رصيد إجازة.**
+     *
+     * أجرٌ مقابل عمل: لا إجازةَ سنوية تتراكم. وتركُ الاستحقاق لهما يُظهر رصيدًا
+     * لا يقوم على اتفاق.
+     */
+    public function test_contract_and_part_time_earn_no_annual_leave(): void
+    {
+        foreach (['contract', 'part_time'] as $type) {
+            $profile = $this->employee(days: 14, type: $type);
+
+            $this->assertEqualsWithDelta(0.0, $this->service()->entitlementFor($profile, 2026), 0.01, $type);
+            $this->assertEqualsWithDelta(0.0, $this->service()->balance($profile, 2026)['entitlement'], 0.01, $type);
+        }
+    }
+
+    /**
+     * وتسجيل الإجازة يبقى ممكنًا لهما — للسجلّ.
+     *
+     * فالمنعُ يدفع إلى ألّا يُسجَّل الغياب أصلًا، وغيرُ المدفوعة تُخصَم من
+     * راتبها كالجميع.
+     */
+    public function test_they_can_still_have_leaves_recorded(): void
+    {
+        $profile = $this->employee(type: 'contract');
+
+        $profile->leaves()->create([
+            'kind' => 'unpaid', 'from_date' => '2026-03-01', 'to_date' => '2026-03-03', 'days' => 3,
+        ]);
+
+        $balance = $this->service()->balance($profile, 2026);
+
+        $this->assertEqualsWithDelta(3.0, $balance['unpaid'], 0.01);
+        $this->assertEqualsWithDelta(0.0, $balance['entitlement'], 0.01);
+    }
+
+    /** والشاشة تقول السبب بدل أن تعرض صفرًا يُقرأ «استُهلك رصيده». */
+    public function test_the_screen_explains_why_there_is_no_balance(): void
+    {
+        $profile = $this->employee(type: 'contract');
+
+        $this->actingAs($this->admin)->get(route('admin.hr.employees.show', $profile))
+            ->assertOk()
+            ->assertSee('لا رصيد إجازةٍ سنوية ولا مكافأة نهاية خدمة', false);
     }
 
     /** وتسجيل الإجازة من الشاشة يعمل. */

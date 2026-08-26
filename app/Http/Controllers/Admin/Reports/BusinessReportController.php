@@ -148,6 +148,11 @@ class BusinessReportController extends Controller
             'empty' => __('لم يُسجّل أي مسوّق مبيعات بعد.'),
             'file' => 'sales-by-affiliate',
             'roles' => ['affiliate'],
+            // الربح مقسومٌ هنا وحده: المسوّق يشتري بسعر قائمته ويبيع بالمفرّق،
+            // فالفرق فرقان — واحدٌ له وواحدٌ للشركة منه.
+            'split' => true,
+            'earner_profit' => __('ربح المسوّق'),
+            'company_profit' => __('ربح توفير'),
         ]);
     }
 
@@ -261,6 +266,8 @@ class BusinessReportController extends Controller
                     'orders_count' => $lines->count(),
                     'sales' => round($lines->sum('sale'), 2),
                     'profit' => round($lines->sum('profit'), 2),
+                    'earner_profit' => round($lines->sum('earner_profit'), 2),
+                    'company_profit' => round($lines->sum('company_profit'), 2),
                     'orders' => $lines,
                 ];
             })
@@ -269,9 +276,24 @@ class BusinessReportController extends Controller
             ->sortBy(fn ($r) => $r['unassigned'] ? 1 : 0)
             ->values();
 
+        $split = $labels['split'] ?? false;
+
         if ($request->query('export') === 'csv') {
-            return $this->csv($labels['file'], [$labels['person'], __('عدد الطلبات'), __('سعر البيع'), __('الربح')],
-                $rows->map(fn ($r) => [$r['name'], $r['orders_count'], number_format($r['sales'], 2, '.', ''), number_format($r['profit'], 2, '.', '')]));
+            $head = [$labels['person'], __('عدد الطلبات'), __('سعر البيع')];
+            $head = $split
+                ? array_merge($head, [__('ربح المسوّق'), __('ربح توفير')])
+                : array_merge($head, [__('الربح')]);
+
+            return $this->csv($labels['file'], $head, $rows->map(function ($r) use ($split) {
+                $row = [$r['name'], $r['orders_count'], number_format($r['sales'], 2, '.', '')];
+
+                return $split
+                    ? array_merge($row, [
+                        number_format($r['earner_profit'], 2, '.', ''),
+                        number_format($r['company_profit'], 2, '.', ''),
+                    ])
+                    : array_merge($row, [number_format($r['profit'], 2, '.', '')]);
+            }));
         }
 
         return view('admin.reports.business.sales_by_earner', [
@@ -279,6 +301,14 @@ class BusinessReportController extends Controller
             'totalOrders' => $rows->sum('orders_count'),
             'totalSales' => round($rows->sum('sales'), 2),
             'totalProfit' => round($rows->sum('profit'), 2),
+            'totalEarnerProfit' => round($rows->sum('earner_profit'), 2),
+            'totalCompanyProfit' => round($rows->sum('company_profit'), 2),
+            // تقرير المسوّقين وحده يقسم الربح: المسوّق يشتري بسعر جملته ويبيع
+            // بالمفرّق، فللفرق طرفان. وموظف المبيعات لا يشتري شيئًا — فقسمةُ
+            // ربحه عند سعر الجملة تخترع له هامشًا لا يقبضه.
+            'splitProfit' => $split,
+            'earnerProfitLabel' => $labels['earner_profit'] ?? __('الربح'),
+            'companyProfitLabel' => $labels['company_profit'] ?? __('ربح توفير'),
             'reportTitle' => $labels['title'],
             'personLabel' => $labels['person'],
             'unassignedLabel' => $labels['unassigned'],
@@ -342,6 +372,8 @@ class BusinessReportController extends Controller
     {
         $sale = $order->items->sum(fn (OrderItem $i) => $i->goodsSale());
         $cost = $order->items->sum(fn (OrderItem $i) => $i->goodsCost());
+        // سعر شراء المسوّق — الخطّ الفاصل بين الربحين.
+        $wholesale = $order->items->sum(fn (OrderItem $i) => $i->goodsWholesale());
 
         return [
             'number' => $order->number,
@@ -355,6 +387,10 @@ class BusinessReportController extends Controller
             'qty' => (float) $order->items->sum(fn (OrderItem $i) => (float) $i->qty),
             'sale' => $sale,
             'profit' => $sale - $cost,
+            // الربح مقسومًا عند سعر شراء المسوّق: ما فوقه له، وما تحته للشركة.
+            // ومجموعهما يساوي `profit` بالضبط — فلا يضيع شيءٌ في القسمة.
+            'earner_profit' => round($sale - $wholesale, 2),
+            'company_profit' => round($wholesale - $cost, 2),
         ];
     }
 
