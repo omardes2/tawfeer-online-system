@@ -29,6 +29,8 @@ use App\Http\Controllers\Admin\Catalog\UnitController;
 use App\Http\Controllers\Admin\Commissions\CommissionController as AdminCommissionController;
 use App\Http\Controllers\Admin\Crm\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\Hr\EmployeeController as HrEmployeeController;
+use App\Http\Controllers\Admin\Hr\PayrollController;
 use App\Http\Controllers\Admin\Inventory\InventoryController;
 use App\Http\Controllers\Admin\Inventory\InventoryCountController as AdminInventoryCountController;
 use App\Http\Controllers\Admin\Inventory\StockAdjustmentController as AdminStockAdjustmentController;
@@ -432,6 +434,31 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::get('rules', [AdminCommissionController::class, 'rules'])->name('rules')->middleware('can:commissions.rules.manage');
         Route::post('rules', [AdminCommissionController::class, 'storeRule'])->name('rules.store')->middleware('can:commissions.rules.manage');
         Route::delete('rules/{rule}', [AdminCommissionController::class, 'destroyRule'])->name('rules.destroy')->middleware('can:commissions.rules.manage');
+    });
+
+    // الرواتب والموظفون: الملفّات والعقود والإجازات ومخصّص نهاية الخدمة
+    // ومسيّرات الرواتب بقيودها.
+    Route::prefix('hr')->name('hr.')->group(function () {
+        Route::get('employees', [HrEmployeeController::class, 'index'])->name('employees.index')->middleware('can:hr.employees.view');
+        Route::get('employees/create', [HrEmployeeController::class, 'create'])->name('employees.create')->middleware('can:hr.employees.manage');
+        Route::post('employees', [HrEmployeeController::class, 'store'])->name('employees.store')->middleware('can:hr.employees.manage');
+        Route::get('employees/{employee}', [HrEmployeeController::class, 'show'])->name('employees.show')->middleware('can:hr.employees.view');
+        Route::get('employees/{employee}/edit', [HrEmployeeController::class, 'edit'])->name('employees.edit')->middleware('can:hr.employees.manage');
+        Route::put('employees/{employee}', [HrEmployeeController::class, 'update'])->name('employees.update')->middleware('can:hr.employees.manage');
+        Route::post('employees/{employee}/salaries', [HrEmployeeController::class, 'storeSalary'])->name('employees.salaries.store')->middleware('can:hr.employees.manage');
+        Route::post('employees/{employee}/leaves', [HrEmployeeController::class, 'storeLeave'])->name('employees.leaves.store')->middleware('can:hr.employees.manage');
+        Route::delete('employees/{employee}/leaves/{leave}', [HrEmployeeController::class, 'destroyLeave'])->name('employees.leaves.destroy')->middleware('can:hr.employees.manage');
+        Route::post('employees/{employee}/end-of-service/settle', [HrEmployeeController::class, 'settleEndOfService'])->name('employees.eos.settle')->middleware('can:hr.payroll.manage');
+        Route::post('employees/{employee}/end-of-service/adjust', [HrEmployeeController::class, 'adjustEndOfService'])->name('employees.eos.adjust')->middleware('can:hr.payroll.manage');
+
+        Route::get('payroll', [PayrollController::class, 'index'])->name('payroll.index')->middleware('can:hr.payroll.view');
+        Route::post('payroll/generate', [PayrollController::class, 'generate'])->name('payroll.generate')->middleware('can:hr.payroll.manage');
+        Route::get('payroll/{payroll}', [PayrollController::class, 'show'])->name('payroll.show')->middleware('can:hr.payroll.view');
+        Route::put('payroll/{payroll}/lines/{line}', [PayrollController::class, 'updateLine'])->name('payroll.lines.update')->middleware('can:hr.payroll.manage');
+        Route::post('payroll/{payroll}/post', [PayrollController::class, 'post'])->name('payroll.post')->middleware('can:hr.payroll.manage');
+        Route::post('payroll/{payroll}/pay', [PayrollController::class, 'pay'])->name('payroll.pay')->middleware('can:hr.payroll.manage');
+        Route::post('payroll/{payroll}/reverse', [PayrollController::class, 'reverse'])->name('payroll.reverse')->middleware('can:hr.payroll.manage');
+        Route::delete('payroll/{payroll}', [PayrollController::class, 'destroy'])->name('payroll.destroy')->middleware('can:hr.payroll.manage');
     });
 
     // نظام التقارير (المبيعات + الذمم) — للقراءة فقط

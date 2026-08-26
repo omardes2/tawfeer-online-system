@@ -72,6 +72,7 @@ class DatabaseSeeder extends Seeder
             AnalyticsReportPermissionSeeder::class,
             // نظام التقارير الجديد (المبيعات + الذمم)
             BusinessReportsPermissionSeeder::class,
+            HrPermissionSeeder::class,
         ]);
     }
 }

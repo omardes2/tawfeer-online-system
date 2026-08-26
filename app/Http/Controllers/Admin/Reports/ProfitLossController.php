@@ -79,6 +79,8 @@ class ProfitLossController extends Controller
             [__('مجمل الربح'), $report['gross_profit']],
             [__('الإعلانات'), $report['expenses']['ads']],
             [__('عمولات المبيعات والتسويق'), $report['expenses']['commissions']],
+            [__('الرواتب والأجور'), $report['expenses']['payroll']],
+            [__('مكافأة نهاية الخدمة'), $report['expenses']['end_of_service']],
         ];
 
         foreach ($report['expenses']['categories'] as $category) {

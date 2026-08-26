@@ -108,6 +108,18 @@
                         </td>
                         <td class="text-start tabular-nums">({{ $money($report['expenses']['commissions']) }})</td>
                     </tr>
+                    <tr>
+                        <td class="ps-8">{{ __('الرواتب والأجور') }}
+                            <span class="text-[11px] text-gray-400">{{ __('(من مسيّرات الرواتب المُرحَّلة)') }}</span>
+                        </td>
+                        <td class="text-start tabular-nums">({{ $money($report['expenses']['payroll']) }})</td>
+                    </tr>
+                    <tr>
+                        <td class="ps-8">{{ __('مكافأة نهاية الخدمة') }}
+                            <span class="text-[11px] text-gray-400">{{ __('(المخصّص المتراكم في الفترة)') }}</span>
+                        </td>
+                        <td class="text-start tabular-nums">({{ $money($report['expenses']['end_of_service']) }})</td>
+                    </tr>
 
                     @forelse ($report['expenses']['categories'] as $category)
                         <tr>
@@ -156,6 +168,7 @@
             <li>{{ __('طلبٌ لمسوّقٍ ومُسنَدٌ لموظف يُحتسب للمسوّق وحده — فلا يُعدّ مرّتين.') }}</li>
             <li>{{ __('العمولة تُحتسب باستحقاق الفترة سواءٌ صُرفت أم لا، ودفعاتها لا تتكرّر في سندات الصرف.') }}</li>
             <li>{{ __('الإعلانات تُقرأ من جدول الصرف الإعلاني — وهو خارج القيود المحاسبية، فلا يظهر في ميزان المراجعة.') }}</li>
+            <li>{{ __('الرواتب ومكافأة نهاية الخدمة تُقرآن من قيود المسيّرات المُرحَّلة — فالمسودّة لا تدخل، والمعكوس يُلغي نفسه.') }}</li>
             <li>
                 {{ __('التوصيل خارج القائمة من طرفيه: لا رسومَ محصَّلة في الإيرادات ولا أجرةَ طرودٍ في المصاريف — فهي مال شركة التوصيل يمرّ بنا.') }}
                 <a href="{{ route('admin.reports.delivery_cost') }}" class="text-emerald-600 hover:underline">{{ __('تقرير تكلفة التوصيل') }}</a>

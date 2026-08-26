@@ -4,6 +4,8 @@ namespace App\Modules\Reporting\Services;
 
 use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Commissions\Models\CommissionEntry;
+use App\Modules\Hr\Services\EndOfServiceService;
+use App\Modules\Hr\Services\PayrollService;
 use App\Modules\Marketing\Models\AdDailySpend;
 use App\Modules\Reporting\Support\DateRange;
 use Illuminate\Database\Query\Builder;
@@ -20,6 +22,7 @@ use Illuminate\Support\Facades\DB;
  * | تكلفة البضاعة | `wholesale_cost_snapshot` المُجمَّدة وقت البيع |
  * | الإعلانات | `ad_daily_spends` بالشيكل بسعر صرف يومه |
  * | العمولات | استحقاقات الفترة الحيّة في دفتر العمولات |
+ * | الرواتب ونهاية الخدمة | قيود مسيّر الرواتب (٥٢٠٠ و٥٢١٠) — لا سندات صرف |
  * | المصاريف | سندات الصرف المُرحَّلة (`kind = expense`) بتصنيفاتها |
  *
  * ## خمسة قرارات تجعل الرقم صحيحًا
@@ -151,6 +154,9 @@ class ProfitLossService
             ->whereBetween('created_at', [$from, $to])
             ->sum('amount'), 2);
 
+        $payroll = $this->postedExpense(PayrollService::SALARY_EXPENSE_ACCOUNT, $from, $to);
+        $endOfService = $this->postedExpense(EndOfServiceService::EXPENSE_ACCOUNT, $from, $to);
+
         $categories = FinancialVoucher::posted()
             ->where('kind', 'expense')
             ->whereBetween('voucher_date', [substr($from, 0, 10), substr($to, 0, 10)])
@@ -166,9 +172,33 @@ class ProfitLossService
         return [
             'ads' => $ads,
             'commissions' => $commissions,
+            'payroll' => $payroll,
+            'end_of_service' => $endOfService,
             'categories' => $categories,
             'vouchers' => $vouchers,
-            'total' => round($ads + $commissions + $vouchers, 2),
+            'total' => round($ads + $commissions + $payroll + $endOfService + $vouchers, 2),
         ];
+    }
+
+    /**
+     * مصروفٌ مُرحَّل مباشرةً إلى الدفتر — لا عبر سند صرف.
+     *
+     * الرواتب ومخصّص نهاية الخدمة يُقيَّدان من مسيّر الرواتب لا من سندٍ من نوع
+     * `expense`، فجمعُ السندات وحده يُسقطهما — وهما أكبر مصروفٍ في أكثر
+     * الشركات. والقراءة من القيد لا من المسيّر: **مدين ناقص دائن**، فالمسيّر
+     * المعكوس يُلغي نفسه بلا استثناءٍ في الاستعلام.
+     */
+    private function postedExpense(string $accountCode, string $from, string $to): float
+    {
+        $row = DB::table('journal_lines')
+            ->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
+            ->join('accounts', 'accounts.id', '=', 'journal_lines.account_id')
+            ->where('accounts.code', $accountCode)
+            ->where('journal_entries.status', 'posted')
+            ->whereBetween('journal_entries.entry_date', [substr($from, 0, 10), substr($to, 0, 10)])
+            ->selectRaw('COALESCE(SUM(journal_lines.debit), 0) - COALESCE(SUM(journal_lines.credit), 0) as net')
+            ->first();
+
+        return round((float) ($row->net ?? 0), 2);
     }
 }
