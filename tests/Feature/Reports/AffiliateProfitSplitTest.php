@@ -179,6 +179,54 @@ class AffiliateProfitSplitTest extends TestCase
         $this->assertEqualsWithDelta(20.0, $row['company_profit'], 0.01);
     }
 
+    // ────────── نطاق التقرير ──────────
+
+    /**
+     * **الطلبات بلا مسوّق خارج التقرير.**
+     *
+     * هو عن المسوّقين، وصفُّ «بلا مسوّق» يضمّ طلبات المتجر كلّها — فيبتلع
+     * الصفحة ويُخفي من هي عنهم.
+     */
+    public function test_orders_without_an_affiliate_are_excluded(): void
+    {
+        $this->order(price: 100, wholesale: 60, cost: 40);
+
+        // طلبُ متجرٍ بلا مسوّق.
+        $storeOrder = Order::factory()->create([
+            'branch_id' => Branch::default()->id,
+            'warehouse_id' => Warehouse::firstOrFail()->id,
+            'affiliate_id' => null,
+            'status' => 'confirmed',
+            'total' => 900,
+        ]);
+
+        DB::table('order_items')->insert([
+            'order_id' => $storeOrder->id,
+            'variant_id' => $this->product->defaultVariant->id,
+            'qty' => 9, 'unit_price' => 100, 'discount' => 0, 'line_total' => 900,
+            'wholesale_price_snapshot' => 60, 'wholesale_cost_snapshot' => 40,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $rows = $this->report()->viewData('rows');
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('سائد شاهين', $rows->first()['name']);
+        $this->assertEqualsWithDelta(100.0, (float) $this->report()->viewData('totalSales'), 0.01);
+    }
+
+    /** وتقرير الموظفين يبقي صفّ «بلا موظف» — به يطابق إجماليُّه بقيّة التقارير. */
+    public function test_the_employee_report_keeps_its_unassigned_row(): void
+    {
+        $this->order(price: 100, wholesale: 60, cost: 40);
+
+        $response = $this->actingAs($this->admin)
+            ->get(route('admin.reports.sales.by_employee', ['range' => 'this_year']));
+
+        $this->assertFalse($response->viewData('earnersOnly'));
+        $this->assertTrue($response->viewData('rows')->contains('unassigned', true));
+    }
+
     // ────────── الشاشة ──────────
 
     /** الشاشة تعرض العمودين باسميهما. */

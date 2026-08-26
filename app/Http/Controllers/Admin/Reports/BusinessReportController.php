@@ -153,6 +153,10 @@ class BusinessReportController extends Controller
             'split' => true,
             'earner_profit' => __('ربح المسوّق'),
             'company_profit' => __('ربح توفير'),
+            // طلبات المتجر وما يُنشئه المدير خارج هذا التقرير: هو عن **المسوّقين**،
+            // وصفُّ «بلا مسوّق» يضمّ أضعافَ مبيعاتهم فيبتلع الصفحة ويُخفي من هي
+            // عنهم. ومطابقةُ الإجمالي مع بقيّة التقارير غرضٌ آخر له صفحاتُه.
+            'only_earners' => true,
         ]);
     }
 
@@ -242,8 +246,12 @@ class BusinessReportController extends Controller
         $selected = collect((array) $request->query('users', []))
             ->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
 
+        $onlyEarners = $labels['only_earners'] ?? false;
+
         $orders = Order::query()
             ->when($selected !== [], fn ($q) => $q->whereIn('orders.'.$column, $selected))
+            // تقريرٌ عن أشخاصٍ بأعيانهم لا عن مبيعات الفترة كلّها.
+            ->when($onlyEarners, fn ($q) => $q->whereNotNull('orders.'.$column))
             ->whereNotIn('status', self::EXCLUDED_STATUSES)
             ->whereBetween('orders.created_at', [$range->from, $range->to])
             ->with(['items.variant.product', 'items.variant.attributeValues'])
@@ -309,6 +317,9 @@ class BusinessReportController extends Controller
             'splitProfit' => $split,
             'earnerProfitLabel' => $labels['earner_profit'] ?? __('الربح'),
             'companyProfitLabel' => $labels['company_profit'] ?? __('ربح توفير'),
+            // الحاشية تقول إن الإجمالي أقلّ من مبيعات الفترة ولماذا — فرقمٌ
+            // لا يطابق التقارير الأخرى بلا تفسير يُقرأ خللًا.
+            'earnersOnly' => $onlyEarners,
             'reportTitle' => $labels['title'],
             'personLabel' => $labels['person'],
             'unassignedLabel' => $labels['unassigned'],
