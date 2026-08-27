@@ -1058,6 +1058,14 @@ class OrderController extends Controller
     }
 
     /** سعر توصيل المدينة من جدول أسعار المزوّد (نمط Opost) — 0 إن لم يُضبط. */
+    /**
+     * رسوم التوصيل المُقيَّدة على الطلب — **سعر البيع للزبون** لا تكلفة الشركة.
+     *
+     * وهو نفس ما تقرؤه خريطة `cityRates` التي يحسب بها النموذج الإجماليَّ في
+     * المتصفّح. وقراءةُ `delivery_fee` هنا كانت تجعل الشاشة تُظهر رقمًا
+     * والخادمَ يحفظ آخر: يرى المستخدم ٦٥ ويُقيَّد ٦٣ — فيصل الزبون إجماليٌّ
+     * غير الذي أُخبر به.
+     */
     private function deliveryFeeFor(?int $cityId): float
     {
         if ($cityId === null) {
@@ -1066,7 +1074,7 @@ class OrderController extends Controller
 
         return (float) (DeliveryCityRate::where('is_active', true)
             ->where('city_id', $cityId)
-            ->value('delivery_fee') ?? 0);
+            ->first()?->customerFee() ?? 0);
     }
 
     private function guard(Order $order, callable $fn, string $success): RedirectResponse
