@@ -2,6 +2,7 @@
 
 namespace App\Modules\Catalog\Providers;
 
+use App\Modules\Catalog\Console\CostCheckCommand;
 use App\Modules\Catalog\Models\Brand;
 use App\Modules\Catalog\Models\Category;
 use App\Modules\Catalog\Models\Product;
@@ -39,6 +40,11 @@ class CatalogServiceProvider extends ServiceProvider
     {
         foreach ($this->policies as $model => $policy) {
             Gate::policy($model, $policy);
+        }
+
+        // فحصُ سلامةِ بياناتٍ يُشغَّل بيدٍ قبل قرارٍ كبير — غير مجدول.
+        if ($this->app->runningInConsole()) {
+            $this->commands([CostCheckCommand::class]);
         }
     }
 }
