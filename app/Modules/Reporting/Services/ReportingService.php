@@ -26,6 +26,19 @@ class ReportingService
     private const NET_SALES = 'orders.total - orders.shipping_total';
 
     /**
+     * ما حُصِّل من **قيمة البضاعة** — مقابلًا لـ`NET_SALES` على الأساس نفسه.
+     *
+     * `amount_paid` يحمل ما دفعه الزبون شاملًا رسوم التوصيل. فلو قِيس على مبيعاتٍ
+     * بلا توصيل لتجاوز عمودُ المدفوعات عمودَ الفواتير على طلبٍ مُسدَّد بالكامل —
+     * ويُقرأ الرسم أنّ المحصَّل أكثر من المبيع. فيُسقَّف بقيمة البضاعة.
+     *
+     * و`CASE` لا `LEAST`: الأخيرة غير محمولة (MySQL تعرفها، وSQLite تُفسّر
+     * `MIN(a,b)` تجميعًا لا مقارنة).
+     */
+    private const NET_PAID = '(CASE WHEN orders.amount_paid > (orders.total - orders.shipping_total) '
+        .'THEN (orders.total - orders.shipping_total) ELSE orders.amount_paid END)';
+
+    /**
      * جدول الطلبات مستثنيًا المحذوف ناعمًا.
      *
      * الاستعلام الخام يتجاوز `SoftDeletes`، فكان الطلب المحذوف يبقى في كل التقارير
@@ -62,7 +75,11 @@ class ReportingService
     }
 
     /**
-     * مبيعات السنة شهرًا شهرًا — بلا رسوم التوصيل.
+     * مبيعات السنة شهرًا شهرًا: **ما فُوتِر وما حُصِّل** — كلاهما بلا رسوم التوصيل.
+     *
+     * الرقمان معًا لا أحدهما: عمودُ المبيعات وحده يقول ما بِيع ولا يقول ما دخل
+     * الصندوق، والفجوةُ بينهما هي الذمّة المفتوحة — وهي ما يُقرأ في شهرٍ مرتفع
+     * البيع ضعيف التحصيل، ولا يظهر أثرُها في رقمٍ واحد.
      *
      * **الاثنا عشر شهرًا كلّها تُرجَع** ولو كانت بلا مبيعات: رسمٌ بيانيّ يحذف
      * الشهور الفارغة يُظهر تمّوزًا بجانب تشرين فيبدو النمو متّصلًا وهو منقطع.
@@ -71,21 +88,29 @@ class ReportingService
      */
     public function monthlySales(int $year): Collection
     {
-        $totals = $this->ordersTable()
+        $rows = $this->ordersTable()
             ->whereBetween('created_at', [
                 Carbon::create($year, 1, 1)->startOfDay(),
                 Carbon::create($year, 12, 31)->endOfDay(),
             ])
             ->where('status', '!=', 'cancelled')
-            ->selectRaw('SUBSTR(created_at, 6, 2) as m, COALESCE(SUM('.self::NET_SALES.'), 0) as t')
+            ->selectRaw('SUBSTR(created_at, 6, 2) as m')
+            ->selectRaw('COALESCE(SUM('.self::NET_SALES.'), 0) as t')
+            ->selectRaw('COALESCE(SUM('.self::NET_PAID.'), 0) as p')
             ->groupBy('m')
-            ->pluck('t', 'm');
+            ->get()
+            ->keyBy('m');
 
-        return collect(range(1, 12))->map(fn (int $m) => [
-            'month' => $m,
-            'label' => Carbon::create($year, $m, 1)->translatedFormat('M'),
-            'total' => $this->money($totals[str_pad((string) $m, 2, '0', STR_PAD_LEFT)] ?? 0),
-        ]);
+        return collect(range(1, 12))->map(function (int $m) use ($year, $rows) {
+            $row = $rows[str_pad((string) $m, 2, '0', STR_PAD_LEFT)] ?? null;
+
+            return [
+                'month' => $m,
+                'label' => Carbon::create($year, $m, 1)->translatedFormat('M'),
+                'total' => $this->money($row->t ?? 0),
+                'paid' => $this->money($row->p ?? 0),
+            ];
+        });
     }
 
     /** @return array<string, float|int> */

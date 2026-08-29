@@ -46,8 +46,34 @@ abstract class TreasuryControllerBase extends Controller
         return view('admin.accounting.treasury.index', array_merge($this->ctx(), [
             'treasuries' => $treasuries,
             'search' => $request->input('search'),
-            'total' => $treasuries->sum('current_balance'),
+            'totals' => $this->totalsByCurrency($treasuries),
         ]));
+    }
+
+    /**
+     * إجمالي الأرصدة **لكل عملة على حدة** — لا رقمًا واحدًا.
+     *
+     * كان يُجمَع عمودُ الرصيد كما هو، فيُضاف الدولار إلى الشيكل: حسابٌ بـ14,131.90 ₪
+     * وآخر بـ98.00 $ يُنتجان «14,229.90» — رقمٌ لا يُقابله مالٌ في الوجود، ولا
+     * عملةَ له تُكتب بجانبه.
+     *
+     * ولا تُحوَّل العملات إلى واحدة: التحويل يحتاج سعرَ صرفٍ يومَ العرض، ولا سعر
+     * مخزَّن في النظام لهذا الغرض. واختراعُ سعرٍ ضمنًا يُنتج رقمًا يبدو دقيقًا وهو
+     * تخمين — والمجموع لكل عملةٍ صادقٌ دائمًا.
+     *
+     * والعملة الأساسية أوّلًا: هي ما يُقرأ أوّلًا ويُقارَن به.
+     *
+     * @param  Collection<int, Treasury>  $treasuries
+     * @return Collection<string, float>
+     */
+    private function totalsByCurrency(Collection $treasuries): Collection
+    {
+        $base = config('app.currency', 'ILS');
+
+        return $treasuries
+            ->groupBy(fn (Treasury $t) => $t->currency ?: $base)
+            ->map(fn (Collection $group) => round((float) $group->sum('current_balance'), 2))
+            ->sortKeysUsing(fn (string $a, string $b) => [$b === $base, $a] <=> [$a === $base, $b]);
     }
 
     public function create(): View

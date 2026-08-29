@@ -84,31 +84,60 @@
         <div class="admin-card admin-card-pad lg:col-span-2">
             <div class="flex items-center justify-between mb-4">
                 <div>
-                    <h3 class="font-semibold text-gray-800">{{ __('مبيعات السنة (شهريًّا)') }}</h3>
-                    {{-- الإجمالي بلا رسوم التوصيل: هو ما يدخل الدفاتر. --}}
+                    <h3 class="font-semibold text-gray-800">{{ __('الفواتير مقابل المحصَّل (شهريًّا)') }}</h3>
+                    {{--
+                        الرقمان معًا لا أحدهما: المبيعات وحدها تقول ما بِيع ولا
+                        تقول ما دخل الصندوق. والفجوة بينهما هي الذمّة المفتوحة.
+                    --}}
+                    @php
+                        $sumTotal = (float) $monthlySales->sum('total');
+                        $sumPaid = (float) $monthlySales->sum('paid');
+                    @endphp
                     <p class="text-xs text-gray-500 mt-0.5">
-                        {{ __('الإجمالي') }}:
-                        <span class="font-bold text-gray-800 tabular-nums">{{ number_format($monthlySales->sum('total'), 2) }}</span>
+                        {{ __('الفواتير') }}:
+                        <span class="font-bold text-gray-800 tabular-nums">{{ number_format($sumTotal, 2) }}</span>
+                        <span class="text-gray-300 mx-1">·</span>
+                        {{ __('المحصَّل') }}:
+                        <span class="font-bold text-sky-700 tabular-nums">{{ number_format($sumPaid, 2) }}</span>
                         <span class="text-gray-400">{{ __('بلا رسوم التوصيل') }}</span>
                     </p>
                 </div>
-                <span class="text-xs text-gray-400">{{ $chartYear }}</span>
+                <div class="text-end">
+                    <span class="text-xs text-gray-400">{{ $chartYear }}</span>
+                    {{-- مفتاح الرسم: عمودان متجاوران لا يُقرآن بلا تسمية. --}}
+                    <div class="flex items-center gap-3 mt-1 text-[11px] text-gray-500">
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>{{ __('الفواتير') }}</span>
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-sky-500"></span>{{ __('المحصَّل') }}</span>
+                    </div>
+                </div>
             </div>
             {{--
                 اثنا عشر شهرًا دائمًا ولو كان بعضها صفرًا: رسمٌ يحذف الشهور
                 الفارغة يُظهر تمّوزًا بجانب تشرين فيبدو النمو متّصلًا وهو منقطع.
+
+                والعمودان يُقاسان على **مقياسٍ واحد** (أعلى قيمةٍ في الرسم كلّه)
+                لا كلٌّ على أعلى سلسلته: مقياسان يجعلان عمودَي شهرٍ حُصِّل نصفُه
+                متساويَي الطول، فتختفي الفجوة التي رُسم الشكل لإظهارها.
             --}}
-            @php $max = max(1, (float) $monthlySales->max('total')); @endphp
+            @php
+                $max = max(1, (float) $monthlySales->max('total'), (float) $monthlySales->max('paid'));
+                $short = fn (float $v) => $v >= 1000 ? number_format($v / 1000, 1).'k' : number_format($v, 0);
+            @endphp
             <div class="flex items-end gap-1.5 h-56">
                 @foreach ($monthlySales as $m)
                     <div class="group relative flex flex-col items-center justify-end flex-1 min-w-0">
                         {{-- القيمة فوق العمود: قراءتها لا تحتاج تمرير المؤشّر. --}}
                         <span class="text-[9px] text-gray-500 tabular-nums mb-1 whitespace-nowrap {{ $m['total'] > 0 ? '' : 'invisible' }}">
-                            {{ $m['total'] >= 1000 ? number_format($m['total'] / 1000, 1).'k' : number_format($m['total'], 0) }}
+                            {{ $short((float) $m['total']) }}
                         </span>
-                        <div class="w-full rounded-t transition-all {{ $m['total'] > 0 ? 'bg-emerald-500 group-hover:bg-emerald-600' : 'bg-gray-100' }}"
-                             style="height: {{ $m['total'] > 0 ? max(3, (int) round(($m['total'] / $max) * 100)) : 2 }}%"
-                             title="{{ $m['label'] }}: {{ number_format($m['total'], 2) }}"></div>
+                        <div class="w-full flex items-end justify-center gap-px h-full">
+                            <div class="w-1/2 rounded-t transition-all {{ $m['total'] > 0 ? 'bg-emerald-500 group-hover:bg-emerald-600' : 'bg-gray-100' }}"
+                                 style="height: {{ $m['total'] > 0 ? max(3, (int) round(($m['total'] / $max) * 100)) : 2 }}%"
+                                 title="{{ $m['label'] }} — {{ __('الفواتير') }}: {{ number_format($m['total'], 2) }}"></div>
+                            <div class="w-1/2 rounded-t transition-all {{ $m['paid'] > 0 ? 'bg-sky-500 group-hover:bg-sky-600' : 'bg-gray-100' }}"
+                                 style="height: {{ $m['paid'] > 0 ? max(3, (int) round(($m['paid'] / $max) * 100)) : 2 }}%"
+                                 title="{{ $m['label'] }} — {{ __('المحصَّل') }}: {{ number_format($m['paid'], 2) }}"></div>
+                        </div>
                         <span class="text-[10px] text-gray-400 mt-1">{{ $m['month'] }}</span>
                     </div>
                 @endforeach

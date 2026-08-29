@@ -9,9 +9,28 @@
                 @endcan
             </x-admin.header>
 
-            <div class="mb-4 p-4 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-between">
-                <span class="text-sm text-gray-600">{{ __('إجمالي الأرصدة') }}</span>
-                <span class="text-2xl font-bold text-emerald-700">{{ number_format($total, 2) }}</span>
+            {{--
+                مجموعٌ لكل عملة، لا رقمٌ واحد: جمعُ الدولار إلى الشيكل يُنتج عددًا
+                لا يُقابله مالٌ في الوجود ولا عملةَ تُكتب بجانبه. ولا تُحوَّل هنا —
+                لا سعرَ صرفٍ مخزَّنًا لهذا الغرض، واختراعُه تخمينٌ يبدو دقيقًا.
+            --}}
+            <div class="mb-4 p-4 rounded-lg bg-emerald-50 border border-emerald-100">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                    <span class="text-sm text-gray-600">{{ __('إجمالي الأرصدة') }}</span>
+                    <div class="flex items-center gap-6 flex-wrap">
+                        @forelse ($totals as $currency => $sum)
+                            <span class="flex items-baseline gap-1.5">
+                                <span class="text-2xl font-bold tabular-nums {{ $sum < 0 ? 'text-rose-600' : 'text-emerald-700' }}">{{ number_format($sum, 2) }}</span>
+                                <span class="text-xs font-medium text-gray-500">{{ $currency }}</span>
+                            </span>
+                        @empty
+                            <span class="text-2xl font-bold text-emerald-700">0.00</span>
+                        @endforelse
+                    </div>
+                </div>
+                @if ($totals->count() > 1)
+                    <p class="mt-2 text-xs text-gray-500">{{ __('لكل عملة مجموعها — لا تُجمع العملات بعضها إلى بعض.') }}</p>
+                @endif
             </div>
 
             <form method="GET" class="mb-4"><input type="text" name="search" value="{{ $search }}" placeholder="{{ __('بحث بالاسم أو الرمز') }}" class="rounded-md border-gray-300 text-sm w-64" /><button class="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-md">{{ __('بحث') }}</button></form>

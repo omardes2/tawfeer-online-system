@@ -47,6 +47,7 @@ class PermissionLabel
         'fail' => 'تعليم كفاشل',
         'use' => 'استخدام',
         'audit' => 'تدقيق',
+        'record' => 'تسجيل',
         'override_price' => 'تجاوز السعر',
         'override_cost' => 'تجاوز التكلفة',
         'view_cost' => 'عرض التكلفة',
@@ -82,6 +83,7 @@ class PermissionLabel
         'capture' => 'تحصيل المبلغ فعليًّا.',
         'refund' => 'ردّ مبلغ إلى العميل.',
         'reconcile' => 'مطابقة :r مع كشف المزوّد وإقرار الفروق.',
+        'record' => 'تسجيل ما وقع فعلًا في :r — رقمٌ يُدخَل بيدٍ ويُسأل عنه.',
         'finalize' => 'إنهاء :r وإقفالها.',
         'view_cost' => 'رؤية تكلفة الشراء وهامش الربح — بيانات لا يراها البائع عادةً.',
         'view_own' => 'رؤية سجلّاته هو فقط، لا سجلّات غيره.',
@@ -263,6 +265,10 @@ class PermissionLabel
         'ai_agent' => 'وكيل المبيعات الذكي',
         'runs' => 'سجلّ تشغيل الوكيل',
         'knowledge' => 'المعرفة البيعية للأصناف',
+        'payroll' => 'الرواتب والموظفون',
+        'delivery_cost' => 'تقرير تكلفة التوصيل',
+        'profit_loss' => 'تقرير الأرباح والخسائر',
+        'collection_variance' => 'فروقات التحصيل',
     ];
 
     public static function for(string $key): string
