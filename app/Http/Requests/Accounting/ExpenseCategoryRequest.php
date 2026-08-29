@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Accounting;
 
+use App\Modules\Accounting\Models\ExpenseCategory;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -34,6 +35,9 @@ class ExpenseCategoryRequest extends FormRequest
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
             'is_active' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:255'],
+            // مصدرٌ من قائمةٍ مغلقة لا نصٌّ حرّ: التقرير يفرز به، ومصدرٌ لا يعرفه
+            // يُخرج التصنيف من الإجمالي بلا أن يُحتسب من مكانٍ آخر — فيضيع المبلغ.
+            'auto_source' => ['nullable', 'string', Rule::in(array_keys(ExpenseCategory::AUTO_SOURCES))],
         ];
     }
 
@@ -63,6 +67,7 @@ class ExpenseCategoryRequest extends FormRequest
             'name' => __('اسم التصنيف'),
             'name_en' => __('الاسم بالإنجليزية'),
             'sort_order' => __('الترتيب'),
+            'auto_source' => __('مصدر الاحتساب الآلي'),
         ];
     }
 }

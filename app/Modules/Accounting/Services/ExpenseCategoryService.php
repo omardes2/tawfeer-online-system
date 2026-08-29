@@ -48,6 +48,8 @@ class ExpenseCategoryService
                 'is_active' => $data['is_active'] ?? true,
                 'sort_order' => (int) ($data['sort_order'] ?? 0),
                 'notes' => $data['notes'] ?? null,
+                // وسمُ «محتسَب من مصدره» — تُعرَض سنداتُه ولا تدخل إجمالي المصاريف.
+                'auto_source' => $data['auto_source'] ?? null,
                 'created_by' => auth()->id(),
             ]);
         });
@@ -70,6 +72,8 @@ class ExpenseCategoryService
                 'is_active' => (bool) ($data['is_active'] ?? $category->is_active),
                 'sort_order' => (int) ($data['sort_order'] ?? $category->sort_order),
                 'notes' => $data['notes'] ?? null,
+                // فارغٌ = لا احتساب آليّ. يُمرَّر دائمًا فيُرفع الوسم كما يُوضع.
+                'auto_source' => $data['auto_source'] ?? null,
             ]);
 
             $category->account?->update([

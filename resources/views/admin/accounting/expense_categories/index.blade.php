@@ -30,6 +30,20 @@
                     <x-admin.field :label="__('الترتيب')" name="sort_order">
                         <input type="number" name="sort_order" value="{{ old('sort_order', 0) }}" min="0" max="9999" class="w-full rounded-md border-gray-300" />
                     </x-admin.field>
+                    {{--
+                        وسمُ «محتسَب من مصدره»: الميزانية تقرأ الإعلانات من جدول
+                        الصرف والعمولات من دفترها استحقاقًا. فسندُ صرفٍ بتصنيفٍ
+                        منها يُعدّ الرقم مرّتين ما لم يُستثنَ.
+                    --}}
+                    <x-admin.field :label="__('محتسَب آليًّا من')" name="auto_source"
+                                   :hint="__('اتركه فارغًا للتصنيفات العادية. الموسوم تُعرَض سنداتُه في الميزانية ولا تُجمَع — لأنه محسوبٌ من مصدره.')">
+                        <select name="auto_source" class="w-full rounded-md border-gray-300">
+                            <option value="">{{ __('— لا شيء (تصنيف عادي) —') }}</option>
+                            @foreach (App\Modules\Accounting\Models\ExpenseCategory::AUTO_SOURCES as $key => $label)
+                                <option value="{{ $key }}" @selected(old('auto_source') === $key)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </x-admin.field>
                     <button class="w-full px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('حفظ وفتح الحساب') }}</button>
                 </form>
             </div>
@@ -55,8 +69,15 @@
                                     @if ($category->is_system)
                                         <span class="ms-1 text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{{ __('نظام') }}</span>
                                     @endif
+                                    @if ($category->isAutoCounted())
+                                        <span class="ms-1 text-[11px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700"
+                                              title="{{ __('سنداتُه تُعرَض في الميزانية ولا تُجمَع — محسوبٌ من مصدره') }}">{{ __('محتسَب آليًّا') }}</span>
+                                    @endif
                                     @if ($category->name_en)
                                         <span class="block text-xs text-gray-400">{{ $category->name_en }}</span>
+                                    @endif
+                                    @if ($category->isAutoCounted())
+                                        <span class="block text-xs text-amber-600">{{ __('من') }} {{ $category->autoSourceLabel() }}</span>
                                     @endif
                                 </div>
 
@@ -66,6 +87,12 @@
                                         @csrf @method('PUT')
                                         <input type="text" name="name" value="{{ $category->name }}" maxlength="120" required class="w-full rounded-md border-gray-300 text-sm" />
                                         <input type="text" name="name_en" value="{{ $category->name_en }}" maxlength="120" placeholder="{{ __('بالإنجليزية') }}" class="w-full rounded-md border-gray-300 text-sm" />
+                                        <select name="auto_source" class="w-full rounded-md border-gray-300 text-sm">
+                                            <option value="">{{ __('— لا احتساب آليّ —') }}</option>
+                                            @foreach (App\Modules\Accounting\Models\ExpenseCategory::AUTO_SOURCES as $key => $label)
+                                                <option value="{{ $key }}" @selected($category->auto_source === $key)>{{ __('محتسَب من') }} {{ $label }}</option>
+                                            @endforeach
+                                        </select>
                                         <div class="flex items-center gap-3">
                                             <input type="number" name="sort_order" value="{{ $category->sort_order }}" min="0" max="9999" class="w-20 rounded-md border-gray-300 text-sm" />
                                             <label class="flex items-center gap-1 text-xs text-gray-600">

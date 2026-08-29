@@ -160,6 +160,31 @@
                         <td>{{ __('إجمالي المصاريف') }}</td>
                         <td class="text-start tabular-nums">({{ $money($report['expenses']['total']) }})</td>
                     </tr>
+
+                    {{--
+                        سنداتٌ على تصنيفاتٍ **محتسَبة من مصادرها** — تُعرض ولا
+                        تُجمع. الإعلانات والعمولات والرواتب محسوبةٌ أعلاه من
+                        جداولها، فجمعُ سندها فوقها يعدّ الرقم مرّتين.
+
+                        وتُعرض ولا تُخفى: الدفعة واقعةٌ حقيقية سجّلها المستخدم،
+                        وإخفاؤها يجعله يُعيد إدخالها ظنًّا أنها ضاعت.
+                    --}}
+                    @if (($report['expenses']['auto_counted'] ?? collect())->isNotEmpty())
+                        <tr class="border-t border-dashed border-gray-200">
+                            <td colspan="2" class="pt-3 text-xs text-gray-500">
+                                {{ __('سندات صرف على تصنيفات محتسَبة من مصادرها — معروضة للعِلم ولم تُجمَع أعلاه (وإلا عُدّت مرّتين):') }}
+                            </td>
+                        </tr>
+                        @foreach ($report['expenses']['auto_counted'] as $row)
+                            <tr class="text-gray-400">
+                                <td class="ps-8">
+                                    {{ $row['name'] }}
+                                    <span class="text-xs">({{ __('محتسَب من') }} {{ $row['auto_source'] }})</span>
+                                </td>
+                                <td class="text-start tabular-nums line-through">({{ $money($row['total']) }})</td>
+                            </tr>
+                        @endforeach
+                    @endif
                 </tbody>
 
                 {{-- ⑤ النتيجة. --}}

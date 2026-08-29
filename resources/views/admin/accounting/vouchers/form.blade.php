@@ -24,8 +24,22 @@
                             «عمال تنزيل» دون أن يعرف رمزًا في الدليل.
                         --}}
                         <x-admin.field :label="__('تصنيف المصروف')" name="expense_category_id" :required="! $voucher->exists">
+                            {{--
+                                تحذيرٌ لحظة الاختيار: تصنيفٌ تحتسبه الميزانية من
+                                مصدره (الإعلانات من جدولها، العمولات من دفترها)
+                                يُعرَض سندُه ولا يُجمَع — وإلا عُدّ الرقم مرّتين.
+                                يُقال هنا لا في التقرير: بعد الحفظ يكون المستخدم
+                                قد ظنّ أنه سجّل مصروفًا جديدًا.
+                            --}}
+                            @php
+                                $autoSources = $categories->filter->isAutoCounted()
+                                    ->mapWithKeys(fn ($c) => [$c->id => $c->autoSourceLabel()]);
+                            @endphp
                             <div x-data="{
                                     open: false, name: '', saving: false, error: '',
+                                    autoSources: @js($autoSources),
+                                    get autoNotice() { return this.autoSources[this.picked] || ''; },
+                                    picked: '{{ old('expense_category_id', $voucher->expense_category_id) }}',
                                     async save() {
                                         const name = this.name.trim();
                                         if (! name || this.saving) return;
@@ -51,7 +65,7 @@
                                     },
                                  }">
                                 <div class="flex gap-2">
-                                    <select name="expense_category_id" x-ref="picker" @if (! $voucher->exists) required @endif class="w-full rounded-md border-gray-300">
+                                    <select name="expense_category_id" x-ref="picker" x-model="picked" @if (! $voucher->exists) required @endif class="w-full rounded-md border-gray-300">
                                         <option value="">{{ __('— اختر —') }}</option>
                                         @foreach ($categories as $c)
                                             <option value="{{ $c->id }}" @selected(old('expense_category_id', $voucher->expense_category_id) == $c->id)>{{ $c->name }}@if ($c->account) ({{ $c->account->code }})@endif</option>
@@ -60,6 +74,12 @@
                                     @can('create', App\Modules\Accounting\Models\ExpenseCategory::class)
                                         <button type="button" @click="open = true" class="shrink-0 px-3 rounded-md bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100">+ {{ __('تصنيف') }}</button>
                                     @endcan
+                                </div>
+
+                                <div x-show="autoNotice" x-cloak class="mt-1.5 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                                    <span class="font-semibold">{{ __('هذا التصنيف محتسَب آليًّا في الميزانية') }}</span>
+                                    — <span>{{ __('من') }} <span x-text="autoNotice"></span>.</span>
+                                    <span class="block mt-0.5 text-amber-700">{{ __('سجّل السند إن أردت تتبّع النقد؛ لن يُجمَع في «إجمالي المصاريف» حتى لا يُعدّ الرقم مرّتين.') }}</span>
                                 </div>
 
                                 @if ($voucher->exists && ! $voucher->expense_category_id && $voucher->counterAccount)

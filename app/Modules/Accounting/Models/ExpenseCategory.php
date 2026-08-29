@@ -20,8 +20,21 @@ class ExpenseCategory extends Model
 {
     use Auditable, HasUuid, SoftDeletes;
 
+    /**
+     * مصادر الاحتساب الآلي: تصنيفٌ موسومٌ بأحدها تحتسبه الميزانية من مصدره لا
+     * من سندات الصرف — فتُستثنى سنداتُه من الإجمالي ولا يُعدّ الرقم مرّتين.
+     *
+     * @var array<string, string>
+     */
+    public const AUTO_SOURCES = [
+        'ads' => 'جدول الصرف الإعلاني',
+        'commissions' => 'دفتر العمولات (استحقاق الفترة)',
+        'payroll' => 'مسيّرات الرواتب المُرحّلة',
+    ];
+
     protected $fillable = [
-        'uuid', 'name', 'name_en', 'account_id', 'is_system', 'is_active', 'sort_order', 'notes', 'created_by',
+        'uuid', 'name', 'name_en', 'account_id', 'is_system', 'auto_source',
+        'is_active', 'sort_order', 'notes', 'created_by',
     ];
 
     protected $casts = [
@@ -29,6 +42,18 @@ class ExpenseCategory extends Model
         'is_active' => 'boolean',
         'sort_order' => 'integer',
     ];
+
+    /** هل تحتسب الميزانيةُ هذا التصنيف من مصدره؟ */
+    public function isAutoCounted(): bool
+    {
+        return isset(self::AUTO_SOURCES[(string) $this->auto_source]);
+    }
+
+    /** اسمُ المصدر الذي يُحتسب منه — للعرض في التحذير. */
+    public function autoSourceLabel(): ?string
+    {
+        return self::AUTO_SOURCES[(string) $this->auto_source] ?? null;
+    }
 
     public function account(): BelongsTo
     {

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Reporting\Services;
 
+use App\Modules\Accounting\Models\ExpenseCategory;
 use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Commissions\Models\CommissionEntry;
 use App\Modules\Hr\Services\EndOfServiceService;
@@ -197,15 +198,36 @@ class ProfitLossService
         $payroll = $this->postedExpense(PayrollService::SALARY_EXPENSE_ACCOUNT, $from, $to);
         $endOfService = $this->postedExpense(EndOfServiceService::EXPENSE_ACCOUNT, $from, $to);
 
-        $categories = FinancialVoucher::posted()
+        /*
+        | سندات الصرف بتصنيفاتها — **مقسومةً على قسمين**.
+        |
+        | الإعلانات والعمولات والرواتب تُحتسب أعلاه من مصادرها. فلو أُنشئ سند
+        | صرفٍ بتصنيفٍ من هذه، جُمع الرقم مرّتين: مرّةً من جدوله ومرّةً من سنده.
+        | والتصنيف الموسوم بـ`auto_source` يُعلن ذلك صراحةً، فتُفرَز سنداتُه إلى
+        | قائمةٍ تُعرَض للعِلم ولا تدخل الإجمالي.
+        |
+        | ولا تُحذف من العرض: الدفعة النقدية واقعةٌ حقيقية سجّلها المستخدم، وحذفها
+        | من الشاشة يُخفي عمله ويجعله يُعيد إدخالها ظنًّا أنها ضاعت.
+        */
+        $rows = FinancialVoucher::posted()
             ->where('kind', 'expense')
             ->whereBetween('voucher_date', [substr($from, 0, 10), substr($to, 0, 10)])
             ->leftJoin('expense_categories', 'expense_categories.id', '=', 'financial_vouchers.expense_category_id')
-            ->groupBy('expense_categories.name')
-            ->selectRaw('COALESCE(expense_categories.name, ?) as name, SUM(financial_vouchers.amount) as total', [__('مصاريف غير مصنّفة')])
+            ->groupBy('expense_categories.name', 'expense_categories.auto_source')
+            ->selectRaw(
+                'COALESCE(expense_categories.name, ?) as name, expense_categories.auto_source as auto_source, '
+                .'SUM(financial_vouchers.amount) as total',
+                [__('مصاريف غير مصنّفة')],
+            )
             ->orderByDesc('total')
             ->get()
-            ->map(fn ($r) => ['name' => $r->name, 'total' => round((float) $r->total, 2)]);
+            ->map(fn ($r) => [
+                'name' => $r->name,
+                'total' => round((float) $r->total, 2),
+                'auto_source' => ExpenseCategory::AUTO_SOURCES[(string) $r->auto_source] ?? null,
+            ]);
+
+        [$autoCounted, $categories] = $rows->partition(fn (array $r) => $r['auto_source'] !== null);
 
         $vouchers = round((float) $categories->sum('total'), 2);
 
@@ -214,7 +236,10 @@ class ProfitLossService
             'commissions' => $commissions,
             'payroll' => $payroll,
             'end_of_service' => $endOfService,
-            'categories' => $categories,
+            'categories' => $categories->values(),
+            // سنداتٌ على تصنيفاتٍ محتسَبة من مصادرها — تُعرض ولا تُجمع.
+            'auto_counted' => $autoCounted->values(),
+            'auto_counted_total' => round((float) $autoCounted->sum('total'), 2),
             'vouchers' => $vouchers,
             'total' => round($ads + $commissions + $payroll + $endOfService + $vouchers, 2),
         ];
