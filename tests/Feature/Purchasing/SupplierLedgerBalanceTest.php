@@ -179,6 +179,29 @@ class SupplierLedgerBalanceTest extends TestCase
             ->assertSee('رصيد افتتاحي');
     }
 
+    /**
+     * **والافتتاحي أوّل سطرٍ مهما كان تاريخ قيده.**
+     *
+     * قيدُه يُرحَّل بتاريخ اليوم الذي أُدخل فيه لا بتاريخ بدء التعامل. فلو رُتّب
+     * زمنيًّا مع غيره لسقط في وسط الكشف — أو في آخره، تحت فواتير شهورٍ سبقته —
+     * فيُقرأ تسويةً طارئة لا نقطةَ بداية، ولا يجده من يبحث عنه في أوّله.
+     */
+    public function test_the_opening_row_leads_even_when_entered_last(): void
+    {
+        // فواتير قديمة أوّلًا، ثم يُدخَل الرصيد الافتتاحي اليوم.
+        $this->travelTo(now()->subMonths(2));
+        $this->localInvoice(1000);
+        $this->travelBack();
+
+        $this->service()->syncOpeningBalance($this->supplier, -5000);
+
+        $statement = $this->get(route('admin.purchasing.suppliers.show', $this->supplier))
+            ->assertOk()->viewData('statement');
+
+        $this->assertSame('opening', $statement->first()['type']);
+        $this->assertEqualsWithDelta(-5000.0, $statement->first()['balance'], 0.01);
+    }
+
     /** وفرق الصرف يظهر سطرًا كذلك — لا يختفي بين الفاتورة والدفعة. */
     public function test_the_fx_difference_appears_as_a_row(): void
     {

@@ -136,8 +136,13 @@ class SupplierController extends Controller
             ->join('journal_entries as je', 'je.id', '=', 'journal_lines.journal_entry_id')
             ->where('journal_lines.account_id', $account->id)
             ->where('je.status', 'posted')
-            // الترتيب بالتاريخ ثم برقم القيد: قيدان في يومٍ واحد يجب أن يقرآ
-            // بترتيب تسجيلهما، وإلا قفز الرصيد المتحرّك ورجع.
+            // **الافتتاحي أوّلًا مهما كان تاريخه.** قيده يُرحَّل بتاريخ اليوم الذي
+            // أُدخل فيه لا بتاريخ بدء التعامل، فلو رُتّب زمنيًّا مع غيره سقط في
+            // وسط الكشف بين فواتير حزيران وآب — ويُقرأ تسويةً طارئة لا نقطةَ
+            // بداية. والرصيد الافتتاحي بحدّه هو ما قبل أوّل حركة.
+            ->orderByRaw("CASE WHEN je.source = 'supplier_opening' THEN 0 ELSE 1 END")
+            // ثم بالتاريخ فرقم القيد: قيدان في يومٍ واحد يُقرآن بترتيب تسجيلهما،
+            // وإلا قفز الرصيد المتحرّك ورجع.
             ->orderBy('je.entry_date')->orderBy('je.id')->orderBy('journal_lines.id')
             ->select('journal_lines.*')
             ->with('entry:id,number,entry_date,description,source')
