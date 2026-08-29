@@ -704,7 +704,8 @@ class PurchaseInvoiceService
     {
         do {
             $sku = 'P-'.Str::upper(Str::random(8));
-        } while (Product::where('sku', $sku)->exists());
+            // المحذوف ناعمًا يحتلّ رمزه في قيد التفرّد — فيُشمل في الفحص.
+        } while (Product::withTrashed()->where('sku', $sku)->exists());
 
         return $sku;
     }

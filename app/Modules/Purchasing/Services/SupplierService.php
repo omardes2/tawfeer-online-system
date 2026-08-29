@@ -219,15 +219,22 @@ class SupplierService
         return __('ذمم المورد: :name', ['name' => $supplier->name]);
     }
 
-    /** كود فرعي فريد تحت الأب بنمط «2010-0001». */
+    /**
+     * كود فرعي فريد تحت الأب بنمط «2010-0001» — **شاملًا المحذوف ناعمًا**.
+     *
+     * `accounts.code` فريدٌ في قاعدة البيانات، وقيد التفرّد لا يعرف الحذف
+     * الناعم: الصفّ المحذوف ما يزال يحتلّ رمزه. فالعدّ والفحص بمُستعلمٍ يُخفي
+     * المحذوف كانا يريان الرمز شاغرًا وهو مشغول، فيفشل الإدراج
+     * بـUniqueConstraintViolation — خطأ ٥٠٠ بلا رسالةٍ تدلّ على سببه.
+     */
     private function nextChildCode(Account $parent): string
     {
-        $seq = (int) Account::where('parent_id', $parent->id)->count() + 1;
+        $seq = (int) Account::withTrashed()->where('parent_id', $parent->id)->count() + 1;
 
         do {
             $code = $parent->code.'-'.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
             $seq++;
-        } while (Account::where('code', $code)->exists());
+        } while (Account::withTrashed()->where('code', $code)->exists());
 
         return $code;
     }

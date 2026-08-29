@@ -217,16 +217,22 @@ class TreasuryService
         ]);
     }
 
-    /** كود فرعي فريد تحت الأب بنمط «1011-0001». */
+    /**
+     * كود فرعي فريد تحت الأب بنمط «1011-0001» — **شاملًا المحذوف ناعمًا**.
+     *
+     * قيد التفرّد على `accounts.code` لا يعرف الحذف الناعم: خزينةٌ حُذف حسابها
+     * تُبقي رمزه محجوزًا. فالعدّ والفحص بمُستعلمٍ يُخفي المحذوف يُعيدان استعمال
+     * رمزٍ مشغول فيفشل الإدراج.
+     */
     private function nextChildCode(Account $parent): string
     {
-        $seq = (int) Account::where('parent_id', $parent->id)
+        $seq = (int) Account::withTrashed()->where('parent_id', $parent->id)
             ->where('code', 'like', $parent->code.'-%')->count() + 1;
 
         do {
             $code = $parent->code.'-'.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
             $seq++;
-        } while (Account::where('code', $code)->exists());
+        } while (Account::withTrashed()->where('code', $code)->exists());
 
         return $code;
     }
