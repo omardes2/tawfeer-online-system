@@ -123,14 +123,23 @@
                 $max = max(1, (float) $monthlySales->max('total'), (float) $monthlySales->max('paid'));
                 $short = fn (float $v) => $v >= 1000 ? number_format($v / 1000, 1).'k' : number_format($v, 0);
             @endphp
-            <div class="flex items-end gap-1.5 h-56">
+            {{--
+                **ارتفاع منطقة الأعمدة صريح (`h-48`) لا موروث.**
+
+                الأعمدة تُرسم بنسبةٍ مئوية، والنسبة لا تُحلّ إلا على أبٍ ارتفاعُه
+                معلوم. وكان الأب عمودًا في صفٍّ `items-end`، فلا يمتدّ إلى ارتفاع
+                الصفّ بل يقصر على محتواه — فتُحلّ `height: 62%` على `auto`
+                فتصير صفرًا. فكان الرسم فارغًا تمامًا: تظهر الأرقام فوق الأعمدة
+                وأسماء الشهور تحتها، ولا عمود بينهما.
+            --}}
+            <div class="flex items-end gap-1.5">
                 @foreach ($monthlySales as $m)
-                    <div class="group relative flex flex-col items-center justify-end flex-1 min-w-0">
+                    <div class="group relative flex flex-col items-center flex-1 min-w-0">
                         {{-- القيمة فوق العمود: قراءتها لا تحتاج تمرير المؤشّر. --}}
                         <span class="text-[9px] text-gray-500 tabular-nums mb-1 whitespace-nowrap {{ $m['total'] > 0 ? '' : 'invisible' }}">
                             {{ $short((float) $m['total']) }}
                         </span>
-                        <div class="w-full flex items-end justify-center gap-px h-full">
+                        <div class="h-48 w-full flex items-end justify-center gap-px">
                             <div class="w-1/2 rounded-t transition-all {{ $m['total'] > 0 ? 'bg-emerald-500 group-hover:bg-emerald-600' : 'bg-gray-100' }}"
                                  style="height: {{ $m['total'] > 0 ? max(3, (int) round(($m['total'] / $max) * 100)) : 2 }}%"
                                  title="{{ $m['label'] }} — {{ __('الفواتير') }}: {{ number_format($m['total'], 2) }}"></div>
