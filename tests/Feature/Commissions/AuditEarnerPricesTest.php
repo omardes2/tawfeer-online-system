@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\Catalog\Models\PriceList;
 use App\Modules\Catalog\Models\PriceListItem;
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Commissions\Models\CommissionEntry;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Foundation\Models\Warehouse;
 use App\Modules\Sales\Models\Order;
@@ -189,6 +190,77 @@ class AuditEarnerPricesTest extends TestCase
         $this->item($product, frozen: 0);
 
         $this->assertStringContainsString('بلقطةٍ صفرٍ أو فارغة', $this->audit());
+    }
+
+    // ────────── تفكيك فاتورة ──────────
+
+    /**
+     * **`--order` يعرض الاشتقاق كاملًا: من سعر البيع إلى العمولة.**
+     *
+     * الفحص العامّ يقول «هذا البند مختلف»، وهذا يقول **لماذا** — فيُرى أين
+     * انكسر الرقم بدل تخمينه.
+     */
+    public function test_it_explains_a_single_order_line_by_line(): void
+    {
+        $product = $this->product('جهاز تعطير', wholesale: 100);
+        $this->listPrice($product, 100);
+
+        // بِيع بـ٢٢٠ وجُمّد شراؤه بـ١٦٣ خطأً ⇒ العمولة ٥٧ بدل ١٢٠.
+        $item = $this->item($product, frozen: 163, price: 220);
+
+        CommissionEntry::create([
+            'order_id' => $item->order_id,
+            'order_item_id' => $item->id,
+            'variant_id' => $item->variant_id,
+            'earner_id' => $this->affiliate->id,
+            'earner_type' => 'affiliate',
+            'entry_type' => 'accrual',
+            'state' => 'eligible',
+            'basis' => 57,
+            'rate' => 1,
+            'amount' => 57,
+        ]);
+
+        $output = $this->explain($item->order->number);
+
+        $this->assertStringContainsString('جهاز تعطير', $output);
+        $this->assertStringContainsString('57.00', $output);   // العمولة الآن
+        $this->assertStringContainsString('120.00', $output);  // ما يجب أن تكون
+        $this->assertStringContainsString('63.00', $output);   // الفرق
+    }
+
+    /** ويقبل رقم التتبّع كما يقبل رقم الطلب. */
+    public function test_it_accepts_a_tracking_number(): void
+    {
+        $product = $this->product('جهاز تعطير', wholesale: 100);
+        $item = $this->item($product, frozen: 100, price: 220);
+        $item->order->update(['tracking_number' => '7471455']);
+
+        $this->assertStringContainsString('7471455', $this->explain('7471455'));
+    }
+
+    /** وطلبٌ ليس له يُرفض بوضوح. */
+    public function test_an_unknown_order_is_reported(): void
+    {
+        $code = Artisan::call('commissions:audit-earner-prices', [
+            'user' => (string) $this->affiliate->id,
+            '--order' => 'SO-LA-YUJAD',
+        ]);
+
+        $this->assertSame(1, $code);
+    }
+
+    /** تفكيك طلبٍ بعينه — `Artisan::call` لا `$this->artisan()` كما في `audit()`. */
+    private function explain(string $key): string
+    {
+        $code = Artisan::call('commissions:audit-earner-prices', [
+            'user' => (string) $this->affiliate->id,
+            '--order' => $key,
+        ]);
+
+        $this->assertSame(0, $code);
+
+        return Artisan::output();
     }
 
     // ────────── الحدود ──────────

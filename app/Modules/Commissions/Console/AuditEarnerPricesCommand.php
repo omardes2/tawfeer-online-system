@@ -5,6 +5,7 @@ namespace App\Modules\Commissions\Console;
 use App\Models\User;
 use App\Modules\Catalog\Services\PriceListService;
 use App\Modules\Commissions\Models\CommissionEntry;
+use App\Modules\Sales\Models\Order;
 use App\Modules\Sales\Models\OrderItem;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
@@ -38,7 +39,8 @@ class AuditEarnerPricesCommand extends Command
                             {user : بريد المسوّق أو معرّفه}
                             {--from= : من تاريخ (YYYY-MM-DD)}
                             {--to= : إلى تاريخ (YYYY-MM-DD)}
-                            {--all : عرض كل البنود لا المختلف منها فقط}';
+                            {--all : عرض كل البنود لا المختلف منها فقط}
+                            {--order= : رقم طلبٍ أو رقم تتبّع — يُفكَّك سطرًا سطرًا بدل الفحص العامّ}';
 
     protected $description = 'فحص أسعار شراء مسوّق على بنوده وأثرها في الأرباح والعمولات (قراءة فقط)';
 
@@ -60,6 +62,10 @@ class AuditEarnerPricesCommand extends Command
         $this->line($list
             ? "قائمة الأسعار: {$list->name}"
             : 'قائمة الأسعار: لا قائمة مُسنَدة — المتوقَّع لكل صنف هو سعر الجملة.');
+
+        if ($this->option('order')) {
+            return $this->explainOrder($earner, $prices, $list);
+        }
 
         $items = $this->items($earner);
 
@@ -91,6 +97,120 @@ class AuditEarnerPricesCommand extends Command
         $this->nextSteps($mismatched);
 
         return self::SUCCESS;
+    }
+
+    // ————————————————————————— تفكيك فاتورة —————————————————————————
+
+    /**
+     * تفكيك فاتورةٍ واحدة سطرًا سطرًا — من سعر البيع إلى العمولة.
+     *
+     * الفحص العامّ يقول «هذا البند مختلف بكذا»، وهذا يقول **لماذا**: يعرض
+     * الاشتقاق كاملًا فيُرى أين انكسر الرقم بدل تخمينه.
+     *
+     * والنسبة تُقرأ من الحركة نفسها لا من القاعدة الحالية: قاعدة العمولة قد
+     * تكون تغيّرت بعد البيع، فقياسُ ما مضى عليها يخترع فرقًا ليس هناك.
+     */
+    private function explainOrder(User $earner, PriceListService $prices, $list): int
+    {
+        $key = (string) $this->option('order');
+
+        $order = Order::with(['items.variant.product:id,name,wholesale_price'])
+            ->where('affiliate_id', $earner->id)
+            ->where(fn ($q) => $q->where('number', $key)->orWhere('tracking_number', $key))
+            ->first();
+
+        if (! $order) {
+            $this->error("لا طلبَ لـ«{$earner->name}» برقم أو تتبّع «{$key}».");
+
+            return self::FAILURE;
+        }
+
+        $listPrices = $list
+            ? $prices->pricesForList($list, $order->items->pluck('variant_id')->filter()->unique()->values()->all())
+            : collect();
+
+        $this->line('');
+        $this->info("الطلب: {$order->number}  ·  التتبّع: ".($order->tracking_number ?: '—'));
+        $this->line('الحالة: '.$order->status.'  ·  الإجمالي: '.number_format((float) $order->total, 2)
+            .'  ·  رسوم التوصيل: '.number_format((float) $order->shipping_total, 2));
+        $this->line('');
+
+        $rows = [];
+        $deltaTotal = 0.0;
+
+        foreach ($order->items as $item) {
+            $row = $this->explainItem($item, $listPrices, $earner);
+            $deltaTotal += $row['delta'];
+
+            $rows[] = [
+                mb_substr($row['name'], 0, 24),
+                $row['source'],
+                rtrim(rtrim(number_format($row['qty'], 2), '0'), '.'),
+                number_format($row['price'], 2),
+                number_format($row['frozen'], 2),
+                number_format($row['expected'], 2),
+                $row['rate'],
+                number_format($row['now'], 2),
+                number_format($row['should'], 2),
+                number_format($row['delta'], 2),
+            ];
+        }
+
+        $this->table(
+            ['الصنف', 'المصدر', 'كمية', 'سعر البيع', 'شراؤه المُجمَّد', 'شراؤه المتوقَّع', 'النسبة', 'العمولة الآن', 'يجب أن تكون', 'الفرق'],
+            $rows,
+        );
+
+        $this->line('');
+        $this->line('صافي فرق العمولة على هذا الطلب: '.($deltaTotal > 0 ? '+' : '').number_format($deltaTotal, 2));
+        $this->line('');
+        $this->comment('العمولة = (سعر البيع − سعر شرائه) × الكمية × النسبة — بلا رسوم التوصيل.');
+        $this->comment('لم يتغيّر شيء — هذا الأمر يقرأ ولا يكتب.');
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * @param  Collection<int, float>  $listPrices
+     * @return array<string, mixed>
+     */
+    private function explainItem(OrderItem $item, Collection $listPrices, User $earner): array
+    {
+        $inList = $listPrices->has($item->variant_id);
+
+        $expected = round((float) ($inList
+            ? $listPrices[$item->variant_id]
+            : ($item->variant?->effectiveWholesalePrice() ?? 0)), 2);
+
+        $frozen = round((float) $item->wholesale_price_snapshot, 2);
+        $qty = (float) $item->qty;
+        $price = round((float) $item->unit_price, 2);
+
+        $entry = CommissionEntry::where('order_item_id', $item->id)
+            ->where('earner_id', $earner->id)
+            ->where('earner_type', 'affiliate')
+            ->where('entry_type', 'accrual')
+            ->whereNotIn('state', ['reversed', 'cancelled'])
+            ->first();
+
+        // النسبة من الحركة نفسها: `1.0` تعني «الهامش كاملًا للمسوّق».
+        $rate = $entry?->rate !== null ? (float) $entry->rate : 1.0;
+
+        $now = $entry ? round((float) $entry->amount, 2) : 0.0;
+        $should = round(max(0, ($price - $expected) * $qty) * $rate, 2);
+
+        return [
+            'name' => $item->variant?->product?->name ?? $item->variant?->sku ?? 'بند حرّ',
+            'source' => $inList ? 'قائمته' : 'الجملة',
+            'qty' => $qty,
+            'price' => $price,
+            'frozen' => $frozen,
+            'expected' => $expected,
+            'rate' => $entry === null ? 'لا حركة' : ($entry->rate === null ? 'مبلغ ثابت' : rtrim(rtrim(number_format($rate * 100, 2), '0'), '.').'%'),
+            'now' => $now,
+            'should' => $should,
+            'delta' => round($should - $now, 2),
+        ];
     }
 
     // ————————————————————————— الجمع —————————————————————————
