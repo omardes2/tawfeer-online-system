@@ -76,4 +76,44 @@ class CommissionEntry extends Model
     {
         return $this->hasMany(CommissionTransition::class)->orderBy('id');
     }
+
+    // ————————————— قراءة الربح في الكشف —————————————
+
+    /**
+     * قيمة بيع البند — لا `basis`.
+     *
+     * أساسُ حركة المسوّق هو **الهامش** لا سعر البيع: قاعدة `margin` تُعطيه
+     * الهامش كاملًا فيتساوى `basis` و`amount`. فعرضُ `basis` تحت عنوان «سعر
+     * المنتج» يكتب الربح مرّتين ويُخفي السعر الذي بِيع به فعلًا — وبه وحده
+     * يُراجَع الكشف أمام الفاتورة.
+     *
+     * وأساسُ حركة البائع قيمةُ المبيعات أصلًا، فيُقرأ كما هو.
+     */
+    public function saleValue(): ?float
+    {
+        if ($this->earner_type !== 'affiliate') {
+            return round((float) $this->basis, 2);
+        }
+
+        $item = $this->orderItem;
+
+        return $item ? round((float) $item->qty * (float) $item->unit_price, 2) : null;
+    }
+
+    /**
+     * ما اشترى به المستفيد: سعر الجملة أو سعر قائمته المخصّصة — **لقطةً وقت
+     * البيع** لا سعرَ اليوم، فتغيُّر القائمة لاحقًا لا يُعيد كتابة كشفٍ مضى.
+     *
+     * يُضرب في الكمية ليُقرأ في سطر الإجماليات نفسه: الربح = البيع − الجملة.
+     */
+    public function costValue(): ?float
+    {
+        if ($this->wholesale_cost_snapshot === null) {
+            return null;   // حركة بائعٍ بنسبة — لا شراءَ لها.
+        }
+
+        $qty = (float) ($this->orderItem?->qty ?? 0);
+
+        return $qty > 0 ? round($qty * (float) $this->wholesale_cost_snapshot, 2) : null;
+    }
 }

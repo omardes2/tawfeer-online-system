@@ -46,14 +46,31 @@
                 <label class="block text-xs text-gray-500 mb-1">{{ __('commissions.period_to') }}</label>
                 <input type="date" name="to" value="{{ $to }}" class="rounded-md border-gray-300 text-sm">
             </div>
+            {{--
+                الحالة: «مستحقّة» افتراضًا. الكشف يُقرأ ليُصرَف عليه، و«قيد
+                الانتظار» حركةٌ لم يصل مالُها من شركة التوصيل بعد — ظهورُها بين
+                المستحقّات يُوهم المراجع بأنها واجبة الدفع. وتبقى في القائمة
+                لمن يطلبها بدل أن تُحذف فيبحث عنها صاحبُها فلا يجدها.
+            --}}
+            <div>
+                <label class="block text-xs text-gray-500 mb-1">{{ __('commissions.state') }}</label>
+                <select name="state" class="rounded-md border-gray-300 text-sm">
+                    @foreach ($states as $s)
+                        <option value="{{ $s }}" @selected($state === $s)>
+                            {{ $s === 'all' ? __('commissions.all_states') : __('commissions.'.$s) }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
             <button type="submit" class="px-4 py-2 bg-gray-700 text-white text-sm rounded-md hover:bg-gray-800">{{ __('commissions.apply_filter') }}</button>
 
             {{--
-                التصدير يحمل الفترة المعروضة نفسها، ويُصدّر **كل حركاتها** لا
-                الصفحة الظاهرة: الملفّ يُبنى عليه صرفٌ ومراجعة، وكشفٌ ناقص أسوأ
-                من لا كشف.
+                التصدير يحمل الفترة والحالة المعروضتين نفسيهما، ويُصدّر **كل
+                حركاتها** لا الصفحة الظاهرة: الملفّ يُبنى عليه صرفٌ ومراجعة،
+                وكشفٌ ناقص أسوأ من لا كشف.
             --}}
-            <a href="{{ request()->fullUrlWithQuery(['export' => 'csv']) }}"
+            <a href="{{ request()->fullUrlWithQuery(['export' => 'xlsx']) }}"
                class="px-4 py-2 border border-emerald-600 text-emerald-700 text-sm rounded-md hover:bg-emerald-50">
                 {{ __('تصدير Excel') }}
             </a>
@@ -178,12 +195,19 @@
                         <th class="py-2 px-3 font-medium">{{ __('الصنف') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('commissions.order_date') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('commissions.entry_type') }}</th>
-                        <th class="py-2 px-3 font-medium">{{ __('commissions.basis') }}</th>
-                        <th class="py-2 px-3 font-medium">{{ __('commissions.amount') }}</th>
+                        {{--
+                            الأعمدة الثلاثة تُقرأ طرحًا: سعر المنتج − سعر الجملة
+                            = الربح. وكلاهما **قيمة السطر** (مضروبةً في الكمية)
+                            لا سعر الوحدة — وإلّا لم يصحّ الطرح على بندٍ كميّتُه
+                            أكثر من واحد.
+                        --}}
+                        <th class="py-2 px-3 font-medium">{{ __('commissions.sale_price') }}</th>
+                        <th class="py-2 px-3 font-medium">{{ __('commissions.buy_price') }}</th>
+                        <th class="py-2 px-3 font-medium">{{ __('commissions.profit') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('commissions.state') }}</th>
                     </tr></thead>
                     <tbody>
-                        @foreach ($entries as $e)
+                        @forelse ($entries as $e)
                             <tr class="border-b">
                                 <td class="py-2 px-3" data-label="{{ __('commissions.order') }}">
                                     @if ($e->order)
@@ -209,11 +233,20 @@
                                 </td>
                                 <td class="py-2 px-3 text-gray-500 whitespace-nowrap" data-label="{{ __('commissions.order_date') }}">{{ $e->order?->created_at?->format('Y-m-d') ?? '—' }}</td>
                                 <td class="py-2 px-3" data-label="{{ __('commissions.entry_type') }}">{{ __('commissions.'.$e->entry_type) }}</td>
-                                <td class="py-2 px-3" data-label="{{ __('commissions.basis') }}">{{ number_format((float) $e->basis, 2) }}</td>
-                                <td class="py-2 px-3 {{ (float) $e->amount < 0 ? 'text-rose-600' : '' }}" data-label="{{ __('commissions.amount') }}">{{ number_format((float) $e->amount, 2) }}</td>
+                                @php($sale = $e->saleValue())
+                                @php($cost = $e->costValue())
+                                <td class="py-2 px-3 tabular-nums" data-label="{{ __('commissions.sale_price') }}">
+                                    {{ $sale === null ? '—' : number_format($sale, 2) }}
+                                </td>
+                                <td class="py-2 px-3 tabular-nums text-gray-500" data-label="{{ __('commissions.buy_price') }}">
+                                    {{ $cost === null ? '—' : number_format($cost, 2) }}
+                                </td>
+                                <td class="py-2 px-3 tabular-nums font-medium {{ (float) $e->amount < 0 ? 'text-rose-600' : '' }}" data-label="{{ __('commissions.profit') }}">{{ number_format((float) $e->amount, 2) }}</td>
                                 <td class="py-2 px-3" data-label="{{ __('commissions.state') }}">{{ __('commissions.'.$e->state) }}</td>
                             </tr>
-                        @endforeach
+                        @empty
+                            <tr><td colspan="9" class="py-6 text-center text-gray-400">{{ __('لا توجد حركات بهذه الحالة في الفترة.') }}</td></tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>

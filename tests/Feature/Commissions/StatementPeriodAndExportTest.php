@@ -10,6 +10,8 @@ use App\Modules\Sales\Models\Order;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use OpenSpout\Reader\XLSX\Reader;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Tests\TestCase;
 
 /**
@@ -140,15 +142,57 @@ class StatementPeriodAndExportTest extends TestCase
 
     // ────────── التصدير ──────────
 
-    /** التصدير يُنزّل ملفًّا بترويسة الفترة. */
-    public function test_the_export_downloads_a_csv(): void
+    /**
+     * قراءة ملفّ التصدير صفًّا صفًّا.
+     *
+     * الـxlsx أرشيفُ zip لا نصّ، والسلاسل المكرّرة تُخزَّن مرّةً واحدة بفهرس —
+     * فالبحث في بايتات الملفّ يعدّ الاسم الواحد مرّةً مهما تكرّر في الصفوف.
+     * فيُقرأ بقارئٍ حقيقيّ.
+     *
+     * @return array<int, array<int, mixed>>
+     */
+    private function readSheet(BinaryFileResponse $response): array
+    {
+        $reader = new Reader;
+        $reader->open($response->getFile()->getPathname());
+
+        $rows = [];
+
+        foreach ($reader->getSheetIterator() as $sheet) {
+            foreach ($sheet->getRowIterator() as $row) {
+                $rows[] = $row->toArray();
+            }
+            break;
+        }
+
+        $reader->close();
+
+        return $rows;
+    }
+
+    /** نصُّ الورقة كاملًا — لتأكيد وجود قيمةٍ بصرف النظر عن موضعها. */
+    private function sheetText(BinaryFileResponse $response): string
+    {
+        return collect($this->readSheet($response))
+            ->map(fn (array $row) => implode('|', array_map(
+                static fn ($c) => $c instanceof \DateTimeInterface ? $c->format('Y-m-d') : (string) $c,
+                $row,
+            )))
+            ->implode("\n");
+    }
+
+    /** التصدير يُنزّل ملفَّ xlsx لا CSV بامتدادٍ مُضلِّل. */
+    public function test_the_export_downloads_an_xlsx(): void
     {
         $this->entry('2026-08-20');
 
-        $response = $this->statement(['export' => 'csv'])->assertOk();
+        $response = $this->statement(['export' => 'xlsx'])->assertOk()->baseResponse;
 
-        $this->assertStringContainsString('text/csv', $response->headers->get('Content-Type'));
-        $this->assertStringContainsString('.csv', $response->headers->get('Content-Disposition'));
+        $this->assertInstanceOf(BinaryFileResponse::class, $response);
+        // الاسم الذي يصل المتصفّح في الترويسة لا اسم الملفّ المؤقّت على القرص.
+        $this->assertStringContainsString('.xlsx', $response->headers->get('content-disposition'));
+        // توقيع أرشيف zip — وهو ما يجعل Excel يفتحه بلا حيلةِ BOM.
+        $this->assertSame('PK', substr(file_get_contents($response->getFile()->getPathname()), 0, 2));
     }
 
     /** ويحمل الأعمدة والمجموع ورقم التتبّع. */
@@ -157,11 +201,11 @@ class StatementPeriodAndExportTest extends TestCase
         $this->entry('2026-08-20', amount: 100, tracking: 'OP-77');
         $this->entry('2026-08-21', amount: 50);
 
-        $csv = $this->statement(['export' => 'csv'])->streamedContent();
+        $text = $this->sheetText($this->statement(['export' => 'xlsx'])->baseResponse);
 
-        $this->assertStringContainsString('سائد شاهين', $csv);
-        $this->assertStringContainsString('OP-77', $csv);
-        $this->assertStringContainsString('150.00', $csv);   // المجموع
+        $this->assertStringContainsString('سائد شاهين', $text);
+        $this->assertStringContainsString('OP-77', $text);
+        $this->assertStringContainsString('150', $text);   // المجموع
     }
 
     /**
@@ -176,11 +220,14 @@ class StatementPeriodAndExportTest extends TestCase
             $this->entry('2026-08-20', amount: 10);
         }
 
-        $csv = $this->statement(['export' => 'csv'])->streamedContent();
+        $rows = $this->readSheet($this->statement(['export' => 'xlsx'])->baseResponse);
 
-        // 35 صفًّا + 4 أسطر ترويسة + سطران للمجموع.
-        $this->assertSame(35, substr_count($csv, 'عطر سمارت'));
-        $this->assertStringContainsString('350.00', $csv);
+        $named = collect($rows)->filter(
+            fn (array $row) => in_array('عطر سمارت', array_map(static fn ($c) => (string) $c, $row), true),
+        );
+
+        $this->assertCount(35, $named);
+        $this->assertStringContainsString('350', $this->sheetText($this->statement(['export' => 'xlsx'])->baseResponse));
     }
 
     /** وما خرج عن الفترة لا يدخل الملفّ. */
@@ -189,8 +236,9 @@ class StatementPeriodAndExportTest extends TestCase
         $this->entry('2026-08-20', amount: 100);
         $this->entry('2026-07-10', amount: 555);
 
-        $csv = $this->statement(['export' => 'csv'])->streamedContent();
-
-        $this->assertStringNotContainsString('555.00', $csv);
+        $this->assertStringNotContainsString(
+            '555',
+            $this->sheetText($this->statement(['export' => 'xlsx'])->baseResponse),
+        );
     }
 }

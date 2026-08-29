@@ -13,6 +13,11 @@ return [
     'order' => 'Order',
     'entry_type' => 'Entry type',
     'basis' => 'Basis',
+    // Statement columns: what it sold for, what the earner paid, the gap.
+    'sale_price' => 'Sale price',
+    'buy_price' => 'Wholesale price',
+    'profit' => 'Profit',
+    'all_states' => 'All states',
     'rate' => 'Rate',
     'amount' => 'Amount',
     'state' => 'State',

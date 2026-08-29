@@ -14,10 +14,11 @@ use App\Modules\Commissions\Models\CommissionPayout;
 use App\Modules\Commissions\Models\CommissionRule;
 use App\Modules\Commissions\Services\CommissionService;
 use App\Modules\Foundation\Models\Branch;
+use App\Support\XlsxExporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * لوحة العمولات/الأرباح (Phase 4.2) — واجهات إدارة RTL: الدفتر (فلترة بالحالة)،
@@ -25,7 +26,30 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class CommissionController extends Controller
 {
+    /** قيمة الفلتر التي تعني «بلا تصفية». */
+    private const ALL_STATES = 'all';
+
+    /**
+     * حالات كشف الحساب — و**«مستحقّة» هي الافتراض**.
+     *
+     * الكشف يُقرأ ليُصرَف عليه، و«قيد الانتظار» حركةٌ لم يصل مالُها من شركة
+     * التوصيل بعد: ظهورُها بين المستحقّات يُوهم المراجع بأنها واجبة الدفع.
+     * فتُخفى افتراضًا وتبقى في متناول من يطلبها من الفلتر — لا تُحذف من الشاشة
+     * كي لا يبحث عنها صاحبُها فلا يجدها.
+     */
+    private const STATEMENT_STATES = [
+        'eligible', 'approved', 'paid', 'pending', 'cancelled', 'reversed', self::ALL_STATES,
+    ];
+
     public function __construct(private readonly CommissionService $commissions) {}
+
+    /** حالة الكشف المطلوبة — تُحصر في المعروف حتى لا يُفلتَر بقيمةٍ من العنوان. */
+    private function statementState(Request $request): string
+    {
+        $state = (string) $request->query('state', 'eligible');
+
+        return in_array($state, self::STATEMENT_STATES, true) ? $state : 'eligible';
+    }
 
     /**
      * الصفحة الرئيسية: قائمة الأشخاص (موظفو المبيعات ثم المسوّقون) بأرصدتهم — مستحق
@@ -74,58 +98,72 @@ class CommissionController extends Controller
      * واحدة تُنتج كشفًا ناقصًا يُبنى عليه صرفٌ خاطئ. فيُبثّ الصفّ تلو الآخر
      * (`chunk`) بلا تحميل الكل في الذاكرة.
      *
-     * و`BOM` في أوله شرطُ قراءة العربية في Excel — بدونه تظهر مربّعات.
+     * ويتبع الفلتر الظاهر على الشاشة: ملفٌّ يخالف ما أمام عينَي من صدّره
+     * أسوأ من غياب التصدير.
      */
-    private function statementCsv(int $earnerId, string $type, array $range, string $from, string $to): StreamedResponse
+    private function statementXlsx(int $earnerId, string $type, array $range, string $from, string $to, string $state): BinaryFileResponse
     {
         $earner = User::find($earnerId);
 
         $head = [
             __('commissions.order'), __('رقم التتبّع'), __('الصنف'), __('commissions.order_date'),
-            __('commissions.entry_type'), __('commissions.basis'), __('commissions.amount'),
-            __('commissions.state'),
+            __('commissions.entry_type'), __('commissions.sale_price'), __('commissions.buy_price'),
+            __('commissions.profit'), __('commissions.state'),
         ];
 
-        $query = $this->inPeriod($earnerId, $type, $range)
-            ->with(['order:id,number,created_at,tracking_number', 'variant.product:id,name', 'variant.attributeValues'])
-            ->orderBy('id');
+        $query = $this->statementEntries($earnerId, $type, $range, $state)->orderBy('id');
 
-        $name = 'commission-statement-'.($earner?->id ?? $earnerId).'-'.$from.'_'.$to.'.csv';
-
-        return response()->streamDownload(function () use ($query, $head, $earner, $from, $to) {
-            $out = fopen('php://output', 'w');
-            fwrite($out, "\xEF\xBB\xBF");
-
-            // ترويسةٌ تعرّف الكشف: ملفٌّ بلا اسم صاحبه ولا فترته لا يصلح مستندًا.
-            fputcsv($out, [__('كشف حساب'), $earner?->name ?? '—']);
-            fputcsv($out, [__('من'), $from, __('إلى'), $to]);
-            fputcsv($out, []);
-            fputcsv($out, $head);
-
+        $rows = function () use ($query) {
             $total = 0.0;
 
-            $query->chunk(500, function ($chunk) use ($out, &$total) {
-                foreach ($chunk as $e) {
-                    $total += (float) $e->amount;
+            foreach ($query->lazy(500) as $e) {
+                $total += (float) $e->amount;
 
-                    fputcsv($out, [
-                        $e->order?->number ?? '—',
-                        $e->order?->tracking_number ?? '',
-                        $e->variant?->product?->name ?? $e->variant?->sku ?? '—',
-                        $e->order?->created_at?->format('Y-m-d') ?? '',
-                        __('commissions.'.$e->entry_type),
-                        number_format((float) $e->basis, 2, '.', ''),
-                        number_format((float) $e->amount, 2, '.', ''),
-                        __('commissions.'.$e->state),
-                    ]);
-                }
-            });
+                yield [
+                    $e->order?->number ?? '—',
+                    $e->order?->tracking_number ?? '',
+                    $e->variant?->product?->name ?? $e->variant?->sku ?? '—',
+                    $e->order?->created_at?->format('Y-m-d') ?? '',
+                    __('commissions.'.$e->entry_type),
+                    $e->saleValue(),
+                    $e->costValue(),
+                    round((float) $e->amount, 2),
+                    __('commissions.'.$e->state),
+                ];
+            }
 
-            fputcsv($out, []);
-            fputcsv($out, [__('الإجمالي'), '', '', '', '', '', number_format($total, 2, '.', '')]);
+            yield [];
+            yield [__('الإجمالي'), '', '', '', '', '', '', round($total, 2), ''];
+        };
 
-            fclose($out);
-        }, $name, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        return XlsxExporter::download(
+            'commission-statement-'.($earner?->id ?? $earnerId).'-'.$from.'_'.$to,
+            $head,
+            $rows,
+            [
+                // ترويسةٌ تعرّف الكشف: ملفٌّ بلا اسم صاحبه ولا فترته لا يصلح مستندًا.
+                [__('كشف حساب'), $earner?->name ?? '—'],
+                [__('من'), $from, __('إلى'), $to],
+                [__('commissions.state'), $state === self::ALL_STATES ? __('commissions.all_states') : __('commissions.'.$state)],
+            ],
+        );
+    }
+
+    /**
+     * حركات الكشف بعد الفلترة بالحالة.
+     *
+     * الشاشة والتصدير يقرآن من هنا معًا — وإلّا انحرف أحدهما عن الآخر عند أول
+     * تعديل على الفلتر.
+     */
+    private function statementEntries(int $earnerId, string $type, array $range, string $state)
+    {
+        return $this->inPeriod($earnerId, $type, $range)
+            ->when($state !== self::ALL_STATES, fn ($q) => $q->where('state', $state))
+            ->with([
+                'order:id,uuid,number,created_at,tracking_number',
+                'orderItem:id,qty,unit_price',
+                'variant.product:id,name', 'variant.attributeValues',
+            ]);
     }
 
     /**
@@ -209,17 +247,20 @@ class CommissionController extends Controller
         return back()->with('status', __('commissions.paid_total', ['total' => number_format((float) $payout->total, 2)]));
     }
 
-    public function statement(Request $request, int $earnerId): View|StreamedResponse
+    public function statement(Request $request, int $earnerId): View|BinaryFileResponse
     {
         $type = $request->query('earner_type', 'sales');
         [$fromStr, $toStr, $range] = $this->period($request);
+        $state = $this->statementState($request);
 
         // مستحقّات الفترة (الأرباح المؤهّلة صافيةً ضمن المدى الزمني).
+        // **لا تتبع فلتر الحالة**: بطاقات الأرصدة تقول ما للمستفيد كاملًا،
+        // وربطُها بالفلتر يجعل الرصيد يتغيّر بتغيّر العرض وهو لا يتغيّر.
         $periodEarned = (float) $this->inPeriod($earnerId, $type, $range)
             ->whereIn('state', ['eligible', 'approved', 'paid'])->sum('amount');
 
-        if ($request->query('export') === 'csv') {
-            return $this->statementCsv($earnerId, $type, $range, $fromStr, $toStr);
+        if (in_array($request->query('export'), ['xlsx', 'csv'], true)) {
+            return $this->statementXlsx($earnerId, $type, $range, $fromStr, $toStr, $state);
         }
 
         return view('admin.commissions.statement', [
@@ -231,18 +272,15 @@ class CommissionController extends Controller
             'periodEarned' => round($periodEarned, 2),
             'from' => $fromStr,
             'to' => $toStr,
-            // uuid وتاريخ الطلب: رقم الطلب يقود إلى فاتورته (الربط بالـuuid)، ويُعرض تاريخه.
-            'entries' => $this->inPeriod($earnerId, $type, $range)
-                // الصنف مع الطلب: الحركة **لكل بند** لا لكل طلب، فالطلب ذو
-                // الصنفين يعطي سطرين برقمٍ واحد — يبدوان تكرارًا لمن يقرأ
-                // الكشف، وهما بندان مختلفان.
-                //
-                // ورقم التتبّع يُقرأ من الطلب عرضًا فقط — Protected Delivery
-                // Integration — Do Not Modify: لا يُكتب ولا يُطلب من الشركة.
-                ->with([
-                    'order:id,uuid,number,created_at,tracking_number',
-                    'variant.product:id,name', 'variant.attributeValues',
-                ])
+            'state' => $state,
+            'states' => self::STATEMENT_STATES,
+            // الصنف مع الطلب: الحركة **لكل بند** لا لكل طلب، فالطلب ذو الصنفين
+            // يعطي سطرين برقمٍ واحد — يبدوان تكرارًا لمن يقرأ الكشف، وهما بندان
+            // مختلفان. وبند الطلب يُحمَّل لأن سعر البيع يُقرأ منه لا من `basis`.
+            //
+            // ورقم التتبّع يُقرأ من الطلب عرضًا فقط — Protected Delivery
+            // Integration — Do Not Modify: لا يُكتب ولا يُطلب من الشركة.
+            'entries' => $this->statementEntries($earnerId, $type, $range, $state)
                 ->latest('id')->paginate(30)->withQueryString(),
             'payouts' => CommissionPayout::where('earner_id', $earnerId)->where('earner_type', $type)
                 ->with(['voucher:id,number,status,kind', 'treasury:id,name'])->latest('id')->get(),
