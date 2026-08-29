@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Purchasing\StoreSupplierRequest;
 use App\Http\Requests\Purchasing\UpdateSupplierRequest;
 use App\Modules\Accounting\Models\FinancialVoucher;
+use App\Modules\Accounting\Models\JournalLine;
 use App\Modules\Purchasing\Models\PurchaseInvoice;
 use App\Modules\Purchasing\Models\Supplier;
 use App\Modules\Purchasing\Services\SupplierService;
@@ -107,11 +108,72 @@ class SupplierController extends Controller
     }
 
     /**
-     * كشف حساب المورد: الفواتير المُرحّلة (تزيد المستحق) والدفعات (تُنقصه) مرتّبة زمنيًا برصيد متحرّك.
+     * كشف الحساب من **دفتر الأستاذ** — كالرصيد تمامًا.
      *
-     * @return Collection<int, array<string, mixed>>
+     * بناؤه من الفواتير والسندات وحدها كان يُسقط ثلاثة أشياء:
+     *
+     * 1. **الرصيد الافتتاحي**: كان يدخل الرصيد المتحرّك صامتًا بلا سطر، فيبدأ
+     *    الكشف من رقمٍ لا يُفسّره شيء — يقرأ المستخدم فاتورةً بـ13,208 فيقفز
+     *    الرصيد إلى −136,088 ولا يجد لها سببًا.
+     * 2. **فروق الصرف**: قيدٌ مستقلّ يُطفئ من الذمّة ما لم يخرج نقدًا، فيختلف
+     *    آخرُ سطرٍ في الكشف عن بطاقة «الرصيد المتبقّي».
+     * 3. **قيود التسوية اليدوية** على حساب المورد.
+     *
+     * والدفتر يحملها جميعًا، والبيان يُقرأ من وصف القيد نفسه — فلا يحتاج كلُّ
+     * مصدرٍ جديدٍ تعديلًا هنا كي يظهر.
      */
     private function buildStatement(Supplier $supplier, float $opening): Collection
+    {
+        $account = $supplier->glAccount()->first();
+
+        if (! $account) {
+            return $this->buildStatementFromDocuments($supplier, $opening);
+        }
+
+        $running = 0.0;
+
+        return JournalLine::query()
+            ->join('journal_entries as je', 'je.id', '=', 'journal_lines.journal_entry_id')
+            ->where('journal_lines.account_id', $account->id)
+            ->where('je.status', 'posted')
+            // الترتيب بالتاريخ ثم برقم القيد: قيدان في يومٍ واحد يجب أن يقرآ
+            // بترتيب تسجيلهما، وإلا قفز الرصيد المتحرّك ورجع.
+            ->orderBy('je.entry_date')->orderBy('je.id')->orderBy('journal_lines.id')
+            ->select('journal_lines.*')
+            ->with('entry:id,number,entry_date,description,source')
+            ->get()
+            ->map(function (JournalLine $line) use (&$running) {
+                $running += (float) $line->credit - (float) $line->debit;
+
+                return [
+                    'date' => $line->entry->entry_date,
+                    'type' => $this->statementRowType($line->entry->source),
+                    'ref' => $line->entry->description ?: $line->entry->number,
+                    'debit' => round((float) $line->debit, 2),
+                    'credit' => round((float) $line->credit, 2),
+                    'model_id' => $line->entry->id,
+                    'balance' => round($running, 2),
+                ];
+            });
+    }
+
+    /**
+     * وسمُ السطر من مصدر القيد. ما لا يُعرف يُوسَم «حركة» بدل أن يُنسب خطأً إلى
+     * فاتورةٍ أو دفعة — والوصف تحته يقول ما هو.
+     */
+    private function statementRowType(?string $source): string
+    {
+        return match ($source) {
+            'purchase_invoice' => 'invoice',
+            'voucher' => 'payment',
+            'purchase_invoice_fx' => 'fx',
+            'opening_balance', 'supplier_opening' => 'opening',
+            default => 'entry',
+        };
+    }
+
+    /** الاحتياط للمورّد بلا حساب فرعيّ: البناء من المستندات كما كان. */
+    private function buildStatementFromDocuments(Supplier $supplier, float $opening): Collection
     {
         $invoices = PurchaseInvoice::where('supplier_id', $supplier->id)
             ->where('status', 'posted')

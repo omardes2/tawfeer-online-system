@@ -161,6 +161,62 @@ class SupplierLedgerBalanceTest extends TestCase
             ->assertSee('تسويات');
     }
 
+    // ────────── كشف الحساب ──────────
+
+    /**
+     * **الرصيد الافتتاحي يظهر سطرًا في الكشف.**
+     *
+     * كان يدخل الرصيد المتحرّك صامتًا، فيبدأ الكشف من رقمٍ لا يُفسّره شيء: تُقرأ
+     * أوّلُ فاتورةٍ بـ13,208 ويقفز الرصيد إلى −136,088 بلا سبب ظاهر.
+     */
+    public function test_the_opening_balance_appears_as_a_row(): void
+    {
+        $this->service()->syncOpeningBalance($this->supplier, -5000);
+        $this->localInvoice(1000);
+
+        $this->get(route('admin.purchasing.suppliers.show', $this->supplier))
+            ->assertOk()
+            ->assertSee('رصيد افتتاحي');
+    }
+
+    /** وفرق الصرف يظهر سطرًا كذلك — لا يختفي بين الفاتورة والدفعة. */
+    public function test_the_fx_difference_appears_as_a_row(): void
+    {
+        $invoice = $this->importInvoice(usd: 1000, rateOnInvoice: 3.60);
+        app(PurchaseInvoiceService::class)->payForeign(
+            $invoice->fresh(), $this->treasury()->id, foreignAmount: 1000, paymentRate: 3.55,
+        );
+
+        $this->get(route('admin.purchasing.suppliers.show', $this->supplier))
+            ->assertOk()
+            ->assertSee('فرق صرف');
+    }
+
+    /**
+     * **وآخر سطرٍ في الكشف يساوي بطاقة «الرصيد المتبقّي».**
+     *
+     * وهو الشرط الذي يجعل الكشف مستندًا يُراجَع: رقمان مختلفان على شاشةٍ واحدة
+     * يُبطلان الثقة بكليهما.
+     */
+    public function test_the_statement_ends_at_the_card_balance(): void
+    {
+        $this->service()->syncOpeningBalance($this->supplier, -5000);
+        $invoice = $this->importInvoice(usd: 1000, rateOnInvoice: 3.60);
+        app(PurchaseInvoiceService::class)->payForeign(
+            $invoice->fresh(), $this->treasury()->id, foreignAmount: 400, paymentRate: 3.55,
+        );
+
+        $response = $this->get(route('admin.purchasing.suppliers.show', $this->supplier))->assertOk();
+
+        $statement = $response->viewData('statement');
+        $balance = $response->viewData('balance');
+
+        $this->assertEqualsWithDelta($balance, $statement->last()['balance'], 0.01);
+        $this->assertEqualsWithDelta(
+            $this->service()->ledgerBalance($this->supplier->fresh()), $balance, 0.01,
+        );
+    }
+
     // ────────── الدفعة على الحساب ──────────
 
     /**

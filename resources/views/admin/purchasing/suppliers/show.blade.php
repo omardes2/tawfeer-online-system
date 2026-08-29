@@ -159,8 +159,19 @@
                         @forelse ($statement as $row)
                             <tr class="hover:bg-gray-50">
                                 <td class="py-3 px-4 text-gray-500">{{ \Illuminate\Support\Carbon::parse($row['date'])->format('Y-m-d') }}</td>
+                                {{--
+                                    الوسم يقول نوع الحركة: الكشف يحمل الآن ما
+                                    يحمله الدفتر — رصيدًا افتتاحيًّا وفروقَ صرفٍ
+                                    وقيودَ تسوية، لا فواتيرَ ودفعاتٍ فقط.
+                                --}}
+                                @php($badge = [
+                                    'invoice' => ['bg-amber-50 text-amber-700', __('فاتورة')],
+                                    'payment' => ['bg-emerald-50 text-emerald-700', __('دفعة')],
+                                    'fx' => ['bg-sky-50 text-sky-700', __('فرق صرف')],
+                                    'opening' => ['bg-violet-50 text-violet-700', __('رصيد افتتاحي')],
+                                ][$row['type']] ?? ['bg-gray-100 text-gray-600', __('حركة')])
                                 <td class="py-3 px-4 text-gray-800">
-                                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs me-1 {{ $row['type'] === 'invoice' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700' }}">{{ $row['type'] === 'invoice' ? __('فاتورة') : __('دفعة') }}</span>
+                                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs me-1 {{ $badge[0] }}">{{ $badge[1] }}</span>
                                     {{ $row['ref'] }}
                                 </td>
                                 <td class="py-3 px-4 tabular-nums text-emerald-600">{{ $row['debit'] > 0 ? number_format($row['debit'], 2) : '—' }}</td>
