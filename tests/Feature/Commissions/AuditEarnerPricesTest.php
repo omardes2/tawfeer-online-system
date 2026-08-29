@@ -183,13 +183,38 @@ class AuditEarnerPricesTest extends TestCase
         $this->assertStringContainsString('0.00', $output);
     }
 
-    /** ولقطةٌ صفرٌ تُعدّ وتُعرَض — هي أسوأ الحالات لا أسلمُها. */
-    public function test_a_zero_snapshot_is_counted(): void
+    /**
+     * **ولقطةٌ صفرٌ لا تعني عمولةً على صفر.**
+     *
+     * الحساب يرتدّ إلى سعر جملة الصنف، فالبند مُسعَّرٌ بـ٨٠ لا بصفر. وقياسُ
+     * الفرق على الصفر يقلب إشارة الأثر ويجعل مسوّقًا يستحقّ زيادةً يبدو مدينًا
+     * بها — وهو ما وقع فعلًا في أوّل تشغيلٍ لهذا الأمر.
+     */
+    public function test_a_zero_snapshot_falls_back_to_the_wholesale_price(): void
     {
         $product = $this->product('عطر سمارت', wholesale: 80);
-        $this->item($product, frozen: 0);
+        $this->listPrice($product, 65);
+        $this->item($product, frozen: 0, price: 100);
 
-        $this->assertStringContainsString('بلقطةٍ صفرٍ أو فارغة', $this->audit());
+        $output = $this->audit();
+
+        // يُعدّ في الملخّص لأنه بيانٌ ناقص…
+        $this->assertStringContainsString('بلقطةٍ صفرٍ', $output);
+        // …لكنّ الفرق يُقاس على ٨٠ لا على صفر: ٨٠ − ٦٥ = ١٥.
+        $this->assertStringContainsString('15.00', $output);
+        $this->assertStringNotContainsString('65.00 | 65.00', $output);
+    }
+
+    /** ولقطةٌ صفرٌ بلا سعر جملةٍ ترتدّ إلى التكلفة — آخر الاحتياط. */
+    public function test_a_zero_snapshot_without_wholesale_falls_back_to_cost(): void
+    {
+        $product = $this->product('عطر سمارت', wholesale: 0);
+        $product->defaultVariant->forceFill(['average_cost' => 40])->save();
+        $this->listPrice($product, 65);
+        $this->item($product, frozen: 0, price: 100);
+
+        // ٤٠ تكلفةً مقابل ٦٥ متوقَّعًا ⇒ فرق الوحدة ٢٥.
+        $this->assertStringContainsString('25.00', $this->audit());
     }
 
     // ────────── تفكيك فاتورة ──────────

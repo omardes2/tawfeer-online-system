@@ -147,7 +147,7 @@ class AuditEarnerPricesCommand extends Command
                 $row['source'],
                 rtrim(rtrim(number_format($row['qty'], 2), '0'), '.'),
                 number_format($row['price'], 2),
-                number_format($row['frozen'], 2),
+                number_format($row['used'], 2),
                 number_format($row['expected'], 2),
                 $row['rate'],
                 number_format($row['now'], 2),
@@ -157,7 +157,7 @@ class AuditEarnerPricesCommand extends Command
         }
 
         $this->table(
-            ['الصنف', 'المصدر', 'كمية', 'سعر البيع', 'شراؤه المُجمَّد', 'شراؤه المتوقَّع', 'النسبة', 'العمولة الآن', 'يجب أن تكون', 'الفرق'],
+            ['الصنف', 'المصدر', 'كمية', 'سعر البيع', 'شراؤه المُحتسَب', 'شراؤه المتوقَّع', 'النسبة', 'العمولة الآن', 'يجب أن تكون', 'الفرق'],
             $rows,
         );
 
@@ -182,7 +182,9 @@ class AuditEarnerPricesCommand extends Command
             ? $listPrices[$item->variant_id]
             : ($item->variant?->effectiveWholesalePrice() ?? 0)), 2);
 
-        $frozen = round((float) $item->wholesale_price_snapshot, 2);
+        // المُستعمَل فعلًا لا اللقطة الخام — اللقطة صفرًا تعني ارتدادًا إلى
+        // سعر جملة الصنف، وعرضُ الصفر هنا يُخفي الرقم الذي أنتج العمولة.
+        $used = $this->effectiveCost($item);
         $qty = (float) $item->qty;
         $price = round((float) $item->unit_price, 2);
 
@@ -204,7 +206,7 @@ class AuditEarnerPricesCommand extends Command
             'source' => $inList ? 'قائمته' : 'الجملة',
             'qty' => $qty,
             'price' => $price,
-            'frozen' => $frozen,
+            'used' => $used,
             'expected' => $expected,
             'rate' => $entry === null ? 'لا حركة' : ($entry->rate === null ? 'مبلغ ثابت' : rtrim(rtrim(number_format($rate * 100, 2), '0'), '.').'%'),
             'now' => $now,
@@ -259,7 +261,8 @@ class AuditEarnerPricesCommand extends Command
             ? $listPrices[$item->variant_id]
             : ($item->variant?->effectiveWholesalePrice() ?? 0)), 2);
 
-        $frozen = round((float) $item->wholesale_price_snapshot, 2);
+        $snapshot = round((float) $item->wholesale_price_snapshot, 2);
+        $used = $this->effectiveCost($item);
         $qty = (float) $item->qty;
 
         return [
@@ -269,15 +272,41 @@ class AuditEarnerPricesCommand extends Command
             'source' => $inList ? 'قائمته' : 'الجملة',
             'in_list' => $inList,
             'qty' => $qty,
-            'frozen' => $frozen,
+            'snapshot' => $snapshot,
+            'used' => $used,
             'expected' => $expected,
-            // الفرق للوحدة، وأثرُه على الربحين مضروبًا بالكمية.
-            'delta_unit' => round($expected - $frozen, 2),
-            // لقطةٌ أعلى من الصحيح ⇒ ربحُ المسوّق ظهر أقلّ، وربح توفير أكثر.
-            'affiliate_effect' => round(($frozen - $expected) * $qty, 2),
-            'company_effect' => round(($expected - $frozen) * $qty, 2),
-            'differs' => abs($expected - $frozen) >= 0.01,
+            // الفرق للوحدة، وأثرُه على الربحين مضروبًا بالكمية — كلُّه على
+            // **المُستعمَل** لا على اللقطة الخام.
+            'delta_unit' => round($expected - $used, 2),
+            // سعرُ شراءٍ أعلى من الصحيح ⇒ ربحُ المسوّق ظهر أقلّ، وربح توفير أكثر.
+            'affiliate_effect' => round(($used - $expected) * $qty, 2),
+            'company_effect' => round(($expected - $used) * $qty, 2),
+            'differs' => abs($expected - $used) >= 0.01,
         ];
+    }
+
+    /**
+     * سعر الشراء الذي **حُسبت عليه العمولة فعلًا**.
+     *
+     * ليس اللقطة الخام: `CommissionService::itemCost()` يرتدّ حين تكون اللقطة
+     * صفرًا إلى سعر جملة الصنف ثم إلى تكلفته. فبندٌ لقطتُه صفر لم تُحسب عمولتُه
+     * على صفر — وقياسُ الفرق على الصفر يقلب إشارة الأثر ويجعل مسوّقًا يستحقّ
+     * زيادةً يبدو مدينًا بها.
+     *
+     * ونفس الترتيب هنا وهناك عمدًا: أيّ افتراقٍ بينهما يجعل الفحص يقيس شيئًا
+     * لا يفعله النظام.
+     */
+    private function effectiveCost(OrderItem $item): float
+    {
+        $wholesale = (float) $item->wholesale_price_snapshot > 0
+            ? (float) $item->wholesale_price_snapshot
+            : (float) ($item->variant?->effectiveWholesalePrice() ?? 0);
+
+        if ($wholesale > 0) {
+            return round($wholesale, 2);
+        }
+
+        return round((float) ($item->wholesale_cost_snapshot ?? $item->variant?->average_cost ?? 0), 2);
     }
 
     // ————————————————————————— العرض —————————————————————————
@@ -291,7 +320,9 @@ class AuditEarnerPricesCommand extends Command
             ['مسعَّرة من قائمته', $rows->where('in_list', true)->count()],
             ['مسعَّرة بسعر الجملة', $rows->where('in_list', false)->count()],
             ['**مختلفة عن المتوقَّع**', $rows->where('differs', true)->count()],
-            ['بلقطةٍ صفرٍ أو فارغة', $rows->filter(fn ($r) => $r['frozen'] <= 0)->count()],
+            // لقطةٌ صفر لا تعني عمولةً على صفر — الحساب ارتدّ إلى سعر جملة
+            // الصنف. لكنّها تُعدّ لأنها بيانٌ ناقص يستحقّ الإصلاح.
+            ['بلقطةٍ صفرٍ (ارتدّ الحساب لسعر الجملة)', $rows->filter(fn ($r) => $r['snapshot'] <= 0)->count()],
         ]);
     }
 
@@ -302,13 +333,17 @@ class AuditEarnerPricesCommand extends Command
         $this->warn('البنود المختلفة:');
 
         $this->table(
-            ['الطلب', 'الصنف', 'المصدر', 'كمية', 'المُجمَّد', 'المتوقَّع', 'فرق الوحدة', 'أثره على ربح المسوّق'],
+            // عمودان لسعر الشراء: اللقطة الخام و**ما حُسبت عليه العمولة فعلًا**.
+            // إخفاءُ الثاني كان يُظهر صفرًا حيث ارتدّ الحساب إلى سعر الجملة،
+            // فينقلب اتّجاه الأثر ويبدو المسوّق مدينًا وهو دائن.
+            ['الطلب', 'الصنف', 'المصدر', 'كمية', 'اللقطة', 'المُستعمَل فعلًا', 'المتوقَّع', 'فرق الوحدة', 'أثره على ربح المسوّق'],
             $rows->sortByDesc(fn ($r) => abs($r['affiliate_effect']))->map(fn ($r) => [
                 $r['order'],
-                mb_substr($r['product'], 0, 28),
+                mb_substr($r['product'], 0, 26),
                 $r['source'],
                 rtrim(rtrim(number_format($r['qty'], 2), '0'), '.'),
-                number_format($r['frozen'], 2),
+                $r['snapshot'] > 0 ? number_format($r['snapshot'], 2) : '— صفر',
+                number_format($r['used'], 2),
                 number_format($r['expected'], 2),
                 number_format($r['delta_unit'], 2),
                 number_format($r['affiliate_effect'], 2),
