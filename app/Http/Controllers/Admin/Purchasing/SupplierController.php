@@ -27,14 +27,12 @@ class SupplierController extends Controller
         $filter = $request->query('filter');
         $filter = in_array($filter, self::FILTERS, true) ? $filter : 'all';
 
-        // الرصيد المستحق للمورد = الرصيد الافتتاحي + متبقّي الفواتير المُرحّلة (بند فرعي بلا N+1).
-        $dueSub = PurchaseInvoice::selectRaw('COALESCE(SUM(total - amount_paid), 0)')
-            ->whereColumn('supplier_id', 'suppliers.id')
-            ->where('status', 'posted');
-
+        // الرصيد من دفتر الأستاذ (بند فرعي بلا N+1) — لا من أعمدة الفواتير:
+        // ذمّة المورد تتحرّك بفروق الصرف والدفعات على الحساب أيضًا، والدفتر وحده
+        // يعرفها. راجع `SupplierService::ledgerBalance`.
         $query = Supplier::query()
             ->select('suppliers.*')
-            ->selectSub($dueSub, 'invoices_due');
+            ->selectRaw(SupplierService::ledgerBalanceExpression().' as ledger_balance');
 
         if ($request->filled('search')) {
             $term = '%'.$request->string('search').'%';
@@ -47,13 +45,10 @@ class SupplierController extends Controller
         match ($filter) {
             'active' => $query->where('is_active', true),
             'inactive' => $query->where('is_active', false),
-            // بند فرعي مترابط في WHERE (متوافق مع MySQL وSQLite، خلافًا لـ HAVING على استعلام غير تجميعي).
-            'with_balance' => $query->whereRaw(
-                '(opening_balance + (select COALESCE(SUM(total - amount_paid), 0) from purchase_invoices '
-                .'where purchase_invoices.supplier_id = suppliers.id and purchase_invoices.status = ? '
-                .'and purchase_invoices.deleted_at is null)) <> 0',
-                ['posted']
-            ),
+            // بند فرعي مترابط في WHERE (متوافق مع MySQL وSQLite، خلافًا لـ HAVING على
+            // استعلام غير تجميعي) — وبالتعبير نفسه الذي يُعرض، فلا يظهر في «بأرصدة»
+            // مورّدٌ رصيده صفر ولا يغيب عنها ذو رصيد.
+            'with_balance' => $query->whereRaw(SupplierService::ledgerBalanceExpression().' <> 0'),
             default => null,
         };
 
@@ -85,6 +80,15 @@ class SupplierController extends Controller
         $paid = (float) FinancialVoucher::where('supplier_id', $supplier->id)
             ->where('kind', 'payment')->where('status', 'posted')->sum('amount');
 
+        // الرصيد من الدفتر لا من طرحِ السندات من الفواتير — راجع
+        // `SupplierService::ledgerBalance`.
+        $balance = app(SupplierService::class)->ledgerBalance($supplier);
+
+        // ما أطفأ الذمّة زيادةً على النقد الخارج: فروق الصرف عند السداد بالعملة
+        // الأجنبية، والمرتجعات، وقيود التسوية. يُعرض صراحةً بدل أن يظهر فرقًا بين
+        // البطاقات لا يُفسَّر — وهو بعينه ما جعل الشاشتين تختلفان.
+        $adjustments = round((float) $supplier->opening_balance + $invoiced - $paid - $balance, 2);
+
         $payments = FinancialVoucher::where('supplier_id', $supplier->id)
             ->where('kind', 'payment')
             ->with('treasury:id,name')
@@ -97,7 +101,8 @@ class SupplierController extends Controller
             'statement' => $this->buildStatement($supplier, (float) $supplier->opening_balance),
             'invoiced' => $invoiced,
             'paid' => $paid,
-            'balance' => (float) $supplier->opening_balance + ($invoiced - $paid),
+            'adjustments' => $adjustments,
+            'balance' => $balance,
         ]);
     }
 

@@ -4,6 +4,7 @@ namespace App\Modules\Purchasing\Services;
 
 use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Services\AccountingService;
+use App\Modules\Purchasing\Models\PurchaseInvoice;
 use App\Modules\Purchasing\Models\Supplier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -14,6 +15,64 @@ use Illuminate\Validation\ValidationException;
  */
 class SupplierService
 {
+    /**
+     * رصيد المورد — **من دفتر الأستاذ، لا من أعمدة الفواتير**.
+     *
+     * ## لماذا لا يُحسب من الفواتير
+     *
+     * كانت الشاشتان تشتقّانه بمعادلتين مختلفتين، فيختلف الرقمان لمورّدٍ واحد:
+     *
+     * ```
+     * القائمة:  افتتاحي + Σ(إجمالي الفاتورة − amount_paid)
+     * الصفحة:   افتتاحي + Σالفواتير − Σسندات الصرف
+     * ```
+     *
+     * وكلتاهما ناقصة، لأن ذمّة المورد تتحرّك بأكثر من الفاتورة والسند:
+     *
+     * - **السداد بالعملة الأجنبية**: الدَّين قُيّد بسعر يوم الفاتورة ويُدفع بسعر
+     *   يوم الدفع. فما يخرج من الخزينة يخالف ما يُطفأ من الذمّة، والفارق قيدُ
+     *   **فرق صرف** مستقلّ. فالمعادلة الثانية تطرح النقد وحده فتُبقي على المورد
+     *   فرقًا وهميًّا لا يُسدَّد أبدًا.
+     * - **الدفعة على الحساب**: سند صرفٍ بلا فاتورة يُنقص الذمّة ولا يُنقص أيّ
+     *   `amount_paid`. فالمعادلة الأولى لا تراه أصلًا.
+     * - وكذلك المرتجعات وقيود التسوية اليدوية.
+     *
+     * والدفتر يعرفها جميعًا لأنها كلّها تمرّ عليه. فهو المصدر الوحيد.
+     *
+     * الاحتياط للمورّد الذي لا حساب فرعيّ له بعد (سجلّ قديم): المعادلة السابقة —
+     * رقمٌ تقريبيّ خيرٌ من صفرٍ قاطع.
+     */
+    public function ledgerBalance(Supplier $supplier): float
+    {
+        $account = $supplier->glAccount()->first();
+
+        if (! $account) {
+            return round((float) $supplier->opening_balance + (float) PurchaseInvoice::query()
+                ->where('supplier_id', $supplier->id)
+                ->where('status', 'posted')
+                ->sum(DB::raw('total - amount_paid')), 2);
+        }
+
+        return round(app(AccountingService::class)->accountBalance($account), 2);
+    }
+
+    /**
+     * التعبير نفسه في SQL — لقائمةٍ من الموردين بلا استعلامٍ لكل صفّ.
+     *
+     * حساب المورد الفرعيّ ورقةٌ في الشجرة بلا فروع، فيكفي مجموع سطوره ولا حاجة
+     * للتفكيك التكراري الذي يفعله `accountBalance` لحسابات المراقبة.
+     */
+    public static function ledgerBalanceExpression(): string
+    {
+        return '(CASE WHEN suppliers.gl_account_id IS NULL THEN ('
+            .'suppliers.opening_balance + (SELECT COALESCE(SUM(total - amount_paid), 0) '
+            .'FROM purchase_invoices WHERE purchase_invoices.supplier_id = suppliers.id '
+            ."AND purchase_invoices.status = 'posted' AND purchase_invoices.deleted_at IS NULL)"
+            .') ELSE (SELECT COALESCE(SUM(jl.credit - jl.debit), 0) FROM journal_lines jl '
+            .'INNER JOIN journal_entries je ON je.id = jl.journal_entry_id '
+            ."WHERE jl.account_id = suppliers.gl_account_id AND je.status = 'posted') END)";
+    }
+
     public function create(array $data, array $contacts = []): Supplier
     {
         return DB::transaction(function () use ($data, $contacts) {

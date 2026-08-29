@@ -58,7 +58,8 @@
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         @forelse ($suppliers as $s)
-                            @php($balance = (float) $s->opening_balance + (float) ($s->invoices_due ?? 0))
+                            {{-- الرصيد من الدفتر: يشمل فروق الصرف والدفعات على الحساب --}}
+                            @php($balance = (float) ($s->ledger_balance ?? 0))
                             <tr class="hover:bg-gray-50">
                                 <td class="py-3 px-4">
                                     <a href="{{ route('admin.purchasing.suppliers.show', $s) }}" class="flex items-center gap-2 text-gray-900 font-medium hover:text-emerald-700">

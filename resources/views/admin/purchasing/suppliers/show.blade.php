@@ -50,6 +50,19 @@
                     <div class="rounded-lg bg-gray-50 p-3 text-center">
                         <div class="text-xs text-gray-500">{{ __('المدفوعات') }}</div>
                         <div class="text-base font-bold text-emerald-600 tabular-nums mt-1">{{ number_format($paid, 2) }}</div>
+                        {{--
+                            ما أطفأ الذمّة زيادةً على النقد الخارج: فرقُ صرفٍ عند
+                            السداد بالعملة الأجنبية، أو مرتجعٌ، أو قيد تسوية.
+                            يُعرض صراحةً — وإخفاؤه هو ما جعل هذه البطاقة تخالف
+                            رصيد القائمة بلا تفسير.
+                        --}}
+                        @if (abs($adjustments) >= 0.01)
+                            <div class="text-[11px] leading-tight text-gray-500 mt-0.5"
+                                 title="{{ __('فروق صرف أو مرتجعات أو قيود تسوية على حساب المورد') }}">
+                                {{ $adjustments > 0 ? '+' : '−' }}{{ number_format(abs($adjustments), 2) }}
+                                {{ __('تسويات') }}
+                            </div>
+                        @endif
                     </div>
                     <div class="rounded-lg p-3 text-center {{ abs($balance) < 0.01 ? 'bg-gray-50' : 'bg-rose-50' }}">
                         <div class="text-xs text-gray-500">{{ __('الرصيد المتبقّي') }}</div>
