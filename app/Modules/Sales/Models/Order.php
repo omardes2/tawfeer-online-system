@@ -41,6 +41,10 @@ class Order extends Model
         'delivery_cancel_error', 'delivery_cancel_attempted_at',
         'channel', 'ad_channel_id', 'ad_click_id', 'ad_source', 'ad_campaign_ref', 'ad_set_ref', 'status', 'payment_status', 'assigned_to', 'affiliate_id',
         'subtotal', 'discount_total', 'tax_total', 'shipping_total', 'total', 'amount_paid',
+        // ما حُصِّل فعلًا من الزبون — قد يقلّ عن الإجمالي حين تُعدّل شركة
+        // التوصيل مبلغ التحصيل قبل التسليم.
+        'collected_total', 'collection_note', 'collection_recorded_at', 'collection_recorded_by',
+        'collection_entry_id',
         'notes', 'cancel_reason',
         'confirmed_at', 'reserved_at', 'shipped_at', 'delivered_at', 'cancelled_at', 'settled_at',
         // اعتماد المدير — يُغلق الإلغاء في وجه مُدخِل الطلب (مستقلّ عن التأكيد الداخلي).
@@ -57,6 +61,8 @@ class Order extends Model
         'shipping_total' => 'decimal:2',
         'total' => 'decimal:2',
         'amount_paid' => 'decimal:2',
+        'collected_total' => 'decimal:2',
+        'collection_recorded_at' => 'datetime',
         'confirmed_at' => 'datetime',
         'approved_at' => 'datetime',
         'reserved_at' => 'datetime',
