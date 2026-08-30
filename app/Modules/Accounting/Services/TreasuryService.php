@@ -5,6 +5,7 @@ namespace App\Modules\Accounting\Services;
 use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Accounting\Models\Treasury;
+use App\Modules\Sales\Models\Order;
 use App\Support\NumberGenerator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -215,6 +216,55 @@ class TreasuryService
             'currency' => $data['currency'] ?? 'ILS',
             'is_active' => true,
         ]);
+    }
+
+    /**
+     * اسمُ الطرف ورقمُ تتبّع الشحنة لكل قيد — المفتاح معرّف القيد.
+     *
+     * **رقم التتبّع** هو ما تُكتب به فاتورة شركة التوصيل، بينما يحمل السند **رقم
+     * الطلب**. فبغيره تُطابَق مئات السطور بالمبلغ وحده — والمبالغ تتكرّر كثيرًا،
+     * فتضيع المطابقة.
+     *
+     * و**اسم الزبون** يُقرأ ولا يُحفظ حرفًا: الطلب قد يُحرَّر ويُلغى ويُعاد، والاسم
+     * على السند هو المرجع.
+     *
+     * الاثنان معًا في جلبةٍ واحدة على السندات: الشاشتان تحتاجانهما، وفصلُهما كان
+     * يُكرّر الاستعلام على كشفٍ يعرض مئة حركة أو أكثر.
+     *
+     * @param  array<int, int>  $entryIds
+     * @return array{parties: array<int, string>, trackings: array<int, string>}
+     */
+    public function entryMeta(array $entryIds): array
+    {
+        if ($entryIds === []) {
+            return ['parties' => [], 'trackings' => []];
+        }
+
+        $vouchers = FinancialVoucher::whereIn('journal_entry_id', $entryIds)
+            ->with(['supplier:id,name', 'customer:id,name', 'employee:id,name'])
+            ->get(['id', 'journal_entry_id', 'supplier_id', 'customer_id', 'employee_id', 'party_name', 'reference']);
+
+        $references = $vouchers->pluck('reference')->filter()->unique()->values()->all();
+
+        $orders = $references === []
+            ? collect()
+            : Order::whereIn('number', $references)->get(['number', 'customer_name', 'tracking_number'])->keyBy('number');
+
+        return [
+            // اسمُ السند أولًا، ثم اسمُ الزبون على الطلب: سندُ التحصيل الآليّ لا
+            // يحمل عميلًا مسجَّلًا حين يُطلَب الطلبُ باسمٍ وهاتفٍ بلا حساب.
+            'parties' => $vouchers->mapWithKeys(fn (FinancialVoucher $v) => [
+                $v->journal_entry_id => $v->supplier?->name
+                    ?? $v->customer?->name
+                    ?? $v->employee?->name
+                    ?? $v->party_name
+                    ?? $orders->get((string) $v->reference)?->customer_name,
+            ])->filter()->all(),
+
+            'trackings' => $vouchers->mapWithKeys(fn (FinancialVoucher $v) => [
+                $v->journal_entry_id => $orders->get((string) $v->reference)?->tracking_number,
+            ])->filter()->all(),
+        ];
     }
 
     /**

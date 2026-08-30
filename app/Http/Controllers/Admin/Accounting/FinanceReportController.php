@@ -48,9 +48,16 @@ class FinanceReportController extends Controller
                 ->selectRaw('COALESCE(SUM(debit),0) - COALESCE(SUM(credit),0) as b')->value('b')
             : 0.0;
 
+        $meta = $this->treasuries->entryMeta(
+            $lines->map(fn ($l) => $l->entry?->id)->filter()->unique()->all(),
+        );
+
         return view('admin.accounting.reports.treasury_statement', [
             'treasury' => $treasury, 'range' => $range, 'lines' => $lines, 'opening' => round($opening, 2),
             'closing' => $this->treasuries->balance($treasury),
+            // رقم التتبّع تُطابَق به فاتورة شركة التوصيل سطرًا سطرًا، واسمُ الطرف
+            // يجعل السطر يُقرأ بلا فتح الطلب.
+            ...$meta,
         ]);
     }
 

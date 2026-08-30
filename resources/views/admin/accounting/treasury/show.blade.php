@@ -16,22 +16,26 @@
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm text-right">
-                    <thead class="text-gray-500 border-b"><tr><th class="py-2 px-3">{{ __('القيد') }}</th><th class="py-2 px-3">{{ __('التاريخ') }}</th><th class="py-2 px-3">{{ __('البيان') }}</th><th class="py-2 px-3">{{ __('مدين') }}</th><th class="py-2 px-3">{{ __('دائن') }}</th></tr></thead>
+                    {{--
+                        عمود رقم التتبّع: فاتورة شركة التوصيل تُكتب به لا برقم
+                        الطلب، فبغيره تُطابَق مئات السطور بالمبلغ وحده — والمبالغ
+                        تتكرّر. يُعرض بخطٍّ أحاديّ ليُنسخ ويُلصق في البحث.
+                    --}}
+                    <thead class="text-gray-500 border-b"><tr><th class="py-2 px-3">{{ __('القيد') }}</th><th class="py-2 px-3">{{ __('التاريخ') }}</th><th class="py-2 px-3">{{ __('رقم التتبّع') }}</th><th class="py-2 px-3">{{ __('الزبون') }}</th><th class="py-2 px-3">{{ __('البيان') }}</th><th class="py-2 px-3">{{ __('مدين') }}</th><th class="py-2 px-3">{{ __('دائن') }}</th></tr></thead>
                     <tbody class="divide-y">
                         @forelse ($movements as $m)
                             <tr>
                                 <td class="py-2 px-3 font-mono text-xs">{{ $m->entry?->number }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ $m->entry?->entry_date?->format('Y-m-d') }}</td>
-                                <td class="py-2 px-3 text-gray-600">
-                                    {{ $m->entry?->description }}
-                                    @php($party = $parties[$m->entry?->id] ?? null)
-                                    @if ($party)<span class="text-gray-400">— {{ $party }}</span>@endif
-                                </td>
+                                <td class="py-2 px-3 font-mono text-xs text-sky-700 select-all">{{ $trackings[$m->entry?->id] ?? '—' }}</td>
+                                {{-- الزبون في عمودٍ مستقلّ: كان ذيلًا في البيان لا يُفرَز ولا يُقرأ سريعًا. --}}
+                                <td class="py-2 px-3 text-gray-700">{{ $parties[$m->entry?->id] ?? '—' }}</td>
+                                <td class="py-2 px-3 text-gray-600">{{ $m->entry?->description }}</td>
                                 <td class="py-2 px-3 text-emerald-700">{{ $m->debit > 0 ? number_format($m->debit, 2) : '' }}</td>
                                 <td class="py-2 px-3 text-rose-600">{{ $m->credit > 0 ? number_format($m->credit, 2) : '' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="py-6 text-center text-gray-400">{{ __('لا توجد حركة.') }}</td></tr>
+                            <tr><td colspan="7" class="py-6 text-center text-gray-400">{{ __('لا توجد حركة.') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
