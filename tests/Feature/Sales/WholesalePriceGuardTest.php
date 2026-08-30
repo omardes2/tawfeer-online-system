@@ -19,13 +19,21 @@ class WholesalePriceGuardTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * المتصرّف **موظف مبيعات لا مدير**.
+     *
+     * الحارس صار يستثني مدير النظام: البيع بأقل من الجملة قرارٌ تجاريّ يقع
+     * أحيانًا (تصفية راكد، تسويةُ شكوى، تصحيح سعر)، ومنعُه عن الجميع كان يترك
+     * المدير بلا مخرجٍ إلا تعطيل الحارس. فيُفحص هنا على من يقع عليه فعلًا،
+     * ويُفحص استثناءُ المدير في `OrderEditRestrictedToAdminTest`.
+     */
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(DatabaseSeeder::class);
-        $admin = User::factory()->create(['branch_id' => Branch::default()->id]);
-        $admin->assignRole('admin');
-        $this->actingAs($admin);
+        $seller = User::factory()->create(['branch_id' => Branch::default()->id]);
+        $seller->assignRole('sales');
+        $this->actingAs($seller);
     }
 
     /** متغيّر بسعر جملة 70 وبيع 100، مع مخزون كافٍ. */

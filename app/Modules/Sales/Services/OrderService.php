@@ -186,12 +186,24 @@ class OrderService
 
     /**
      * يمنع البيع بأقل من سعر الجملة: صافي سعر الوحدة (بعد الخصم) يجب ألّا يقلّ عن
-     * wholesale_price للمتغيّر عندما يكون محدَّدًا (> 0). يُطبَّق على كل قنوات البيع ولكل المستخدمين.
+     * wholesale_price للمتغيّر عندما يكون محدَّدًا (> 0). يُطبَّق على كل قنوات البيع.
+     *
+     * **ومدير النظام مستثنى.** البيع بأقل من الجملة قرارٌ تجاريّ يقع أحيانًا —
+     * تصفية راكد، أو تسويةُ شكوى، أو خطأ سعرٍ يُصحَّح على طلبٍ قائم. ومنعُه عن
+     * الجميع كان يترك المدير بلا مخرجٍ إلا تعطيلَ الحارس أو تحرير قاعدة البيانات.
+     * فيُفتح له وحده، ويبقى مغلقًا على من سواه.
+     *
+     * والفحص بالدور لا بالاسم (ADR: RBAC فقط). وزائرُ المتجر بلا مستخدمٍ يقع
+     * تحت الحارس كما يجب — `?->` يُرجع null فلا يُستثنى.
      *
      * @param  array<int, array<string, mixed>>  $items
      */
     private function assertPricesAboveWholesale(array $items, ?int $affiliateId = null): void
     {
+        if (auth()->user()?->hasRole('admin')) {
+            return;
+        }
+
         $variantIds = collect($items)->pluck('variant_id')->filter()->unique()->all();
         if (empty($variantIds)) {
             return;

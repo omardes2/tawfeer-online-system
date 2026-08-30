@@ -55,6 +55,12 @@ class OrderPolicy
         return in_array($user->id, [$order->created_by, $order->assigned_to, $order->affiliate_id], true);
     }
 
+    /**
+     * تعديل الطلب — بالصلاحية كما كان: المسوّقون والمدراء وموظفو المبيعات
+     * يُعدّلون الأسعار. والقيدُ الوحيد المضاف هو **حدّ سعر الجملة**، ويُطبَّق في
+     * `OrderService::assertPricesAboveWholesale` لا هنا: هو قيدٌ على **الرقم**
+     * لا على **الوصول**، ويجب أن يقع على كل قنوات البيع لا على هذه الشاشة وحدها.
+     */
     public function update(User $user, Order $m): bool
     {
         return $user->can('sales.orders.update');
