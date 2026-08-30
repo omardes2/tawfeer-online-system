@@ -91,18 +91,21 @@ class DashboardController extends Controller
             'salesBoard' => $this->reports->earnerBoard('assigned_to', ['sales', 'sales_supervisor']),
             'affiliateBoard' => $this->reports->earnerBoard('affiliate_id', ['affiliate']),
             /**
-             * ما على الشركة للمسوّقين والموظفين الآن.
+             * ما على الشركة للمسوّقين والموظفين الآن — **بعد طرح ما صُرف**.
              *
-             * `eligible` و`approved` وحدهما: الأولى استُحقّت بتحصيل مال الطلب
-             * ولم تُعتمد بعد، والثانية اعتُمدت ولم تُصرف. و`paid` خرجت،
-             * و`reversed`/`cancelled` سقطت.
+             * كان يُجمع `eligible` و`approved` وحدهما. وصرفُ الدفعة لا يُحوّل
+             * البنود إلى `paid` — الدفعة مبلغٌ على الحساب لا تُقابَل ببنودٍ
+             * بعينها — فبقي الرقم كما كان بعد الصرف وكأن المال لم يخرج.
              *
-             * و`pending` **خارجها**: عمولةٌ على طلبٍ سُلّم ولم يصل مالُه من
+             * فصار من `outstandingTotal`: المستحقّ ناقص ما صُرف وما هو في طريقه،
+             * وهو تعريف كشف حساب المستفيد نفسه مطبَّقًا على الجميع.
+             *
+             * و`pending` تبقى **خارجه**: عمولةٌ على طلبٍ سُلّم ولم يصل مالُه من
              * شركة التوصيل بعد — لم تُستحقّ، فعدُّها ديْنًا قائمًا يُظهر على
-             * الشركة ما لا تدين به اليوم. وتُعرض بجانبها كي لا تختفي.
+             * الشركة ما لا تدين به اليوم. وتُعرض بجانبه كي لا تختفي.
              */
             'pendingCommissions' => Gate::allows('commissions.view_team')
-                ? (float) CommissionEntry::whereIn('state', ['eligible', 'approved'])->sum('amount')
+                ? $this->commissions->outstandingTotal()
                 : null,
             'notYetDueCommissions' => Gate::allows('commissions.view_team')
                 ? (float) CommissionEntry::where('state', 'pending')->sum('amount')

@@ -709,6 +709,32 @@ class CommissionService
     }
 
     /**
+     * ما على الشركة للمستفيدين جميعًا الآن — **بعد طرح ما صُرف**.
+     *
+     * ## لماذا لا يكفي جمع الحالات
+     *
+     * صرفُ دفعةٍ عبر `payAmount` يُنشئ سندًا وسجلَّ دفعة، ولا يُحوّل بنود العمولة
+     * إلى `paid`: الدفعة **مبلغٌ على الحساب** قد يغطّي بعض البنود أو يزيد عليها،
+     * فلا تُقابَل ببنودٍ بعينها. فبقيت البنود `eligible` بعد الصرف — وجمعُ الحالات
+     * وحده يُبقي الرقم كما كان وكأن المال لم يخرج.
+     *
+     * وهذا هو تعريف `balance()` نفسه مطبَّقًا على الجميع: المستحقّ ناقص ما صُرف
+     * وما هو في طريقه. وسندٌ ملغًى أو معكوس لا يُطرح — ماله عاد.
+     */
+    public function outstandingTotal(): float
+    {
+        $earned = (float) CommissionEntry::whereIn('state', ['eligible', 'approved', 'paid'])->sum('amount');
+
+        // بلا سند = دفعة قديمة من النظام السابق ⇒ تُعتبر مصروفة.
+        $settled = (float) CommissionPayout::query()
+            ->leftJoin('financial_vouchers as v', 'v.id', '=', 'commission_payouts.financial_voucher_id')
+            ->where(fn ($q) => $q->whereNull('v.id')->orWhereIn('v.status', ['posted', 'draft', 'approved']))
+            ->sum('commission_payouts.total');
+
+        return round($earned - $settled, 2);
+    }
+
+    /**
      * رصيد المستفيد: المستحق (كل الأرباح المؤهّلة صافيةً) − المدفوع فعليًا (سند مُرحّل)
      * − قيد الاعتماد (سند مسودّة/معتمد لم يُرحّل بعد). سندات ملغاة/معكوسة لا تُحتسب.
      *
