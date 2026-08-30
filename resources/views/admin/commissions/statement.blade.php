@@ -141,6 +141,7 @@
                         <th class="py-2 px-3 font-medium">{{ __('commissions.period') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('commissions.voucher') }}</th>
                         <th class="py-2 px-3 font-medium">{{ __('commissions.voucher_status') }}</th>
+                        <th class="py-2 px-3 font-medium">{{ __('ملاحظات') }}</th>
                         <th class="py-2 px-3 font-medium"></th>
                     </tr></thead>
                     <tbody>
@@ -161,14 +162,33 @@
                                         ])>{{ $p->voucher->status }}</span>
                                     @else — @endif
                                 </td>
+                                {{--
+                                    ملاحظة الدفعة: ما كتبه المُصدِر لحظة الصرف —
+                                    «تسوية شهر آب» أو «خصم سلفة». تُقرأ هنا بلا
+                                    فتح السند، وتُقتطع بـ`truncate` فلا تكسر الجدول.
+                                --}}
+                                <td class="py-2 px-3 text-gray-600 max-w-xs">
+                                    @php($note = $p->notes ?: $p->voucher?->notes)
+                                    @if ($note)
+                                        <span class="block truncate" title="{{ $note }}">{{ $note }}</span>
+                                    @else
+                                        <span class="text-gray-300">—</span>
+                                    @endif
+                                </td>
                                 <td class="py-2 px-3">
+                                    {{--
+                                        السند يُمرَّر نموذجًا لا رقمًا: مفتاح مساره
+                                        `uuid` لا `id` (HasUuid)، فتمريرُ الرقم كان
+                                        يبحث عن سندٍ uuid‑ه «8» فلا يجده — رابطٌ
+                                        يفتح صفحة «غير موجود».
+                                    --}}
                                     @if ($p->voucher)
-                                        <a href="{{ route('admin.accounting.vouchers.show', ['kind' => 'payment', 'voucher' => $p->financial_voucher_id]) }}" class="text-emerald-600 hover:underline">{{ __('commissions.view_voucher') }}</a>
+                                        <a href="{{ route('admin.accounting.vouchers.show', ['kind' => $p->voucher->kind, 'voucher' => $p->voucher]) }}" class="text-emerald-600 hover:underline">{{ __('commissions.view_voucher') }}</a>
                                     @endif
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="7" class="py-6 text-center text-gray-400">{{ __('commissions.no_payments') }}</td></tr>
+                            <tr><td colspan="8" class="py-6 text-center text-gray-400">{{ __('commissions.no_payments') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>

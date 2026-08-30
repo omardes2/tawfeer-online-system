@@ -282,8 +282,11 @@ class CommissionController extends Controller
             // Integration — Do Not Modify: لا يُكتب ولا يُطلب من الشركة.
             'entries' => $this->statementEntries($earnerId, $type, $range, $state)
                 ->latest('id')->paginate(30)->withQueryString(),
+            // `uuid` إلزاميّ في التحديد: مفتاح مسار السند هو الـuuid لا الـid
+            // (HasUuid)، وبدونه يُبنى رابط «عرض السند» بمفتاحٍ فارغ فلا يفتح.
+            // و`notes` تُعرض في الجدول فلا تُجلب بطلبٍ ثانٍ لكل صفّ.
             'payouts' => CommissionPayout::where('earner_id', $earnerId)->where('earner_type', $type)
-                ->with(['voucher:id,number,status,kind', 'treasury:id,name'])->latest('id')->get(),
+                ->with(['voucher:id,uuid,number,status,kind,notes', 'treasury:id,name'])->latest('id')->get(),
             // البنوك أولًا (الصرف من الحسابات البنكية هو الأصل) ثم الخزائن النقدية.
             'treasuries' => Treasury::active()->orderByRaw("type = 'bank' desc")->orderBy('name')->get(),
         ]);
