@@ -7,9 +7,11 @@ use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Accounting\Services\AccountingService;
+use App\Modules\Accounting\Services\VoucherService;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Hr\Models\EmployeeProfile;
 use App\Modules\Hr\Models\EmployeeSalary;
+use App\Modules\Hr\Models\EndOfServiceEntry;
 use App\Modules\Hr\Services\EndOfServiceService;
 use App\Modules\Hr\Services\PayrollService;
 use Database\Seeders\DatabaseSeeder;
@@ -199,6 +201,42 @@ class EndOfServiceYearEndTest extends TestCase
         ])->assertRedirect()->assertSessionHas('error');
 
         $this->assertSame(0, FinancialVoucher::where('category', 'end_of_service')->count());
+    }
+
+    // ────────── الحركة تتبع سندها ──────────
+
+    /**
+     * **تعديل سند التصفية يُصحّح المخصّص.**
+     *
+     * الحركة نسخةٌ سالبة من مبلغ السند، والسند يُعدَّل بعدها (عكسٌ ثم قيد
+     * مُصحّح). وتركُ النسخة قديمةً يجعل دفتر المخصّص يقول رقمًا والدفترَ العامّ
+     * رقمًا آخر.
+     */
+    public function test_editing_the_settlement_voucher_corrects_the_provision(): void
+    {
+        $this->postPayroll();
+        $this->service()->settleMany([$this->taha->id => 200], $this->treasury()->id, $this->admin);
+
+        $voucher = FinancialVoucher::where('category', 'end_of_service')->latest('id')->firstOrFail();
+        app(VoucherService::class)->repost($voucher, ['amount' => 150], $this->admin);
+
+        // ٢٠٨٫٣٣ − ١٥٠ = ٥٨٫٣٣
+        $this->assertSame(58.33, $this->service()->balance($this->taha));
+        $this->assertSame('-150.00', EndOfServiceEntry::where('kind', 'settlement')->firstOrFail()->amount);
+    }
+
+    /** **وعكسُ السند يُعيد المخصّص كاملًا** — ماله عاد إلى الخزينة. */
+    public function test_reversing_the_settlement_restores_the_provision(): void
+    {
+        $this->postPayroll();
+        $this->service()->settleMany([$this->taha->id => 208.33], $this->treasury()->id, $this->admin);
+        $this->assertSame(0.0, $this->service()->balance($this->taha));
+
+        app(VoucherService::class)->reverse(
+            FinancialVoucher::where('category', 'end_of_service')->latest('id')->firstOrFail(),
+        );
+
+        $this->assertSame(208.33, $this->service()->balance($this->taha));
     }
 
     // ────────── الشاشة ──────────

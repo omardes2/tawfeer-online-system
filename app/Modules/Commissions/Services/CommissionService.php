@@ -726,10 +726,13 @@ class CommissionService
         $earned = (float) CommissionEntry::whereIn('state', ['eligible', 'approved', 'paid'])->sum('amount');
 
         // بلا سند = دفعة قديمة من النظام السابق ⇒ تُعتبر مصروفة.
+        //
+        // والمبلغ يُقرأ من السند حيث وُجد: عمود `total` نسخةٌ تُكتب لحظة الإنشاء،
+        // وتعديلُ السند لاحقًا يجعلها قديمة — فيُطرح رقمٌ لم يعد قائمًا.
         $settled = (float) CommissionPayout::query()
             ->leftJoin('financial_vouchers as v', 'v.id', '=', 'commission_payouts.financial_voucher_id')
             ->where(fn ($q) => $q->whereNull('v.id')->orWhereIn('v.status', ['posted', 'draft', 'approved']))
-            ->sum('commission_payouts.total');
+            ->sum(DB::raw('COALESCE(v.amount, commission_payouts.total)'));
 
         return round($earned - $settled, 2);
     }
@@ -745,15 +748,17 @@ class CommissionService
         $earned = (float) CommissionEntry::where('earner_id', $earnerId)->where('earner_type', $earnerType)
             ->whereIn('state', ['eligible', 'approved', 'paid'])->sum('amount');
 
+        // `amount` في التحديد: المبلغ يُقرأ من السند لا من نسخته المحفوظة —
+        // تعديلُ السند يجعل النسخة قديمة فيُطرح من المستحقّ رقمٌ لم يُصرف.
         $payouts = CommissionPayout::where('earner_id', $earnerId)->where('earner_type', $earnerType)
-            ->with('voucher:id,status')->get();
+            ->with('voucher:id,status,amount')->get();
 
         // بلا سند = مدفوعة قديمة (النظام السابق) ⇒ تُعتبر مُرحّلة.
         $posted = fn ($p) => $p->voucher === null || $p->voucher->status === 'posted';
         $draft = fn ($p) => $p->voucher !== null && in_array($p->voucher->status, ['draft', 'approved'], true);
 
-        $paid = round((float) $payouts->filter($posted)->sum('total'), 2);
-        $pending = round((float) $payouts->filter($draft)->sum('total'), 2);
+        $paid = round((float) $payouts->filter($posted)->sum(fn ($p) => $p->settledAmount()), 2);
+        $pending = round((float) $payouts->filter($draft)->sum(fn ($p) => $p->settledAmount()), 2);
         $earned = round($earned, 2);
 
         return [

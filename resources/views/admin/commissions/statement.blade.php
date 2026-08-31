@@ -147,9 +147,16 @@
                     <tbody>
                         @forelse ($payouts as $p)
                             <tr class="border-b">
-                                <td class="py-2 px-3">{{ $p->created_at?->format('Y-m-d') }}</td>
-                                <td class="py-2 px-3 font-medium">{{ number_format((float) $p->total, 2) }}</td>
-                                <td class="py-2 px-3">{{ $p->treasury?->name ?? '—' }}</td>
+                                {{--
+                                    التاريخ والمبلغ من **السند** لا من نسخته في
+                                    الدفعة: السند وثيقةٌ تُعدَّل (عكسٌ ثم قيد
+                                    مُصحّح)، والنسخة تبقى على قيمة الإنشاء. فيقول
+                                    الدفتر رقمًا ويقول الأرشيف رقمًا آخر، ولا
+                                    يظهر ذلك خطأً بل رصيدًا كاذبًا.
+                                --}}
+                                <td class="py-2 px-3">{{ ($p->voucher?->voucher_date ?? $p->created_at)?->format('Y-m-d') }}</td>
+                                <td class="py-2 px-3 font-medium">{{ number_format($p->settledAmount(), 2) }}</td>
+                                <td class="py-2 px-3">{{ $p->voucher?->treasury?->name ?? $p->treasury?->name ?? '—' }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ $p->period_start ? $p->period_start->format('Y-m-d').' → '.$p->period_end?->format('Y-m-d') : '—' }}</td>
                                 <td class="py-2 px-3">{{ $p->voucher?->number ?? '—' }}</td>
                                 <td class="py-2 px-3">

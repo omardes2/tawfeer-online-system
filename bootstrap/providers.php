@@ -7,6 +7,7 @@ use App\Modules\Catalog\Providers\CatalogServiceProvider;
 use App\Modules\Commissions\Providers\CommissionsServiceProvider;
 use App\Modules\Crm\Providers\CrmServiceProvider;
 use App\Modules\Foundation\Providers\FoundationServiceProvider;
+use App\Modules\Hr\Providers\HrServiceProvider;
 use App\Modules\Inventory\Providers\InventoryServiceProvider;
 use App\Modules\Marketing\Providers\MarketingServiceProvider;
 use App\Modules\Payment\Providers\PaymentServiceProvider;
@@ -30,6 +31,7 @@ return [
     CrmServiceProvider::class,
     StoreServiceProvider::class,
     CommissionsServiceProvider::class,
+    HrServiceProvider::class,
     // Phase 6 — الذكاء الاصطناعي والتوصيات والتسويق
     AiServiceProvider::class,
     AiAgentServiceProvider::class,

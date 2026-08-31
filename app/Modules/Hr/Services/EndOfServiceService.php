@@ -74,17 +74,40 @@ class EndOfServiceService
     /** رصيد المخصّص لموظف — مجموع حركاته. */
     public function balance(EmployeeProfile $profile): float
     {
-        return round((float) EndOfServiceEntry::where('employee_profile_id', $profile->id)->sum('amount'), 2);
+        return round((float) $this->balances([$profile->id])->get($profile->id, 0.0), 2);
     }
 
-    /** أرصدة عدّة موظفين دفعةً واحدة — لتفادي استعلامٍ لكل صفٍّ في القائمة. */
+    /**
+     * أرصدة عدّة موظفين دفعةً واحدة — لتفادي استعلامٍ لكل صفٍّ في القائمة.
+     *
+     * والجمع في PHP لا في SQL: مبلغُ الحركة يُقرأ من سندها حيث وُجد
+     * (`EndOfServiceEntry::effectiveAmount`)، والحركاتُ قليلةٌ بطبعها — سطرٌ
+     * لكل موظفٍ في كل شهر.
+     */
     public function balances(array $profileIds): Collection
     {
-        return EndOfServiceEntry::whereIn('employee_profile_id', $profileIds)
-            ->selectRaw('employee_profile_id, COALESCE(SUM(amount), 0) as total')
+        return $this->entriesFor($profileIds)
             ->groupBy('employee_profile_id')
-            ->pluck('total', 'employee_profile_id')
-            ->map(fn ($v) => round((float) $v, 2));
+            ->map(fn (Collection $entries) => round(
+                (float) $entries->sum(fn (EndOfServiceEntry $e) => $e->effectiveAmount()), 2,
+            ));
+    }
+
+    /**
+     * حركاتُ موظفين بسنداتها.
+     *
+     * @param  array<int, int>  $profileIds
+     * @return Collection<int, EndOfServiceEntry>
+     */
+    private function entriesFor(array $profileIds): Collection
+    {
+        if ($profileIds === []) {
+            return collect();
+        }
+
+        return EndOfServiceEntry::whereIn('employee_profile_id', $profileIds)
+            ->with('voucher:id,status,amount')
+            ->get();
     }
 
     /**
@@ -101,43 +124,33 @@ class EndOfServiceService
         $to = sprintf('%04d-12-31', $year);
 
         $profiles = EmployeeProfile::with(['user:id,name,job_title', 'branch:id,name'])->get();
-        $ids = $profiles->pluck('id')->all();
 
-        $balances = $this->balances($ids);
-        $accrued = $this->sumBetween($ids, $from, $to, positive: true);
-        $settled = $this->sumBetween($ids, $from, $to, positive: false);
+        $entries = $this->entriesFor($profiles->pluck('id')->all())->groupBy('employee_profile_id');
+
+        // المبلغ من السند حيث وُجد: تعديلُ سندٍ بعد صرفه يُغيّر ما صُرف فعلًا،
+        // وعكسُه يُلغيه — والنسخة المحفوظة في الحركة لا تعرف ذلك.
+        $sum = fn (Collection $rows, callable $keep) => round(
+            (float) $rows->map(fn (EndOfServiceEntry $e) => $e->effectiveAmount())
+                ->filter($keep)->sum(), 2,
+        );
 
         return $profiles
-            ->map(fn (EmployeeProfile $p) => [
-                'profile' => $p,
-                'balance' => (float) $balances->get($p->id, 0.0),
-                'accrued' => (float) $accrued->get($p->id, 0.0),
-                // `abs` لا سالبٌ مقلوب: الصفر السالب يُطبع «‎-0.00» في الشاشة.
-                'settled' => round(abs((float) $settled->get($p->id, 0.0)), 2),
-            ])
+            ->map(function (EmployeeProfile $p) use ($entries, $from, $to, $sum) {
+                $all = $entries->get($p->id, collect());
+                $inYear = $all->filter(fn (EndOfServiceEntry $e) => $e->entry_date->between($from, $to));
+
+                return [
+                    'profile' => $p,
+                    'balance' => $sum($all, fn () => true),
+                    'accrued' => $sum($inYear, fn (float $v) => $v > 0),
+                    // `abs` لا سالبٌ مقلوب: الصفر السالب يُطبع «‎-0.00» في الشاشة.
+                    'settled' => abs($sum($inYear, fn (float $v) => $v < 0)),
+                ];
+            })
             // من لا رصيد له ولا حركة في السنة لا شأن له بهذه الشاشة.
             ->filter(fn (array $r) => $r['balance'] != 0.0 || $r['accrued'] != 0.0 || $r['settled'] != 0.0)
             ->sortBy(fn (array $r) => $r['profile']->user?->name)
             ->values();
-    }
-
-    /**
-     * @param  array<int, int>  $ids
-     * @return Collection<int, float>
-     */
-    private function sumBetween(array $ids, string $from, string $to, bool $positive): Collection
-    {
-        if ($ids === []) {
-            return collect();
-        }
-
-        return EndOfServiceEntry::whereIn('employee_profile_id', $ids)
-            ->whereBetween('entry_date', [$from, $to])
-            ->where('amount', $positive ? '>' : '<', 0)
-            ->selectRaw('employee_profile_id, COALESCE(SUM(amount), 0) as total')
-            ->groupBy('employee_profile_id')
-            ->pluck('total', 'employee_profile_id')
-            ->map(fn ($v) => round((float) $v, 2));
     }
 
     /**

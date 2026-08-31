@@ -3,6 +3,7 @@
 namespace App\Modules\Accounting\Services;
 
 use App\Models\User;
+use App\Modules\Accounting\Events\VoucherRevised;
 use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Support\NumberGenerator;
 use Illuminate\Support\Facades\DB;
@@ -63,6 +64,8 @@ class VoucherService
             'attachments', 'is_recurring', 'recurrence',
         ])->all());
 
+        VoucherRevised::dispatch($voucher);
+
         return $voucher;
     }
 
@@ -108,6 +111,18 @@ class VoucherService
                 'posted_by' => $actor?->id ?? auth()->id(),
                 'posted_at' => now(),
             ]);
+
+            /*
+            | **الوثائق المرتبطة تُصلح نفسها.**
+            |
+            | القيد صُحّح أعلاه، لكنّ وثيقةً في وحدةٍ أخرى قد تحمل نسخةً من مبلغ
+            | السند — دفعةُ عمولة، تصفيةُ نهاية خدمة. وتركُها على القيمة القديمة
+            | يجعل الدفتر يقول رقمًا والأرشيف رقمًا آخر، والفرقُ لا يظهر خطأً بل
+            | رصيدًا كاذبًا يُصرف عليه.
+            |
+            | داخل المعاملة: إمّا أن يُصحَّح الكلّ أو لا شيء.
+            */
+            VoucherRevised::dispatch($voucher);
 
             return $voucher;
         });

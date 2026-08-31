@@ -286,7 +286,15 @@ class CommissionController extends Controller
             // (HasUuid)، وبدونه يُبنى رابط «عرض السند» بمفتاحٍ فارغ فلا يفتح.
             // و`notes` تُعرض في الجدول فلا تُجلب بطلبٍ ثانٍ لكل صفّ.
             'payouts' => CommissionPayout::where('earner_id', $earnerId)->where('earner_type', $type)
-                ->with(['voucher:id,uuid,number,status,kind,notes', 'treasury:id,name'])->latest('id')->get(),
+                //
+                // و`amount` و`voucher_date` و`treasury_id` لأن الأرشيف يقرأ
+                // المبلغ والتاريخ والخزينة من السند لا من نسختها في الدفعة:
+                // السند يُعدَّل بعد الإنشاء، والنسخة تبقى قديمة.
+                ->with([
+                    'voucher:id,uuid,number,status,kind,notes,amount,voucher_date,treasury_id',
+                    'voucher.treasury:id,name',
+                    'treasury:id,name',
+                ])->latest('id')->get(),
             // البنوك أولًا (الصرف من الحسابات البنكية هو الأصل) ثم الخزائن النقدية.
             'treasuries' => Treasury::active()->orderByRaw("type = 'bank' desc")->orderBy('name')->get(),
         ]);

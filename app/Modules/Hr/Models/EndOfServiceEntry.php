@@ -56,4 +56,27 @@ class EndOfServiceEntry extends Model
     {
         return self::LABELS[$this->kind] ?? $this->kind;
     }
+
+    /**
+     * المبلغ الفعليّ للحركة — **من السند حيث وُجد**.
+     *
+     * حركةُ التصفية نسخةٌ سالبة من مبلغ سند الصرف تُكتب لحظة الصرف. والسند
+     * وثيقةٌ تُعدَّل بعدها (عكسٌ ثم قيد مُصحّح)، فتبقى النسخة على القيمة القديمة
+     * ويفترق دفتر المخصّص عن الدفتر العامّ.
+     *
+     * **والسند المعكوس لا يُنقص المخصّص**: ماله عاد إلى الخزينة، فالالتزام قائم
+     * كما كان. وتركُ الحركة سالبةً بعد العكس يُطفئ التزامًا لم يُدفع.
+     */
+    public function effectiveAmount(): float
+    {
+        if (! $this->voucher) {
+            return round((float) $this->amount, 2);
+        }
+
+        if (in_array($this->voucher->status, ['reversed', 'cancelled', 'rejected'], true)) {
+            return 0.0;
+        }
+
+        return round(-(float) $this->voucher->amount, 2);
+    }
 }
