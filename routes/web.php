@@ -632,6 +632,12 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     // المحاسبة (Phase 2.9)
     Route::prefix('accounting')->name('accounting.')->group(function () {
         Route::get('accounts', [AdminAccountingController::class, 'accounts'])->name('accounts.index');
+        // إضافة/تعديل/حذف بنود الدليل — بصلاحية الإدارة وحدها.
+        Route::middleware('can:accounting.accounts.manage')->group(function () {
+            Route::post('accounts', [AdminAccountingController::class, 'storeAccount'])->name('accounts.store');
+            Route::put('accounts/{account}', [AdminAccountingController::class, 'updateAccount'])->name('accounts.update');
+            Route::delete('accounts/{account}', [AdminAccountingController::class, 'destroyAccount'])->name('accounts.destroy');
+        });
         // إعدادات الترحيل المحاسبي (Posting Setup)
         Route::get('posting-setup', [AccountMappingController::class, 'index'])->name('posting_setup.index')->middleware('can:accounting.accounts.manage');
         Route::put('posting-setup', [AccountMappingController::class, 'update'])->name('posting_setup.update')->middleware('can:accounting.accounts.manage');
