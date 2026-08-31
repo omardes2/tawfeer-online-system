@@ -4,6 +4,7 @@
         :description="__('توليد شهريّ ثم ترحيلٌ محاسبيّ ثم صرف.')"
         :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('الرواتب والموظفون') => route('admin.hr.employees.index'), __('مسيّرات الرواتب') => null]">
         <a href="{{ route('admin.hr.employees.index') }}" class="btn-secondary btn-sm">{{ __('الموظفون') }}</a>
+        <a href="{{ route('admin.hr.eos.index') }}" class="btn-secondary btn-sm">{{ __('صرف نهاية الخدمة') }}</a>
     </x-admin.header>
 
     <x-admin.flash />

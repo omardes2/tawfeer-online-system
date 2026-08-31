@@ -30,6 +30,7 @@ use App\Http\Controllers\Admin\Commissions\CommissionController as AdminCommissi
 use App\Http\Controllers\Admin\Crm\CustomerController as AdminCustomerController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\Hr\EmployeeController as HrEmployeeController;
+use App\Http\Controllers\Admin\Hr\EndOfServiceController as HrEndOfServiceController;
 use App\Http\Controllers\Admin\Hr\PayrollController;
 use App\Http\Controllers\Admin\Inventory\InventoryController;
 use App\Http\Controllers\Admin\Inventory\InventoryCountController as AdminInventoryCountController;
@@ -450,6 +451,11 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::delete('employees/{employee}/leaves/{leave}', [HrEmployeeController::class, 'destroyLeave'])->name('employees.leaves.destroy')->middleware('can:hr.employees.manage');
         Route::post('employees/{employee}/end-of-service/settle', [HrEmployeeController::class, 'settleEndOfService'])->name('employees.eos.settle')->middleware('can:hr.payroll.manage');
         Route::post('employees/{employee}/end-of-service/adjust', [HrEmployeeController::class, 'adjustEndOfService'])->name('employees.eos.adjust')->middleware('can:hr.payroll.manage');
+
+        // صرف نهاية الخدمة: مرّةً في نهاية السنة وبيد إنسان — لا موعد مُبرمَج
+        // يصرف من تلقائه.
+        Route::get('end-of-service', [HrEndOfServiceController::class, 'index'])->name('eos.index')->middleware('can:hr.payroll.view');
+        Route::post('end-of-service/settle', [HrEndOfServiceController::class, 'settle'])->name('eos.settle')->middleware('can:hr.payroll.manage');
 
         Route::get('payroll', [PayrollController::class, 'index'])->name('payroll.index')->middleware('can:hr.payroll.view');
         Route::post('payroll/generate', [PayrollController::class, 'generate'])->name('payroll.generate')->middleware('can:hr.payroll.manage');

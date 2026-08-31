@@ -188,9 +188,16 @@
                 <h3 class="font-semibold text-gray-800">{{ __('مكافأة نهاية الخدمة') }}</h3>
                 <p class="text-[11px] mt-0.5 {{ $employee->accruesBenefits() ? 'text-gray-400' : 'text-amber-600' }}">
                     {{ $employee->accruesBenefits()
-                        ? __('شهرٌ عن كل سنة خدمة — يتراكم مع كل مسيّر بمقدار الراتب الأساسيّ ÷ ١٢.')
+                        ? __('شهرٌ عن كل سنة خدمة — يتراكم مع كل مسيّر بمقدار الراتب الأساسيّ ÷ ١٢، ويُصرف يدويًّا نهاية السنة.')
                         : __('لا تراكم لهذا التعاقد. ويبقى الدفتر ظاهرًا لحركاتٍ سابقة إن وُجدت.') }}
                 </p>
+                @can('hr.payroll.view')
+                    {{-- الصرف الجماعيّ نهاية السنة له شاشته؛ وهذا النموذج يبقى لحالةٍ مفردة (خروج موظف مثلًا). --}}
+                    <p class="text-[11px] mt-1 text-gray-400">
+                        {{ __('لصرف مكافآت الجميع دفعةً واحدة:') }}
+                        <a href="{{ route('admin.hr.eos.index') }}" class="text-emerald-700 hover:underline">{{ __('شاشة صرف نهاية الخدمة') }}</a>
+                    </p>
+                @endcan
             </div>
             <table class="admin-table">
                 <thead>

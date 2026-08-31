@@ -5,6 +5,7 @@
         :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('الموظفون والعمولات') => null, __('الرواتب والموظفون') => null]">
         @can('hr.payroll.view')
             <a href="{{ route('admin.hr.payroll.index') }}" class="btn-secondary btn-sm">{{ __('مسيّرات الرواتب') }}</a>
+            <a href="{{ route('admin.hr.eos.index') }}" class="btn-secondary btn-sm">{{ __('صرف نهاية الخدمة') }}</a>
         @endcan
         @can('hr.employees.manage')
             <a href="{{ route('admin.hr.employees.create') }}" class="btn-primary btn-sm">{{ __('موظف جديد') }}</a>
@@ -18,7 +19,7 @@
         <x-admin.stat-card :label="__('الرواتب الشهرية')" :value="$totals['monthly']" money tone="gray"
                            :hint="__('الأساسيّ والبدلات بالعقود السارية')" />
         <x-admin.stat-card :label="__('مخصّص نهاية الخدمة')" :value="$totals['eos']" money tone="amber"
-                           :hint="__('التزامٌ متراكم على الشركة')" />
+                           :hint="__('التزامٌ متراكم — يُصرف نهاية السنة')" />
         {{-- من بلا عقدٍ لا يدخل المسيّر. يُعدّ هنا كي يُرى قبل الترحيل لا بعده. --}}
         <x-admin.stat-card :label="__('بلا راتب مسجَّل')" :value="$totals['without_salary']"
                            :tone="$totals['without_salary'] > 0 ? 'red' : 'green'"

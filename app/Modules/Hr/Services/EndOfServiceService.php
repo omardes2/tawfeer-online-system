@@ -34,6 +34,14 @@ use Illuminate\Validation\ValidationException;
  *
  * لا عمود رصيد يُصحَّح فيفترق عن دفتره. الموجب تراكمٌ والسالب تصفية، والجمع
  * وحده يعطي ما على الشركة.
+ *
+ * ## والصرف نهاية السنة — يدويًّا
+ *
+ * التراكم شهريّ لأنه التزامٌ ينشأ بالعمل، أمّا **الصرف فمرّةً في نهاية السنة**
+ * من شاشة «صرف نهاية الخدمة». ولا يصرف النظام من تلقاء نفسه ولا في موعدٍ
+ * مُبرمَج: يُسلَّم المبلغ باليد ثم يُسجَّل هنا، فيُقيَّد سندُ الصرف ويُطفأ
+ * المخصّص بقيمته. صرفٌ آليّ يُخرج نقدًا لم يُسلَّم، ويجعل الدفتر يقول ما لم
+ * يحدث.
  */
 class EndOfServiceService
 {
@@ -77,6 +85,123 @@ class EndOfServiceService
             ->groupBy('employee_profile_id')
             ->pluck('total', 'employee_profile_id')
             ->map(fn ($v) => round((float) $v, 2));
+    }
+
+    /**
+     * صفوف شاشة صرف نهاية السنة — لكل موظف: متراكمُ السنة، ومصروفُها، والرصيد.
+     *
+     * الرصيد يشمل سنواتٍ سابقة لم تُصرف، فهو وحده ما يُصرف — لا متراكمُ السنة.
+     * وعرضُهما معًا يُري الفرق بدل أن يُخفيه.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function yearEndRows(int $year): Collection
+    {
+        $from = sprintf('%04d-01-01', $year);
+        $to = sprintf('%04d-12-31', $year);
+
+        $profiles = EmployeeProfile::with(['user:id,name,job_title', 'branch:id,name'])->get();
+        $ids = $profiles->pluck('id')->all();
+
+        $balances = $this->balances($ids);
+        $accrued = $this->sumBetween($ids, $from, $to, positive: true);
+        $settled = $this->sumBetween($ids, $from, $to, positive: false);
+
+        return $profiles
+            ->map(fn (EmployeeProfile $p) => [
+                'profile' => $p,
+                'balance' => (float) $balances->get($p->id, 0.0),
+                'accrued' => (float) $accrued->get($p->id, 0.0),
+                // `abs` لا سالبٌ مقلوب: الصفر السالب يُطبع «‎-0.00» في الشاشة.
+                'settled' => round(abs((float) $settled->get($p->id, 0.0)), 2),
+            ])
+            // من لا رصيد له ولا حركة في السنة لا شأن له بهذه الشاشة.
+            ->filter(fn (array $r) => $r['balance'] != 0.0 || $r['accrued'] != 0.0 || $r['settled'] != 0.0)
+            ->sortBy(fn (array $r) => $r['profile']->user?->name)
+            ->values();
+    }
+
+    /**
+     * @param  array<int, int>  $ids
+     * @return Collection<int, float>
+     */
+    private function sumBetween(array $ids, string $from, string $to, bool $positive): Collection
+    {
+        if ($ids === []) {
+            return collect();
+        }
+
+        return EndOfServiceEntry::whereIn('employee_profile_id', $ids)
+            ->whereBetween('entry_date', [$from, $to])
+            ->where('amount', $positive ? '>' : '<', 0)
+            ->selectRaw('employee_profile_id, COALESCE(SUM(amount), 0) as total')
+            ->groupBy('employee_profile_id')
+            ->pluck('total', 'employee_profile_id')
+            ->map(fn ($v) => round((float) $v, 2));
+    }
+
+    /**
+     * صرف نهاية السنة لعدّة موظفين — سندُ صرفٍ لكلٍّ منهم.
+     *
+     * **يُتحقَّق من الجميع قبل صرف أحد.** دفعةٌ تُصرف نصفَها ثم تتوقّف على خطأ
+     * تترك الخزينة مصروفةً بعضًا والشاشة تقول «فشل»، فيُعاد الإرسال فيُصرف
+     * المصروفُ مرّتين. فإمّا أن تمرّ كلّها أو لا شيء.
+     *
+     * وسندٌ لكلٍّ لا سندٌ جامع: كلٌّ يقبض مبلغه ويوقّع عليه، وسندٌ واحد يُخفي
+     * مَن قبض ومَن لم يقبض.
+     *
+     * @param  array<int, float>  $amounts  معرّف ملفّ الموظف ⇦ المبلغ
+     * @return int عدد من صُرف لهم
+     */
+    public function settleMany(array $amounts, int $treasuryId, User $actor, ?string $note = null): int
+    {
+        $amounts = collect($amounts)
+            ->map(fn ($v) => round((float) $v, 2))
+            ->filter(fn (float $v) => $v > 0);
+
+        if ($amounts->isEmpty()) {
+            throw ValidationException::withMessages([
+                'amounts' => __('لم يُحدَّد أحد — اختر موظفًا وأدخل مبلغًا أكبر من صفر.'),
+            ]);
+        }
+
+        $profiles = EmployeeProfile::with('user:id,name')
+            ->whereIn('id', $amounts->keys()->all())->get()->keyBy('id');
+
+        $balances = $this->balances($profiles->keys()->all());
+
+        $errors = [];
+
+        foreach ($amounts as $profileId => $amount) {
+            $profile = $profiles->get($profileId);
+
+            if (! $profile) {
+                $errors['amounts'][] = __('موظفٌ غير موجود في القائمة.');
+
+                continue;
+            }
+
+            $balance = (float) $balances->get($profileId, 0.0);
+
+            if ($amount > $balance) {
+                $errors['amounts.'.$profileId][] = __(':n — المبلغ يتجاوز المخصّص المتراكم (:b).', [
+                    'n' => $profile->user?->name,
+                    'b' => number_format($balance, 2),
+                ]);
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return DB::transaction(function () use ($amounts, $profiles, $treasuryId, $actor, $note) {
+            foreach ($amounts as $profileId => $amount) {
+                $this->settle($profiles->get($profileId), $amount, $treasuryId, $actor, $note);
+            }
+
+            return $amounts->count();
+        });
     }
 
     /** تسجيل تراكم المسيّر لموظف — يُستدعى من `PayrollService` بعد الترحيل. */
