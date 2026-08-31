@@ -86,12 +86,30 @@ class PayrollService
         $this->assertPeriod($year, $month);
 
         return DB::transaction(function () use ($year, $month, $actor) {
-            $run = PayrollRun::where('period_year', $year)->where('period_month', $month)->first();
+            /*
+            | **البحث يشمل المحذوف ناعمًا.**
+            |
+            | الفهرس `payroll_runs_period_unique` على (السنة، الشهر) لا يعرف الحذف
+            | الناعم: مسيّرٌ حُذف يبقى محتلًّا شهره في قاعدة البيانات. وكان البحث
+            | يُخفي المحذوف فلا يجده، فيمضي إلى الإدراج ويصطدم بالفهرس —
+            | UniqueConstraintViolation، أي خطأ ٥٠٠ في الشاشة بلا رسالة تدلّ عليه.
+            |
+            | والمحذوف يُستعاد لا يُتجاوز: الحذف لا يُسمح به إلّا للمسودّة
+            | (`PayrollController::destroy`)، فاستعادتُها لإعادة التوليد آمنة —
+            | وبنودُها تُمحى وتُبنى من جديد أدناه. ويعود المسيّر برقمه الأول فلا
+            | تُحرق أرقامٌ بلا مستند.
+            */
+            $run = PayrollRun::withTrashed()
+                ->where('period_year', $year)->where('period_month', $month)->first();
 
             if ($run && ! $run->isDraft()) {
                 throw ValidationException::withMessages([
                     'period' => __('مسيّر :p مُرحَّل — يُصحَّح بالعكس لا بإعادة التوليد.', ['p' => $run->periodLabel()]),
                 ]);
+            }
+
+            if ($run && $run->trashed()) {
+                $run->restore();
             }
 
             $run ??= PayrollRun::create([
