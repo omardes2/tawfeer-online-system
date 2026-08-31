@@ -3,6 +3,7 @@
 namespace App\Modules\Crm\Services;
 
 use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Accounting\Services\AccountingService;
 use App\Modules\Accounting\Services\PostingAccountResolver;
@@ -405,27 +406,165 @@ class CustomerService
     }
 
     /**
-     * دمج عميلين مكرّرين (BR-CUST-14): ينقل الهواتف/العناوين/جهات الاتصال/الملاحظات/الطلبات
-     * إلى السجل الباقي، ويعلّم المُدمَج ويحذفه ناعمًا. لا يُفقد أي طلب.
+     * دمج عميلين مكرّرين (BR-CUST-14): كل ما يخصّ المُدمَج ينتقل إلى الباقي،
+     * ورصيدُه ينتقل بقيدٍ لا بتعديل، ثم يُعلَّم المُدمَج ويُحذف ناعمًا.
+     *
+     * ## لماذا لا يكفي نقل الطلبات
+     *
+     * العميل ليس صفًّا في جدول: له حسابٌ فرعيّ في «ذمم العملاء» بقيودٍ مُرحَّلة.
+     * ونقلُ الطلبات وحدها ثم حذفُ المُدمَج ناعمًا كان يُخفيه من القائمة ويُبقي
+     * رصيده على حسابه — فلا يعود مجموعُ أرصدة العملاء يساوي حساب المراقبة،
+     * ويصير على الدفاتر دَينٌ حقيقيّ لا يطالب به أحد لأن صاحبه لم يعد ظاهرًا.
+     *
+     * ## ولماذا الرصيد ينتقل بقيدٍ لا بنقل سطوره
+     *
+     * سطور القيد المُرحَّل لا تُنقل من حسابٍ إلى حساب: كشفُ حسابٍ طُبع أمس يجب
+     * أن يُطبع اليوم كما هو (BR-ACC-09). فالدمج يُرحّل **قيد إعادة تصنيف**
+     * بقيمة رصيد المُدمَج: مدين حساب الباقي / دائن حساب المُدمَج. فيصير حساب
+     * المُدمَج صفرًا، ويحمل الباقي الذمّة كاملة، ولا يتغيّر مجموع «ذمم
+     * العملاء» بشيء — لأن الطرفين كليهما تحته.
+     *
+     * والاتجاه ينعكس إن كان للمُدمَج رصيدٌ دائن (دفعة مقدَّمة): المال له لا
+     * عليه، ونقلُه مدينًا كان سيقلب دفعةً مقبوضة إلى دَينٍ عليه.
      */
     public function merge(Customer $source, Customer $target): Customer
     {
-        if ($source->id === $target->id) {
-            throw ValidationException::withMessages(['merge' => __('لا يمكن دمج العميل مع نفسه.')]);
-        }
+        $this->assertMergeable($source, $target);
 
         return DB::transaction(function () use ($source, $target) {
-            $source->phones()->update(['customer_id' => $target->id, 'is_primary' => false]);
-            $source->addresses()->update(['customer_id' => $target->id, 'is_default' => false]);
-            $source->contacts()->update(['customer_id' => $target->id, 'is_primary' => false]);
-            $source->customerNotes()->update(['customer_id' => $target->id]);
-            Order::where('customer_id', $source->id)->update(['customer_id' => $target->id]);
+            $this->moveLedgerBalance($source, $target);
+            $this->moveRelations($source, $target);
+            $this->fillGapsFrom($source, $target);
+
+            // سلسلةُ الدمج تُقصَّر: من دُمج في المُدمَج سابقًا يُشير إلى الباقي
+            // مباشرةً، وإلّا صار تتبّعُ عميلٍ قديم قفزًا بين سجلّاتٍ محذوفة.
+            Customer::withTrashed()->where('merged_into_id', $source->id)
+                ->update(['merged_into_id' => $target->id]);
+
+            // الحساب يُعطَّل ولا يُحذف: حذفُه يترك قيودَه بلا حساب.
+            $source->glAccount()->first()?->update(['is_active' => false]);
 
             $source->update(['merged_into_id' => $target->id]);
             $source->delete();
 
             return $target->fresh();
         });
+    }
+
+    /** @throws ValidationException */
+    private function assertMergeable(Customer $source, Customer $target): void
+    {
+        if ($source->id === $target->id) {
+            throw ValidationException::withMessages(['merge' => __('لا يمكن دمج العميل مع نفسه.')]);
+        }
+
+        if ($source->merged_into_id || $source->trashed()) {
+            throw ValidationException::withMessages(['merge' => __('هذا العميل مدموجٌ أصلًا في سجلٍّ آخر.')]);
+        }
+
+        if ($target->merged_into_id || $target->trashed()) {
+            throw ValidationException::withMessages(['merge' => __('لا يمكن الدمج في سجلٍّ محذوف أو مدموج — اختر السجلّ الباقي.')]);
+        }
+    }
+
+    /**
+     * قيد إعادة تصنيف ينقل رصيد المُدمَج إلى الباقي فيصفّر حسابه.
+     *
+     * ولا قيد إن كان الرصيد صفرًا: قيدٌ بلا أثرٍ يُثقل الدفاتر ويُربك الكشف.
+     */
+    private function moveLedgerBalance(Customer $source, Customer $target): void
+    {
+        $from = $source->glAccount()->first();
+        if (! $from) {
+            return; // لا حساب — ولا رصيد ينتقل.
+        }
+
+        $accounting = app(AccountingService::class);
+        $balance = round($accounting->accountBalance($from), 2);
+
+        if (abs($balance) < 0.01) {
+            return;
+        }
+
+        $to = $target->glAccount()->first() ?: $this->ensureLedgerAccount($target);
+        if (! $to) {
+            throw ValidationException::withMessages([
+                'merge' => __('لا يمكن نقل الرصيد قبل تهيئة حساب العميل الباقي.'),
+            ]);
+        }
+
+        $value = abs($balance);
+        $lines = $balance > 0
+            ? [ // على المُدمَج دَين: يُنقل إلى ذمّة الباقي.
+                ['account_code' => $to->code, 'debit' => $value, 'credit' => 0],
+                ['account_code' => $from->code, 'debit' => 0, 'credit' => $value],
+            ]
+            : [ // للمُدمَج رصيدٌ دائن (دفعة مقدَّمة): يُنقل دائنًا كما هو.
+                ['account_code' => $from->code, 'debit' => $value, 'credit' => 0],
+                ['account_code' => $to->code, 'debit' => 0, 'credit' => $value],
+            ];
+
+        $accounting->postEntry([
+            'entry_date' => now()->toDateString(),
+            'description' => __('نقل رصيد بدمج العميل :from في :to', [
+                'from' => $source->name,
+                'to' => $target->name,
+            ]),
+            'source' => 'customer_merge',
+            'reference_type' => 'customer',
+            'reference_id' => $source->id,
+        ], $lines);
+    }
+
+    /**
+     * نقل كل ما يشير إلى المُدمَج.
+     *
+     * والمفضّلة والمراجعات لهما فريدٌ مركّب مع المنتج: صفٌّ مكرّر عند الباقي
+     * يُحذف قبل النقل، وإلّا رفضته قاعدة البيانات فسقط الدمج كلّه.
+     */
+    private function moveRelations(Customer $source, Customer $target): void
+    {
+        $source->phones()->update(['customer_id' => $target->id, 'is_primary' => false]);
+        $source->addresses()->update(['customer_id' => $target->id, 'is_default' => false]);
+        $source->contacts()->update(['customer_id' => $target->id, 'is_primary' => false]);
+        $source->customerNotes()->update(['customer_id' => $target->id]);
+
+        Order::where('customer_id', $source->id)->update(['customer_id' => $target->id]);
+
+        // سندات القبض: بدونها يفقد الكشفُ الموحَّد ما دفعه العميل فعلًا.
+        FinancialVoucher::where('customer_id', $source->id)->update(['customer_id' => $target->id]);
+
+        foreach (['carts', 'campaign_messages', 'message_suppressions', 'marketing_contacts', 'channel_contacts'] as $table) {
+            DB::table($table)->where('customer_id', $source->id)->update(['customer_id' => $target->id]);
+        }
+
+        foreach (['wishlist_items', 'product_reviews'] as $table) {
+            $taken = DB::table($table)->where('customer_id', $target->id)->pluck('product_id');
+            DB::table($table)->where('customer_id', $source->id)->whereIn('product_id', $taken)->delete();
+            DB::table($table)->where('customer_id', $source->id)->update(['customer_id' => $target->id]);
+        }
+    }
+
+    /**
+     * يملأ فراغات الباقي مما عند المُدمَج — ولا يكتب فوق قيمةٍ قائمة.
+     *
+     * فالمكرّر كثيرًا ما يحمل الهاتف أو البريد الذي نقص الأوّل، وضياعُه في
+     * الدمج يعني فقدَ وسيلة الوصول إلى العميل. والكتابةُ فوق القائم عكسُها:
+     * تُبدّل بياناتٍ صحيحة ببياناتٍ أدخِلت على عجل.
+     */
+    private function fillGapsFrom(Customer $source, Customer $target): void
+    {
+        $fill = [];
+        foreach (['primary_phone', 'email', 'user_id', 'category', 'birth_date'] as $field) {
+            if (blank($target->{$field}) && filled($source->{$field})) {
+                $fill[$field] = $source->{$field};
+            }
+        }
+
+        if ($fill !== []) {
+            $target->forceFill($fill)->save();
+            $this->ensureLedgerAccount($target); // الاسم لم يتغيّر، لكن الحساب قد يغيب.
+        }
     }
 
     /**
@@ -446,6 +585,129 @@ class CustomerService
     public function normalizePhone(string $phone): string
     {
         return preg_replace('/\D/', '', trim($phone)) ?? $phone;
+    }
+
+    /**
+     * تطبيع الاسم العربي للمقارنة — لا للعرض.
+     *
+     * الاسم الواحد يُكتب صورًا: «عمر قفيشه/جمله» و«عمر قفيشة / جملة» و«عمر
+     * قفيشه-جمله». والمقارنة الحرفية تراها ثلاثة عملاء، فيتفرّق دَينُ رجلٍ
+     * واحد على ثلاثة سجلّات لا يجمعها كشف.
+     *
+     * فتُوحَّد صور الهمزة والتاء المربوطة والألف المقصورة، ويُحذف التشكيل
+     * والتطويل، ثم كل ما ليس حرفًا ولا رقمًا — فالفاصلة والمسافة والشرطة
+     * اختيارُ كاتبٍ لا فرقٌ في المُسمّى.
+     */
+    public function normalizeName(?string $name): string
+    {
+        $name = trim((string) $name);
+        if ($name === '') {
+            return '';
+        }
+
+        $name = preg_replace('/[\x{0640}\x{064B}-\x{0652}\x{0670}]/u', '', $name) ?? $name;
+        $name = strtr($name, [
+            'أ' => 'ا', 'إ' => 'ا', 'آ' => 'ا', 'ٱ' => 'ا',
+            'ة' => 'ه', 'ى' => 'ي', 'ؤ' => 'و', 'ئ' => 'ي',
+        ]);
+        $name = preg_replace('/[^\p{L}\p{N}]+/u', '', $name) ?? $name;
+
+        return mb_strtolower($name);
+    }
+
+    /**
+     * مرشَّحو الدمج مع عميلٍ بعينه — لقائمة الدمج في صفحته.
+     *
+     * الاستعلام مبدوءٌ بأوّل كلمةٍ من الاسم ومحدودٌ بخمسين: تطبيعُ الاسم لا
+     * يُكتب في SQL، وجلبُ كل العملاء لتطبيعهم في PHP يُثقل كل فتحةٍ للصفحة.
+     * فتُضيَّق الدائرة بالاستعلام ثم تُصفَّى بالتطبيع.
+     *
+     * @return Collection<int, Customer>
+     */
+    public function mergeCandidatesFor(Customer $customer): Collection
+    {
+        return $this->lookAlikes($customer->name, $customer->primary_phone, $customer->id);
+    }
+
+    /**
+     * من يشبه هذا الاسم أو يحمل هذا الرقم — قبل الإنشاء وقبل الدمج.
+     *
+     * @return Collection<int, Customer>
+     */
+    public function lookAlikes(?string $name, ?string $phone, ?int $excludeId = null): Collection
+    {
+        $token = collect(preg_split('/\s+/u', trim((string) $name)))->first() ?: '';
+        $phone = $this->normalizePhone((string) $phone);
+        $normalized = $this->normalizeName($name);
+
+        if ($token === '' && $phone === '') {
+            return collect();
+        }
+
+        return Customer::query()
+            ->whereNull('merged_into_id')
+            ->when($excludeId, fn ($q) => $q->where('id', '!=', $excludeId))
+            ->where(function ($q) use ($token, $phone) {
+                $q->when($token !== '', fn ($w) => $w->where('name', 'like', '%'.$token.'%'));
+                $q->when($phone !== '', fn ($w) => $w->orWhere('primary_phone', $phone));
+            })
+            ->withOutstandingBalance()
+            ->limit(50)
+            ->get()
+            ->filter(fn ($c) => ($phone !== '' && $this->normalizePhone((string) $c->primary_phone) === $phone)
+                || ($normalized !== '' && $this->normalizeName($c->name) === $normalized))
+            ->values();
+    }
+
+    /**
+     * مجموعات العملاء المرشَّحة للدمج — بالهاتف أوّلًا ثم بالاسم.
+     *
+     * **الهاتف يقين والاسم ظنّ**: رقمان متطابقان رجلٌ واحد، واسمان متطابقان قد
+     * يكونان رجلين. ولهذا تُعرض المجموعات ولا تُدمج: «زبون» تتكرّر عشرًا وهم
+     * عشرة، ودمجُهم آليًّا يخلط ذممًا لا تُفكّ بعدها.
+     *
+     * ومن دُمج أو حُذف خارج الحساب: الدمج يقع على الأحياء فقط.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function duplicateGroups(): Collection
+    {
+        $customers = Customer::query()
+            ->whereNull('merged_into_id')
+            ->withCount('orders')
+            ->withOutstandingBalance()
+            ->orderBy('id')
+            ->get();
+
+        $groups = collect();
+
+        foreach (['phone', 'name'] as $by) {
+            $seen = $groups->flatMap(fn ($g) => $g['customers']->pluck('id'))->flip();
+
+            $groups = $groups->merge(
+                $customers
+                    // من ظهر في مجموعةٍ بالهاتف لا يُعاد بالاسم: مجموعتان لنفس
+                    // العملاء تعنيان دمجًا مرّتين، والثانية على سجلٍّ محذوف.
+                    ->reject(fn ($c) => $seen->has($c->id))
+                    ->groupBy(fn ($c) => $by === 'phone'
+                        ? $this->normalizePhone((string) $c->primary_phone)
+                        : $this->normalizeName($c->name))
+                    ->reject(fn ($group, $key) => $key === '' || $group->count() < 2)
+                    ->map(fn ($group, $key) => [
+                        'key' => $by.':'.$key,
+                        'by' => $by,
+                        'label' => $by === 'phone' ? $key : $group->first()->name,
+                        'customers' => $group->values(),
+                        'balance' => round($group->sum(fn ($c) => $c->outstandingBalance()), 2),
+                        'orders' => (int) $group->sum('orders_count'),
+                    ])
+                    ->values()
+            );
+        }
+
+        // الأثقل أوّلًا: مجموعةٌ عليها رصيدٌ أو طلبات هي التي تُفسد الكشف
+        // والتقارير، ومجموعةُ أسماءٍ فارغة تنتظر.
+        return $groups->sortByDesc(fn ($g) => [abs($g['balance']), $g['orders']])->values();
     }
 
     private function syncPhones(Customer $customer, array $phones): void

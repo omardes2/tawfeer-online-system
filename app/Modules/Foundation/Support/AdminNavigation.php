@@ -66,6 +66,7 @@ final class AdminNavigation
             ]],
             ['العملاء', 'users', [
                 ['admin.crm.customers.index', 'العملاء', 'crm.customers.view', 'admin.crm.customers.*'],
+                ['admin.crm.customers.duplicates', 'العملاء المكرّرون', 'crm.customers.merge', 'admin.crm.customers.duplicates'],
             ]],
             ['الشحن والتوصيل', 'truck', [
                 ['admin.shipping.shipments.index', 'الشحنات', 'shipping.shipments.view', 'admin.shipping.shipments.*'],

@@ -630,8 +630,14 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
 
     // CRM/العملاء (Phase 2.10)
     Route::prefix('crm')->name('crm.')->group(function () {
+        // قبل الـresource: وإلّا التُقطت «duplicates» على أنها معرّف عميل.
+        Route::get('customers/duplicates', [AdminCustomerController::class, 'duplicates'])
+            ->name('customers.duplicates')->middleware('can:crm.customers.merge');
+
         // الحذف محروسٌ في الخدمة: لا طلبات ولا حركة دفترية غير الرصيد الافتتاحي.
         Route::resource('customers', AdminCustomerController::class);
+        Route::post('customers/{customer}/merge', [AdminCustomerController::class, 'merge'])
+            ->name('customers.merge')->middleware('can:crm.customers.merge');
         Route::post('customers/{customer}/notes', [AdminCustomerController::class, 'addNote'])->name('customers.notes.store');
         Route::post('customers/{customer}/block', [AdminCustomerController::class, 'block'])->name('customers.block');
         Route::post('customers/{customer}/unblock', [AdminCustomerController::class, 'unblock'])->name('customers.unblock');

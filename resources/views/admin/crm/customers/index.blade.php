@@ -4,6 +4,9 @@
         <div class="bg-white shadow-sm sm:rounded-lg p-6">
             <x-admin.flash />
             <x-admin.header :title="__('العملاء')">
+                @can('merge', new \App\Modules\Crm\Models\Customer)
+                    <a href="{{ route('admin.crm.customers.duplicates') }}" class="inline-flex px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md hover:bg-gray-200">{{ __('العملاء المكرّرون') }}</a>
+                @endcan
                 @can('create', \App\Modules\Crm\Models\Customer::class)
                     <a href="{{ route('admin.crm.customers.create') }}" class="inline-flex px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">{{ __('عميل جديد') }}</a>
                 @endcan

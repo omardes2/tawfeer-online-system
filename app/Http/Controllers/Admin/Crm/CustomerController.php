@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin\Crm;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\BlockCustomerRequest;
+use App\Http\Requests\Crm\MergeCustomerRequest;
 use App\Http\Requests\Crm\StoreCustomerRequest;
 use App\Http\Requests\Crm\StoreNoteRequest;
 use App\Http\Requests\Crm\UpdateCustomerRequest;
@@ -14,6 +15,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 class CustomerController extends Controller
 {
@@ -50,6 +52,22 @@ class CustomerController extends Controller
         $data = $request->safe()->except(['phones', 'addresses', 'contacts']);
         if ($request->user()->branch_id) {
             $data['branch_id'] = $request->user()->branch_id;
+        }
+
+        /*
+            تحذيرٌ لا منع.
+
+            المكرّر يُنشأ لأن المُدخِل لا يرى أن الاسم موجود، فيتفرّق دَينُ رجلٍ
+            واحد على سجلّين. والمنعُ خطأ مقابل: «زبون» اسمٌ لعشرة مختلفين، ومنعُه
+            يُعطّل الإدخال. فيُعرض المتشابه ويُترك القرار — ومن أصرّ أعاد الإرسال
+            بـ`confirm_duplicate`.
+        */
+        if (! $request->boolean('confirm_duplicate')) {
+            $matches = $this->service->lookAlikes($data['name'] ?? null, $data['primary_phone'] ?? null);
+
+            if ($matches->isNotEmpty()) {
+                return back()->withInput()->with('duplicate_matches', $matches);
+            }
         }
 
         $customer = $this->service->create($data, $request->validated('phones', []), $request->validated('addresses', []), $request->validated('contacts', []));
@@ -122,8 +140,14 @@ class CustomerController extends Controller
         // الرصيد من الحركات كلّها كما هي — آخر رصيد في الكشف يطابق البطاقة.
         $balance = round($statement->sum('debit') - $statement->sum('credit'), 2);
 
+        // مرشَّحو الدمج لمن يملك الصلاحية وحده: الاستعلام لا يُدفع ثمنُه لمن
+        // لا يرى الزرّ أصلًا.
+        $mergeCandidates = auth()->user()?->can('crm.customers.merge')
+            ? $this->service->mergeCandidatesFor($customer)
+            : collect();
+
         return view('admin.crm.customers.show', compact(
-            'customer', 'orders', 'receipts', 'statement', 'sales', 'received', 'balance',
+            'customer', 'orders', 'receipts', 'statement', 'sales', 'received', 'balance', 'mergeCandidates',
         ));
     }
 
@@ -191,5 +215,35 @@ class CustomerController extends Controller
         $this->service->unblock($customer);
 
         return back()->with('success', __('رُفع الحظر.'));
+    }
+
+    /** شاشة المكرّرين: تعرض المجموعات ولا تدمج — القرار للمستخدم (BR-CUST-14). */
+    public function duplicates(): View
+    {
+        $this->authorize('merge', new Customer);
+
+        return view('admin.crm.customers.duplicates', [
+            'groups' => $this->service->duplicateGroups(),
+        ]);
+    }
+
+    public function merge(MergeCustomerRequest $request, Customer $customer): RedirectResponse
+    {
+        $this->authorize('merge', $customer);
+
+        $target = Customer::where('uuid', $request->validated('target'))->firstOrFail();
+        $this->authorize('merge', $target);
+
+        try {
+            $this->service->merge($customer, $target);
+        } catch (ValidationException $e) {
+            return back()->with('error', $e->validator->errors()->first());
+        }
+
+        return redirect()->route('admin.crm.customers.show', $target)
+            ->with('success', __('دُمج «:from» في «:to» — انتقلت طلباته وسنداته ورصيده.', [
+                'from' => $customer->name,
+                'to' => $target->name,
+            ]));
     }
 }

@@ -253,6 +253,39 @@
                     </ul>
                 </div>
 
+                {{--
+                    الدمج: هذا السجلّ يذوب في الآخر لا العكس. والقائمة مقصورة على
+                    المتشابهين اسمًا أو هاتفًا — قائمةٌ بكل العملاء تجعل الخطأ
+                    نقرةً واحدة.
+                --}}
+                @can('merge', $customer)
+                    @if ($mergeCandidates->isNotEmpty())
+                        <div class="border-t border-gray-100 pt-4" x-data="{ merging: false }">
+                            <button type="button" @click="merging = !merging" class="text-sm text-gray-600 hover:text-gray-900">
+                                {{ __('دمج هذا العميل في سجلٍّ آخر (:n مرشَّح)', ['n' => $mergeCandidates->count()]) }}
+                            </button>
+                            <form method="POST" action="{{ route('admin.crm.customers.merge', $customer) }}" x-show="merging" x-cloak class="mt-3 space-y-2"
+                                  onsubmit="return confirm('{{ __('سيذوب «:name» في السجلّ المختار وتنتقل طلباته وسنداته ورصيده. لا يمكن التراجع.', ['name' => $customer->name]) }}')">
+                                @csrf
+                                <p class="text-xs text-gray-500">{{ __('اختر السجلّ الباقي — ينتقل إليه كل شيء ويُحذف هذا السجلّ.') }}</p>
+                                <div class="flex flex-wrap gap-2 items-center">
+                                    <select name="target" required class="rounded-lg border-gray-300 text-sm min-w-64">
+                                        <option value="">{{ __('السجلّ الباقي…') }}</option>
+                                        @foreach ($mergeCandidates as $candidate)
+                                            <option value="{{ $candidate->uuid }}">
+                                                {{ $candidate->name }}
+                                                @if ($candidate->primary_phone) — {{ $candidate->primary_phone }} @endif
+                                                ({{ number_format($candidate->outstandingBalance(), 2) }})
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <button class="px-3 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700">{{ __('تأكيد الدمج') }}</button>
+                                </div>
+                            </form>
+                        </div>
+                    @endif
+                @endcan
+
                 {{-- إجراءات الحظر --}}
                 <div class="flex flex-wrap gap-2 border-t border-gray-100 pt-4" x-data="{ blocking: false }">
                     @can('block', $customer)

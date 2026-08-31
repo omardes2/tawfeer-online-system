@@ -12,6 +12,30 @@
                 @csrf
                 @if ($customer->exists) @method('PUT') @endif
 
+                {{--
+                    تحذير التكرار: يُعرض بعد محاولة حفظٍ وجدت متشابهًا. والزرّ
+                    الثاني وحده يحمل `confirm_duplicate`، فلا يمرّ الإنشاء إلّا
+                    باختيارٍ واعٍ بعد رؤية القائمة.
+                --}}
+                @if (session('duplicate_matches'))
+                    <div class="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-900 space-y-2">
+                        <p class="font-semibold">{{ __('يوجد عميل بهذا الاسم أو الرقم — تأكّد قبل الإنشاء') }}</p>
+                        <ul class="space-y-1">
+                            @foreach (session('duplicate_matches') as $match)
+                                <li>
+                                    <a href="{{ route('admin.crm.customers.show', $match) }}" target="_blank" class="text-emerald-700 underline">{{ $match->name }}</a>
+                                    @if ($match->primary_phone)<span class="text-amber-700">— {{ $match->primary_phone }}</span>@endif
+                                    <span class="text-amber-700 tabular-nums">({{ number_format($match->outstandingBalance(), 2) }})</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                        <p class="text-xs">{{ __('إن كان أحدهم هو نفسه، افتحه وأضف طلبه إليه بدل إنشاء سجلٍّ ثانٍ يتفرّق عليه رصيده.') }}</p>
+                        <button type="submit" name="confirm_duplicate" value="1" class="px-3 py-2 bg-amber-600 text-white text-sm rounded-lg hover:bg-amber-700">
+                            {{ __('هذا عميلٌ مختلف — أنشئه') }}
+                        </button>
+                    </div>
+                @endif
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <x-admin.field :label="__('الاسم')" name="name">
                         <input type="text" name="name" value="{{ old('name', $customer->name) }}" required class="w-full rounded-md border-gray-300 text-sm" />

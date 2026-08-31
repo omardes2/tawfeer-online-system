@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — merging duplicate customers left the merged record's balance behind
+
+`CustomerService::merge()` moved phones, addresses, contacts, notes and orders,
+then soft-deleted the merged record. Everything else stayed pointing at a
+customer that no longer appeared anywhere — receipt vouchers, carts, wishlists,
+reviews, marketing and channel contacts, campaign messages, suppressions.
+
+Worst of it was the ledger. Every customer owns a sub-account under
+**1100 ذمم العملاء**, and the merged record kept its balance there. So the debt
+vanished from the customers list and stayed in the control account: the sum of
+customer balances no longer equalled 1100, and a real receivable sat on the books
+with nobody left to bill for it.
+
+The balance now moves as a **reclassification entry** — debit the survivor's
+sub-account, credit the merged one, reversed for a credit balance (an advance is
+owed *to* the customer, not *by* them). The merged sub-account goes to zero, the
+survivor carries the full debt, and 1100 does not move. Posted entries are never
+re-pointed, so a statement printed yesterday still prints the same today
+(BR-ACC-09).
+
+Merging also fills gaps in the surviving record (phone, email, category, birth
+date) without overwriting anything already set, shortens merge chains so an
+earlier merge points straight at the survivor, and deactivates the merged
+sub-account rather than deleting it.
+
+### Added — a screen that finds duplicate customers
+
+**العملاء المكرّرون** groups candidates by normalised phone and by normalised
+Arabic name — unifying hamza forms, ta marbuta, alif maqsura, and stripping
+diacritics, tatweel and punctuation, so «عمر قفيشه/جمله» and «عمر قفيشة - جملة»
+land in one group.
+
+It lists and never merges on its own: a matching phone is near-certain, a
+matching name is a guess, and a placeholder like «زبون» repeats across genuinely
+different people. Each group shows orders and balance per record; the user picks
+the survivor and confirms. Merging is also available from the customer's own page,
+limited to look-alike candidates. Both are gated on `crm.customers.merge`.
+
 ### Fixed — a variant with no wholesale price of its own was read as "no price at all"
 
 The product form carries a single wholesale field at the **product** level, and
