@@ -1,11 +1,11 @@
 <x-app-layout :title="__('صرف نهاية الخدمة')">
     <x-admin.header
         :title="__('صرف مكافأة نهاية الخدمة')"
-        :description="__('التراكم شهريّ مع المسيّر، والصرف مرّةً في نهاية السنة.')"
+        :description="__('التراكم شهريّ مع الكشف، والصرف مرّةً في نهاية السنة.')"
         :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('الرواتب والموظفون') => route('admin.hr.employees.index'), __('صرف نهاية الخدمة') => null]">
         <a href="{{ route('admin.hr.employees.index') }}" class="btn-secondary btn-sm">{{ __('الموظفون') }}</a>
         @can('hr.payroll.view')
-            <a href="{{ route('admin.hr.payroll.index') }}" class="btn-secondary btn-sm">{{ __('مسيّرات الرواتب') }}</a>
+            <a href="{{ route('admin.hr.payroll.index') }}" class="btn-secondary btn-sm">{{ __('كشوفات الرواتب') }}</a>
         @endcan
     </x-admin.header>
 
@@ -18,7 +18,7 @@
     <div class="admin-card admin-card-pad mb-5 border-s-4 border-sky-400 bg-sky-50 text-sm text-sky-900 leading-7">
         <h3 class="font-semibold mb-1">{{ __('كيف يعمل') }}</h3>
         <ul class="list-disc ps-5 space-y-1">
-            <li>{{ __('المخصّص يتراكم شهريًّا مع كل مسيّر (الراتب الأساسيّ ÷ ١٢) — وهو التزامٌ على الشركة لا مبلغٌ يُصرف مع الراتب.') }}</li>
+            <li>{{ __('المخصّص يتراكم شهريًّا مع كل كشف (الراتب الأساسيّ ÷ ١٢) — وهو التزامٌ على الشركة لا مبلغٌ يُصرف مع الراتب.') }}</li>
             <li>{{ __('الصرف يدويّ لا آليّ: النظام لا يُحوّل مالًا ولا يصرف في موعدٍ مُبرمَج. يُسلَّم المبلغ باليد، ثم يُسجَّل هنا.') }}</li>
             <li>{{ __('التسجيل يُنشئ سند صرفٍ لكل موظف: مدين «مخصّص مكافأة نهاية الخدمة ٢٢١٠» / دائن الخزينة — ولا يمرّ بالمصروف ثانيةً لأنه حُمّل شهرًا بشهر.') }}</li>
             <li>{{ __('الرصيد يشمل ما لم يُصرف من سنواتٍ سابقة، وهو وحده ما يجوز صرفه.') }}</li>
@@ -29,7 +29,7 @@
         <x-admin.stat-card :label="__('المخصّص المستحقّ')" :value="$totals['balance']" money tone="amber"
                            :hint="__('الرصيد القابل للصرف الآن')" />
         <x-admin.stat-card :label="__('متراكم :y', ['y' => $year])" :value="$totals['accrued']" money tone="blue"
-                           :hint="__('من مسيّرات السنة المُرحَّلة')" />
+                           :hint="__('من كشوفات السنة المُرحَّلة')" />
         <x-admin.stat-card :label="__('مصروف :y', ['y' => $year])" :value="$totals['settled']" money tone="green"
                            :hint="__('ما سُلّم فعلًا وسُجّل')" />
         <x-admin.stat-card :label="__('موظفون لهم رصيد')" :value="$totals['due']"

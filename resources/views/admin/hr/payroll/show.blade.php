@@ -1,8 +1,8 @@
-<x-app-layout :title="__('مسيّر :p', ['p' => $run->periodLabel()])">
+<x-app-layout :title="__('كشف :p', ['p' => $run->periodLabel()])">
     <x-admin.header
-        :title="__('مسيّر رواتب :p', ['p' => $run->periodLabel()])"
+        :title="__('كشف رواتب :p', ['p' => $run->periodLabel()])"
         :description="$run->number.' · '.$run->statusLabel()"
-        :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('مسيّرات الرواتب') => route('admin.hr.payroll.index'), $run->periodLabel() => null]">
+        :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('كشوفات الرواتب') => route('admin.hr.payroll.index'), $run->periodLabel() => null]">
         @can('hr.payroll.manage')
             @if ($run->isDraft())
                 <form method="POST" action="{{ route('admin.hr.payroll.generate') }}" class="inline">
@@ -12,7 +12,7 @@
                     <button class="btn-secondary btn-sm">{{ __('إعادة التوليد') }}</button>
                 </form>
                 <form method="POST" action="{{ route('admin.hr.payroll.post', $run) }}" class="inline"
-                      onsubmit="return confirm('{{ __('ترحيل المسيّر؟ سيُنشأ قيدٌ محاسبيّ لا يُحذف.') }}')">
+                      onsubmit="return confirm('{{ __('ترحيل الكشف؟ سيُنشأ قيدٌ محاسبيّ لا يُحذف.') }}')">
                     @csrf
                     <button class="btn-primary btn-sm">{{ __('ترحيل') }}</button>
                 </form>
@@ -23,9 +23,9 @@
                 </form>
             @elseif ($run->status !== 'reversed')
                 <form method="POST" action="{{ route('admin.hr.payroll.reverse', $run) }}" class="inline"
-                      onsubmit="return confirm('{{ __('عكس المسيّر بقيدٍ عاكس؟') }}')">
+                      onsubmit="return confirm('{{ __('عكس الكشف بقيدٍ عاكس؟') }}')">
                     @csrf
-                    <button class="btn-danger btn-sm">{{ __('عكس المسيّر') }}</button>
+                    <button class="btn-danger btn-sm">{{ __('عكس الكشف') }}</button>
                 </form>
             @endif
         @endcan
@@ -37,10 +37,10 @@
         <x-admin.stat-card :label="__('إجمالي الاستحقاق')" :value="$run->total_earnings" money tone="blue" />
         <x-admin.stat-card :label="__('إجمالي الخصم')" :value="$run->total_deductions" money tone="red"
                            :hint="__('إجازات بلا راتب وخصومات')" />
-        <x-admin.stat-card :label="__('صافي المسيّر')" :value="$run->total_net" money tone="green"
+        <x-admin.stat-card :label="__('صافي الكشف')" :value="$run->total_net" money tone="green"
                            :hint="__('هو المصروف المُرحَّل')" />
         {{--
-            المخصّص لا يُصرف مع الراتب. يُكتب صراحةً هنا لأن ظهورَه في المسيّر
+            المخصّص لا يُصرف مع الراتب. يُكتب صراحةً هنا لأن ظهورَه في الكشف
             يوهم أنه جزءٌ ممّا يُدفع هذا الشهر — وهو التزامٌ يُقيَّد الآن ويُصرف
             نهاية السنة.
         --}}
@@ -52,7 +52,7 @@
     <div class="admin-card admin-card-pad mb-5 text-sm text-gray-600 leading-7">
         <h3 class="font-semibold text-gray-800 mb-2">{{ __('القيود') }}</h3>
         <ul class="list-disc ps-5 space-y-1">
-            <li>{{ __('الرواتب: مدين «مصروف الرواتب والأجور ٥٢٠٠» / دائن «رواتب مستحقة ٢٢٠٠» بصافي المسيّر.') }}</li>
+            <li>{{ __('الرواتب: مدين «مصروف الرواتب والأجور ٥٢٠٠» / دائن «رواتب مستحقة ٢٢٠٠» بصافي الكشف.') }}</li>
             <li>{{ __('نهاية الخدمة: مدين «مصروف مكافأة نهاية الخدمة ٥٢١٠» / دائن «مخصّص مكافأة نهاية الخدمة ٢٢١٠» — تراكمٌ لا صرف.') }}</li>
             <li>
                 {{ __('وصرفُ المكافأة يدويّ مرّةً في نهاية السنة من') }}

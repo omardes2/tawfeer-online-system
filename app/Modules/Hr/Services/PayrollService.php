@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * مسيّر الرواتب — من العقد إلى القيد إلى الصرف.
+ * كشف الرواتب — من العقد إلى القيد إلى الصرف.
  *
  * ## ثلاث خطوات لا خطوة
  *
@@ -28,8 +28,8 @@ use Illuminate\Validation\ValidationException;
  * ## القيدان
  *
  * ```
- * الترحيل:   مدين  ٥٢٠٠ مصروف الرواتب والأجور   = صافي المسيّر
- *            دائن  ٢٢٠٠ رواتب مستحقة            = صافي المسيّر
+ * الترحيل:   مدين  ٥٢٠٠ مصروف الرواتب والأجور   = صافي الكشف
+ *            دائن  ٢٢٠٠ رواتب مستحقة            = صافي الكشف
  *
  * ونهاية الخدمة قيدٌ ثانٍ مستقلّ:
  *            مدين  ٥٢١٠ مصروف مكافأة نهاية الخدمة
@@ -43,14 +43,14 @@ use Illuminate\Validation\ValidationException;
  * جزاء — ليس التزامًا على الشركة لأحد: هو مبلغٌ لم تستحقّه الذمّة أصلًا.
  * فتحميلُه مصروفًا ثم تقييدُه دائنًا لجهةٍ ما يخترع دَينًا لا وجود له.
  *
- * **وسندٌ لكل موظف لا سندٌ للمسيّر.** الرواتب تُصرف متفرّقة — واحدٌ نقدًا
+ * **وسندٌ لكل موظف لا سندٌ للكشف.** الرواتب تُصرف متفرّقة — واحدٌ نقدًا
  * واليوم، وآخر بنكًا الأسبوع القادم. وسندٌ جامع يمنع ذلك ويُخفي مَن قبض
  * ومَن لم يقبض.
  *
  * ## ولماذا لا تُدمج العمولات هنا
  *
  * للعمولات دفترُها الخاصّ بحالاتٍ ومسارِ اعتمادٍ وسنداتِ صرفٍ من نوع
- * `payment`. وسحبُها إلى المسيّر يجعل خللًا في الرواتب يمسّ دفترَ العمولات،
+ * `payment`. وسحبُها إلى الكشف يجعل خللًا في الرواتب يمسّ دفترَ العمولات،
  * ويفتح باب دفعِها مرّتين. فهي تُعرَض في ملفّ الموظف للاطّلاع، وتُدفع من
  * شاشتها.
  */
@@ -76,10 +76,10 @@ class PayrollService
     // ————————————————————————— التوليد —————————————————————————
 
     /**
-     * توليد مسيّر الشهر مسودّةً من العقود السارية.
+     * توليد كشف الشهر مسودّةً من العقود السارية.
      *
      * يُعاد توليدُه ما دام مسودّة: البنود تُمحى وتُبنى من جديد، فتصحيحُ راتبٍ
-     * أو إضافةُ موظفٍ لا يحتاج حذف المسيّر.
+     * أو إضافةُ موظفٍ لا يحتاج حذف الكشف.
      */
     public function generate(int $year, int $month, User $actor): PayrollRun
     {
@@ -90,13 +90,13 @@ class PayrollService
             | **البحث يشمل المحذوف ناعمًا.**
             |
             | الفهرس `payroll_runs_period_unique` على (السنة، الشهر) لا يعرف الحذف
-            | الناعم: مسيّرٌ حُذف يبقى محتلًّا شهره في قاعدة البيانات. وكان البحث
+            | الناعم: كشفٌ حُذف يبقى محتلًّا شهره في قاعدة البيانات. وكان البحث
             | يُخفي المحذوف فلا يجده، فيمضي إلى الإدراج ويصطدم بالفهرس —
             | UniqueConstraintViolation، أي خطأ ٥٠٠ في الشاشة بلا رسالة تدلّ عليه.
             |
             | والمحذوف يُستعاد لا يُتجاوز: الحذف لا يُسمح به إلّا للمسودّة
             | (`PayrollController::destroy`)، فاستعادتُها لإعادة التوليد آمنة —
-            | وبنودُها تُمحى وتُبنى من جديد أدناه. ويعود المسيّر برقمه الأول فلا
+            | وبنودُها تُمحى وتُبنى من جديد أدناه. ويعود الكشف برقمه الأول فلا
             | تُحرق أرقامٌ بلا مستند.
             */
             $run = PayrollRun::withTrashed()
@@ -104,7 +104,7 @@ class PayrollService
 
             if ($run && ! $run->isDraft()) {
                 throw ValidationException::withMessages([
-                    'period' => __('مسيّر :p مُرحَّل — يُصحَّح بالعكس لا بإعادة التوليد.', ['p' => $run->periodLabel()]),
+                    'period' => __('كشف :p مُرحَّل — يُصحَّح بالعكس لا بإعادة التوليد.', ['p' => $run->periodLabel()]),
                 ]);
             }
 
@@ -209,7 +209,7 @@ class PayrollService
     // ————————————————————————— الترحيل —————————————————————————
 
     /**
-     * ترحيل المسيّر: قيد الرواتب وقيد مخصّص نهاية الخدمة.
+     * ترحيل الكشف: قيد الرواتب وقيد مخصّص نهاية الخدمة.
      *
      * idempotent: المُرحَّل يعود كما هو بلا قيدٍ ثانٍ.
      */
@@ -220,17 +220,17 @@ class PayrollService
         }
 
         if ($run->status === 'reversed') {
-            throw ValidationException::withMessages(['status' => __('المسيّر المعكوس لا يُرحَّل ثانيةً.')]);
+            throw ValidationException::withMessages(['status' => __('الكشف المعكوس لا يُرحَّل ثانيةً.')]);
         }
 
         $run = $this->refreshTotals($run);
 
         if ($run->lines()->count() === 0) {
-            throw ValidationException::withMessages(['lines' => __('لا بنود في المسيّر.')]);
+            throw ValidationException::withMessages(['lines' => __('لا بنود في الكشف.')]);
         }
 
         if ((float) $run->total_net <= 0) {
-            throw ValidationException::withMessages(['total' => __('صافي المسيّر صفر — لا شيء يُرحَّل.')]);
+            throw ValidationException::withMessages(['total' => __('صافي الكشف صفر — لا شيء يُرحَّل.')]);
         }
 
         $date = $run->periodEnd()->toDateString();
@@ -298,7 +298,7 @@ class PayrollService
     public function pay(PayrollRun $run, array $lineIds, int $treasuryId, User $actor): int
     {
         if (! $run->isPosted()) {
-            throw ValidationException::withMessages(['status' => __('يُصرف المسيّر المُرحَّل وحده.')]);
+            throw ValidationException::withMessages(['status' => __('يُصرف الكشف المُرحَّل وحده.')]);
         }
 
         $payable = Account::where('code', self::SALARY_PAYABLE_ACCOUNT)->firstOrFail();
@@ -351,7 +351,7 @@ class PayrollService
     // ————————————————————————— العكس —————————————————————————
 
     /**
-     * عكس مسيّر مُرحَّل — قيدٌ عاكس لا حذف.
+     * عكس كشف مُرحَّل — قيدٌ عاكس لا حذف.
      *
      * ويُمنع بعد صرف أيّ بند: النقدية خرجت فعلًا، وعكسُ الالتزام وحده يترك
      * سندَ صرفٍ يُطفئ دَينًا لم يعد قائمًا. تُعكس السنداتُ أوّلًا من شاشتها.
@@ -359,12 +359,12 @@ class PayrollService
     public function reverse(PayrollRun $run, User $actor, ?string $reason = null): PayrollRun
     {
         if (! $run->isPosted()) {
-            throw ValidationException::withMessages(['status' => __('يُعكس المسيّر المُرحَّل وحده.')]);
+            throw ValidationException::withMessages(['status' => __('يُعكس الكشف المُرحَّل وحده.')]);
         }
 
         if ($run->lines()->whereNotNull('financial_voucher_id')->exists()) {
             throw ValidationException::withMessages([
-                'status' => __('صُرفت بنودٌ من هذا المسيّر — اعكس سنداتها أوّلًا.'),
+                'status' => __('صُرفت بنودٌ من هذا الكشف — اعكس سنداتها أوّلًا.'),
             ]);
         }
 
@@ -372,7 +372,7 @@ class PayrollService
             foreach ([$run->journalEntry, $run->eosJournalEntry] as $entry) {
                 if ($entry && ! $entry->isReversed()) {
                     $this->accounting->reverse($entry, [
-                        'description' => $reason ?: __('عكس مسيّر :p', ['p' => $run->periodLabel()]),
+                        'description' => $reason ?: __('عكس كشف :p', ['p' => $run->periodLabel()]),
                     ]);
                 }
             }
@@ -415,7 +415,7 @@ class PayrollService
 
         // شهرٌ لم يبدأ بعدُ لا رواتب فيه.
         if (Carbon::create($year, $month, 1)->startOfMonth()->isFuture()) {
-            throw ValidationException::withMessages(['period' => __('لا يُولَّد مسيّر لشهرٍ لم يبدأ.')]);
+            throw ValidationException::withMessages(['period' => __('لا يُولَّد كشف لشهرٍ لم يبدأ.')]);
         }
     }
 }

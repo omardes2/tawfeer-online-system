@@ -15,14 +15,14 @@ use Illuminate\Support\Facades\Schema;
  *
  * ## ولماذا الراتب صفوفٌ لا عمود
  *
- * الراتب يتغيّر، والمسيّر القديم يجب أن يبقى صحيحًا. فلو كان عمودًا واحدًا
+ * الراتب يتغيّر، والكشف القديم يجب أن يبقى صحيحًا. فلو كان عمودًا واحدًا
  * لأعادت الزيادةُ كتابةَ رواتب السنة الماضية. والساري لشهرٍ ما هو **أحدثُ
  * صفٍّ تاريخُ سريانه ≤ نهاية ذلك الشهر** — وهو نفس نمط `operating_daily_costs`.
  *
  * ## والبنود لقطةٌ لا حساب
  *
- * بند المسيّر يحمل الراتب والبدل والخصم أرقامًا مُجمَّدة لحظةَ التوليد، لا
- * مراجعَ تُقرأ عند العرض. المسيّر المُرحَّل مستندٌ محاسبيّ: قيمتُه يجب ألّا
+ * بند الكشف يحمل الراتب والبدل والخصم أرقامًا مُجمَّدة لحظةَ التوليد، لا
+ * مراجعَ تُقرأ عند العرض. الكشف المُرحَّل مستندٌ محاسبيّ: قيمتُه يجب ألّا
  * تتحرّك بعد ترحيله مهما تغيّر العقد.
  */
 return new class extends Migration
@@ -86,7 +86,7 @@ return new class extends Migration
             $table->index('from_date');
         });
 
-        // ————— مسيّر الرواتب —————
+        // ————— كشف الرواتب —————
         Schema::create('payroll_runs', function (Blueprint $table) {
             $table->id();
             $table->uuid('uuid')->unique();
@@ -110,7 +110,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            // مسيّرٌ واحد للشهر: الثاني يعني ترحيل الرواتب مرّتين.
+            // كشفٌ واحد للشهر: الثاني يعني ترحيل الرواتب مرّتين.
             $table->unique(['period_year', 'period_month'], 'payroll_runs_period_unique');
         });
 
@@ -118,7 +118,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('payroll_run_id')->constrained()->cascadeOnDelete();
             $table->foreignId('employee_profile_id')->constrained()->restrictOnDelete();
-            // لقطاتٌ مُجمَّدة: المسيّر المُرحَّل مستندٌ لا يتحرّك بتغيّر العقد.
+            // لقطاتٌ مُجمَّدة: الكشف المُرحَّل مستندٌ لا يتحرّك بتغيّر العقد.
             $table->decimal('basic_salary', 15, 2)->default(0);
             $table->decimal('allowances', 15, 2)->default(0);
             $table->decimal('other_additions', 15, 2)->default(0);
@@ -132,7 +132,7 @@ return new class extends Migration
             $table->string('note', 255)->nullable();
             $table->timestamps();
 
-            // بندٌ واحد للموظف في المسيّر: الثاني يُضاعف راتبه.
+            // بندٌ واحد للموظف في الكشف: الثاني يُضاعف راتبه.
             $table->unique(['payroll_run_id', 'employee_profile_id'], 'payroll_lines_unique');
         });
 

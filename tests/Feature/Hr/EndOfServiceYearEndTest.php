@@ -25,7 +25,7 @@ use Tests\TestCase;
  * ## الفرق الذي تحرسه هذه الاختبارات
  *
  * المخصّص يُقيَّد كل شهر لأن الالتزام ينشأ بالعمل، لكنّ **النقدية لا تخرج**.
- * فمن يقرأ «مخصّص نهاية الخدمة ٣٧٥» في المسيّر يظنّها مبلغًا يُدفع مع الراتب،
+ * فمن يقرأ «مخصّص نهاية الخدمة ٣٧٥» في الكشف يظنّها مبلغًا يُدفع مع الراتب،
  * وهي دَينٌ يُثبَت في الدفتر ويُسلَّم مرّةً في نهاية السنة.
  *
  * ## والصرف يدويّ
@@ -78,7 +78,7 @@ class EndOfServiceYearEndTest extends TestCase
         return $profile;
     }
 
-    /** ترحيل مسيّر شهرٍ — يُنشئ التراكم. */
+    /** ترحيل كشف شهرٍ — يُنشئ التراكم. */
     private function postPayroll(int $month = 8): void
     {
         $payroll = app(PayrollService::class);
@@ -105,9 +105,9 @@ class EndOfServiceYearEndTest extends TestCase
     // ────────── التراكم لا يُصرف مع الراتب ──────────
 
     /**
-     * **المسيّر يُقيّد المخصّص ولا يُخرج نقدًا.**
+     * **الكشف يُقيّد المخصّص ولا يُخرج نقدًا.**
      *
-     * هذا هو سوء الفهم الذي أثار الطلب: الرقم يظهر في المسيّر فيُظنّ مصروفًا.
+     * هذا هو سوء الفهم الذي أثار الطلب: الرقم يظهر في الكشف فيُظنّ مصروفًا.
      */
     public function test_posting_a_payroll_provisions_without_paying(): void
     {
@@ -259,7 +259,7 @@ class EndOfServiceYearEndTest extends TestCase
     public function test_employees_without_a_provision_are_not_listed(): void
     {
         $this->postPayroll();
-        $idle = $this->employee('لم يدخل مسيّرًا', 1200); // بعد الترحيل: بلا حركة.
+        $idle = $this->employee('لم يدخل كشفًا', 1200); // بعد الترحيل: بلا حركة.
 
         $rows = $this->service()->yearEndRows(2026);
 

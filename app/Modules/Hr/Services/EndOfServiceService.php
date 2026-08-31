@@ -26,7 +26,7 @@ use Illuminate\Validation\ValidationException;
  * تدين لهم بثلاثين شهرَ راتب **الآن**، ولا يظهر ذلك في ميزانيّتها إن أُجّل
  * الحساب إلى يوم الاستقالة — فتُقرأ الشركة أغنى ممّا هي، وتفاجئها التصفية.
  *
- * والتراكم يُقيَّد مع كل مسيّر: مدين «مصروف مكافأة نهاية الخدمة» / دائن
+ * والتراكم يُقيَّد مع كل كشف: مدين «مصروف مكافأة نهاية الخدمة» / دائن
  * «مخصّص مكافأة نهاية الخدمة». والتصفية تُطفئ المخصّص من الخزينة ولا تمرّ
  * بالمصروف ثانيةً — وإلّا حُمّلت السنةُ الأخيرة كلفةَ كل السنوات.
  *
@@ -217,7 +217,7 @@ class EndOfServiceService
         });
     }
 
-    /** تسجيل تراكم المسيّر لموظف — يُستدعى من `PayrollService` بعد الترحيل. */
+    /** تسجيل تراكم الكشف لموظف — يُستدعى من `PayrollService` بعد الترحيل. */
     public function recordAccrual(EmployeeProfile $profile, PayrollRun $run, float $amount, ?User $actor = null): ?EndOfServiceEntry
     {
         if ($amount <= 0) {
@@ -230,7 +230,7 @@ class EndOfServiceService
             'entry_date' => $run->periodEnd()->toDateString(),
             'amount' => round($amount, 2),
             'payroll_run_id' => $run->id,
-            'note' => __('تراكم مسيّر :p', ['p' => $run->periodLabel()]),
+            'note' => __('تراكم كشف :p', ['p' => $run->periodLabel()]),
             'created_by' => $actor?->id,
         ]);
     }

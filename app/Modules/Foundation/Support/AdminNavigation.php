@@ -91,7 +91,7 @@ final class AdminNavigation
             ]],
             ['الموظفون والعمولات', 'badge', [
                 ['admin.hr.employees.index', 'الرواتب والموظفون', 'hr.employees.view', 'admin.hr.employees.*'],
-                ['admin.hr.payroll.index', 'مسيّرات الرواتب', 'hr.payroll.view', 'admin.hr.payroll.*'],
+                ['admin.hr.payroll.index', 'كشوفات الرواتب', 'hr.payroll.view', 'admin.hr.payroll.*'],
                 ['admin.commissions.index', 'العمولات والأرباح', 'commissions.view_team', 'admin.commissions.*'],
                 ['admin.users.index', 'المستخدمون', 'settings.users.view', 'admin.users.*'],
                 ['admin.roles.index', 'الأدوار والصلاحيات', 'settings.roles.view', 'admin.roles.*'],

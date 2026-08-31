@@ -67,6 +67,12 @@ class EmployeeProfile extends Model
         return $this->hasMany(EndOfServiceEntry::class);
     }
 
+    /** المكافآت والسلف — خارج العقد، فلا تدخل كشف الرواتب. */
+    public function financeEntries(): HasMany
+    {
+        return $this->hasMany(EmployeeFinanceEntry::class);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', 'active');
@@ -75,7 +81,7 @@ class EmployeeProfile extends Model
     /**
      * الراتب الساري في تاريخٍ ما — أحدثُ صفٍّ تاريخُ سريانه ≤ ذلك التاريخ.
      *
-     * فزيادةُ اليوم لا تُعيد كتابة مسيّر الشهر الماضي.
+     * فزيادةُ اليوم لا تُعيد كتابة كشف الشهر الماضي.
      */
     public function salaryOn(string $date): ?EmployeeSalary
     {

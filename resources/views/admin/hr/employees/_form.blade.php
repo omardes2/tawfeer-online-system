@@ -6,7 +6,7 @@
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('المستخدم') }} <span class="text-rose-500">*</span></label>
             @if ($e)
-                {{-- المستخدم لا يُغيَّر بعد الإنشاء: الملفّ يحمل مسيّرات وقيودًا
+                {{-- المستخدم لا يُغيَّر بعد الإنشاء: الملفّ يحمل كشوفات وقيودًا
                      باسمه، ونقلُه إلى شخصٍ آخر ينقل تاريخه المالي معه. --}}
                 <input type="hidden" name="user_id" value="{{ $e->user_id }}">
                 <p class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
@@ -52,7 +52,7 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">{{ __('تاريخ انتهاء الخدمة') }}</label>
             <input type="date" name="end_date" value="{{ old('end_date', $e?->end_date?->toDateString()) }}"
                    class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
-            <p class="mt-1 text-xs text-gray-400">{{ __('بتعبئته يُغلق الملفّ ويخرج من المسيّرات القادمة.') }}</p>
+            <p class="mt-1 text-xs text-gray-400">{{ __('بتعبئته يُغلق الملفّ ويخرج من الكشوفات القادمة.') }}</p>
             <x-input-error :messages="$errors->get('end_date')" class="mt-1" />
         </div>
 

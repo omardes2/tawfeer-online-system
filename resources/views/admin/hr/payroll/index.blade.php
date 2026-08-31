@@ -1,8 +1,8 @@
-<x-app-layout :title="__('مسيّرات الرواتب')">
+<x-app-layout :title="__('كشوفات الرواتب')">
     <x-admin.header
-        :title="__('مسيّرات الرواتب')"
+        :title="__('كشوفات الرواتب')"
         :description="__('توليد شهريّ ثم ترحيلٌ محاسبيّ ثم صرف.')"
-        :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('الرواتب والموظفون') => route('admin.hr.employees.index'), __('مسيّرات الرواتب') => null]">
+        :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('الرواتب والموظفون') => route('admin.hr.employees.index'), __('كشوفات الرواتب') => null]">
         <a href="{{ route('admin.hr.employees.index') }}" class="btn-secondary btn-sm">{{ __('الموظفون') }}</a>
         <a href="{{ route('admin.hr.eos.index') }}" class="btn-secondary btn-sm">{{ __('صرف نهاية الخدمة') }}</a>
     </x-admin.header>
@@ -11,7 +11,7 @@
 
     @if ($withoutSalary > 0)
         <div class="admin-card admin-card-pad mb-5 border-s-4 border-amber-400 bg-amber-50 text-sm text-amber-800">
-            {{ __(':c موظفًا بلا راتب مسجَّل — لن يدخلوا المسيّر.', ['c' => $withoutSalary]) }}
+            {{ __(':c موظفًا بلا راتب مسجَّل — لن يدخلوا الكشف.', ['c' => $withoutSalary]) }}
             <a href="{{ route('admin.hr.employees.index') }}" class="underline">{{ __('راجع القائمة') }}</a>
         </div>
     @endif
@@ -36,7 +36,7 @@
                     @endfor
                 </select>
             </div>
-            <button type="submit" class="btn-primary btn-sm">{{ __('توليد المسيّر') }}</button>
+            <button type="submit" class="btn-primary btn-sm">{{ __('توليد الكشف') }}</button>
             <p class="text-[11px] text-gray-400 basis-full">
                 {{ __('التوليد يُنشئ مسودّةً تُراجَع وتُصحَّح — لا قيد حتى الترحيل. وإعادة التوليد تُعيد بناء بنود المسودّة.') }}
             </p>
@@ -83,7 +83,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="9" class="py-10 text-center text-gray-400">{{ __('لا مسيّرات بعد.') }}</td></tr>
+                        <tr><td colspan="9" class="py-10 text-center text-gray-400">{{ __('لا كشوفات بعد.') }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

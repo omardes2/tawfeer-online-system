@@ -29,7 +29,7 @@ class ExpenseCategory extends Model
     public const AUTO_SOURCES = [
         'ads' => 'جدول الصرف الإعلاني',
         'commissions' => 'دفتر العمولات (استحقاق الفترة)',
-        'payroll' => 'مسيّرات الرواتب المُرحّلة',
+        'payroll' => 'كشوفات الرواتب المُرحّلة',
     ];
 
     protected $fillable = [

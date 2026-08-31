@@ -4,7 +4,7 @@
         :description="__('ملفّات الموظفين ورواتبهم وإجازاتهم ومستحقّاتهم.')"
         :breadcrumbs="[__('الرئيسية') => route('admin.dashboard'), __('الموظفون والعمولات') => null, __('الرواتب والموظفون') => null]">
         @can('hr.payroll.view')
-            <a href="{{ route('admin.hr.payroll.index') }}" class="btn-secondary btn-sm">{{ __('مسيّرات الرواتب') }}</a>
+            <a href="{{ route('admin.hr.payroll.index') }}" class="btn-secondary btn-sm">{{ __('كشوفات الرواتب') }}</a>
             <a href="{{ route('admin.hr.eos.index') }}" class="btn-secondary btn-sm">{{ __('صرف نهاية الخدمة') }}</a>
         @endcan
         @can('hr.employees.manage')
@@ -20,10 +20,14 @@
                            :hint="__('الأساسيّ والبدلات بالعقود السارية')" />
         <x-admin.stat-card :label="__('مخصّص نهاية الخدمة')" :value="$totals['eos']" money tone="amber"
                            :hint="__('التزامٌ متراكم — يُصرف نهاية السنة')" />
-        {{-- من بلا عقدٍ لا يدخل المسيّر. يُعدّ هنا كي يُرى قبل الترحيل لا بعده. --}}
+        {{-- السلف أصلٌ للشركة لا مصروف: مالٌ عند الموظفين يعود. --}}
+        <x-admin.stat-card :label="__('السلف القائمة')" :value="$totals['advances']" money
+                           :tone="$totals['advances'] > 0 ? 'red' : 'green'"
+                           :hint="__('دَينٌ على الموظفين — أصلٌ لا مصروف')" />
+        {{-- من بلا عقدٍ لا يدخل الكشف. يُعدّ هنا كي يُرى قبل الترحيل لا بعده. --}}
         <x-admin.stat-card :label="__('بلا راتب مسجَّل')" :value="$totals['without_salary']"
                            :tone="$totals['without_salary'] > 0 ? 'red' : 'green'"
-                           :hint="__('لا يدخلون مسيّر الرواتب')" />
+                           :hint="__('لا يدخلون كشف الرواتب')" />
     </div>
 
     <form method="GET" class="admin-card admin-card-pad mb-5 flex flex-wrap items-end gap-3">
@@ -65,6 +69,7 @@
                         <th class="text-start">{{ __('الإجماليّ') }}</th>
                         <th class="text-start">{{ __('رصيد الإجازة') }}</th>
                         <th class="text-start">{{ __('نهاية الخدمة') }}</th>
+                        <th class="text-start">{{ __('السلفة') }}</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -92,7 +97,7 @@
 
                             @if ($r['basic'] === null)
                                 {{-- بلا عقدٍ ساري: يُقال صراحةً لا يُعرض صفرٌ يُقرأ راتبًا. --}}
-                                <td colspan="3" class="text-rose-600 text-sm">{{ __('لا راتب مسجَّل — لن يدخل المسيّر') }}</td>
+                                <td colspan="3" class="text-rose-600 text-sm">{{ __('لا راتب مسجَّل — لن يدخل الكشف') }}</td>
                             @else
                                 <td class="text-start tabular-nums">{{ number_format($r['basic'], 2) }}</td>
                                 <td class="text-start tabular-nums text-gray-500">{{ number_format($r['allowances'], 2) }}</td>
@@ -110,13 +115,17 @@
                                 </td>
                                 <td class="text-start tabular-nums text-amber-700">{{ number_format($r['eos'], 2) }}</td>
                             @endif
+                            {{-- شرطةٌ لا صفر: الصفر يُقرأ «سُدّدت»، والشرطة «لا سلفة أصلًا». --}}
+                            <td class="text-start tabular-nums {{ $r['advance'] > 0 ? 'text-rose-600 font-semibold' : 'text-gray-400' }}">
+                                {{ $r['advance'] > 0 ? number_format($r['advance'], 2) : '—' }}
+                            </td>
                             <td class="text-end">
                                 <a href="{{ route('admin.hr.employees.show', $p) }}" class="btn-secondary btn-sm">{{ __('الملفّ') }}</a>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="py-10 text-center text-gray-400">{{ __('لا موظفين في هذه القائمة.') }}</td>
+                            <td colspan="10" class="py-10 text-center text-gray-400">{{ __('لا موظفين في هذه القائمة.') }}</td>
                         </tr>
                     @endforelse
                 </tbody>

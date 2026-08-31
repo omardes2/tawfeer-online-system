@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
- * مسيّر رواتب شهر.
+ * كشف رواتب شهر.
  *
  * دورة الحالة: `draft` → `posted` → `paid`، و`reversed` بعد الترحيل.
  * المسودّة وحدها تُعاد توليدًا وتُحذف؛ والمُرحَّل مستندٌ يُصحَّح بالعكس لا
@@ -104,7 +104,7 @@ class PayrollRun extends Model
         return self::STATUS_LABELS[$this->status] ?? $this->status;
     }
 
-    /** ما لم يُدفع بعدُ من بنود المسيّر. */
+    /** ما لم يُدفع بعدُ من بنود الكشف. */
     public function unpaidTotal(): float
     {
         return round((float) $this->lines()->whereNull('financial_voucher_id')->sum('net'), 2);

@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
- * مسيّر الرواتب — من العقد إلى القيد إلى الصرف.
+ * كشف الرواتب — من العقد إلى القيد إلى الصرف.
  *
  * والفحص الحاسم ليس «هل ظهر الراتب؟» بل **«هل الدفتر متماسك؟»**: القيد
  * متوازن، والمصروف هو الصافي لا الاستحقاق، والالتزام يُطفأ بالصرف لا قبله،
@@ -34,7 +34,7 @@ class PayrollTest extends TestCase
 
     protected function setUp(): void
     {
-        // قبل البذر لا بعده: المسيّرات تُولَّد لأشهر ٢٠٢٦، والسنة المالية
+        // قبل البذر لا بعده: الكشوفات تُولَّد لأشهر ٢٠٢٦، والسنة المالية
         // تُبذَر على «الآن». فتثبيتُ الوقت بعد البذر يترك قيودًا بلا سنةٍ ماليّة.
         Carbon::setTestNow(Carbon::parse('2026-12-15 10:00:00'));
 
@@ -93,7 +93,7 @@ class PayrollTest extends TestCase
 
     // ────────── التوليد ──────────
 
-    /** المسيّر يُولَّد من العقود السارية. */
+    /** الكشف يُولَّد من العقود السارية. */
     public function test_it_builds_a_line_per_employee_with_a_salary(): void
     {
         $this->employee(basic: 3000);
@@ -161,7 +161,7 @@ class PayrollTest extends TestCase
     // ────────── الإجازة بلا راتب ──────────
 
     /**
-     * **الإجازة بلا راتب تُخصَم من مسيّر شهرها.**
+     * **الإجازة بلا راتب تُخصَم من كشف شهرها.**
      *
      * ثلاثون يومًا قاسمًا لا عددُ أيام الشهر — وإلا اختلفت قيمة اليوم بين
      * شباط وآذار للراتب نفسه.
@@ -338,7 +338,7 @@ class PayrollTest extends TestCase
         }
     }
 
-    /** ومسيّرٌ كلّه عقودٌ يُرحَّل بقيد الرواتب وحده — بلا قيد مخصّص. */
+    /** وكشفٌ كلّه عقودٌ يُرحَّل بقيد الرواتب وحده — بلا قيد مخصّص. */
     public function test_a_run_of_contractors_posts_no_provision_entry(): void
     {
         $this->employee(basic: 3600, type: 'contract');
@@ -351,7 +351,7 @@ class PayrollTest extends TestCase
         $this->assertEqualsWithDelta(0.0, $this->accountBalance(EndOfServiceService::EXPENSE_ACCOUNT), 0.01);
     }
 
-    /** ويُخلَط النوعان في مسيّرٍ واحد بلا خطأ: المخصّص للدوام الكامل وحده. */
+    /** ويُخلَط النوعان في كشفٍ واحد بلا خطأ: المخصّص للدوام الكامل وحده. */
     public function test_a_mixed_run_accrues_only_for_full_timers(): void
     {
         $this->employee(basic: 3600, type: 'full_time');
@@ -398,7 +398,7 @@ class PayrollTest extends TestCase
         $this->assertSame(1, FinancialVoucher::where('category', 'payroll')->count());
     }
 
-    /** ولا يُصرف مسيّرٌ لم يُرحَّل — النقدية لا تخرج قبل إثبات الالتزام. */
+    /** ولا يُصرف كشفٌ لم يُرحَّل — النقدية لا تخرج قبل إثبات الالتزام. */
     public function test_a_draft_run_cannot_be_paid(): void
     {
         $this->employee(basic: 3000);
@@ -408,7 +408,7 @@ class PayrollTest extends TestCase
         $this->service()->pay($run, $run->lines->pluck('id')->all(), $this->treasury->id, $this->admin);
     }
 
-    /** وصرفُ بعضِ البنود يُبقي المسيّر «مُرحَّلًا» لا «مدفوعًا». */
+    /** وصرفُ بعضِ البنود يُبقي الكشف «مُرحَّلًا» لا «مدفوعًا». */
     public function test_a_partial_payment_leaves_the_run_posted(): void
     {
         $this->employee(basic: 3000);
@@ -438,7 +438,7 @@ class PayrollTest extends TestCase
         $this->assertEqualsWithDelta(0.0, app(EndOfServiceService::class)->balance($profile), 0.01);
     }
 
-    /** ولا يُعكس مسيّرٌ صُرفت بنودُه — النقدية خرجت فعلًا. */
+    /** ولا يُعكس كشفٌ صُرفت بنودُه — النقدية خرجت فعلًا. */
     public function test_a_run_with_paid_lines_cannot_be_reversed(): void
     {
         $this->employee(basic: 3000);

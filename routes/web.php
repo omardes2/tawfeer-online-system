@@ -438,7 +438,7 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     });
 
     // الرواتب والموظفون: الملفّات والعقود والإجازات ومخصّص نهاية الخدمة
-    // ومسيّرات الرواتب بقيودها.
+    // وكشوفات الرواتب بقيودها.
     Route::prefix('hr')->name('hr.')->group(function () {
         Route::get('employees', [HrEmployeeController::class, 'index'])->name('employees.index')->middleware('can:hr.employees.view');
         Route::get('employees/create', [HrEmployeeController::class, 'create'])->name('employees.create')->middleware('can:hr.employees.manage');
@@ -449,6 +449,8 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('employees/{employee}/salaries', [HrEmployeeController::class, 'storeSalary'])->name('employees.salaries.store')->middleware('can:hr.employees.manage');
         Route::post('employees/{employee}/leaves', [HrEmployeeController::class, 'storeLeave'])->name('employees.leaves.store')->middleware('can:hr.employees.manage');
         Route::delete('employees/{employee}/leaves/{leave}', [HrEmployeeController::class, 'destroyLeave'])->name('employees.leaves.destroy')->middleware('can:hr.employees.manage');
+        // المكافآت والسلف: خارج العقد — لا تمسّ الراتب الثابت ولا كشوفه.
+        Route::post('employees/{employee}/finance', [HrEmployeeController::class, 'storeFinanceEntry'])->name('employees.finance.store')->middleware('can:hr.payroll.manage');
         Route::post('employees/{employee}/end-of-service/settle', [HrEmployeeController::class, 'settleEndOfService'])->name('employees.eos.settle')->middleware('can:hr.payroll.manage');
         Route::post('employees/{employee}/end-of-service/adjust', [HrEmployeeController::class, 'adjustEndOfService'])->name('employees.eos.adjust')->middleware('can:hr.payroll.manage');
 

@@ -24,12 +24,12 @@
 
     @if ($employee->status === 'ended')
         <div class="admin-card admin-card-pad mb-5 border-s-4 border-gray-400 bg-gray-50 text-sm text-gray-700">
-            {{ __('انتهت خدمته في :d — لا يدخل المسيّرات ولا يتراكم له مخصّص.', ['d' => $employee->end_date?->toDateString()]) }}
+            {{ __('انتهت خدمته في :d — لا يدخل الكشوفات ولا يتراكم له مخصّص.', ['d' => $employee->end_date?->toDateString()]) }}
         </div>
     @endif
 
-    {{-- الأرقام الأربعة التي يُسأل عنها الموظف. --}}
-    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 mb-5">
+    {{-- الأرقام التي يُسأل عنها الموظف. --}}
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 mb-5">
         <x-admin.stat-card :label="__('الراتب الشهريّ')" :value="$currentSalary?->gross() ?? 0" money tone="blue"
                            :hint="$currentSalary ? __('أساسيّ :b + بدلات :a', ['b' => number_format((float) $currentSalary->basic_salary, 2), 'a' => number_format((float) $currentSalary->allowances, 2)]) : __('لا راتب مسجَّل')" />
         <x-admin.stat-card :label="__('رصيد الإجازة :y', ['y' => $year])"
@@ -47,6 +47,15 @@
                                : __('لا مكافأة نهاية خدمة لهذا التعاقد')" />
         <x-admin.stat-card :label="__('رصيد العمولات')" :value="$commissions['outstanding'] ?? 0" money tone="gray"
                            :hint="__('للاطّلاع — تُصرف من شاشة العمولات')" />
+        {{--
+            السلفة **دَينٌ على الموظف** لا مصروفٌ على الشركة: تظهر في الميزانية
+            أصلًا تحت «سلف الموظفين ١١٥٠»، وتُطفأ بالتسديد لا بالنسيان.
+        --}}
+        <x-admin.stat-card :label="__('السلفة القائمة')" :value="$advanceBalance" money
+                           :tone="$advanceBalance > 0 ? 'red' : 'green'"
+                           :hint="__('دَينٌ على الموظف — أصلٌ للشركة لا مصروف')" />
+        <x-admin.stat-card :label="__('مكافآت :y', ['y' => $year])" :value="$bonusTotal" money tone="gray"
+                           :hint="__('مصروفُ شهرها — خارج الراتب الثابت')" />
     </div>
 
     <div class="grid gap-5 lg:grid-cols-2">
@@ -177,7 +186,7 @@
                     <button type="submit" class="btn-primary btn-sm">{{ __('تسجيل') }}</button>
                 </form>
                 <p class="px-4 pb-3 text-[11px] text-gray-400">
-                    {{ __('«بلا راتب» تُخصَم تلقائيًّا من مسيّر شهرها. و«سنوية» تُنقص الرصيد ولا تمسّ الراتب.') }}
+                    {{ __('«بلا راتب» تُخصَم تلقائيًّا من كشف شهرها. و«سنوية» تُنقص الرصيد ولا تمسّ الراتب.') }}
                 </p>
             @endcan
         </div>
@@ -188,7 +197,7 @@
                 <h3 class="font-semibold text-gray-800">{{ __('مكافأة نهاية الخدمة') }}</h3>
                 <p class="text-[11px] mt-0.5 {{ $employee->accruesBenefits() ? 'text-gray-400' : 'text-amber-600' }}">
                     {{ $employee->accruesBenefits()
-                        ? __('شهرٌ عن كل سنة خدمة — يتراكم مع كل مسيّر بمقدار الراتب الأساسيّ ÷ ١٢، ويُصرف يدويًّا نهاية السنة.')
+                        ? __('شهرٌ عن كل سنة خدمة — يتراكم مع كل كشف بمقدار الراتب الأساسيّ ÷ ١٢، ويُصرف يدويًّا نهاية السنة.')
                         : __('لا تراكم لهذا التعاقد. ويبقى الدفتر ظاهرًا لحركاتٍ سابقة إن وُجدت.') }}
                 </p>
                 @can('hr.payroll.view')
@@ -221,7 +230,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="3" class="py-6 text-center text-gray-400">{{ __('لا حركات بعد — تبدأ مع أوّل مسيّر مُرحَّل.') }}</td></tr>
+                        <tr><td colspan="3" class="py-6 text-center text-gray-400">{{ __('لا حركات بعد — تبدأ مع أوّل كشف مُرحَّل.') }}</td></tr>
                     @endforelse
                 </tbody>
                 <tfoot>
@@ -281,7 +290,7 @@
             @endcan
         </div>
 
-        {{-- ④ المستحقّات: العمولات (للاطّلاع) وآخر المسيّرات --}}
+        {{-- ④ المستحقّات: العمولات (للاطّلاع) وآخر الكشوفات --}}
         <div class="space-y-5">
             <div class="admin-card overflow-hidden">
                 <div class="px-4 py-3 border-b border-gray-100">
@@ -314,7 +323,7 @@
 
             <div class="admin-card overflow-hidden">
                 <div class="px-4 py-3 border-b border-gray-100">
-                    <h3 class="font-semibold text-gray-800">{{ __('آخر المسيّرات') }}</h3>
+                    <h3 class="font-semibold text-gray-800">{{ __('آخر الكشوفات') }}</h3>
                 </div>
                 <table class="admin-table">
                     <thead>
@@ -341,11 +350,143 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="3" class="py-6 text-center text-gray-400">{{ __('لم يدخل مسيّرًا بعد.') }}</td></tr>
+                            <tr><td colspan="3" class="py-6 text-center text-gray-400">{{ __('لم يدخل كشفًا بعد.') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
         </div>
+    </div>
+
+    {{--
+        ⑤ المكافآت والسلف — خارج العقد.
+
+        عرضٌ بعرض الصفحة لا عمودًا: الدفتر يجمع نوعين بحسابين مختلفين، وضغطُه
+        في نصف الشاشة يُخفي أيّهما مصروفٌ وأيّهما دَين — وهو الفرق كلّه.
+    --}}
+    <div class="admin-card overflow-hidden mt-5">
+        <div class="px-4 py-3 border-b border-gray-100">
+            <h3 class="font-semibold text-gray-800">{{ __('المكافآت والسلف') }}</h3>
+            <p class="text-[11px] text-gray-400 mt-0.5">
+                {{ __('خارج العقد: لا تُضاف إلى الراتب الثابت، ولا تدخل كشف الرواتب، ولا يتراكم عليها مخصّص نهاية الخدمة.') }}
+            </p>
+        </div>
+
+        <div class="px-4 py-3 border-b border-gray-100 bg-sky-50/60 text-[11px] text-sky-900 leading-6">
+            <span class="font-semibold">{{ __('القيود:') }}</span>
+            {{ __('المكافأة — مدين «مكافآت وحوافز ٥٢٢٠» / دائن الخزينة (مصروفُ شهرها).') }}
+            {{ __('السلفة — مدين «سلف الموظفين ١١٥٠» / دائن الخزينة (أصلٌ لا مصروف).') }}
+            {{ __('التسديد — مدين الخزينة / دائن «سلف الموظفين ١١٥٠» (يُطفئ الدَّين ولا يُنشئ إيرادًا).') }}
+        </div>
+
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>{{ __('التاريخ') }}</th>
+                    <th>{{ __('النوع') }}</th>
+                    <th class="text-start">{{ __('المبلغ') }}</th>
+                    <th>{{ __('السند') }}</th>
+                    <th>{{ __('ملاحظة') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($financeEntries as $entry)
+                    @php $value = $entry->effectiveAmount(); @endphp
+                    <tr class="{{ $value == 0.0 ? 'opacity-50' : '' }}">
+                        <td class="tabular-nums text-gray-600">{{ $entry->entry_date->toDateString() }}</td>
+                        <td>
+                            <span @class([
+                                'inline-block rounded-full px-2 py-0.5 text-[11px] font-medium',
+                                'bg-emerald-100 text-emerald-700' => $entry->kind === 'bonus',
+                                'bg-amber-100 text-amber-700' => $entry->kind === 'advance',
+                                'bg-sky-100 text-sky-700' => $entry->kind === 'advance_repayment',
+                            ])>{{ __($entry->label()) }}</span>
+                            @if ($value == 0.0)
+                                <span class="ms-1 text-[11px] text-gray-500">{{ __('سندٌ معكوس — لا أثر') }}</span>
+                            @endif
+                        </td>
+                        <td class="text-start tabular-nums font-medium">{{ number_format($value, 2) }}</td>
+                        <td>
+                            @if ($entry->voucher)
+                                <a href="{{ route('admin.accounting.vouchers.show', ['kind' => $entry->voucher->kind, 'voucher' => $entry->voucher->uuid]) }}"
+                                   class="text-emerald-700 hover:underline">{{ $entry->voucher->number }}</a>
+                            @else — @endif
+                        </td>
+                        <td class="text-gray-600 max-w-xs">
+                            @if ($entry->note)
+                                <span class="block truncate" title="{{ $entry->note }}">{{ $entry->note }}</span>
+                            @else <span class="text-gray-300">—</span> @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="5" class="py-6 text-center text-gray-400">{{ __('لا مكافآت ولا سلف.') }}</td></tr>
+                @endforelse
+            </tbody>
+            <tfoot>
+                <tr class="bg-gray-50 font-semibold">
+                    <td colspan="2">{{ __('السلفة القائمة') }}</td>
+                    <td class="text-start tabular-nums {{ $advanceBalance > 0 ? 'text-rose-600' : 'text-gray-500' }}">
+                        {{ number_format($advanceBalance, 2) }}
+                    </td>
+                    <td colspan="2" class="text-[11px] font-normal text-gray-400">{{ __('ما مُنِح ناقص ما سُدّد') }}</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        @can('hr.payroll.manage')
+            {{--
+                نموذجٌ واحد بثلاثة أنواع: ثلاثتها فعلٌ واحد بثلاثة حسابات،
+                وثلاثةُ نماذج تُكرّر الحقول وتُغري باختلافها.
+            --}}
+            <form method="POST" action="{{ route('admin.hr.employees.finance.store', $employee) }}"
+                  class="p-4 border-t border-gray-100 bg-gray-50/50 grid gap-3 sm:grid-cols-5 items-end"
+                  x-data="{ kind: 'bonus', outstanding: {{ $advanceBalance }} }"
+                  @submit="if (! confirm('{{ __('تسجيل الحركة؟ سيُنشأ سندٌ يخرج من الخزينة المختارة أو يدخلها.') }}')) $event.preventDefault()">
+                @csrf
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">{{ __('النوع') }}</label>
+                    <select name="kind" x-model="kind" required
+                            class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <option value="bonus">{{ __('مكافأة') }}</option>
+                        <option value="advance">{{ __('سلفة') }}</option>
+                        <option value="advance_repayment" @disabled($advanceBalance <= 0)>{{ __('تسديد سلفة') }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">{{ __('المبلغ') }}</label>
+                    <input type="number" step="0.01" min="0.01" name="amount" required
+                           :max="kind === 'advance_repayment' ? outstanding : null"
+                           class="w-full rounded-lg border-gray-300 text-sm tabular-nums focus:border-emerald-500 focus:ring-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">{{ __('الخزينة') }}</label>
+                    <select name="treasury_id" required
+                            class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        @foreach ($treasuries as $treasury)
+                            <option value="{{ $treasury->id }}">{{ $treasury->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-500 mb-1">{{ __('ملاحظة (اختياري)') }}</label>
+                    <input type="text" name="note" maxlength="255" value="{{ old('note') }}"
+                           class="w-full rounded-lg border-gray-300 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+                </div>
+                <button type="submit" class="btn-primary btn-sm">{{ __('تسجيل') }}</button>
+
+                {{-- أثرُ الاختيار مكتوبًا: من يضغط «تسجيل» يجب أن يعرف ما سيُقيَّد. --}}
+                <p class="text-[11px] basis-full sm:col-span-5" x-cloak>
+                    <span x-show="kind === 'bonus'" class="text-emerald-700">
+                        {{ __('مصروفٌ يخرج من الخزينة ولا يعود — ولا يُغيّر الراتب الثابت.') }}
+                    </span>
+                    <span x-show="kind === 'advance'" class="text-amber-700">
+                        {{ __('دَينٌ على الموظف يخرج من الخزينة ويُستردّ — ليس مصروفًا ولا يظهر في قائمة الدخل.') }}
+                    </span>
+                    <span x-show="kind === 'advance_repayment'" class="text-sky-700">
+                        {{ __('مالٌ يدخل الخزينة ويُطفئ السلفة — لا يُقيَّد إيرادًا.') }}
+                    </span>
+                </p>
+            </form>
+        @endcan
     </div>
 </x-app-layout>

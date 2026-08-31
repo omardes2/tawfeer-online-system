@@ -84,6 +84,7 @@ class ProfitLossController extends Controller
             [__('عمولات المبيعات والتسويق'), $report['expenses']['commissions']],
             [__('الرواتب والأجور'), $report['expenses']['payroll']],
             [__('مكافأة نهاية الخدمة'), $report['expenses']['end_of_service']],
+            [__('مكافآت وحوافز'), $report['expenses']['bonuses']],
         ];
 
         foreach ($report['expenses']['categories'] as $category) {

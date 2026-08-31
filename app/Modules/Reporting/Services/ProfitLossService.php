@@ -5,6 +5,7 @@ namespace App\Modules\Reporting\Services;
 use App\Modules\Accounting\Models\ExpenseCategory;
 use App\Modules\Accounting\Models\FinancialVoucher;
 use App\Modules\Commissions\Models\CommissionEntry;
+use App\Modules\Hr\Services\EmployeeFinanceService;
 use App\Modules\Hr\Services\EndOfServiceService;
 use App\Modules\Hr\Services\PayrollService;
 use App\Modules\Marketing\Models\AdDailySpend;
@@ -23,7 +24,7 @@ use Illuminate\Support\Facades\DB;
  * | تكلفة البضاعة | `wholesale_cost_snapshot` المُجمَّدة وقت البيع |
  * | الإعلانات | `ad_daily_spends` بالشيكل بسعر صرف يومه |
  * | العمولات | استحقاقات الفترة الحيّة في دفتر العمولات |
- * | الرواتب ونهاية الخدمة | قيود مسيّر الرواتب (٥٢٠٠ و٥٢١٠) — لا سندات صرف |
+ * | الرواتب ونهاية الخدمة | قيود كشف الرواتب (٥٢٠٠ و٥٢١٠) — لا سندات صرف |
  * | المصاريف | سندات الصرف المُرحَّلة (`kind = expense`) بتصنيفاتها |
  *
  * ## خمسة قرارات تجعل الرقم صحيحًا
@@ -198,6 +199,11 @@ class ProfitLossService
         $payroll = $this->postedExpense(PayrollService::SALARY_EXPENSE_ACCOUNT, $from, $to);
         $endOfService = $this->postedExpense(EndOfServiceService::EXPENSE_ACCOUNT, $from, $to);
 
+        // المكافآت: مصروفٌ يُقيَّد من ملفّ الموظف بسند صرف من نوع `payment` لا
+        // `expense`، فجمعُ سندات المصروف وحده يُسقطها. والسلف ليست هنا: أصلٌ
+        // لا مصروف — مالٌ عند الموظفين يعود.
+        $bonuses = $this->postedExpense(EmployeeFinanceService::BONUS_ACCOUNT, $from, $to);
+
         /*
         | سندات الصرف بتصنيفاتها — **مقسومةً على قسمين**.
         |
@@ -236,21 +242,22 @@ class ProfitLossService
             'commissions' => $commissions,
             'payroll' => $payroll,
             'end_of_service' => $endOfService,
+            'bonuses' => $bonuses,
             'categories' => $categories->values(),
             // سنداتٌ على تصنيفاتٍ محتسَبة من مصادرها — تُعرض ولا تُجمع.
             'auto_counted' => $autoCounted->values(),
             'auto_counted_total' => round((float) $autoCounted->sum('total'), 2),
             'vouchers' => $vouchers,
-            'total' => round($ads + $commissions + $payroll + $endOfService + $vouchers, 2),
+            'total' => round($ads + $commissions + $payroll + $endOfService + $bonuses + $vouchers, 2),
         ];
     }
 
     /**
      * مصروفٌ مُرحَّل مباشرةً إلى الدفتر — لا عبر سند صرف.
      *
-     * الرواتب ومخصّص نهاية الخدمة يُقيَّدان من مسيّر الرواتب لا من سندٍ من نوع
+     * الرواتب ومخصّص نهاية الخدمة يُقيَّدان من كشف الرواتب لا من سندٍ من نوع
      * `expense`، فجمعُ السندات وحده يُسقطهما — وهما أكبر مصروفٍ في أكثر
-     * الشركات. والقراءة من القيد لا من المسيّر: **مدين ناقص دائن**، فالمسيّر
+     * الشركات. والقراءة من القيد لا من الكشف: **مدين ناقص دائن**، فالكشف
      * المعكوس يُلغي نفسه بلا استثناءٍ في الاستعلام.
      */
     private function postedExpense(string $accountCode, string $from, string $to): float

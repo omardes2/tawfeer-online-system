@@ -12,6 +12,7 @@ use App\Modules\Commissions\Services\CommissionService;
 use App\Modules\Foundation\Models\Branch;
 use App\Modules\Hr\Models\EmployeeLeave;
 use App\Modules\Hr\Models\EmployeeProfile;
+use App\Modules\Hr\Services\EmployeeFinanceService;
 use App\Modules\Hr\Services\EndOfServiceService;
 use App\Modules\Hr\Services\LeaveService;
 use Illuminate\Contracts\View\View;
@@ -34,6 +35,7 @@ class EmployeeController extends Controller
         private readonly LeaveService $leaves,
         private readonly EndOfServiceService $endOfService,
         private readonly CommissionService $commissions,
+        private readonly EmployeeFinanceService $finance,
     ) {}
 
     public function index(Request $request): View
@@ -58,8 +60,9 @@ class EmployeeController extends Controller
 
         $today = today()->toDateString();
         $eosBalances = $this->endOfService->balances($profiles->pluck('id')->all());
+        $advances = $this->finance->advanceBalances($profiles->pluck('id')->all());
 
-        $rows = $profiles->map(function (EmployeeProfile $profile) use ($year, $today, $eosBalances) {
+        $rows = $profiles->map(function (EmployeeProfile $profile) use ($year, $today, $eosBalances, $advances) {
             $salary = $profile->salaryOn($today);
             $leave = $this->leaves->balance($profile, $year);
 
@@ -71,6 +74,7 @@ class EmployeeController extends Controller
                 'leave_remaining' => $leave['remaining'],
                 'leave_taken' => $leave['taken'],
                 'eos' => (float) $eosBalances->get($profile->id, 0.0),
+                'advance' => (float) $advances->get($profile->id, 0.0),
             ];
         });
 
@@ -83,7 +87,9 @@ class EmployeeController extends Controller
                 'headcount' => $rows->count(),
                 'monthly' => round((float) $rows->sum(fn ($r) => $r['gross'] ?? 0), 2),
                 'eos' => round((float) $rows->sum('eos'), 2),
-                // بلا عقدٍ مسجَّل لا يدخل الموظف المسيّر — يُعدّ هنا كي يُرى.
+                // السلف أصلٌ للشركة لا مصروف — مالٌ عند الموظفين يعود.
+                'advances' => round((float) $rows->sum('advance'), 2),
+                // بلا عقدٍ مسجَّل لا يدخل الموظف الكشف — يُعدّ هنا كي يُرى.
                 'without_salary' => $rows->whereNull('basic')->count(),
             ],
         ]);
@@ -101,7 +107,7 @@ class EmployeeController extends Controller
         $profile = EmployeeProfile::create($request->validated() + ['created_by' => $request->user()->id]);
 
         return redirect()->route('admin.hr.employees.show', $profile)
-            ->with('success', __('أُنشئ ملفّ الموظف. سجّل راتبه ليدخل مسيّر الرواتب.'));
+            ->with('success', __('أُنشئ ملفّ الموظف. سجّل راتبه ليدخل كشف الرواتب.'));
     }
 
     public function show(EmployeeProfile $employee, Request $request): View
@@ -124,6 +130,11 @@ class EmployeeController extends Controller
             'eosEntries' => $employee->endOfServiceEntries()->with('voucher:id,number,status')
                 ->orderByDesc('entry_date')->orderByDesc('id')->limit(50)->get(),
             'serviceMonths' => $employee->serviceMonthsUntil(today()->toDateString()),
+            // المكافآت والسلف: خارج العقد فلا تدخل كشف الرواتب ولا يتراكم
+            // عليها مخصّص نهاية الخدمة.
+            'advanceBalance' => $this->finance->advanceBalance($employee),
+            'bonusTotal' => $this->finance->bonusTotal($employee, $year),
+            'financeEntries' => $this->finance->ledger($employee)->take(50),
             // للاطّلاع فقط — الصرف من شاشة العمولات.
             'commissions' => $employee->user
                 ? $this->commissions->balance($employee->user_id, $earnerType)
@@ -166,7 +177,7 @@ class EmployeeController extends Controller
             ],
         );
 
-        return back()->with('success', __('سُجّل الراتب. المسيّرات المُرحَّلة لا تتأثّر.'));
+        return back()->with('success', __('سُجّل الراتب. الكشوفات المُرحَّلة لا تتأثّر.'));
     }
 
     // ————————————————————————— الإجازات —————————————————————————
@@ -241,6 +252,48 @@ class EmployeeController extends Controller
         }
 
         return back()->with('success', __('سُجّلت التسوية في دفتر المخصّص. قيّدها محاسبيًّا بسندٍ مستقلّ إن لزم.'));
+    }
+
+    // ————————————————————————— المكافآت والسلف —————————————————————————
+
+    /**
+     * منح مكافأةٍ أو سلفة، أو تسديد سلفة — كلٌّ بسندٍ يخرج من الخزينة.
+     *
+     * ثلاثتُها فعلٌ واحد بثلاثة حسابات، فمسارٌ واحد يحملها: تشعّبها إلى ثلاثة
+     * مساراتٍ يُكرّر التحقّق والصلاحية ثلاث مرّات ويُغري باختلافها.
+     */
+    public function storeFinanceEntry(Request $request, EmployeeProfile $employee): RedirectResponse
+    {
+        $this->authorize('hr.payroll.manage');
+
+        $data = $request->validate([
+            'kind' => ['required', 'in:bonus,advance,advance_repayment'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'treasury_id' => ['required', 'integer', 'exists:treasuries,id'],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        try {
+            match ($data['kind']) {
+                'bonus' => $this->finance->grantBonus(
+                    $employee, (float) $data['amount'], (int) $data['treasury_id'], $request->user(), $data['note'] ?? null,
+                ),
+                'advance' => $this->finance->grantAdvance(
+                    $employee, (float) $data['amount'], (int) $data['treasury_id'], $request->user(), $data['note'] ?? null,
+                ),
+                'advance_repayment' => $this->finance->repayAdvance(
+                    $employee, (float) $data['amount'], (int) $data['treasury_id'], $request->user(), $data['note'] ?? null,
+                ),
+            };
+        } catch (ValidationException $e) {
+            return back()->with('error', collect($e->errors())->flatten()->first())->withInput();
+        }
+
+        return back()->with('success', match ($data['kind']) {
+            'bonus' => __('سُجّلت المكافأة — مصروفُ شهرها، ولا تدخل الراتب الثابت.'),
+            'advance' => __('سُجّلت السلفة — دَينٌ على الموظف في «سلف الموظفين»، لا مصروف.'),
+            'advance_repayment' => __('سُجّل التسديد وأُطفئ من السلفة القائمة بقيمته.'),
+        });
     }
 
     /** @return array<string, mixed> */

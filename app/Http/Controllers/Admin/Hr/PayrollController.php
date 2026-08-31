@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 /**
- * مسيّرات الرواتب — توليدٌ فترحيلٌ فصرف.
+ * كشوفات الرواتب — توليدٌ فترحيلٌ فصرف.
  *
  * متحكّم رفيع: كل قاعدةٍ محاسبية في `PayrollService`. وما هنا هو تحويل الخطأ
  * إلى رسالةٍ يفهمها المستخدم بدل صفحة ٤٢٢.
@@ -32,7 +32,7 @@ class PayrollController extends Controller
                 ->orderByDesc('period_month')->paginate(24),
             'year' => (int) today()->year,
             'month' => (int) today()->month,
-            // من بلا عقدٍ ساري لا يدخل المسيّر — يُعرَض العدد كي لا يُكتشف بعد الترحيل.
+            // من بلا عقدٍ ساري لا يدخل الكشف — يُعرَض العدد كي لا يُكتشف بعد الترحيل.
             'withoutSalary' => EmployeeProfile::active()
                 ->whereDoesntHave('salaries', fn ($q) => $q->whereDate('effective_from', '<=', today()))
                 ->count(),
@@ -72,7 +72,7 @@ class PayrollController extends Controller
         }
 
         return redirect()->route('admin.hr.payroll.show', $run)
-            ->with('success', __('وُلّد مسيّر :p مسودّةً — راجعه قبل الترحيل.', ['p' => $run->periodLabel()]));
+            ->with('success', __('وُلّد كشف :p مسودّةً — راجعه قبل الترحيل.', ['p' => $run->periodLabel()]));
     }
 
     public function updateLine(Request $request, PayrollRun $payroll, PayrollLine $line): RedirectResponse
@@ -106,7 +106,7 @@ class PayrollController extends Controller
             return back()->with('error', collect($e->errors())->flatten()->first());
         }
 
-        return back()->with('success', __('رُحّل المسيّر: مصروف الرواتب مدين ورواتب مستحقة دائن.'));
+        return back()->with('success', __('رُحّل الكشف: مصروف الرواتب مدين ورواتب مستحقة دائن.'));
     }
 
     public function pay(Request $request, PayrollRun $payroll): RedirectResponse
@@ -150,7 +150,7 @@ class PayrollController extends Controller
             return back()->with('error', collect($e->errors())->flatten()->first());
         }
 
-        return back()->with('success', __('عُكس المسيّر بقيدٍ عاكس — القيد الأصلي باقٍ في الدفتر.'));
+        return back()->with('success', __('عُكس الكشف بقيدٍ عاكس — القيد الأصلي باقٍ في الدفتر.'));
     }
 
     public function destroy(PayrollRun $payroll): RedirectResponse
@@ -159,7 +159,7 @@ class PayrollController extends Controller
 
         // المُرحَّل مستندٌ محاسبيّ: يُصحَّح بالعكس لا بالحذف.
         if (! $payroll->isDraft()) {
-            return back()->with('error', __('المسيّر المُرحَّل لا يُحذف — اعكسه.'));
+            return back()->with('error', __('الكشف المُرحَّل لا يُحذف — اعكسه.'));
         }
 
         $payroll->lines()->delete();

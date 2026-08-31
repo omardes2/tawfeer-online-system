@@ -20,7 +20,7 @@ class EmployeeProfileRequest extends FormRequest
         $profile = $this->route('employee');
 
         return [
-            // مستخدمٌ واحد = ملفٌّ واحد: ملفّان لشخصٍ يجعلان راتبه بندين في المسيّر.
+            // مستخدمٌ واحد = ملفٌّ واحد: ملفّان لشخصٍ يجعلان راتبه بندين في الكشف.
             'user_id' => [
                 'required', 'integer', 'exists:users,id',
                 Rule::unique('employee_profiles', 'user_id')
@@ -50,7 +50,7 @@ class EmployeeProfileRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        // من انتهت خدمته يُغلق ملفّه: تركُه «نشطًا» يُبقيه في مسيّرات الأشهر
+        // من انتهت خدمته يُغلق ملفّه: تركُه «نشطًا» يُبقيه في كشوفات الأشهر
         // القادمة، ويتراكم له مخصّصُ نهاية خدمةٍ انتهت.
         if ($this->filled('end_date')) {
             $this->merge(['status' => 'ended']);
