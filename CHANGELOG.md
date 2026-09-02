@@ -24,11 +24,31 @@ stock, revenue, COGS and the journal are all left exactly as they are: the goods
 really did leave under the old product, and rewriting that would leave stock
 deducted from one item and the invoice raised on another.
 
-**A zero wholesale on the target is refused.** Zero here means *unknown*, not
-*free* — an affiliate's commission is based on margin, so a zero wholesale makes
-the margin the entire sale price and inflates what is owed. Fix the item card,
-then run it again. This is the same guard `recomputeItemCommissions` already
-applies (`$cost <= 0`).
+**A zero wholesale on the target is refused by default.** Zero here means
+*unknown*, not *free* — an affiliate's commission is based on margin, so a zero
+wholesale makes the margin the entire sale price and inflates what is owed. Fix
+the item card, then run it again. This is the same guard
+`recomputeItemCommissions` already applies (`$cost <= 0`).
+
+A product can genuinely have no purchase cost, though — a gift, a sample,
+something made in-house with no buy price — so `--allow-zero-wholesale` accepts
+it. The acceptance covers **the one product passed to that run**: no setting
+changes, no other product is affected, and nothing outlives the command. A
+visible warning prints before the write.
+
+### Added — put existing entries back on the current wholesale price
+
+An item card with no wholesale price makes `itemCost` fall back to **average
+cost**, which is lower than wholesale — so the margin is wider and the
+commission higher than earned, and the snapshot freezes on that. Correcting the
+card later only helps new orders.
+
+`commissions:recompute-earner-variant <earner> <variant>` brings the existing
+entries onto the corrected price so the whole statement sits on one basis. Same
+limits as the swap: preview first, `--apply` to write, paid and fixed and
+already-adjusted entries keep their amounts, and only `commission_entries` is
+touched. Entries where nothing would change are skipped rather than rewritten —
+a transition row with no transition ruins the "what changed, and when" trail.
 
 Three kinds are relabelled without recomputing: **paid** entries (the payment
 voucher carries what actually left the treasury), **fixed** commissions (not

@@ -4,6 +4,7 @@ namespace App\Modules\Commissions\Providers;
 
 use App\Modules\Accounting\Events\VoucherRevised;
 use App\Modules\Commissions\Console\AuditEarnerPricesCommand;
+use App\Modules\Commissions\Console\RecomputeEarnerVariantCommand;
 use App\Modules\Commissions\Console\RepairWholesaleSnapshotsCommand;
 use App\Modules\Commissions\Console\RepriceEarnerCommand;
 use App\Modules\Commissions\Console\SwapEntryVariantCommand;
@@ -32,6 +33,7 @@ class CommissionsServiceProvider extends ServiceProvider
             $this->commands([
                 // الفحص يقرأ ولا يكتب — يُشغَّل قبل الإصلاح ليُعرف حجمُه.
                 AuditEarnerPricesCommand::class,
+                RecomputeEarnerVariantCommand::class,
                 RepairWholesaleSnapshotsCommand::class,
                 RepriceEarnerCommand::class,
                 SwapEntryVariantCommand::class,

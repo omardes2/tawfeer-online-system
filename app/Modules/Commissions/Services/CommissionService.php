@@ -559,12 +559,14 @@ class CommissionService
      * فالبضاعة خرجت على الصنف القديم فعلًا، وإعادةُ كتابة ذلك تجعل المخزون
      * مخصومًا من صنفٍ والفاتورة على صنفٍ آخر.
      *
-     * ## ولماذا الصفر يُرفض
+     * ## والصفر يُرفض إلا بقرارٍ صريح
      *
      * سعر جملةٍ صفر في هذا النظام يعني **«غير معروف»** لا «مجّاني»: أساس عمولة
      * المسوّق هو الهامش، فجملةٌ صفر تجعل الهامش سعرَ البيع كاملًا وتُضخّم
-     * المستحقّ. ولهذا يُرفض التبديل حتى يُصحَّح كرت الصنف الجديد — وهو نفس
-     * حارس `recomputeItemCommissions` (`$cost <= 0`).
+     * المستحقّ. ولهذا يُرفض افتراضًا — وهو نفس حارس `recomputeItemCommissions`.
+     *
+     * ويُقبل بـ`$allowZeroCost` **للصنف المُمرَّر في هذا الاستدعاء وحده**: لا
+     * إعداد يُغيَّر، ولا صنف آخر يتأثّر، ولا يبقى القبول بعد انتهاء التشغيل.
      *
      * ## وحدود لا تُتجاوز
      *
@@ -586,16 +588,31 @@ class CommissionService
         ProductVariant $to,
         ?User $actor = null,
         bool $apply = false,
+        bool $allowZeroCost = false,
     ): array {
         $cost = round($to->effectiveWholesalePrice(), 2);
 
-        if ($cost <= 0) {
+        /*
+            الصفر يُرفض افتراضًا ويُقبل بقرارٍ صريح.
+
+            في هذا النظام سعر جملةٍ صفر يعني «غير معروف» لا «مجّاني»، وأساس
+            عمولة المسوّق هو الهامش — فصفرٌ يجعل الهامش سعرَ البيع كاملًا. وهو
+            في الغالب كرتُ صنفٍ لم يُملأ، لا صنفٌ بلا كلفة.
+
+            لكنّ الصنف قد يكون فعلًا بلا كلفة شراء (هديّة، أو عيّنة، أو ما يُصنّع
+            داخليًّا بلا تسعير شراء). فالقرار لصاحب النظام، ويُطلب صراحةً
+            بـ`$allowZeroCost` كي لا يقع بسهوٍ في تشغيلٍ عابر.
+        */
+        if ($cost <= 0 && ! $allowZeroCost) {
             throw ValidationException::withMessages(['wholesale' => __(
                 'سعر جملة «:name» صفر — والصفر هنا يعني «غير معروف» لا «مجّاني»، '
-                .'فيصير الهامش سعرَ البيع كاملًا ويتضخّم المستحقّ. صحّح كرت الصنف ثم أعد التشغيل.',
+                .'فيصير الهامش سعرَ البيع كاملًا ويتضخّم المستحقّ. صحّح كرت الصنف ثم أعد التشغيل، '
+                .'أو أضف --allow-zero-wholesale إن كان الصنف بلا كلفة شراء فعلًا.',
                 ['name' => $to->product?->name ?? $to->sku],
             )]);
         }
+
+        $cost = max($cost, 0.0);
 
         $entries = CommissionEntry::query()
             ->where('earner_id', $earner->id)
@@ -610,7 +627,16 @@ class CommissionService
         $changes = [];
 
         foreach ($entries as $entry) {
-            $changes[] = $this->planVariantSwap($entry, $to, $cost);
+            $change = $this->planVariantSwap($entry, $to, $cost);
+
+            // في إعادة الاحتساب على الصنف نفسه تُسقَط الحركات التي لا شيء
+            // فيها يتغيّر: كتابتُها تُحدث سطرًا في سجلّ التحوّلات بلا تحوّل،
+            // وعرضُها يُغرق الجدول بأصفارٍ تُخفي ما تغيّر فعلًا.
+            if ($this->isNoopSwap($entry, $to, $cost, $change)) {
+                continue;
+            }
+
+            $changes[] = $change;
         }
 
         if ($apply && $changes !== []) {
@@ -618,6 +644,16 @@ class CommissionService
         }
 
         return $changes;
+    }
+
+    /**
+     * @param  array<string, mixed>  $change
+     */
+    private function isNoopSwap(CommissionEntry $entry, ProductVariant $to, float $cost, array $change): bool
+    {
+        return $entry->variant_id === $to->id
+            && abs((float) $change['delta']) < 0.01
+            && abs((float) $entry->wholesale_cost_snapshot - $cost) < 0.01;
     }
 
     /**

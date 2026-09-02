@@ -118,7 +118,7 @@ class SwapEntryVariantTest extends TestCase
         ]);
     }
 
-    private function runSwap(bool $apply = true, ?ProductVariant $to = null): array
+    private function runSwap(bool $apply = true, ?ProductVariant $to = null, bool $allowZero = false): array
     {
         return app(CommissionService::class)->swapEntryVariant(
             $this->affiliate,
@@ -126,6 +126,7 @@ class SwapEntryVariantTest extends TestCase
             $to ?? $this->newProduct->defaultVariant,
             $this->admin,
             $apply,
+            $allowZero,
         );
     }
 
@@ -268,6 +269,111 @@ class SwapEntryVariantTest extends TestCase
 
         $this->assertSame($this->oldProduct->defaultVariant->id, $entry->fresh()->variant_id);
         $this->assertSame('15.00', $entry->fresh()->amount);
+    }
+
+    /**
+     * **ويُقبل بقرارٍ صريح** — صنفٌ بلا كلفة شراء فعلًا.
+     *
+     * حينها الربح سعرُ البيع كاملًا، وهو ما يعنيه غيابُ الكلفة. والقبول
+     * **للصنف المُمرَّر وحده**: لا إعداد يُغيَّر ولا صنف آخر يتأثّر.
+     */
+    public function test_zero_is_accepted_when_asked_for_explicitly(): void
+    {
+        $entry = $this->entry();
+        $free = $this->product('عطر بلا كلفة', 33, 0);
+
+        $this->runSwap(to: $free->defaultVariant, allowZero: true);
+        $entry->refresh();
+
+        $this->assertSame($free->defaultVariant->id, $entry->variant_id);
+        $this->assertSame('33.00', $entry->amount);              // سعر البيع كاملًا
+        $this->assertSame('0.00', $entry->wholesale_cost_snapshot);
+    }
+
+    /** ولا يتعدّى القبولُ صنفَه — غيرُه يبقى محروسًا. */
+    public function test_allowing_zero_does_not_leak_to_another_product(): void
+    {
+        $this->entry();
+        $free = $this->product('عطر بلا كلفة', 33, 0);
+        $alsoFree = $this->product('صنفٌ آخر بلا كلفة', 33, 0);
+
+        $this->runSwap(to: $free->defaultVariant, allowZero: true);
+
+        $this->expectException(ValidationException::class);
+        app(CommissionService::class)->swapEntryVariant(
+            $this->affiliate, [$free->defaultVariant->id], $alsoFree->defaultVariant, $this->admin, true,
+        );
+    }
+
+    // ────────── إعادة الاحتساب على الصنف نفسه ──────────
+
+    /**
+     * **صفوفٌ قائمة تُنزَل على سعر الجملة الحاليّ.**
+     *
+     * صنفٌ بِيع وكرتُه بلا سعر جملة تُحسب عمولته على متوسّط التكلفة وتُجمَّد
+     * عليه. وتصحيحُ الكرت لاحقًا ينفع الطلبات الجديدة وحدها — وهذا يُنزل
+     * القديمة معها فيصير الكشف على أساسٍ واحد.
+     */
+    public function test_existing_entries_are_recomputed_on_the_current_wholesale(): void
+    {
+        $order = $this->order($this->newProduct, 33, 1);
+        $item = $order->items()->firstOrFail();
+
+        $entry = CommissionEntry::create([
+            'order_id' => $order->id,
+            'order_item_id' => $item->id,
+            'variant_id' => $this->newProduct->defaultVariant->id,
+            'earner_id' => $this->affiliate->id,
+            'earner_type' => 'affiliate',
+            'entry_type' => 'accrual',
+            'state' => 'eligible',
+            'basis_amount' => 23,
+            'basis' => 23,
+            'rate' => 1,
+            'amount' => 23,                        // محسوبة على تكلفةٍ ١٠ لا جملةٍ ١٢
+            'wholesale_cost_snapshot' => 10,
+            'rule_snapshot' => ['method' => 'margin'],
+        ]);
+
+        $this->artisan('commissions:recompute-earner-variant', [
+            'earner' => (string) $this->affiliate->id,
+            'variant' => (string) $this->newProduct->defaultVariant->id,
+            '--apply' => true,
+        ])->assertSuccessful();
+
+        $entry->refresh();
+        $this->assertSame('21.00', $entry->amount);              // ٣٣ − ١٢
+        $this->assertSame('12.00', $entry->wholesale_cost_snapshot);
+    }
+
+    /** ولا شيء يُكتب لمن هو على السعر الصحيح أصلًا. */
+    public function test_recomputing_an_already_correct_entry_is_a_noop(): void
+    {
+        $order = $this->order($this->newProduct, 33, 1);
+        $item = $order->items()->firstOrFail();
+
+        $entry = CommissionEntry::create([
+            'order_id' => $order->id,
+            'order_item_id' => $item->id,
+            'variant_id' => $this->newProduct->defaultVariant->id,
+            'earner_id' => $this->affiliate->id,
+            'earner_type' => 'affiliate',
+            'entry_type' => 'accrual',
+            'state' => 'eligible',
+            'basis_amount' => 21, 'basis' => 21, 'rate' => 1, 'amount' => 21,
+            'wholesale_cost_snapshot' => 12,
+            'rule_snapshot' => ['method' => 'margin'],
+        ]);
+
+        $before = CommissionTransition::where('commission_entry_id', $entry->id)->count();
+
+        $changes = app(CommissionService::class)->swapEntryVariant(
+            $this->affiliate, [$this->newProduct->defaultVariant->id],
+            $this->newProduct->defaultVariant, $this->admin, true,
+        );
+
+        $this->assertSame([], $changes);
+        $this->assertSame($before, CommissionTransition::where('commission_entry_id', $entry->id)->count());
     }
 
     // ────────── الأثر مُدوَّن ──────────

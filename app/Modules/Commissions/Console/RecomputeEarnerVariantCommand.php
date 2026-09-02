@@ -10,31 +10,35 @@ use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 /**
- * تبديل صنف حركات عمولة مسوّقٍ واحد من صنفٍ إلى آخر — وإعادة الاحتساب عليه.
+ * إعادة احتساب حركات مسوّقٍ على صنفٍ بعينه، على سعر جملته **الحاليّ**.
  *
- * صنفٌ بِيع باسمٍ ثم صار يُباع باسمٍ آخر: كشف المسوّق يبقى على الاسم القديم
- * فيُقرأ صنفين وهو صنفٌ واحد، ويُحسب ربحه على سعر جملةٍ لم يعد قائمًا.
+ * صنفٌ بِيع وكرتُه بلا سعر جملة: `itemCost` يرجع حينها إلى **متوسّط التكلفة**،
+ * والتكلفة أدنى من الجملة — فالهامش أوسع والعمولة أعلى مما تستحقّ، واللقطة
+ * تُجمَّد على ذلك. فإذا صُحّح الكرت لاحقًا، استفادت منه الطلبات الجديدة وحدها
+ * وبقيت القديمة على الرقم الخاطئ.
  *
- * **يقرأ ولا يكتب افتراضيًّا.** الكتابة تحتاج `--apply` صراحةً: أمرٌ يحرّك
- * مستحقّات شخصٍ بعينه لا يجوز أن ينفّذ بالخطأ في سطرٍ واحد.
+ * وهذا الأمر يُنزل القديمة على السعر المصحَّح، فيصير الكشف كلّه على أساسٍ واحد.
+ *
+ * **يقرأ ولا يكتب افتراضيًّا.** الكتابة تحتاج `--apply` صراحةً.
  *
  * ولا يمسّ إلا `commission_entries`: الفاتورة والمخزون والإيراد وتكلفة
- * المبيعات وقيود اليومية تبقى كما هي — البضاعة خرجت على الصنف القديم فعلًا.
+ * المبيعات وقيود اليومية تبقى كما هي.
  */
-class SwapEntryVariantCommand extends Command
+class RecomputeEarnerVariantCommand extends Command
 {
-    protected $signature = 'commissions:swap-entry-variant
+    protected $signature = 'commissions:recompute-earner-variant
                             {earner : بريد المسوّق أو معرّفه}
-                            {from : الصنف القديم — معرّف منتج أو متغيّر أو SKU أو جزء من الاسم}
-                            {to : الصنف الجديد — مثلها، ويجب أن يُطابق متغيّرًا واحدًا}
+                            {variant : الصنف — معرّف منتج أو متغيّر أو SKU أو جزء من الاسم}
                             {--apply : تنفيذ التعديل فعلًا (بدونه عرضٌ فقط)}
                             {--allow-zero-wholesale : اقبل سعر جملةٍ صفر لهذا الصنف وحده — الربح يصير سعر البيع كاملًا}';
 
-    protected $description = 'تبديل صنف حركات عمولة مسوّق وإعادة احتسابها على سعر جملة الصنف الجديد';
+    protected $description = 'إعادة احتساب حركات مسوّق على صنفٍ بعينه على سعر جملته الحاليّ';
 
     public function handle(CommissionService $commissions): int
     {
-        $earner = $this->resolveEarner((string) $this->argument('earner'));
+        $earner = User::where('email', $this->argument('earner'))
+            ->orWhere('id', is_numeric($this->argument('earner')) ? (int) $this->argument('earner') : 0)
+            ->first();
 
         if (! $earner) {
             $this->error('لا مستخدم بالبريد أو المعرّف «'.$this->argument('earner').'».');
@@ -42,40 +46,31 @@ class SwapEntryVariantCommand extends Command
             return self::FAILURE;
         }
 
-        $from = $this->resolveVariants((string) $this->argument('from'));
-        $to = $this->resolveVariants((string) $this->argument('to'));
+        $matches = $this->resolveVariants((string) $this->argument('variant'));
 
-        if ($from->isEmpty() || $to->isEmpty()) {
+        if ($matches->isEmpty()) {
             $this->error('لم يُطابَق صنف — راجع المعرّف أو الاسم.');
 
             return self::FAILURE;
         }
 
-        // الوجهة واحدة قطعًا: منتجٌ بمقاسات يعطي متغيّراتٍ عدّة، واختيارُ أحدها
-        // آليًّا يُسند الحركات إلى مقاسٍ لم يُبَع.
-        if ($to->count() > 1) {
-            $this->error('«'.$this->argument('to').'» يطابق '.$to->count().' متغيّرات — حدّد واحدًا بمعرّفه أو SKU:');
-            $this->table(['المعرّف', 'SKU', 'المنتج'], $to->map(fn ($v) => [
+        // متغيّرٌ واحد قطعًا: لكل متغيّرٍ سعر جملته، وإعادةُ الاحتساب على سعر
+        // أحدهم تُنزل حركاتِ مقاسٍ على سعر مقاسٍ آخر.
+        if ($matches->count() > 1) {
+            $this->error('«'.$this->argument('variant').'» يطابق '.$matches->count().' متغيّرات — حدّد واحدًا بمعرّفه أو SKU:');
+            $this->table(['المعرّف', 'SKU', 'المنتج'], $matches->map(fn ($v) => [
                 $v->id, $v->sku, $v->product?->name ?? '—',
             ])->all());
 
             return self::FAILURE;
         }
 
-        $target = $to->first();
-        $fromIds = $from->pluck('id')->all();
-
-        if (in_array($target->id, $fromIds, true)) {
-            $this->error('الصنف القديم والجديد واحد — لا شيء يُبدَّل.');
-
-            return self::FAILURE;
-        }
+        $variant = $matches->first();
 
         $this->line('');
         $this->info('المسوّق: '.$earner->name);
-        $this->line('من: '.$from->map(fn ($v) => ($v->product?->name ?? $v->sku).' #'.$v->id)->implode('، '));
-        $this->line('إلى: '.($target->product?->name ?? $target->sku).' #'.$target->id
-            .'  ·  سعر جملته: '.number_format($target->effectiveWholesalePrice(), 2));
+        $this->line('الصنف: '.($variant->product?->name ?? $variant->sku).' #'.$variant->id
+            .'  ·  سعر جملته الحاليّ: '.number_format($variant->effectiveWholesalePrice(), 2));
         $this->line('');
 
         if ($this->option('allow-zero-wholesale')) {
@@ -88,7 +83,7 @@ class SwapEntryVariantCommand extends Command
 
         try {
             $changes = $commissions->swapEntryVariant(
-                $earner, $fromIds, $target, $this->actor(),
+                $earner, [$variant->id], $variant, $this->actor(),
                 (bool) $this->option('apply'), (bool) $this->option('allow-zero-wholesale'),
             );
         } catch (ValidationException $e) {
@@ -98,7 +93,7 @@ class SwapEntryVariantCommand extends Command
         }
 
         if ($changes === []) {
-            $this->info('✓ لا حركات لهذا المسوّق على الصنف القديم.');
+            $this->info('✓ لا شيء يتغيّر — الحركات محسوبة على سعر الجملة الحاليّ أصلًا.');
 
             return self::SUCCESS;
         }
@@ -106,7 +101,7 @@ class SwapEntryVariantCommand extends Command
         $this->render($changes);
 
         if ($this->option('apply')) {
-            $this->info('✓ نُفّذ التبديل، وأُثبت في سجلّ التحوّلات. الفواتير والمخزون والقيود لم تُمَسّ.');
+            $this->info('✓ نُفّذت إعادة الاحتساب، وأُثبتت في سجلّ التحوّلات. الفواتير والمخزون والقيود لم تُمَسّ.');
         } else {
             $this->warn('عرضٌ فقط — لم يتغيّر شيء. للتنفيذ: أضف --apply');
         }
@@ -118,7 +113,7 @@ class SwapEntryVariantCommand extends Command
     private function render(array $changes): void
     {
         $rows = [];
-        $relabelled = [];
+        $kept = [];
         $total = 0.0;
 
         foreach ($changes as $change) {
@@ -126,7 +121,7 @@ class SwapEntryVariantCommand extends Command
             $order = $entry->order?->number ?? '—';
 
             if ($change['relabel_only']) {
-                $relabelled[] = [$order, number_format($change['was'], 2), $this->reason($change['reason'] ?? null)];
+                $kept[] = [$order, number_format($change['was'], 2), $this->reason($change['reason'] ?? null)];
 
                 continue;
             }
@@ -134,6 +129,7 @@ class SwapEntryVariantCommand extends Command
             $total += $change['delta'];
             $rows[] = [
                 $order,
+                number_format((float) $entry->wholesale_cost_snapshot, 2),
                 number_format($change['basis'], 2),
                 number_format($change['was'], 2),
                 number_format($change['now'], 2),
@@ -141,16 +137,16 @@ class SwapEntryVariantCommand extends Command
             ];
         }
 
-        if ($relabelled !== []) {
-            $this->warn('حركاتٌ يُبدَّل وسمُها ولا يتغيّر مبلغها:');
-            $this->table(['الطلب', 'المبلغ كما هو', 'السبب'], $relabelled);
+        if ($kept !== []) {
+            $this->warn('حركاتٌ لا يتغيّر مبلغها:');
+            $this->table(['الطلب', 'المبلغ كما هو', 'السبب'], $kept);
             $this->line('');
         }
 
         if ($rows !== []) {
-            $this->table(['الطلب', 'الهامش الجديد', 'كانت', 'تصير', 'الفرق'], $rows);
+            $this->table(['الطلب', 'الأساس القديم', 'الهامش الجديد', 'كانت', 'تصير', 'الفرق'], $rows);
             $this->line('');
-            $this->line('عدد الحركات المُعاد احتسابها: '.count($rows).'  ·  صافي الفرق: '.number_format($total, 2));
+            $this->line('عدد الحركات: '.count($rows).'  ·  صافي الفرق: '.number_format($total, 2));
             $this->line('');
         }
     }
@@ -162,30 +158,17 @@ class SwapEntryVariantCommand extends Command
             'fixed' => 'عمولة ثابتة — لا تتعلّق بالهامش',
             'has_prior_adjustment' => 'عليها تعديل سابق (مرتجع) — تُراجع يدويًّا',
             'no_order_item' => 'لا بند طلبٍ مرتبط',
-            default => 'الوسم فقط',
+            default => 'تُترك كما هي',
         };
     }
 
-    private function resolveEarner(string $key): ?User
-    {
-        return User::where('email', $key)
-            ->orWhere('id', is_numeric($key) ? (int) $key : 0)
-            ->first();
-    }
-
     /**
-     * معرّف متغيّر، أو SKU، أو معرّف منتج، أو جزءٌ من اسمه.
-     *
-     * الاسم مقبولٌ لأن الصنف يُعرَف به في الشاشة لا بمعرّفه، والعرض التجريبي
-     * يطبع ما طابقه قبل أي كتابة — فالتوسيع هنا لا يُخفي شيئًا.
-     *
      * @return Collection<int, ProductVariant>
      */
     private function resolveVariants(string $key): Collection
     {
-        // `wholesale_price` في التحميل لا الاسم وحده: بدونه يقرأ
-        // `effectiveWholesalePrice()` صفرًا من علاقةٍ منقوصة، فيُرفض التبديل
-        // بحجّة «سعر جملةٍ صفر» والكرت سليم.
+        // `wholesale_price` في التحميل: بدونه يُقرأ سعر الجملة صفرًا من علاقةٍ
+        // منقوصة، فيُرفض العمل والكرت سليم.
         $q = ProductVariant::with('product:id,name,wholesale_price');
 
         if (is_numeric($key)) {
