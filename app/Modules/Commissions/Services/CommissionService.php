@@ -40,7 +40,9 @@ class CommissionService
     /** الانتقالات المسموحة لآلة الحالة. */
     private const TRANSITIONS = [
         'pending' => ['eligible', 'cancelled', 'reversed'],
-        'eligible' => ['approved', 'cancelled', 'reversed'],
+        // `paid` من `eligible` مباشرةً للتسوية اليدوية: البند صُرف فعلًا بسندٍ
+        // سابق، والاعتمادُ خطوةٌ تسبق الصرف — فلا معنى للمرور بها بعده.
+        'eligible' => ['approved', 'paid', 'cancelled', 'reversed'],
         'approved' => ['paid', 'reversed'],
         'paid' => ['reversed'],
     ];
@@ -268,6 +270,57 @@ class CommissionService
         });
 
         return $count;
+    }
+
+    /**
+     * تعليم بنودٍ «مدفوعة» يدويًّا — **بلا سندٍ ولا قيدٍ ولا أثرٍ على الأرصدة**.
+     *
+     * ## لماذا هذا لا يمسّ المحاسبة
+     *
+     * الصرف الفعليّ يقع في `payAmount`: سندٌ يخرج به المال من الخزينة ويُرحَّل
+     * في الدفتر. والدفعة **مبلغٌ على الحساب** لا تُقابَل ببنودٍ بعينها، فتبقى
+     * البنود `eligible` بعدها — ويبقى المستخدم لا يعرف أيّ بندٍ غطّاه المال.
+     *
+     * وهذه العملية تسدّ ذلك الفراغ وحده: تُعلّم البنود التي غطّاها سندٌ صُرف
+     * سابقًا. ولا يتحرّك بها رقمٌ ماليّ لأن `earned` يجمع `eligible` و`approved`
+     * و`paid` سواءً، و«المدفوع» و«المتبقّي» يُقرآن من السندات لا من حالة البند.
+     * فالمتغيّر الوحيد هو **وسمُ البند** — ومعه بطاقةُ «المستحقّة» التي تعدّ
+     * البنود غير الموسومة.
+     *
+     * ولا يُصرف بها مال: من أراد الصرف فمن نموذج الدفع، وهذا للمطابقة فقط.
+     *
+     * @param  array<int, int|string>  $entryIds
+     * @return array{count: int, total: float}
+     */
+    public function markSettledManually(array $entryIds, int $earnerId, string $earnerType, ?User $actor, ?string $note = null): array
+    {
+        return DB::transaction(function () use ($entryIds, $earnerId, $earnerType, $actor, $note) {
+            // المستفيد في الشرط لا في الواجهة وحدها: معرّفٌ مُرسَل من متصفّح
+            // يُصدَّق، وبدونه عُلِّم بندُ مسوّقٍ آخر من كشف هذا.
+            $entries = CommissionEntry::whereIn('id', $entryIds)
+                ->where('earner_id', $earnerId)->where('earner_type', $earnerType)
+                ->whereIn('state', ['eligible', 'approved'])
+                ->lockForUpdate()->get();
+
+            if ($entries->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'entries' => __('لم يُحدَّد بندٌ قابل للتعليم — اختر بنودًا مستحقّة أو معتمدة.'),
+                ]);
+            }
+
+            // عمود المرجع ٨٠ حرفًا: ملاحظةٌ أطول كانت تُقطع في قاعدة البيانات
+            // أو تُسقط الحفظ، فتضيع التسوية كلّها من أجل نصٍّ زائد.
+            $reference = mb_substr($note ? 'manual: '.$note : 'manual', 0, 80);
+
+            foreach ($entries as $entry) {
+                $this->transition($entry, 'paid', $actor, $reference);
+            }
+
+            return [
+                'count' => $entries->count(),
+                'total' => round((float) $entries->sum('amount'), 2),
+            ];
+        });
     }
 
     /**

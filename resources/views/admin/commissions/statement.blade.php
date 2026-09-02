@@ -203,10 +203,32 @@
         </div>
 
         {{-- حركات المستحقّات ضمن الفترة --}}
-        <div class="bg-white border border-gray-200 rounded-lg p-5">
+        <div class="bg-white border border-gray-200 rounded-lg p-5"
+             x-data="{
+                 picked: [],
+                 amounts: @js($settleAmounts),
+                 get total() { return this.picked.reduce((s, id) => s + Number(this.amounts[id] ?? 0), 0) },
+                 get all() { return Object.keys(this.amounts) },
+                 get allPicked() { return this.picked.length > 0 && this.picked.length === this.all.length },
+                 toggleAll() { this.picked = this.allPicked ? [] : this.all },
+             }">
+            <form method="POST" action="{{ route('admin.commissions.settle_manually') }}" id="settle-form"
+                  onsubmit="return confirm('{{ __('تعليم البنود المحدَّدة كمدفوعة؟ لا يُصرف بها مال ولا يُنشأ سند.') }}')">
+                @csrf
+                <input type="hidden" name="earner_id" value="{{ $earnerId }}" />
+                <input type="hidden" name="earner_type" value="{{ $earnerType }}" />
+            </form>
+
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm text-right admin-table-stack">
                     <thead class="text-gray-500 border-b"><tr>
+                        @if ($canSettle)
+                            <th class="py-2 px-3 font-medium w-10">
+                                <input type="checkbox" :checked="allPicked" @change="toggleAll()"
+                                       class="rounded text-emerald-600 focus:ring-emerald-500"
+                                       title="{{ __('تحديد الكل في هذه الصفحة') }}" />
+                            </th>
+                        @endif
                         <th class="py-2 px-3 font-medium">{{ __('commissions.order') }}</th>
                         {{--
                             رقم التتبّع بجانب الطلب: به يُطابَق السطر مع كشف شركة
@@ -235,7 +257,18 @@
                     </tr></thead>
                     <tbody>
                         @forelse ($entries as $e)
-                            <tr class="border-b">
+                            <tr class="border-b" :class="picked.includes('{{ $e->id }}') && 'bg-emerald-50'">
+                                @if ($canSettle)
+                                    <td class="py-2 px-3">
+                                        @if ($settleAmounts->has((string) $e->id))
+                                            {{-- `form` صريح: النموذج خارج الجدول، وحقلٌ داخله لا يُرسَل بدونه. --}}
+                                            <input type="checkbox" form="settle-form" name="entry_ids[]" value="{{ $e->id }}"
+                                                   x-model="picked" class="rounded text-emerald-600 focus:ring-emerald-500" />
+                                        @else
+                                            <span class="text-gray-300">—</span>
+                                        @endif
+                                    </td>
+                                @endif
                                 <td class="py-2 px-3" data-label="{{ __('commissions.order') }}">
                                     @if ($e->order)
                                         {{-- رقم الطلب يفتح فاتورته في تبويب جديد --}}
@@ -272,12 +305,43 @@
                                 <td class="py-2 px-3" data-label="{{ __('commissions.state') }}">{{ __('commissions.'.$e->state) }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="9" class="py-6 text-center text-gray-400">{{ __('لا توجد حركات بهذه الحالة في الفترة.') }}</td></tr>
+                            <tr><td colspan="{{ $canSettle ? 10 : 9 }}" class="py-6 text-center text-gray-400">{{ __('لا توجد حركات بهذه الحالة في الفترة.') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
             <div class="mt-4">{{ $entries->links() }}</div>
+
+            {{--
+                شريط التحديد: المجموع يُقرأ قبل الضغط لا بعده.
+
+                والتحديد **لهذه الصفحة وحدها** — ثلاثون بندًا. وإخفاءُ ذلك كان
+                يُوهم أن «تحديد الكل» شمل الكشف كلّه، فيُعلَّم ثلثه ويُظنّ تمامه.
+            --}}
+            @if ($canSettle)
+                <div class="mt-4 border-t border-gray-200 pt-4" x-show="picked.length > 0" x-cloak>
+                    <div class="rounded-lg bg-emerald-50 border border-emerald-200 p-4 flex flex-wrap items-center gap-4">
+                        <div class="flex-1 min-w-48">
+                            <p class="text-sm text-emerald-900">
+                                {{ __('المحدَّد') }}
+                                <span class="font-semibold tabular-nums" x-text="picked.length"></span>
+                                {{ __('بندًا — بمجموع') }}
+                                <span class="font-semibold tabular-nums" x-text="total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })"></span>
+                            </p>
+                            <p class="text-xs text-emerald-700 mt-1">
+                                {{ __('التعليم مطابقةٌ لا صرف: لا يُنشأ سند ولا قيد، ولا يتغيّر «المدفوع» ولا «المتبقّي». للصرف استعمل نموذج دفع الأرباح أعلاه.') }}
+                            </p>
+                        </div>
+                        <input type="text" form="settle-form" name="note" maxlength="60"
+                               placeholder="{{ __('ملاحظة — مثلًا رقم السند') }}"
+                               class="rounded-lg border-gray-300 text-sm w-56" />
+                        <button type="submit" form="settle-form"
+                                class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700">
+                            {{ __('تعليم كمدفوعة') }}
+                        </button>
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 </x-app-layout>

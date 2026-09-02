@@ -17,6 +17,7 @@ use App\Modules\Foundation\Models\Branch;
 use App\Support\XlsxExporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -233,6 +234,38 @@ class CommissionController extends Controller
         return back()->with('status', __('commissions.approved_count', ['count' => $count]));
     }
 
+    /**
+     * تعليم بنودٍ «مدفوعة» يدويًّا — مطابقةٌ لا صرف.
+     *
+     * لا سند ولا قيد ولا حركة خزينة: البنود صُرفت بسندٍ سابق، وهذا يَسِمُها به.
+     * والصرف الفعليّ من نموذج «دفع أرباح» وحده.
+     */
+    public function settleManually(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'earner_id' => ['required', 'integer'],
+            'earner_type' => ['required', 'in:sales,affiliate'],
+            'entry_ids' => ['required', 'array', 'min:1'],
+            'entry_ids.*' => ['integer'],
+            // ٦٠ حرفًا لا ٨٠: يُضاف إليها وسم «manual: » في عمودٍ سعتُه ٨٠.
+            'note' => ['nullable', 'string', 'max:60'],
+        ]);
+
+        try {
+            $result = $this->commissions->markSettledManually(
+                $data['entry_ids'], $data['earner_id'], $data['earner_type'],
+                $request->user(), $data['note'] ?? null,
+            );
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        return back()->with('status', __('عُلِّم :count بندًا كمدفوع بمجموع :total — بلا سندٍ ولا قيد.', [
+            'count' => $result['count'],
+            'total' => number_format($result['total'], 2),
+        ]));
+    }
+
     public function payout(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -263,7 +296,25 @@ class CommissionController extends Controller
             return $this->statementXlsx($earnerId, $type, $range, $fromStr, $toStr, $state);
         }
 
+        $entries = $this->statementEntries($earnerId, $type, $range, $state)
+            ->latest('id')->paginate(30)->withQueryString();
+
+        /*
+            البنود القابلة للتعليم يدويًّا في هذه الصفحة: المستحقّة والمعتمدة
+            وحدها. والمدفوعة والملغاة والمعكوسة لا مربّع لها — تحديدُ ما لا
+            يُعلَّم يجعل المجموع يعِد بما لا يقع.
+
+            وتُحسب هنا لا في الشاشة: المجموع يُحتسب في المتصفّح من هذه المبالغ،
+            وقراءتُه من نصّ الخليّة تكسرها الفاصلة الألفية (`1,234.00`).
+        */
+        $settleAmounts = collect($entries->items())
+            ->filter(fn ($e) => in_array($e->state, ['eligible', 'approved'], true))
+            ->mapWithKeys(fn ($e) => [(string) $e->id => (float) $e->amount]);
+
         return view('admin.commissions.statement', [
+            'entries' => $entries,
+            'settleAmounts' => $settleAmounts,
+            'canSettle' => $request->user()?->can('commissions.payout') && $settleAmounts->isNotEmpty(),
             'earnerId' => $earnerId,
             'earnerType' => $type,
             'earner' => User::find($earnerId),
@@ -280,8 +331,6 @@ class CommissionController extends Controller
             //
             // ورقم التتبّع يُقرأ من الطلب عرضًا فقط — Protected Delivery
             // Integration — Do Not Modify: لا يُكتب ولا يُطلب من الشركة.
-            'entries' => $this->statementEntries($earnerId, $type, $range, $state)
-                ->latest('id')->paginate(30)->withQueryString(),
             // `uuid` إلزاميّ في التحديد: مفتاح مسار السند هو الـuuid لا الـid
             // (HasUuid)، وبدونه يُبنى رابط «عرض السند» بمفتاحٍ فارغ فلا يفتح.
             // و`notes` تُعرض في الجدول فلا تُجلب بطلبٍ ثانٍ لكل صفّ.

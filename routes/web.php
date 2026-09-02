@@ -432,6 +432,8 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
         Route::post('approve', [AdminCommissionController::class, 'approve'])->name('approve')->middleware('can:commissions.approve');
         Route::post('payout', [AdminCommissionController::class, 'payout'])->name('payout')->middleware('can:commissions.payout');
         Route::post('pay-profit', [AdminCommissionController::class, 'payProfit'])->name('pay_profit')->middleware('can:commissions.payout');
+        // مطابقةٌ لا صرف: تَسِمُ بنودًا غطّاها سندٌ سابق، بلا سندٍ ولا قيد.
+        Route::post('settle-manually', [AdminCommissionController::class, 'settleManually'])->name('settle_manually')->middleware('can:commissions.payout');
         Route::get('rules', [AdminCommissionController::class, 'rules'])->name('rules')->middleware('can:commissions.rules.manage');
         Route::post('rules', [AdminCommissionController::class, 'storeRule'])->name('rules.store')->middleware('can:commissions.rules.manage');
         Route::delete('rules/{rule}', [AdminCommissionController::class, 'destroyRule'])->name('rules.destroy')->middleware('can:commissions.rules.manage');

@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — mark commission entries paid by hand, without moving any money
+
+Paying an earner goes through `payAmount`: a voucher leaves the treasury and
+posts to the ledger. But a payout is **money on account** — it is not matched to
+particular entries — so every entry stays `eligible` afterwards. The screen then
+shows four posted vouchers and a long list of entries all still marked
+"مستحقّة", with no way to tell which ones the money covered.
+
+The statement now carries a checkbox per selectable entry, a select-all in the
+header, and a bar at the foot of the page showing **how many are selected and
+what they add up to** before anything is submitted.
+
+Marking is reconciliation, not disbursement, and it moves no money: no voucher,
+no journal entry, no treasury movement, no payout record. Nor does any figure
+shift — `earned` counts `eligible`, `approved` and `paid` alike, and both
+"المدفوع" and "المتبقّي" are read from vouchers rather than from entry state.
+The only thing that changes is the entry's own label, and the "المستحقّة" card
+that counts unlabelled entries. Each marking is written to
+`commission_transitions` with its actor and a reference (`manual: <note>`).
+
+Selection covers the displayed page only (30 rows), and the bar says so — hiding
+that would let "select all" look like it covered the whole statement while it
+marked a third of it. The earner is a condition of the query, not just of the
+form, so an entry belonging to somebody else is never touched even if its id is
+posted. Gated on `commissions.payout`.
+
+One later behaviour does follow from the label: returning an entry marked `paid`
+creates a negative refund entry (BR-MKT-07) instead of reversing it outright —
+which is correct, since its money did go out.
+
 ### Fixed — merging duplicate customers left the merged record's balance behind
 
 `CustomerService::merge()` moved phones, addresses, contacts, notes and orders,
