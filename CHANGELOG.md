@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — swap the product on an earner's commission entries
+
+A product sold under one name and later sold under another leaves the earner's
+statement on the old name: it reads as two products when it is one, and the
+profit is computed against a wholesale price that no longer applies.
+
+`commissions:swap-entry-variant <earner> <from> <to>` re-points the entries and
+recomputes the margin on the new product's wholesale price. It previews by
+default and writes only with `--apply`, and it is scoped to one earner — a
+single order may carry commission for somebody else, who is not part of this
+correction.
+
+**It touches `commission_entries` and nothing else.** The invoice, its lines,
+stock, revenue, COGS and the journal are all left exactly as they are: the goods
+really did leave under the old product, and rewriting that would leave stock
+deducted from one item and the invoice raised on another.
+
+**A zero wholesale on the target is refused.** Zero here means *unknown*, not
+*free* — an affiliate's commission is based on margin, so a zero wholesale makes
+the margin the entire sale price and inflates what is owed. Fix the item card,
+then run it again. This is the same guard `recomputeItemCommissions` already
+applies (`$cost <= 0`).
+
+Three kinds are relabelled without recomputing: **paid** entries (the payment
+voucher carries what actually left the treasury), **fixed** commissions (not
+margin-based), and entries **already adjusted** by a return (those need a human).
+Every swap is written to `commission_transitions` with its before and after.
+
 ### Added — mark commission entries paid by hand, without moving any money
 
 Paying an earner goes through `payAmount`: a voucher leaves the treasury and

@@ -4,6 +4,7 @@ namespace App\Modules\Commissions\Services;
 
 use App\Models\User;
 use App\Modules\Accounting\Services\VoucherService;
+use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Catalog\Services\PriceListService;
 use App\Modules\Commissions\Events\CommissionAccrued;
 use App\Modules\Commissions\Events\CommissionAdjusted;
@@ -548,6 +549,193 @@ class CommissionService
      *
      * @param  array<int, array{entry: CommissionEntry, was: float, now: float, delta: float, stale: mixed, basis: float}>  $changes
      */
+    /**
+     * تبديل صنف حركات عمولة مسوّقٍ واحد من متغيّرٍ إلى آخر، وإعادة الاحتساب عليه.
+     *
+     * ## ما يُمَسّ وما لا يُمَسّ
+     *
+     * **الكشف وحده.** تُكتب `commission_entries` لا غير: الفاتورة وبنودها
+     * والمخزون والإيراد وتكلفة المبيعات وقيود اليومية تبقى كما هي حرفًا بحرف.
+     * فالبضاعة خرجت على الصنف القديم فعلًا، وإعادةُ كتابة ذلك تجعل المخزون
+     * مخصومًا من صنفٍ والفاتورة على صنفٍ آخر.
+     *
+     * ## ولماذا الصفر يُرفض
+     *
+     * سعر جملةٍ صفر في هذا النظام يعني **«غير معروف»** لا «مجّاني»: أساس عمولة
+     * المسوّق هو الهامش، فجملةٌ صفر تجعل الهامش سعرَ البيع كاملًا وتُضخّم
+     * المستحقّ. ولهذا يُرفض التبديل حتى يُصحَّح كرت الصنف الجديد — وهو نفس
+     * حارس `recomputeItemCommissions` (`$cost <= 0`).
+     *
+     * ## وحدود لا تُتجاوز
+     *
+     * - **المدفوعة يُبدَّل وسمُها ولا يُمَسّ مبلغها**: سند الصرف يحمل ما خرج من
+     *   الخزينة، وتغييرُ الرقم في الدفتر وحده يجعل الحساب يخالف الخزينة. ويبقى
+     *   الاسم موحَّدًا في الكشف لأن الوسم لا يحرّك مالًا.
+     * - **ذاتُ التعديل السابق (مرتجع) تُترك للمراجعة اليدوية** — تعديل المرتجع
+     *   حُسب نسبةً من مبلغٍ سابق، وتصحيحُه آليًّا يحتاج افتراضًا عن الترتيب.
+     * - **العمولة الثابتة يُبدَّل وسمُها ولا يُعاد احتسابها** — لا تتعلّق بالهامش.
+     *
+     * وكل تغيير يُدوَّن في `commission_transitions` بقيمته السابقة والجديدة.
+     *
+     * @param  array<int, int>  $fromVariantIds
+     * @return array<int, array<string, mixed>>
+     */
+    public function swapEntryVariant(
+        User $earner,
+        array $fromVariantIds,
+        ProductVariant $to,
+        ?User $actor = null,
+        bool $apply = false,
+    ): array {
+        $cost = round($to->effectiveWholesalePrice(), 2);
+
+        if ($cost <= 0) {
+            throw ValidationException::withMessages(['wholesale' => __(
+                'سعر جملة «:name» صفر — والصفر هنا يعني «غير معروف» لا «مجّاني»، '
+                .'فيصير الهامش سعرَ البيع كاملًا ويتضخّم المستحقّ. صحّح كرت الصنف ثم أعد التشغيل.',
+                ['name' => $to->product?->name ?? $to->sku],
+            )]);
+        }
+
+        $entries = CommissionEntry::query()
+            ->where('earner_id', $earner->id)
+            ->where('earner_type', 'affiliate')
+            ->where('entry_type', 'accrual')
+            ->whereIn('variant_id', $fromVariantIds)
+            ->whereNotIn('state', ['reversed', 'cancelled'])
+            ->with(['orderItem', 'order:id,number,created_at', 'variant.product:id,name'])
+            ->orderBy('id')
+            ->get();
+
+        $changes = [];
+
+        foreach ($entries as $entry) {
+            $changes[] = $this->planVariantSwap($entry, $to, $cost);
+        }
+
+        if ($apply && $changes !== []) {
+            $this->writeVariantSwaps($changes, $to, $cost, $actor);
+        }
+
+        return $changes;
+    }
+
+    /**
+     * ماذا يقع على حركةٍ واحدة — قرارًا قبل الكتابة.
+     *
+     * يُفصل التخطيط عن الكتابة كي يكون العرض التجريبي هو نفسه ما سيُنفَّذ، لا
+     * حسابًا ثانيًا قد يختلف عنه.
+     *
+     * @return array<string, mixed>
+     */
+    private function planVariantSwap(CommissionEntry $entry, ProductVariant $to, float $cost): array
+    {
+        $base = [
+            'entry' => $entry,
+            'was' => (float) $entry->amount,
+            'now' => (float) $entry->amount,
+            'delta' => 0.0,
+            'relabel_only' => true,
+        ];
+
+        if ($entry->state === 'paid') {
+            return $base + ['reason' => 'paid'];
+        }
+
+        if (($entry->rule_snapshot['method'] ?? 'margin') === 'fixed') {
+            return $base + ['reason' => 'fixed'];
+        }
+
+        if (CommissionEntry::where('adjusts_entry_id', $entry->id)->exists()) {
+            return $base + ['reason' => 'has_prior_adjustment'];
+        }
+
+        $item = $entry->orderItem;
+
+        if (! $item) {
+            return $base + ['reason' => 'no_order_item'];
+        }
+
+        $margin = $this->itemMargin($item, $cost);
+        $rate = (float) ($entry->rate ?? 1.0);
+        $amount = round(($entry->rule_snapshot['method'] ?? 'margin') === 'margin' ? $margin : $margin * $rate, 2);
+
+        return [
+            'entry' => $entry,
+            'was' => (float) $entry->amount,
+            'now' => $amount,
+            'delta' => round($amount - (float) $entry->amount, 2),
+            'basis' => round($margin, 2),
+            'relabel_only' => false,
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $changes
+     */
+    private function writeVariantSwaps(array $changes, ProductVariant $to, float $cost, ?User $actor): void
+    {
+        DB::transaction(function () use ($changes, $to, $cost, $actor) {
+            foreach ($changes as $change) {
+                /** @var CommissionEntry $entry */
+                $entry = $change['entry'];
+
+                // الوسم وحده للمدفوعة والثابتة وذات التعديل السابق: الاسم يوحَّد
+                // في الكشف ولا يتحرّك مالٌ ولا لقطةُ كلفةٍ حُسب عليها المبلغ.
+                if ($change['relabel_only']) {
+                    CommissionEntry::whereKey($entry->id)->toBase()->update([
+                        'variant_id' => $to->id,
+                        'updated_at' => now(),
+                    ]);
+
+                    $this->logVariantSwap($entry, $to, null, null, $change['reason'] ?? null, $actor);
+
+                    continue;
+                }
+
+                // `basis` و`amount` محروسان بحارس عدم التعديل في النموذج،
+                // ويُتجاوزان هنا بقرارٍ صريح بالكتابة عبر الاستعلام — كما في
+                // تصحيح لقطة الجملة تمامًا، والأثر مُدوَّن.
+                CommissionEntry::whereKey($entry->id)->toBase()->update([
+                    'variant_id' => $to->id,
+                    'basis' => $change['basis'],
+                    'amount' => $change['now'],
+                    'wholesale_cost_snapshot' => $cost,
+                    'updated_at' => now(),
+                ]);
+
+                $this->logVariantSwap($entry, $to, $change['was'], $change['now'], null, $actor);
+
+                CommissionAdjusted::dispatch($entry->refresh());
+            }
+        });
+    }
+
+    private function logVariantSwap(
+        CommissionEntry $entry,
+        ProductVariant $to,
+        ?float $was,
+        ?float $now,
+        ?string $reason,
+        ?User $actor,
+    ): void {
+        $label = $to->product?->name ?? $to->sku;
+
+        $note = $was === null
+            ? 'تبديل الصنف إلى «'.$label.'» — الوسم فقط ('.($reason ?? 'relabel').')'
+            : 'تبديل الصنف إلى «'.$label.'» وإعادة الاحتساب: '
+                .number_format($was, 2).' ← '.number_format((float) $now, 2);
+
+        CommissionTransition::create([
+            'commission_entry_id' => $entry->id,
+            'from_state' => $entry->state,
+            'to_state' => $entry->state,   // الحالة لم تتغيّر — الصنف والمبلغ
+            'actor_id' => $actor?->id ?? auth()->id(),
+            'reference' => 'variant_swap',
+            'note' => $note,
+        ]);
+    }
+
     /**
      * إعادة تسعير عمولات مسوّقٍ واحد على قائمة أسعاره.
      *

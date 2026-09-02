@@ -6,6 +6,7 @@ use App\Modules\Accounting\Events\VoucherRevised;
 use App\Modules\Commissions\Console\AuditEarnerPricesCommand;
 use App\Modules\Commissions\Console\RepairWholesaleSnapshotsCommand;
 use App\Modules\Commissions\Console\RepriceEarnerCommand;
+use App\Modules\Commissions\Console\SwapEntryVariantCommand;
 use App\Modules\Commissions\Listeners\AccrueCommissionsOnDelivery;
 use App\Modules\Commissions\Listeners\SyncPayoutOnVoucherRevised;
 use App\Modules\Sales\Events\OrderDelivered;
@@ -33,6 +34,7 @@ class CommissionsServiceProvider extends ServiceProvider
                 AuditEarnerPricesCommand::class,
                 RepairWholesaleSnapshotsCommand::class,
                 RepriceEarnerCommand::class,
+                SwapEntryVariantCommand::class,
             ]);
         }
     }
