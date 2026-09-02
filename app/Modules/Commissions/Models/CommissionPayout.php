@@ -9,13 +9,14 @@ use App\Support\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * دفعة صرف عمولة/أرباح مجمّعة (Phase 4.2 / ADR-037).
  */
 class CommissionPayout extends Model
 {
-    use HasUuid;
+    use HasUuid, SoftDeletes;
 
     protected $fillable = [
         'earner_id', 'earner_type', 'treasury_id', 'financial_voucher_id', 'total', 'reference',

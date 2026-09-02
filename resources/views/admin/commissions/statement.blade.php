@@ -189,9 +189,26 @@
                                         يبحث عن سندٍ uuid‑ه «8» فلا يجده — رابطٌ
                                         يفتح صفحة «غير موجود».
                                     --}}
-                                    @if ($p->voucher)
-                                        <a href="{{ route('admin.accounting.vouchers.show', ['kind' => $p->voucher->kind, 'voucher' => $p->voucher]) }}" class="text-emerald-600 hover:underline">{{ __('commissions.view_voucher') }}</a>
-                                    @endif
+                                    <div class="flex items-center gap-3">
+                                        @if ($p->voucher)
+                                            <a href="{{ route('admin.accounting.vouchers.show', ['kind' => $p->voucher->kind, 'voucher' => $p->voucher]) }}" class="text-emerald-600 hover:underline">{{ __('commissions.view_voucher') }}</a>
+                                        @endif
+                                        {{--
+                                            الحذف يعكس السند ولا يمحوه، والتأكيد
+                                            يقول أثره على الرصيد: من يحذف دفعةً
+                                            مُرحَّلة يجب أن يعرف أن المتبقّي يرتفع
+                                            قبل أن يضغط لا بعده.
+                                        --}}
+                                        @can('commissions.payout')
+                                            <form method="POST" action="{{ route('admin.commissions.payouts.destroy', $p) }}"
+                                                  onsubmit="return confirm('{{ $p->voucher?->status === 'posted'
+                                                      ? __('سيُعكس السند بقيدٍ عاكس ويرتفع المتبقّي :amount. متابعة؟', ['amount' => number_format($p->settledAmount(), 2)])
+                                                      : __('حذف هذه الدفعة من الأرشيف؟') }}')">
+                                                @csrf @method('DELETE')
+                                                <button class="text-rose-600 hover:underline">{{ __('حذف') }}</button>
+                                            </form>
+                                        @endcan
+                                    </div>
                                 </td>
                             </tr>
                         @empty

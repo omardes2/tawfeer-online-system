@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — delete a payout from the archive, by reversing its voucher
+
+The payout archive had no way to remove a row. A voucher is a document that
+money left the treasury under, with a posted journal entry behind it, so erasing
+it would drop the treasury balance for no visible reason and leave an orphaned
+entry (BR-ACC-09).
+
+Deleting a payout now does the accounting instead: a **posted** voucher is
+reversed with a reversing entry — the money comes back in the books and both the
+original and the reversal stay readable, "paid then cancelled" rather than "never
+paid". A **draft or approved** voucher is cancelled, since there is no entry to
+reverse and it should not post later by accident. One already **reversed or
+cancelled** is left alone. The archive row is then soft-deleted, so it stays in
+the database attached to its voucher.
+
+**The effect on the balance is the point.** Paid counts only posted vouchers, so
+reversing one raises what the earner is still owed by that amount — correct,
+because the money returned to the treasury. The confirmation names the figure
+before the click, not after.
+
+Two cases are refused: a payout **with no voucher** (it counts as settled, so
+deleting it would raise the outstanding with no entry behind it — money claimed
+twice), and a payout **with linked entries** (they sit in `paid`, and moving them
+back is not a permitted transition; that belongs with an accountant on the
+voucher screen).
+
 ### Added — swap the product on an earner's commission entries
 
 A product sold under one name and later sold under another leaves the earner's

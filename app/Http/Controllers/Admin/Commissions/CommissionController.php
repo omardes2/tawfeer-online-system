@@ -266,6 +266,33 @@ class CommissionController extends Controller
         ]));
     }
 
+    /**
+     * حذف دفعة من الأرشيف — بعكس سندها لا بمحوه.
+     *
+     * ورسالةُ النجاح تقول ماذا وقع للسند وكم ارتفع المتبقّي: من يحذف دفعةً
+     * مُرحَّلة يجب أن يرى أثرها في الرصيد فورًا لا أن يكتشفه لاحقًا.
+     */
+    public function destroyPayout(Request $request, CommissionPayout $payout): RedirectResponse
+    {
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:120']]);
+
+        try {
+            $result = $this->commissions->deletePayout($payout, $request->user(), $data['reason'] ?? null);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        $said = match ($result['voucher_action']) {
+            'reversed' => __('عُكس سندها بقيدٍ عاكس، وارتفع المتبقّي :amount.', [
+                'amount' => number_format($result['amount'], 2),
+            ]),
+            'cancelled' => __('أُلغي سندها قبل ترحيله — لا قيد في الدفتر.'),
+            default => __('سندها معكوسٌ أو ملغًى أصلًا — لم يتغيّر رصيد.'),
+        };
+
+        return back()->with('status', __('حُذفت الدفعة من الأرشيف. :said', ['said' => $said]));
+    }
+
     public function payout(Request $request): RedirectResponse
     {
         $data = $request->validate([
