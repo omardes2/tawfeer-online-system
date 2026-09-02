@@ -18,6 +18,8 @@ use App\Modules\Sales\Services\OrderService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use OpenSpout\Reader\XLSX\Reader;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Tests\TestCase;
 
 /**
@@ -374,6 +376,81 @@ class SwapEntryVariantTest extends TestCase
 
         $this->assertSame([], $changes);
         $this->assertSame($before, CommissionTransition::where('commission_entry_id', $entry->id)->count());
+    }
+
+    // ────────── التصدير يتبع ما تغيّر ──────────
+
+    /**
+     * **وملفّ Excel يحمل ما تغيّر** — لا نسخةً قديمة.
+     *
+     * الشاشة والتصدير يقرآن من استعلامٍ واحد (`statementEntries`)، والعمودان
+     * يقرآن من الحركة نفسها: الاسم من متغيّرها، وسعر الجملة من لقطتها. فلا
+     * يحتاج التصدير مزامنةً — لكن الاختبار يقفل هذا الضمان كي لا ينكسر بصمتٍ
+     * عند أول تغييرٍ في أحد المسارين.
+     */
+    public function test_the_excel_export_carries_the_swapped_name_and_new_cost(): void
+    {
+        $entry = $this->entry();
+        $free = $this->product('عطر بلا كلفة', 33, 0);
+
+        $this->runSwap(to: $free->defaultVariant, allowZero: true);
+
+        $text = $this->sheetText($this->exportStatement());
+
+        $this->assertStringContainsString('عطر بلا كلفة', $text);
+        $this->assertStringNotContainsString('عطر 250 ملم', $text);
+        // الربح صار سعر البيع كاملًا، وسعر الجملة صفرًا.
+        $this->assertStringContainsString('33', $text);
+        $this->assertSame('0.00', $entry->fresh()->wholesale_cost_snapshot);
+    }
+
+    /**
+     * **والتصدير يتبع فلتر الحالة**: بندٌ عُلِّم مدفوعًا يغيب عن تصدير
+     * «المستحقّة» — وهو الصواب، لكنّه يُفاجئ من صدّر بعد التعليم ووجد الملفّ أقصر.
+     */
+    public function test_the_export_follows_the_state_filter(): void
+    {
+        $entry = $this->entry();
+
+        $this->assertStringContainsString('SO-', $this->sheetText($this->exportStatement()));
+
+        CommissionEntry::whereKey($entry->id)->toBase()->update(['state' => 'paid']);
+
+        $this->assertStringNotContainsString('SO-', $this->sheetText($this->exportStatement()));
+        $this->assertStringContainsString('SO-', $this->sheetText($this->exportStatement('all')));
+    }
+
+    private function exportStatement(string $state = 'eligible'): BinaryFileResponse
+    {
+        return $this->actingAs($this->admin)->get(route('admin.commissions.statement', [
+            'earnerId' => $this->affiliate->id,
+            'earner_type' => 'affiliate',
+            'from' => now()->startOfYear()->toDateString(),
+            'to' => now()->endOfYear()->toDateString(),
+            'state' => $state,
+            'export' => 'xlsx',
+        ]))->assertOk()->baseResponse;
+    }
+
+    /** نصُّ ورقة الإكسل كاملًا — لتأكيد قيمةٍ بصرف النظر عن موضعها. */
+    private function sheetText(BinaryFileResponse $response): string
+    {
+        $reader = new Reader;
+        $reader->open($response->getFile()->getPathname());
+
+        $rows = [];
+        foreach ($reader->getSheetIterator() as $sheet) {
+            foreach ($sheet->getRowIterator() as $row) {
+                $rows[] = implode('|', array_map(
+                    static fn ($c) => $c instanceof \DateTimeInterface ? $c->format('Y-m-d') : (string) $c,
+                    $row->toArray(),
+                ));
+            }
+            break;
+        }
+        $reader->close();
+
+        return implode("\n", $rows);
     }
 
     // ────────── الأثر مُدوَّن ──────────
