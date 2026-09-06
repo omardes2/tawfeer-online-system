@@ -1,4 +1,9 @@
-@props(['title', 'range', 'searchable' => false, 'exportable' => false])
+{{--
+    `exportFormat` تُمرَّر ولا تُفترض: التقارير القديمة تُصدَّر CSV، وكشف الخزينة
+    ملفَّ xlsx حقيقيًّا (أرقام التتبّع نصوصٌ فيه، وCSV يجعل Excel يقرؤها أرقامًا
+    فيحوّل الطويل منها إلى صيغةٍ أسّية). فالافتراضي يُبقي القديم كما هو.
+--}}
+@props(['title', 'range', 'searchable' => false, 'exportable' => false, 'exportFormat' => 'csv'])
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
@@ -36,7 +41,7 @@
                 @endif
                 <button type="submit" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('reports.apply') }}</button>
                 @if ($exportable)
-                    <a href="{{ request()->fullUrlWithQuery(['export' => 'csv']) }}" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('reports.export_excel') }}</a>
+                    <a href="{{ request()->fullUrlWithQuery(['export' => $exportFormat]) }}" class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md">{{ __('reports.export_excel') }}</a>
                 @endif
             </form>
         </div>

@@ -16,6 +16,8 @@ use App\Modules\Sales\Services\OrderService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use OpenSpout\Reader\XLSX\Reader;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Tests\TestCase;
 
 /**
@@ -163,5 +165,101 @@ class TreasuryStatementColumnsTest extends TestCase
 
         // سندات + طلبات + علاقات السند المُحمَّلة مسبقًا — لا حلقةَ استعلامات.
         $this->assertLessThanOrEqual(6, $count);
+    }
+
+    // ────────── تصدير Excel ──────────
+
+    private function export(): BinaryFileResponse
+    {
+        return $this->get(route('admin.accounting.finance_reports.treasury_statement', [
+            'treasury' => $this->treasury, 'export' => 'xlsx',
+        ]))->assertOk()->baseResponse;
+    }
+
+    /** نصُّ الورقة كاملًا — لتأكيد قيمةٍ بصرف النظر عن موضعها. */
+    private function sheetText(BinaryFileResponse $response): string
+    {
+        $reader = new Reader;
+        $reader->open($response->getFile()->getPathname());
+
+        $rows = [];
+        foreach ($reader->getSheetIterator() as $sheet) {
+            foreach ($sheet->getRowIterator() as $row) {
+                $rows[] = implode('|', array_map(
+                    static fn ($c) => $c instanceof \DateTimeInterface ? $c->format('Y-m-d') : (string) $c,
+                    $row->toArray(),
+                ));
+            }
+            break;
+        }
+        $reader->close();
+
+        return implode("\n", $rows);
+    }
+
+    /** **يُنزَّل ملفَّ xlsx حقيقيًّا** لا CSV بامتدادٍ مُضلِّل. */
+    public function test_the_export_downloads_an_xlsx(): void
+    {
+        $response = $this->export();
+
+        $this->assertInstanceOf(BinaryFileResponse::class, $response);
+        $this->assertStringContainsString('.xlsx', $response->headers->get('content-disposition'));
+        // توقيع أرشيف zip — وهو ما يجعل Excel يفتحه بلا حيلةِ BOM.
+        $this->assertSame('PK', substr(file_get_contents($response->getFile()->getPathname()), 0, 2));
+    }
+
+    /** **ويحمل رقم التتبّع واسم الزبون** — وبهما تُطابَق فاتورة شركة التوصيل. */
+    public function test_the_export_carries_the_tracking_and_customer(): void
+    {
+        $text = $this->sheetText($this->export());
+
+        $this->assertStringContainsString('7441552', $text);
+        $this->assertStringContainsString('رنا واتس', $text);
+        $this->assertStringContainsString('رقم التتبّع', $text);
+    }
+
+    /**
+     * **ورقم التتبّع نصٌّ لا رقم.**
+     *
+     * أرقام التتبّع طويلة، وExcel يحوّل الطويل منها إلى صيغةٍ أسّية
+     * (`7.4416E+06`) فلا يُطابَق بها شيء.
+     */
+    public function test_the_tracking_number_is_written_as_text(): void
+    {
+        $reader = new Reader;
+        $reader->open($this->export()->getFile()->getPathname());
+
+        $found = false;
+        foreach ($reader->getSheetIterator() as $sheet) {
+            foreach ($sheet->getRowIterator() as $row) {
+                foreach ($row->toArray() as $cell) {
+                    if ($cell === '7441552') {
+                        $found = true;
+                    }
+                }
+            }
+            break;
+        }
+        $reader->close();
+
+        $this->assertTrue($found, 'رقم التتبّع يجب أن يُكتب نصًّا لا رقمًا.');
+    }
+
+    /** ويحمل ترويسةَ الخزينة والمدّة ورصيدَي أوّل المدّة وآخرها. */
+    public function test_the_export_carries_the_header_and_balances(): void
+    {
+        $text = $this->sheetText($this->export());
+
+        $this->assertStringContainsString($this->treasury->name, $text);
+        $this->assertStringContainsString('رصيد أول المدّة', $text);
+        $this->assertStringContainsString('رصيد آخر المدّة', $text);
+    }
+
+    /** والزرّ ظاهرٌ على الشاشة ويشير إلى xlsx لا إلى csv. */
+    public function test_the_screen_offers_the_export(): void
+    {
+        $this->get(route('admin.accounting.finance_reports.treasury_statement', $this->treasury))
+            ->assertOk()
+            ->assertSee('export=xlsx', false);
     }
 }

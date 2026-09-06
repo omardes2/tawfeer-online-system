@@ -1,4 +1,4 @@
-<x-report.layout :title="__('كشف حساب').' — '.$treasury->name" :range="$range">
+<x-report.layout :title="__('كشف حساب').' — '.$treasury->name" :range="$range" :exportable="true" export-format="xlsx">
     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
         <div class="bg-white shadow-sm rounded-lg p-4"><p class="text-lg font-bold">{{ number_format($opening, 2) }}</p><p class="text-xs text-gray-500">{{ __('رصيد أول المدّة') }}</p></div>
         <div class="bg-white shadow-sm rounded-lg p-4"><p class="text-lg font-bold text-emerald-700">{{ number_format($closing, 2) }}</p><p class="text-xs text-gray-500">{{ __('الرصيد الحالي') }}</p></div>

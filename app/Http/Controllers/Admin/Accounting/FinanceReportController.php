@@ -4,12 +4,16 @@ namespace App\Http\Controllers\Admin\Accounting;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Accounting\Models\FinancialVoucher;
+use App\Modules\Accounting\Models\JournalLine;
 use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Accounting\Services\TreasuryService;
 use App\Modules\Reporting\Support\DateRange;
+use App\Support\XlsxExporter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -29,7 +33,7 @@ class FinanceReportController extends Controller
     }
 
     /** كشف حساب خزينة/بنك: الحركات المُرحّلة برصيد جارٍ. */
-    public function treasuryStatement(Treasury $treasury, Request $request): View
+    public function treasuryStatement(Treasury $treasury, Request $request): View|BinaryFileResponse
     {
         $range = DateRange::resolve($request->query('preset', 'month'), $request->query('from'), $request->query('to'));
         [$from, $to] = $range->bounds();
@@ -52,13 +56,85 @@ class FinanceReportController extends Controller
             $lines->map(fn ($l) => $l->entry?->id)->filter()->unique()->all(),
         );
 
+        $opening = round($opening, 2);
+
+        if ($request->query('export') === 'xlsx') {
+            return $this->treasuryStatementXlsx($treasury, $range, $lines, $opening, $meta);
+        }
+
         return view('admin.accounting.reports.treasury_statement', [
-            'treasury' => $treasury, 'range' => $range, 'lines' => $lines, 'opening' => round($opening, 2),
+            'treasury' => $treasury, 'range' => $range, 'lines' => $lines, 'opening' => $opening,
             'closing' => $this->treasuries->balance($treasury),
             // رقم التتبّع تُطابَق به فاتورة شركة التوصيل سطرًا سطرًا، واسمُ الطرف
             // يجعل السطر يُقرأ بلا فتح الطلب.
             ...$meta,
         ]);
+    }
+
+    /**
+     * كشف الخزينة ملفَّ Excel — بنفس أعمدة الشاشة ورصيدها المتحرّك.
+     *
+     * الرصيد يُحتسب هنا لا يُقرأ من الشاشة: الملفّ يُطابَق به كشفُ شركة التوصيل
+     * سطرًا سطرًا، ورصيدٌ يخالف ما على الشاشة يجعل المطابقة تُنتج فروقًا وهمية.
+     *
+     * ورقم التتبّع نصٌّ لا رقم: أرقام التتبّع طويلة، وExcel يُحوّل الطويل منها
+     * إلى صيغةٍ أسّية (`7.4999E+06`) فلا يُطابَق بها شيء.
+     *
+     * @param  Collection<int, JournalLine>  $lines
+     * @param  array{parties: array<int, string>, trackings: array<int, string>}  $meta
+     */
+    private function treasuryStatementXlsx(
+        Treasury $treasury,
+        DateRange $range,
+        Collection $lines,
+        float $opening,
+        array $meta,
+    ): BinaryFileResponse {
+        // `fromString()/toString()` لا `bounds()`: الثانية تُعيد تاريخًا بوقتٍ
+        // نصًّا، فيصير اسم الملفّ يحمل ساعةً ودقيقةً لا معنى لهما في كشف مدّة.
+        $from = $range->fromString();
+        $to = $range->toString();
+
+        $head = [
+            __('التاريخ'), __('القيد'), __('رقم التتبّع'), __('الزبون'),
+            __('البيان'), __('مدين'), __('دائن'), __('الرصيد'),
+        ];
+
+        $rows = function () use ($lines, $opening, $meta) {
+            $run = $opening;
+
+            yield ['', '', '', '', __('رصيد أول المدّة'), '', '', round($run, 2)];
+
+            foreach ($lines as $line) {
+                $run += (float) $line->debit - (float) $line->credit;
+                $entryId = $line->entry?->id;
+
+                yield [
+                    $line->entry?->entry_date?->format('Y-m-d') ?? '',
+                    $line->entry?->number ?? '',
+                    (string) ($meta['trackings'][$entryId] ?? ''),
+                    $meta['parties'][$entryId] ?? '',
+                    $line->entry?->description ?? '',
+                    (float) $line->debit > 0 ? round((float) $line->debit, 2) : '',
+                    (float) $line->credit > 0 ? round((float) $line->credit, 2) : '',
+                    round($run, 2),
+                ];
+            }
+
+            yield [];
+            yield ['', '', '', '', __('رصيد آخر المدّة'), '', '', round($run, 2)];
+        };
+
+        return XlsxExporter::download(
+            'treasury-statement-'.$treasury->id.'-'.$from.'_'.$to,
+            $head,
+            $rows,
+            [
+                // ترويسةٌ تعرّف الكشف: ملفٌّ بلا اسم خزينته ولا مدّته لا يصلح مستندًا.
+                [__('كشف حساب'), $treasury->name],
+                [__('من'), $from, __('إلى'), $to],
+            ],
+        );
     }
 
     /** تقرير السندات (قبض/صرف/مصروف/إيراد/تحويل) مع فلاتر. */
