@@ -25,9 +25,15 @@
             $tabs[] = ['key' => $s, 'label' => __($labels[$s] ?? $s), 'count' => (int) ($statusCounts[$s] ?? 0), 'active' => $activeStatus === $s];
         }
     @endphp
+    {{--
+        الشحنة تُلازم تبويب الحالة: من فلتر كونتينرًا ثم نقر «مُرحّلة» يقصد
+        مُرحّلات ذلك الكونتينر، لا كل المُرحّلات.
+    --}}
+    @php $shipmentParam = $activeShipment ? ['shipment' => $activeShipment->id] : []; @endphp
+
     <div class="flex items-center gap-2 flex-wrap mb-4">
         @foreach ($tabs as $t)
-            <a href="{{ $t['key'] ? route('admin.purchasing.invoices.index', ['status' => $t['key']]) : route('admin.purchasing.invoices.index') }}"
+            <a href="{{ route('admin.purchasing.invoices.index', array_filter(['status' => $t['key']] + $shipmentParam)) }}"
                @class(['inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition border', 'bg-emerald-600 text-white border-emerald-600' => $t['active'], 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50' => !$t['active']])>
                 <span>{{ $t['label'] }}</span>
                 <span @class(['text-xs rounded-full px-1.5 min-w-[1.25rem] text-center', 'bg-white/20 text-white' => $t['active'], 'bg-gray-100 text-gray-500' => !$t['active']])>{{ $t['count'] }}</span>
@@ -35,11 +41,39 @@
         @endforeach
     </div>
 
+    {{--
+        فلترة بالشحنة: البضاعة وشحنُها وتخليصُها وعمولتها فواتيرُ منفصلة بموردين
+        وتواريخ وعملات مختلفة — لا تُدمج، لكنها كونتينرٌ واحد. بلا هذا تُقرأ
+        القائمة مستنداتٍ متفرّقة.
+    --}}
+    <form method="GET" class="mb-4 flex flex-wrap items-center gap-2">
+        @if ($activeStatus)
+            <input type="hidden" name="status" value="{{ $activeStatus }}" />
+        @endif
+        <label for="shipment" class="text-sm text-gray-500">{{ __('الشحنة') }}</label>
+        <select id="shipment" name="shipment" onchange="this.form.submit()"
+                class="rounded-md border-gray-300 py-1.5 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+            <option value="">{{ __('كل الشحنات') }}</option>
+            @foreach ($shipments as $s)
+                <option value="{{ $s->id }}" @selected($activeShipment?->id === $s->id)>
+                    {{ $s->number }}@if ($s->reference) — {{ $s->reference }}@endif
+                </option>
+            @endforeach
+        </select>
+        @if ($activeShipment)
+            <a href="{{ route('admin.purchasing.shipments.show', $activeShipment) }}"
+               class="text-sm text-emerald-600 hover:underline">{{ __('فتح الشحنة') }}</a>
+            <a href="{{ route('admin.purchasing.invoices.index', array_filter(['status' => $activeStatus])) }}"
+               class="text-sm text-gray-500 hover:underline">{{ __('إلغاء الفلتر') }}</a>
+        @endif
+    </form>
+
     <x-admin.table>
         <thead>
             <tr>
                 <th>{{ __('رقم الفاتورة') }}</th>
                 <th>{{ __('المورد') }}</th>
+                <th>{{ __('الشحنة') }}</th>
                 <th>{{ __('التاريخ') }}</th>
                 {{--
                     ذمّة المورد بعملته لا الإجمالي بالشيكل: كشفُ المورد مكتوبٌ
@@ -66,6 +100,19 @@
                         <x-admin.badge class="ms-2 align-middle" :tone="$inv->kindTone()" :label="$inv->kindLabel()" :icon="false" />
                     </td>
                     <td class="font-medium text-gray-800">{{ $inv->supplier?->name }}</td>
+                    {{--
+                        الفراغ هنا معلومة لا نقص: مصروفُ استيرادٍ بلا شحنة لم
+                        يدخل تكلفةَ أي كونتينر، فيبقى خارج حساب ربحه.
+                    --}}
+                    <td class="whitespace-nowrap">
+                        @if ($inv->importShipment)
+                            <a href="{{ route('admin.purchasing.invoices.index', ['shipment' => $inv->importShipment->id]) }}"
+                               class="font-mono text-xs text-emerald-600 hover:underline"
+                               title="{{ $inv->importShipment->reference }}">{{ $inv->importShipment->number }}</a>
+                        @else
+                            <span class="text-gray-300">—</span>
+                        @endif
+                    </td>
                     <td class="text-gray-500 whitespace-nowrap">{{ $inv->invoice_date?->format('Y-m-d') }}</td>
                     {{-- الرمز مع كل رقم: الجدول يخلط عملات، ورقمٌ بلا رمزٍ يُقرأ بالخطأ. --}}
                     <td class="text-start">
@@ -99,7 +146,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="!p-0">
+                <tr><td colspan="8" class="!p-0">
                     <x-admin.empty-state :title="__('لا توجد فواتير شراء')" :description="__('ابدأ بتسجيل أول فاتورة مورد.')"
                         :icon="'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'" />
                 </td></tr>

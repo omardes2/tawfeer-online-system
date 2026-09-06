@@ -44,19 +44,35 @@ class PurchaseInvoiceController extends Controller
         $status = $request->query('status');
         $status = in_array($status, self::STATUSES, true) ? $status : null;
 
-        $query = PurchaseInvoice::with('supplier')->latest('id');
-        if ($status !== null) {
-            $query->where('status', $status);
-        }
+        /*
+            الفلترة بالشحنة: فاتورة البضاعة وفواتيرُ شحنها وتخليصها وعمولتها
+            مستنداتٌ منفصلة بموردين وتواريخ وعملات مختلفة — ولا تُدمج. لكنها
+            كونتينرٌ واحد، فبلا رابطٍ ظاهر تُقرأ القائمة فواتيرَ متفرّقة.
+
+            والشحنة تُصفّي **الصفحة كلّها** لا الجدولَ وحده: بطاقاتٌ تعدّ كل
+            الفواتير فوق جدولٍ يعرض كونتينرًا واحدًا تُقرأ على أنها أرقامه.
+        */
+        $shipment = ($id = $request->integer('shipment')) ? ImportShipment::find($id) : null;
+
+        $scoped = fn () => PurchaseInvoice::query()
+            ->when($shipment, fn ($q) => $q->where('import_shipment_id', $shipment->id));
+
+        $query = $scoped()
+            ->with(['supplier', 'importShipment:id,number,reference'])
+            ->when($status, fn ($q) => $q->where('status', $status))
+            ->latest('id');
 
         return view('admin.purchasing.invoices.index', [
             'invoices' => $query->paginate(20)->withQueryString(),
             'currencies' => self::CURRENCIES,
             'statuses' => self::STATUSES,
             'activeStatus' => $status,
-            'statusCounts' => PurchaseInvoice::selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status'),
-            'totalCount' => PurchaseInvoice::count(),
-            'outstanding' => (float) PurchaseInvoice::posted()->whereIn('payment_status', ['unpaid', 'partial'])
+            // الأحدث أولًا: الشحنة قيد المتابعة هي التي وصلت للتوّ.
+            'shipments' => ImportShipment::orderByDesc('id')->get(['id', 'number', 'reference']),
+            'activeShipment' => $shipment,
+            'statusCounts' => $scoped()->selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status'),
+            'totalCount' => $scoped()->count(),
+            'outstanding' => (float) $scoped()->posted()->whereIn('payment_status', ['unpaid', 'partial'])
                 ->selectRaw('SUM(total - amount_paid) as d')->value('d'),
         ]);
     }
