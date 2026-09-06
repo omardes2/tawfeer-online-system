@@ -3,6 +3,7 @@
 namespace App\Support\Integrations\AdPlatform;
 
 use App\Support\Contracts\AdPlatform\AdPlatformProviderInterface;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
@@ -64,11 +65,9 @@ class MetaAdsProvider implements AdPlatformProviderInterface
                 ->get($url, $query);
 
             if ($response->failed()) {
-                // الرسالة من Meta تفيد التشخيص (رمز منتهٍ، صلاحية ناقصة، حسابٌ
-                // خاطئ) — تُسجَّل بلا الرمز نفسه.
-                $error = $response->json('error.message') ?? $response->status();
-
-                throw new RuntimeException('تعذّر جلب بيانات الإعلانات من Meta: '.$error);
+                throw new RuntimeException(
+                    'تعذّر جلب بيانات الإعلانات من Meta: '.$this->errorDetail($response),
+                );
             }
 
             foreach ($response->json('data', []) as $row) {
@@ -89,6 +88,37 @@ class MetaAdsProvider implements AdPlatformProviderInterface
     }
 
     /** @param  array<string, mixed>  $row */
+    /**
+     * خطأ Meta كاملًا — **بالرموز التي تقول السبب**.
+     *
+     * `error.message` وحده يصف العَرَض لا العلّة: «Cannot call API for app X on
+     * behalf of user Y» تصدر عن سحب صلاحية، وعن رمزٍ منتهٍ، وعن تطبيقٍ خارج
+     * الإنتاج — ثلاثة أسباب ونصٌّ واحد. والرمز الفرعيّ يفصل بينها.
+     *
+     * و`error_user_msg` رسالة Meta الموجَّهة للإنسان، وهي أوضح ما تُرسله حين
+     * تُرسلها.
+     *
+     * ولا يُطبع الرمز نفسه ولا أيّ سرّ: هذه حقولُ تشخيصٍ عامّة.
+     */
+    private function errorDetail(Response $response): string
+    {
+        $error = $response->json('error');
+
+        if (! is_array($error)) {
+            return (string) $response->status();
+        }
+
+        $parts = array_filter([
+            $error['message'] ?? null,
+            $error['error_user_msg'] ?? null,
+            isset($error['code']) ? 'code='.$error['code'] : null,
+            isset($error['error_subcode']) ? 'subcode='.$error['error_subcode'] : null,
+            isset($error['type']) ? 'type='.$error['type'] : null,
+        ]);
+
+        return $parts === [] ? (string) $response->status() : implode(' · ', $parts);
+    }
+
     private function toRow(array $row): AdInsightRow
     {
         return new AdInsightRow(
