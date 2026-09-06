@@ -28,6 +28,65 @@ class StorePurchaseInvoiceRequest extends FormRequest
             fn ($rate) => (float) $rate > 0 ? $rate : null,
             $this->only(['fx_rate_to_usd', 'usd_rate']),
         ));
+
+        $this->dropUntouchedRows();
+    }
+
+    /**
+     * يُسقط الصفوف المُضافة التي لم تُملأ قطّ.
+     *
+     * زرّ «إضافة بند» يضع صفًّا بكميّة ١ وكلفة صفر، فالصفّ الذي يضيفه المستخدم
+     * ثم يتركه **لا يبدو فارغًا للتحقّق**: يمرّ على الكمية ويسقط على الاسم
+     * برسالةٍ عن `items.10.new_name` لا يفهمها أحد ولا تدلّ على صفٍّ في الشاشة.
+     *
+     * ويُسقَط الصفّ **بشرطين معًا**: لا يُعرّف صنفًا (لا متغيّر ولا اسم جديد ولا
+     * وصف)، ولا يحمل مبلغًا كُتب. فما كُتب فيه رقمٌ لا يُمحى بصمت — يُرفض
+     * برسالةٍ تُسمّي صفَّه، لأن كلفةً بلا صنفٍ تُقيَّد عليه لا معنى لها.
+     *
+     * والكميّة خارج الشرط: قيمتها الافتراضية ١ فوجودُها ليس دليلَ إدخال.
+     */
+    private function dropUntouchedRows(): void
+    {
+        $items = $this->input('items');
+
+        if (! is_array($items) || $items === []) {
+            return;
+        }
+
+        $kept = array_values(array_filter(
+            $items,
+            fn ($item) => ! is_array($item) || ! $this->isUntouched($item),
+        ));
+
+        // لا تُكتب `items` إن لم يتغيّر شيء: الكتابة بلا داعٍ تُعيد ترتيب
+        // المفاتيح فتُزحزح أرقام الصفوف في رسائل الأخطاء بلا سبب.
+        if (count($kept) !== count($items)) {
+            $this->merge(['items' => $kept]);
+        }
+    }
+
+    /** @param  array<string, mixed>  $item */
+    private function isUntouched(array $item): bool
+    {
+        if ($this->identifiesAnItem($item)) {
+            return false;
+        }
+
+        foreach (['unit_cost', 'sell_price', 'unit_price_foreign', 'landed_unit_cost'] as $field) {
+            if ((float) ($item[$field] ?? 0) > 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** الصفّ يدلّ على صنف: متغيّر مختار، أو اسم منتجٍ جديد، أو وصفٌ حرّ. */
+    private function identifiesAnItem(array $item): bool
+    {
+        return filled($item['variant_id'] ?? null)
+            || filled($item['new_name'] ?? null)
+            || filled($item['description'] ?? null);
     }
 
     public function rules(): array
@@ -56,7 +115,12 @@ class StorePurchaseInvoiceRequest extends FormRequest
             'items' => ['required', 'array', 'min:1'],
             'items.*.variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
             // صنف جديد يُعرَّف من الفاتورة (يُنشأ منتج + متغيّر تلقائيًا).
-            'items.*.new_name' => ['nullable', 'required_without_all:items.*.variant_id,items.*.description', 'string', 'max:180'],
+            //
+            // ولا `required_without_all` هنا: رسالتها تُطبع بلغة القواعد
+            // («items.10.new_name … items.10.variant_id») فلا تدلّ على صفٍّ في
+            // الشاشة ولا تقول ماذا يُفعل. الشرط نفسه محروسٌ في `withValidator`
+            // برسالةٍ عربية تُسمّي رقم الصفّ.
+            'items.*.new_name' => ['nullable', 'string', 'max:180'],
             'items.*.sell_price' => ['nullable', 'numeric', 'min:0'],
             'items.*.description' => ['nullable', 'string', 'max:255'],
             'items.*.qty' => ['required', 'numeric', 'gt:0'],
@@ -89,8 +153,29 @@ class StorePurchaseInvoiceRequest extends FormRequest
                 $v->errors()->add('import_shipment_id', __('اختر الشحنة التي تخصّها فاتورة المصاريف.'));
             }
 
+            $this->rejectItemsWithoutIdentity($v);
             $this->rejectPlaceholderVariants($v);
         });
+    }
+
+    /**
+     * بندٌ يحمل مبلغًا ولا يدلّ على صنف — يُرفض برسالةٍ تُسمّي صفَّه.
+     *
+     * كلفةٌ بلا صنفٍ تُقيَّد عليه لا تدخل المخزون ولا تُسعّر شيئًا، فتصير رقمًا
+     * في الفاتورة بلا أثر. والصفوف غير المملوءة أصلًا سقطت قبل التحقّق.
+     */
+    private function rejectItemsWithoutIdentity(Validator $v): void
+    {
+        foreach ((array) $this->input('items', []) as $i => $item) {
+            if (! is_array($item) || $this->identifiesAnItem($item)) {
+                continue;
+            }
+
+            $v->errors()->add("items.{$i}.new_name", __(
+                'البند رقم :row: اختر صنفًا من القائمة، أو علّم «صنف جديد» واكتب اسمه، أو اكتب وصفًا — وإلّا احذف البند.',
+                ['row' => (int) $i + 1],
+            ));
+        }
     }
 
     /**
@@ -127,6 +212,12 @@ class StorePurchaseInvoiceRequest extends FormRequest
         return [
             'fx_rate_to_usd.required_with' => __('أدخل سعر صرف عملة الفاتورة مقابل الدولار.'),
             'usd_rate.required_with' => __('أدخل سعر الدولار مقابل العملة الأساسية.'),
+            // تظهر حين تسقط كل الصفوف لأنها لم تُملأ — لا حين لا يُرسَل الحقل.
+            'items.required' => __('أضف بندًا واحدًا على الأقل — الفاتورة بلا بنود لا تُقيَّد.'),
+            'items.min' => __('أضف بندًا واحدًا على الأقل — الفاتورة بلا بنود لا تُقيَّد.'),
+            'items.*.qty.required' => __('أدخل الكمية.'),
+            'items.*.qty.gt' => __('الكمية يجب أن تكون أكبر من صفر.'),
+            'items.*.unit_cost.required' => __('أدخل كلفة الوحدة.'),
         ];
     }
 }
