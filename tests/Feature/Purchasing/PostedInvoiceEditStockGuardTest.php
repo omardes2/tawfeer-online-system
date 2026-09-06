@@ -80,7 +80,28 @@ class PostedInvoiceEditStockGuardTest extends TestCase
             $this->assertStringContainsString($this->variant->product->name, $message);
             $this->assertStringContainsString('100', $message);  // المطلوب سحبه
             $this->assertStringContainsString('40', $message);   // المتاح
-            $this->assertStringContainsString('اعكس الفاتورة', $message);
+            $this->assertStringContainsString('أعِد الكمية للمستودع', $message);
+        }
+    }
+
+    /**
+     * **ولا تُحيل الرسالة إلى «اعكس الفاتورة»** — العكس يسحب البضاعة كما يسحبها
+     * التعديل فيقف عند الحارس نفسه. وكانت تُحيل إليه حين كان العكس يترك
+     * البضاعة، أي أنها كانت تدلّ على الطريق الذي يُفسد الدفتر.
+     */
+    public function test_the_message_no_longer_points_at_reversing(): void
+    {
+        $invoice = $this->postedInvoice(100);
+        app(InventoryService::class)->issue($this->variant, $this->warehouse, 60);
+
+        try {
+            $this->service->updatePosted($invoice->fresh('items'), ['supplier_id' => $this->supplier->id], $this->items(120));
+            $this->fail('كان يجب رفض التعديل.');
+        } catch (ValidationException $e) {
+            $this->assertStringNotContainsString(
+                'اعكس الفاتورة',
+                collect($e->errors())->flatten()->implode(' '),
+            );
         }
     }
 

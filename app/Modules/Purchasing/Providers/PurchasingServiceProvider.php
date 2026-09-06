@@ -2,6 +2,8 @@
 
 namespace App\Modules\Purchasing\Providers;
 
+use App\Modules\Purchasing\Console\AuditVariantSplitCostsCommand;
+use App\Modules\Purchasing\Console\SplitInvoiceVariantsCommand;
 use App\Modules\Purchasing\Models\GoodsReceipt;
 use App\Modules\Purchasing\Models\ImportShipment;
 use App\Modules\Purchasing\Models\PurchaseOrder;
@@ -24,5 +26,15 @@ class PurchasingServiceProvider extends ServiceProvider
         Gate::policy(GoodsReceipt::class, GoodsReceiptPolicy::class);
         Gate::policy(SupplierReturn::class, SupplierReturnPolicy::class);
         Gate::policy(ImportShipment::class, ImportShipmentPolicy::class);
+
+        // غير مجدولة عمدًا: أمرٌ يمسّ بنود فاتورةٍ مُرحّلة يُشغَّل بيدٍ ويُقرأ
+        // ناتجه قبل اعتماده، لا يعمل وحده في الليل.
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                // الفحص يقرأ ولا يكتب — يُشغَّل قبل التوزيع ليُعرف حجم الفرق.
+                AuditVariantSplitCostsCommand::class,
+                SplitInvoiceVariantsCommand::class,
+            ]);
+        }
     }
 }
