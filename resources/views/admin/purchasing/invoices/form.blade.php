@@ -46,7 +46,7 @@
     @endphp
 
     <form method="POST" action="{{ $editing ? route('admin.purchasing.invoices.update', $invoice) : route('admin.purchasing.invoices.store') }}"
-          x-data="invoiceForm(@js($initialRows), @js($head), @js($variantCbm), @js($baseCurrency), @js($currencies))" class="space-y-6">
+          x-data="invoiceForm(@js($initialRows), @js($head), @js($variantCbm), @js($baseCurrency), @js($currencies), @js($variantOptions))" class="space-y-6">
         @csrf
         @if ($editing) @method('PUT') @endif
 
@@ -209,13 +209,42 @@
                                     {{-- صنف موجود --}}
                                     <template x-if="!row.is_new">
                                         <div>
-                                            <select :name="`items[${i}][variant_id]`" x-model="row.variant_id" @change="fillCbm(row)" class="w-full rounded-md border-gray-300 py-2 text-sm truncate focus:border-emerald-500 focus:ring-emerald-500">
-                                                <option value="">{{ __('— صنف حرّ (وصف) —') }}</option>
-                                                @foreach ($variants as $v)
-                                                    {{-- المقاس/اللون في الاسم: بلا ذلك تتشابه مقاسات المنتج الواحد --}}
-                                                    <option value="{{ $v->id }}">{{ $v->product?->name }}@if ($v->attributeValues->isNotEmpty()) — {{ $v->optionLabel() }}@elseif ($legacyVariantIds->has($v->id)) — {{ __('صنف مجرَّد ⚠ اختر مقاسًا') }}@endif</option>
-                                                @endforeach
-                                            </select>
+                                            {{--
+                                                قائمةٌ بالبحث لا <select>: الكتالوج يُعدّ بالمئات، والقائمة
+                                                المنسدلة تُقرأ بالتمرير وحده. والقيمة تبقى في حقلٍ مخفي
+                                                باسم `items[i][variant_id]` نفسه — العقد مع الخلفية كما هو.
+                                            --}}
+                                            <div class="relative" x-data="{ open: false, q: '' }"
+                                                 @click.outside="open = false" @keydown.escape="open = false">
+                                                <input type="hidden" :name="`items[${i}][variant_id]`" x-model="row.variant_id" />
+
+                                                <input type="text"
+                                                       :value="open ? q : variantLabel(row.variant_id)"
+                                                       @input="q = $event.target.value; open = true"
+                                                       @focus="q = ''; open = true"
+                                                       placeholder="{{ __('ابحث عن صنف…') }}"
+                                                       autocomplete="off"
+                                                       class="w-full rounded-md border-gray-300 py-2 text-sm truncate focus:border-emerald-500 focus:ring-emerald-500" />
+
+                                                <ul x-show="open" x-cloak
+                                                    class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+                                                    <li @click="row.variant_id = ''; open = false"
+                                                        class="cursor-pointer px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-50">
+                                                        {{ __('— صنف حرّ (وصف) —') }}
+                                                    </li>
+                                                    <template x-for="opt in filterVariants(q)" :key="opt.id">
+                                                        <li @click="row.variant_id = opt.id; fillCbm(row); open = false"
+                                                            x-text="opt.label"
+                                                            :class="opt.id === String(row.variant_id) ? 'bg-emerald-50 font-medium' : ''"
+                                                            class="cursor-pointer px-3 py-1.5 text-sm hover:bg-emerald-50"></li>
+                                                    </template>
+                                                    <li x-show="filterVariants(q).length === 0" x-cloak
+                                                        class="px-3 py-1.5 text-sm text-gray-400">{{ __('لا نتائج') }}</li>
+                                                    {{-- تنبيهٌ حين تُقتطع القائمة: بلاه يظنّ الباحث أن ما لم يظهر غير موجود. --}}
+                                                    <li x-show="moreThanShown(q)" x-cloak
+                                                        class="border-t px-3 py-1.5 text-xs text-gray-400">{{ __('اكتب أكثر لتضييق النتائج…') }}</li>
+                                                </ul>
+                                            </div>
                                             <input type="text" :name="`items[${i}][description]`" x-model="row.description" placeholder="{{ __('وصف (اختياري)') }}" class="mt-1 w-full rounded-md border-gray-200 py-1.5 text-xs focus:border-emerald-500 focus:ring-emerald-500" />
                                         </div>
                                     </template>
@@ -367,15 +396,53 @@
                 unit_price_foreign: 0, cbm_per_unit: 0, landed_unit_cost: 0, landed_is_manual: false,
             };
 
-            function invoiceForm(initial, head, variantCbm, base, currencies) {
+            /** أقصى ما يُعرض من نتائج البحث — القائمة الطويلة تُبطئ الرسم ولا تُقرأ. */
+            const MAX_RESULTS = 50;
+
+            /**
+             * تطبيع عربي للبحث: الهمزات تُوحَّد والتاء المربوطة والألف المقصورة،
+             * وتُحذف التشكيل والتطويل. فمن يكتب «مشد» يجد «مِشَدّ»، ومن يكتب
+             * «احمر» يجد «أحمر» — وإلا بدا الصنف مفقودًا وهو موجود.
+             */
+            function normalizeArabic(text) {
+                return String(text || '')
+                    .replace(/[أإآٱ]/g, 'ا')
+                    .replace(/ة/g, 'ه')
+                    .replace(/ى/g, 'ي')
+                    .replace(/[ً-ْـ]/g, '')
+                    .toLowerCase()
+                    .trim();
+            }
+
+            function invoiceForm(initial, head, variantCbm, base, currencies, variantOptions) {
                 return {
                     rows: (initial && initial.length) ? initial : [{ ...EMPTY_ROW }],
                     head,
                     base,
                     currencies,
                     variantCbm: variantCbm || {},
+                    variantOptions: variantOptions || [],
 
                     addRow() { this.rows.push({ ...EMPTY_ROW }); },
+
+                    /** اسم الصنف المختار — يُعرض في الحقل حين لا يكون البحث مفتوحًا. */
+                    variantLabel(id) {
+                        const found = this.variantOptions.find((o) => o.id === String(id));
+                        return found ? found.label : '';
+                    },
+
+                    /** النتائج المطابقة، مقتطعةً عند الحدّ. */
+                    filterVariants(q) {
+                        return this.matches(q).slice(0, MAX_RESULTS);
+                    },
+
+                    moreThanShown(q) { return this.matches(q).length > MAX_RESULTS; },
+
+                    matches(q) {
+                        const term = normalizeArabic(q);
+                        if (!term) return this.variantOptions;
+                        return this.variantOptions.filter((o) => normalizeArabic(o.label).includes(term));
+                    },
                     symbol(code) { return this.currencies[code] || code; },
 
                     /** فاتورة مصاريف شحنة: تحويلُ عملة فقط، بلا عمولة ولا شحن. */

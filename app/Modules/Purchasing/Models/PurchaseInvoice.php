@@ -174,6 +174,23 @@ class PurchaseInvoice extends Model
         return round((float) $this->total - (float) $this->amount_paid, 2);
     }
 
+    /**
+     * ذمّة المورد **بعملة الفاتورة** — ما نَدين به له كما كتبه في فاتورته.
+     *
+     * ليست `total`: تلك قيمةُ البضاعة بالشيكل بتكلفتها الشاملة (سعر المورد +
+     * العمولة + الشحن)، والمورد لا يطالب بالشحن. ومن قارن كشفَه بها وجد فرقًا
+     * في كل سطر.
+     *
+     * والمحلّية تعود إلى `subtotal`: عملتها هي الأساسية أصلًا، و`foreign_subtotal`
+     * فيها صفر — فعرضُه يُظهر ذمّةً معدومة لفاتورةٍ قائمة.
+     */
+    public function supplierDueForeign(): float
+    {
+        $foreign = round((float) $this->foreign_subtotal, 2);
+
+        return $foreign > 0 ? $foreign : round((float) $this->subtotal, 2);
+    }
+
     /** فاتورة استيراد: مُدخَلة بعملة أجنبية بسعري صرف، فتُحسب لها تكلفة شاملة. */
     public function isImport(): bool
     {

@@ -51,6 +51,7 @@ class PurchaseInvoiceController extends Controller
 
         return view('admin.purchasing.invoices.index', [
             'invoices' => $query->paginate(20)->withQueryString(),
+            'currencies' => self::CURRENCIES,
             'statuses' => self::STATUSES,
             'activeStatus' => $status,
             'statusCounts' => PurchaseInvoice::selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status'),
@@ -111,6 +112,12 @@ class PurchaseInvoiceController extends Controller
             'initialRows' => $rows,
             'suppliers' => Supplier::where('is_active', true)->orderBy('name')->get(),
             'variants' => $variants,
+            // القائمة مبنيّةً للواجهة: الاسم يُصاغ هنا مرّة لا في القالب وفي
+            // مُرشِّح البحث مرّتين — فيبحث المستخدم في **ما يراه** لا في حقلٍ آخر.
+            'variantOptions' => $variants->map(fn (ProductVariant $v) => [
+                'id' => (string) $v->id,
+                'label' => $this->variantLabel($v, $legacyIds),
+            ])->all(),
             // حجم كل متغيّر بالمتر المكعّب — تملأ به الواجهة خانة الـCBM فور اختيار
             // الصنف، فلا يُعاد إدخال ما هو مسجَّل في كرت الصنف.
             'variantCbm' => $variants->mapWithKeys(fn (ProductVariant $v) => [
@@ -129,6 +136,34 @@ class PurchaseInvoiceController extends Controller
     }
 
     /**
+     * اسم المتغيّر كما يُقرأ في القائمة — ولا يعود فارغًا أبدًا.
+     *
+     * الفراغ كان أصل العطب: خيارٌ بلا نصّ يحمل `value` صحيحًا فيُنقر سهوًا.
+     * فحتى المتغيّر الذي حُذف منتجُه — ولا يبقى إلا لأن الفاتورة تشير إليه —
+     * يُسمّى ويُوسَم بأنه محذوف، ليُرى ويُصحَّح لا ليُختار.
+     *
+     * @param  Collection<int, int>  $legacyIds
+     */
+    private function variantLabel(ProductVariant $variant, $legacyIds): string
+    {
+        $name = $variant->product?->name ?: ($variant->sku ?: '#'.$variant->id);
+
+        if ($variant->product === null || $variant->product->trashed()) {
+            return $name.' — '.__('منتج محذوف ⚠');
+        }
+
+        if ($variant->attributeValues->isNotEmpty()) {
+            return $name.' — '.$variant->optionLabel();
+        }
+
+        if ($legacyIds->has($variant->id)) {
+            return $name.' — '.__('صنف مجرَّد ⚠ اختر مقاسًا');
+        }
+
+        return $name;
+    }
+
+    /**
      * الأصناف القابلة للشراء.
      *
      * **يُستبعَد المتغيّر الافتراضي المجرّد لمنتجٍ له مقاسات/ألوان**: ليس صنفًا
@@ -143,12 +178,26 @@ class PurchaseInvoiceController extends Controller
      * يُفقد السطرَ اختيارَه فيبدو «صنفًا حرًّا»، ويُمحى ارتباطه بالصنف عند الحفظ.
      * يُعرض ليُرى ويُصحَّح، والتحقّق يمنع حفظه كما هو.
      *
+     * **ويُستبعَد متغيّرُ منتجٍ محذوف**: حذف المنتج حذفٌ ناعم له وحده
+     * (`ProductService::delete()`) والمتغيّرات تبقى حيّة، فكان المتغيّر يُجلب
+     * و`product` عندَه `null` — فيُرسَم خيارًا **بنصٍّ فارغ**: سطرٌ أبيض في
+     * القائمة يحمل `value` صحيحًا ويُنقر عليه سهوًا، فتدخل بضاعة الفاتورة إلى
+     * متغيّر منتجٍ محذوف: رصيدٌ حقيقي في المستودع لا يظهر في شاشة الأصناف ولا
+     * يُباع ولا يُحجَز، وتكلفتُه تدخل حساب المخزون بلا ما يقابله.
+     *
+     * والمنتج يُحمَّل **مع المحذوف** لا يُستبعَد بالاستعلام: المحذوف الذي تشير
+     * إليه فاتورةٌ مفتوحة يجب أن يبقى في القائمة ليحفظ السطرُ ارتباطَه — وبلا
+     * تحميله يعود اسمُه فارغًا فيبقى السطر الأبيض الذي نُعالجه. يُحمَّل ليُسمّى،
+     * ثم يُستبعَد ما لا تشير إليه الفاتورة.
+     *
      * @return Collection<int, ProductVariant>
      */
     private function purchasableVariants(?PurchaseInvoice $invoice = null)
     {
-        $variants = ProductVariant::with(['product:id,name,cbm', 'attributeValues'])
-            ->orderBy('product_id')->orderBy('id')->get();
+        $variants = ProductVariant::with([
+            'product' => fn ($q) => $q->withTrashed()->select('id', 'name', 'cbm', 'deleted_at'),
+            'attributeValues',
+        ])->orderBy('product_id')->orderBy('id')->get();
 
         $productsWithOptions = $variants
             ->filter(fn (ProductVariant $v) => $v->attributeValues->isNotEmpty())
@@ -157,6 +206,9 @@ class PurchaseInvoiceController extends Controller
         $referenced = $invoice ? $invoice->items->pluck('variant_id')->filter()->flip() : collect();
 
         return $variants
+            // منتجٌ محذوف (أو مفقود) لا يُشترى — إلا إن كانت الفاتورة تشير إليه.
+            ->reject(fn (ProductVariant $v) => ($v->product === null || $v->product->trashed())
+                && ! $referenced->has($v->id))
             ->reject(fn (ProductVariant $v) => $v->attributeValues->isEmpty()
                 && $productsWithOptions->has($v->product_id)
                 && ! $referenced->has($v->id))

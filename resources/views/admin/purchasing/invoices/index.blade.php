@@ -41,8 +41,12 @@
                 <th>{{ __('رقم الفاتورة') }}</th>
                 <th>{{ __('المورد') }}</th>
                 <th>{{ __('التاريخ') }}</th>
-                <th class="text-start">{{ __('الإجمالي') }}</th>
-                <th class="text-start">{{ __('المتبقّي') }}</th>
+                {{--
+                    ذمّة المورد بعملته لا الإجمالي بالشيكل: كشفُ المورد مكتوبٌ
+                    بعملته، ومقارنتُه بالتكلفة الشاملة (وفيها عمولةٌ وشحنٌ لا
+                    يطالب بهما) تُظهر فرقًا في كل سطر.
+                --}}
+                <th class="text-start">{{ __('ذمّة المورد') }}</th>
                 <th>{{ __('الحالة') }}</th>
                 <th>{{ __('الدفع') }}</th>
                 <th></th>
@@ -63,8 +67,12 @@
                     </td>
                     <td class="font-medium text-gray-800">{{ $inv->supplier?->name }}</td>
                     <td class="text-gray-500 whitespace-nowrap">{{ $inv->invoice_date?->format('Y-m-d') }}</td>
-                    <td class="text-start"><x-admin.money :value="$inv->total" class="font-medium" /></td>
-                    <td class="text-start"><x-admin.money :value="$inv->balanceDue()" :class="$inv->balanceDue() > 0 ? 'text-rose-600' : 'text-gray-400'" /></td>
+                    {{-- الرمز مع كل رقم: الجدول يخلط عملات، ورقمٌ بلا رمزٍ يُقرأ بالخطأ. --}}
+                    <td class="text-start">
+                        <x-admin.money :value="$inv->supplierDueForeign()"
+                                       :symbol="$currencies[$inv->currency] ?? $inv->currency"
+                                       class="font-medium" />
+                    </td>
                     <td><x-admin.badge :tone="$statusTone[$inv->status] ?? 'gray'" :label="__($labels[$inv->status] ?? $inv->status)" /></td>
                     <td><x-admin.badge :tone="$payTone[$inv->payment_status] ?? 'gray'" :label="__($payLabel[$inv->payment_status] ?? $inv->payment_status)" /></td>
                     <td class="text-end whitespace-nowrap">
@@ -91,7 +99,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="8" class="!p-0">
+                <tr><td colspan="7" class="!p-0">
                     <x-admin.empty-state :title="__('لا توجد فواتير شراء')" :description="__('ابدأ بتسجيل أول فاتورة مورد.')"
                         :icon="'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'" />
                 </td></tr>
