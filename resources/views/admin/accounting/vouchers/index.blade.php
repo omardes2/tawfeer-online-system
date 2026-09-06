@@ -27,6 +27,8 @@
                 <table class="min-w-full text-sm text-right">
                     <thead class="text-gray-500 border-b"><tr>
                         <th class="py-2 px-3">{{ __('الرقم') }}</th><th class="py-2 px-3">{{ __('التاريخ') }}</th>
+                        {{-- تُطابَق به فاتورة شركة التوصيل سطرًا سطرًا. --}}
+                        <th class="py-2 px-3">{{ __('رقم التتبّع') }}</th>
                         <th class="py-2 px-3">{{ __('الخزينة') }}</th><th class="py-2 px-3">{{ __('الطرف') }}</th>
                         <th class="py-2 px-3">{{ __('المبلغ') }}</th><th class="py-2 px-3">{{ __('الحالة') }}</th><th class="py-2 px-3"></th>
                     </tr></thead>
@@ -35,6 +37,7 @@
                             <tr>
                                 <td class="py-2 px-3 font-mono text-xs">{{ $v->number }}</td>
                                 <td class="py-2 px-3 text-gray-500">{{ $v->voucher_date->format('Y-m-d') }}</td>
+                                <td class="py-2 px-3 font-mono text-xs text-sky-700 select-all">{{ $trackings[$v->id] ?? '—' }}</td>
                                 <td class="py-2 px-3 text-gray-600">{{ $v->treasury?->name }}</td>
                                 <td class="py-2 px-3 text-gray-600">{{ $v->party_name ?: ($v->counterAccount?->name) }}</td>
                                 <td class="py-2 px-3 font-bold">{{ number_format($v->amount, 2) }}</td>
@@ -42,7 +45,7 @@
                                 <td class="py-2 px-3"><a href="{{ route('admin.accounting.vouchers.show', [$kind, $v]) }}" class="text-emerald-600 hover:underline">{{ __('عرض') }}</a></td>
                             </tr>
                         @empty
-                            <tr><td colspan="7" class="py-6 text-center text-gray-400">{{ __('لا توجد سندات.') }}</td></tr>
+                            <tr><td colspan="8" class="py-6 text-center text-gray-400">{{ __('لا توجد سندات.') }}</td></tr>
                         @endforelse
                     </tbody>
                 </table>

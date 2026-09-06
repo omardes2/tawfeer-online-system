@@ -11,10 +11,14 @@ use App\Modules\Accounting\Models\Treasury;
 use App\Modules\Accounting\Services\VoucherService;
 use App\Modules\Crm\Models\Customer;
 use App\Modules\Purchasing\Models\Supplier;
+use App\Modules\Sales\Models\Order;
+use App\Support\XlsxExporter;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Collection;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * سندات القبض/الصرف/المصروفات/الإيرادات (Phase 7.1) — متحكّم موحّد حسب النوع (kind).
@@ -39,15 +43,61 @@ class VoucherController extends Controller
     {
         $this->auth($kind, 'view');
 
-        $vouchers = FinancialVoucher::query()->kind($kind)
+        $vouchers = $this->filtered($request, $kind)->latest('id')->paginate(20)->withQueryString();
+
+        return view('admin.accounting.vouchers.index', [
+            'kind' => $kind,
+            'vouchers' => $vouchers,
+            'filters' => $request->only(['status', 'search', 'from', 'to']),
+            // رقم التتبّع تُطابَق به فاتورة شركة التوصيل سطرًا سطرًا — سندُ
+            // تحصيل COD يحمل رقم الطلب مرجعًا، والشركة تكتب رقم التتبّع.
+            'trackings' => $this->trackings($vouchers->getCollection()),
+        ]);
+    }
+
+    /**
+     * استعلام السندات بعد الفلاتر — تقرؤه الشاشة والتصدير معًا.
+     *
+     * كان التصدير يقرأ التاريخين وحدهما ويتجاهل الحالة والبحث، فيُصدَّر ملفٌّ
+     * أوسع مما على الشاشة: يُفلتر المستخدم «المُرحّلة» ثم يجد الملغاة في ملفّه.
+     */
+    private function filtered(Request $request, string $kind): Builder
+    {
+        return FinancialVoucher::query()->kind($kind)
             ->with(['treasury', 'counterAccount'])
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
-            ->when($request->filled('search'), fn ($q) => $q->where('number', 'like', '%'.$request->string('search').'%')->orWhere('party_name', 'like', '%'.$request->string('search').'%'))
+            ->when($request->filled('search'), fn ($q) => $q->where(fn ($w) => $w
+                ->where('number', 'like', '%'.$request->string('search').'%')
+                ->orWhere('party_name', 'like', '%'.$request->string('search').'%')))
             ->when($request->filled('from'), fn ($q) => $q->whereDate('voucher_date', '>=', $request->date('from')))
-            ->when($request->filled('to'), fn ($q) => $q->whereDate('voucher_date', '<=', $request->date('to')))
-            ->latest('id')->paginate(20)->withQueryString();
+            ->when($request->filled('to'), fn ($q) => $q->whereDate('voucher_date', '<=', $request->date('to')));
+    }
 
-        return view('admin.accounting.vouchers.index', ['kind' => $kind, 'vouchers' => $vouchers, 'filters' => $request->only(['status', 'search', 'from', 'to'])]);
+    /**
+     * رقم تتبّع كل سند — من مرجعه إلى الطلب.
+     *
+     * استعلامٌ واحد لكل الصفحة لا استعلامٌ لكل سند: الصفحة عشرون سندًا
+     * والتصدير مئات.
+     *
+     * ويُقرأ الطلب عرضًا فقط — Protected Delivery Integration — Do Not Modify:
+     * لا يُكتب رقم التتبّع ولا يُطلب من شركة التوصيل.
+     *
+     * @param  Collection<int, FinancialVoucher>  $vouchers
+     * @return array<int, string>
+     */
+    private function trackings(Collection $vouchers): array
+    {
+        $references = $vouchers->pluck('reference')->filter()->unique()->values()->all();
+
+        if ($references === []) {
+            return [];
+        }
+
+        $orders = Order::whereIn('number', $references)->pluck('tracking_number', 'number');
+
+        return $vouchers->mapWithKeys(fn (FinancialVoucher $v) => [
+            $v->id => $orders->get((string) $v->reference),
+        ])->filter()->all();
     }
 
     public function create(string $kind): View
@@ -168,26 +218,45 @@ class VoucherController extends Controller
         ]);
     }
 
-    public function export(Request $request, string $kind): StreamedResponse
+    /**
+     * تصدير السندات ملفَّ Excel — **بنفس فلاتر الشاشة** وبرقم التتبّع.
+     *
+     * وxlsx لا CSV: أرقام التتبّع طويلة، وExcel يقرأ CSV فيحوّل الطويل منها إلى
+     * صيغةٍ أسّية (`7.4999E+06`) فلا يُطابَق بها شيء. وفي xlsx تُكتب نصًّا.
+     */
+    public function export(Request $request, string $kind): BinaryFileResponse
     {
         $this->auth($kind, 'view');
 
-        $rows = FinancialVoucher::query()->kind($kind)->with(['treasury', 'counterAccount'])
-            ->when($request->filled('from'), fn ($q) => $q->whereDate('voucher_date', '>=', $request->date('from')))
-            ->when($request->filled('to'), fn ($q) => $q->whereDate('voucher_date', '<=', $request->date('to')))
-            ->orderBy('voucher_date')->get();
+        $rows = $this->filtered($request, $kind)->orderBy('voucher_date')->orderBy('id')->get();
+        $trackings = $this->trackings($rows);
 
-        $filename = $kind.'-vouchers-'.now()->format('Ymd').'.csv';
+        $head = [
+            __('الرقم'), __('التاريخ'), __('رقم التتبّع'), __('الحالة'),
+            __('الخزينة'), __('الحساب المقابل'), __('الطرف'), __('المبلغ'),
+        ];
 
-        return response()->streamDownload(function () use ($rows) {
-            $out = fopen('php://output', 'w');
-            fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['number', 'date', 'status', 'treasury', 'counter_account', 'party', 'amount']);
-            foreach ($rows as $v) {
-                fputcsv($out, [$v->number, $v->voucher_date->toDateString(), $v->status, $v->treasury?->name, $v->counterAccount?->name, $v->party_name, $v->amount]);
-            }
-            fclose($out);
-        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        return XlsxExporter::download(
+            $kind.'-vouchers-'.now()->format('Ymd'),
+            $head,
+            fn () => yield from $rows->map(fn (FinancialVoucher $v) => [
+                $v->number,
+                $v->voucher_date->toDateString(),
+                (string) ($trackings[$v->id] ?? ''),
+                __('accounting.status.'.$v->status),
+                $v->treasury?->name ?? '',
+                $v->counterAccount?->name ?? '',
+                $v->party_name ?? '',
+                round((float) $v->amount, 2),
+            ]),
+            [
+                // ترويسةٌ تقول أي فلترٍ أنتج الملفّ: ملفٌّ بلا مدّته ولا حالته
+                // يُقرأ كشفًا كاملًا وهو مُصفّى.
+                [__('سندات'), __('accounting.kind.'.$kind)],
+                [__('من'), $request->input('from') ?: '—', __('إلى'), $request->input('to') ?: '—'],
+                [__('الحالة'), $request->filled('status') ? __('accounting.status.'.$request->string('status')) : __('الكل')],
+            ],
+        );
     }
 
     // ————————————————————————————————— داخلي —————————————————————————————————
