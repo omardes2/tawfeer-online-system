@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 /**
@@ -40,8 +41,17 @@ class SlugGenerator
     {
         $query = $modelClass::query()->where($column, $slug);
 
-        // اشمل المحذوفة ناعمًا إن كان النموذج يدعمها (فرادة على مستوى الجدول).
-        if (method_exists($modelClass, 'withTrashed')) {
+        /*
+            اشمل المحذوفة ناعمًا: قيد التفرّد في قاعدة البيانات يشمل الصفّ
+            المحذوف ناعمًا، فسلَّةٌ لا تراه تُعطي slug مأخوذًا ويسقط الإدخال
+            بـ«Duplicate entry» — وهو خطأ ٥٠٠ لا رسالةَ تحقّق.
+
+            والفحص بالتريتة لا بـ`method_exists`: `withTrashed()` ليست دالّةً على
+            النموذج، بل يُضيفها نطاقُ الحذف الناعم إلى **بانِي الاستعلام**. فكان
+            الشرط لا يتحقّق أبدًا ولا تُشمل المحذوفة قطّ — والتعليق يقول عكسَ ما
+            يفعل الكود.
+        */
+        if (in_array(SoftDeletes::class, class_uses_recursive($modelClass), true)) {
             $query->withTrashed();
         }
 
