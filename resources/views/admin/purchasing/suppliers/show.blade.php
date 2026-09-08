@@ -150,6 +150,11 @@
                         <tr>
                             <th class="py-3 px-4 font-medium text-start">{{ __('التاريخ') }}</th>
                             <th class="py-3 px-4 font-medium text-start">{{ __('البيان') }}</th>
+                            {{--
+                                قيمة الفاتورة بعملتها: كشف المورد مكتوبٌ بعملته،
+                                فمطابقتُه بأرقام الشيكل وحدها تقارن عملتين.
+                            --}}
+                            <th class="py-3 px-4 font-medium text-start">{{ __('قيمة الفاتورة بعملتها') }}</th>
                             <th class="py-3 px-4 font-medium text-start">{{ __('مدين (دفعات)') }}</th>
                             <th class="py-3 px-4 font-medium text-start">{{ __('دائن (فواتير)') }}</th>
                             <th class="py-3 px-4 font-medium text-start">{{ __('الرصيد') }}</th>
@@ -174,18 +179,38 @@
                                     <span class="inline-flex px-2 py-0.5 rounded-full text-xs me-1 {{ $badge[0] }}">{{ $badge[1] }}</span>
                                     {{ $row['ref'] }}
                                 </td>
+                                {{-- الدفعة والافتتاحي وفرق الصرف ليست فواتير — لا قيمةَ بعملةٍ أجنبية لها. --}}
+                                <td class="py-3 px-4 tabular-nums whitespace-nowrap text-gray-700">
+                                    {{ empty($row['foreign']) ? '—' : number_format($row['foreign'], 2) }}
+                                    <span class="ms-1 text-xs text-gray-400">{{ empty($row['foreign']) ? '' : ($currencySymbols[$row['foreign_currency']] ?? $row['foreign_currency']) }}</span>
+                                </td>
                                 <td class="py-3 px-4 tabular-nums text-emerald-600">{{ $row['debit'] > 0 ? number_format($row['debit'], 2) : '—' }}</td>
                                 <td class="py-3 px-4 tabular-nums text-rose-600">{{ $row['credit'] > 0 ? number_format($row['credit'], 2) : '—' }}</td>
                                 <td class="py-3 px-4 tabular-nums font-medium text-gray-900">{{ number_format($row['balance'], 2) }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="5" class="py-10 text-center text-gray-400">{{ __('لا توجد حركات في كشف الحساب.') }}</td></tr>
+                            <tr><td colspan="6" class="py-10 text-center text-gray-400">{{ __('لا توجد حركات في كشف الحساب.') }}</td></tr>
                         @endforelse
                     </tbody>
                     @if ($statement->isNotEmpty())
+                        {{--
+                            مجموعٌ لكل عملة على حدة، ولا يُجمع بعضها إلى بعض:
+                            ¥ و$ و₪ في رقمٍ واحد ليست مبلغًا. وهذا هو الرقم الذي
+                            يُطابَق بكشف المورد. ويُحتسب في المتحكّم لا هنا.
+                        --}}
                         <tfoot class="bg-gray-50 border-t border-gray-200">
+                            @foreach ($foreignTotals as $code => $sum)
+                                <tr class="text-gray-600">
+                                    <td colspan="2" class="py-2 px-4 text-start">{{ __('مجموع الفواتير بـ:c', ['c' => $code]) }}</td>
+                                    <td class="py-2 px-4 tabular-nums whitespace-nowrap font-medium">
+                                        {{ number_format($sum, 2) }}
+                                        <span class="ms-1 text-xs text-gray-400">{{ $currencySymbols[$code] ?? $code }}</span>
+                                    </td>
+                                    <td colspan="3"></td>
+                                </tr>
+                            @endforeach
                             <tr>
-                                <td colspan="4" class="py-3 px-4 text-start font-bold text-gray-700">{{ __('الرصيد المتبقّي') }}</td>
+                                <td colspan="5" class="py-3 px-4 text-start font-bold text-gray-700">{{ __('الرصيد المتبقّي') }}</td>
                                 <td class="py-3 px-4 tabular-nums font-bold {{ abs($balance) < 0.01 ? 'text-gray-900' : 'text-rose-600' }}">{{ number_format($balance, 2) }} {{ $currency }}</td>
                             </tr>
                         </tfoot>

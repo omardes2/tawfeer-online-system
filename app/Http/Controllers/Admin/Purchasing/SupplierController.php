@@ -95,11 +95,24 @@ class SupplierController extends Controller
             ->with('treasury:id,name')
             ->latest('voucher_date')->latest('id')->paginate(15, ['*'], 'payments_page');
 
+        $statement = $this->buildStatement($supplier, (float) $supplier->opening_balance);
+
         return view('admin.purchasing.suppliers.show', [
             'supplier' => $supplier->load('contacts'),
             'invoices' => $invoices,
             'payments' => $payments,
-            'statement' => $this->buildStatement($supplier, (float) $supplier->opening_balance),
+            'statement' => $statement,
+            /*
+                مجموع الفواتير لكل عملة على حدة — وهو الرقم الذي يُطابَق بكشف
+                المورد. ولا يُجمع بعضها إلى بعض: ¥ و$ و₪ في رقمٍ واحد ليست مبلغًا.
+
+                ويُحتسب هنا لا في القالب: الحساب منطقُ عرضٍ يُختبَر، والقالب يعرض.
+            */
+            'foreignTotals' => $statement->filter(fn (array $row) => ! empty($row['foreign']))
+                ->groupBy('foreign_currency')
+                ->map(fn ($rows) => round($rows->sum('foreign'), 2)),
+            // رموز العملات للقالب: القالب لا يستدعي متحكّمًا آخر ليعرف رمز ¥.
+            'currencySymbols' => PurchaseInvoiceController::CURRENCIES,
             'invoiced' => $invoiced,
             'paid' => $paid,
             'adjustments' => $adjustments,
@@ -132,6 +145,19 @@ class SupplierController extends Controller
 
         $running = 0.0;
 
+        /*
+            قيمة الفاتورة بعملتها بجانب أثرها بالشيكل: كشف المورد مكتوبٌ بعملته،
+            فمن يطابق كشفَنا بكشفه يقارن رنمينبيًّا بشيكل. والربط بـ
+            `journal_entry_id` لا بالوصف: القيد يعرف فاتورته صراحةً.
+
+            وسطورُ الدفعات والافتتاحي وفروق الصرف لا فاتورة لها — تبقى فارغة،
+            وليست نقصًا: لا قيمةَ بعملةٍ أجنبية لسطرٍ ليس فاتورة.
+        */
+        $foreignByEntry = PurchaseInvoice::where('supplier_id', $supplier->id)
+            ->whereNotNull('journal_entry_id')
+            ->get(['id', 'journal_entry_id', 'currency', 'subtotal', 'foreign_subtotal'])
+            ->keyBy('journal_entry_id');
+
         return JournalLine::query()
             ->join('journal_entries as je', 'je.id', '=', 'journal_lines.journal_entry_id')
             ->where('journal_lines.account_id', $account->id)
@@ -147,8 +173,9 @@ class SupplierController extends Controller
             ->select('journal_lines.*')
             ->with('entry:id,number,entry_date,description,source')
             ->get()
-            ->map(function (JournalLine $line) use (&$running) {
+            ->map(function (JournalLine $line) use (&$running, $foreignByEntry) {
                 $running += (float) $line->credit - (float) $line->debit;
+                $invoice = $foreignByEntry->get($line->entry->id);
 
                 return [
                     'date' => $line->entry->entry_date,
@@ -156,6 +183,8 @@ class SupplierController extends Controller
                     'ref' => $line->entry->description ?: $line->entry->number,
                     'debit' => round((float) $line->debit, 2),
                     'credit' => round((float) $line->credit, 2),
+                    'foreign' => $invoice?->supplierDueForeign(),
+                    'foreign_currency' => $invoice?->currency,
                     'model_id' => $line->entry->id,
                     'balance' => round($running, 2),
                 ];
@@ -182,13 +211,15 @@ class SupplierController extends Controller
     {
         $invoices = PurchaseInvoice::where('supplier_id', $supplier->id)
             ->where('status', 'posted')
-            ->get(['id', 'number', 'invoice_date', 'total'])
+            ->get(['id', 'number', 'invoice_date', 'total', 'currency', 'subtotal', 'foreign_subtotal'])
             ->map(fn ($i) => [
                 'date' => $i->invoice_date,
                 'type' => 'invoice',
                 'ref' => $i->number,
                 'debit' => 0.0,          // نحن مدينون: تزيد ما نستحقه عليه
                 'credit' => (float) $i->total,
+                'foreign' => $i->supplierDueForeign(),
+                'foreign_currency' => $i->currency,
                 'model_id' => $i->id,
             ]);
 
@@ -201,6 +232,8 @@ class SupplierController extends Controller
                 'ref' => $v->number,
                 'debit' => (float) $v->amount, // دفعنا: تُنقص المستحق
                 'credit' => 0.0,
+                'foreign' => null,             // الدفعة ليست فاتورة — لا قيمة بعملةٍ أجنبية.
+                'foreign_currency' => null,
                 'model_id' => $v->id,
             ]);
 
