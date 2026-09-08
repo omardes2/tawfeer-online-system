@@ -54,8 +54,22 @@ class PurchaseInvoiceController extends Controller
         */
         $shipment = ($id = $request->integer('shipment')) ? ImportShipment::find($id) : null;
 
+        /*
+            التصنيف في قائمةٍ واحدة: «بضاعة» وتصنيفاتُ المصاريف الخمسة معًا.
+            فهما في المخطّط عمودان (`kind` و`expense_category`) لكنهما في ذهن
+            المستخدم سؤالٌ واحد: أيّ نوعٍ من الفواتير أريد؟ وقائمتان تجبرانه على
+            معرفة أن «شحن بحري» يسكن عمودًا آخر غير «بضاعة».
+        */
+        $kinds = ['goods' => __('بضاعة')] + PurchaseInvoice::EXPENSE_CATEGORIES;
+        $kind = $request->query('kind');
+        $kind = is_string($kind) && isset($kinds[$kind]) ? $kind : null;
+
         $scoped = fn () => PurchaseInvoice::query()
-            ->when($shipment, fn ($q) => $q->where('import_shipment_id', $shipment->id));
+            ->when($shipment, fn ($q) => $q->where('import_shipment_id', $shipment->id))
+            ->when($kind === 'goods', fn ($q) => $q->where('kind', PurchaseInvoice::KIND_GOODS))
+            ->when($kind && $kind !== 'goods', fn ($q) => $q
+                ->where('kind', PurchaseInvoice::KIND_EXPENSES)
+                ->where('expense_category', $kind));
 
         $query = $scoped()
             ->with(['supplier', 'importShipment:id,number,reference'])
@@ -70,6 +84,8 @@ class PurchaseInvoiceController extends Controller
             // الأحدث أولًا: الشحنة قيد المتابعة هي التي وصلت للتوّ.
             'shipments' => ImportShipment::orderByDesc('id')->get(['id', 'number', 'reference']),
             'activeShipment' => $shipment,
+            'kinds' => $kinds,
+            'activeKind' => $kind,
             'statusCounts' => $scoped()->selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status'),
             'totalCount' => $scoped()->count(),
             'outstanding' => (float) $scoped()->posted()->whereIn('payment_status', ['unpaid', 'partial'])

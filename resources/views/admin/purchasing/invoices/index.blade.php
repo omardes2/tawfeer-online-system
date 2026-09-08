@@ -29,11 +29,11 @@
         الشحنة تُلازم تبويب الحالة: من فلتر كونتينرًا ثم نقر «مُرحّلة» يقصد
         مُرحّلات ذلك الكونتينر، لا كل المُرحّلات.
     --}}
-    @php $shipmentParam = $activeShipment ? ['shipment' => $activeShipment->id] : []; @endphp
+    @php $keep = array_filter(['shipment' => $activeShipment?->id, 'kind' => $activeKind]); @endphp
 
     <div class="flex items-center gap-2 flex-wrap mb-4">
         @foreach ($tabs as $t)
-            <a href="{{ route('admin.purchasing.invoices.index', array_filter(['status' => $t['key']] + $shipmentParam)) }}"
+            <a href="{{ route('admin.purchasing.invoices.index', array_filter(['status' => $t['key']]) + $keep) }}"
                @class(['inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition border', 'bg-emerald-600 text-white border-emerald-600' => $t['active'], 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50' => !$t['active']])>
                 <span>{{ $t['label'] }}</span>
                 <span @class(['text-xs rounded-full px-1.5 min-w-[1.25rem] text-center', 'bg-white/20 text-white' => $t['active'], 'bg-gray-100 text-gray-500' => !$t['active']])>{{ $t['count'] }}</span>
@@ -50,6 +50,7 @@
         @if ($activeStatus)
             <input type="hidden" name="status" value="{{ $activeStatus }}" />
         @endif
+
         <label for="shipment" class="text-sm text-gray-500">{{ __('الشحنة') }}</label>
         <select id="shipment" name="shipment" onchange="this.form.submit()"
                 class="rounded-md border-gray-300 py-1.5 text-sm focus:border-emerald-500 focus:ring-emerald-500">
@@ -60,11 +61,28 @@
                 </option>
             @endforeach
         </select>
+
+        {{--
+            التصنيف: البضاعة والمصاريف في قائمةٍ واحدة — المستخدم يسأل «أيّ نوع
+            فاتورة» لا «أيّ عمود». وبها يُقرأ سؤالٌ لم يكن يُقرأ: كم دفعنا تخليصًا
+            هذا العام، وكم عمولةَ مكتب.
+        --}}
+        <label for="kind" class="ms-2 text-sm text-gray-500">{{ __('التصنيف') }}</label>
+        <select id="kind" name="kind" onchange="this.form.submit()"
+                class="rounded-md border-gray-300 py-1.5 text-sm focus:border-emerald-500 focus:ring-emerald-500">
+            <option value="">{{ __('كل التصنيفات') }}</option>
+            @foreach ($kinds as $key => $label)
+                <option value="{{ $key }}" @selected($activeKind === $key)>{{ __($label) }}</option>
+            @endforeach
+        </select>
+
         @if ($activeShipment)
             <a href="{{ route('admin.purchasing.shipments.show', $activeShipment) }}"
                class="text-sm text-emerald-600 hover:underline">{{ __('فتح الشحنة') }}</a>
+        @endif
+        @if ($activeShipment || $activeKind)
             <a href="{{ route('admin.purchasing.invoices.index', array_filter(['status' => $activeStatus])) }}"
-               class="text-sm text-gray-500 hover:underline">{{ __('إلغاء الفلتر') }}</a>
+               class="text-sm text-gray-500 hover:underline">{{ __('إلغاء الفلاتر') }}</a>
         @endif
     </form>
 
