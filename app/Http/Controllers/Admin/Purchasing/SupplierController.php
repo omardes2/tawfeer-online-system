@@ -96,6 +96,7 @@ class SupplierController extends Controller
             ->latest('voucher_date')->latest('id')->paginate(15, ['*'], 'payments_page');
 
         $statement = $this->buildStatement($supplier, (float) $supplier->opening_balance);
+        $foreign = $this->foreignSummary($supplier, $paid, $balance);
 
         return view('admin.purchasing.suppliers.show', [
             'supplier' => $supplier->load('contacts'),
@@ -117,7 +118,67 @@ class SupplierController extends Controller
             'paid' => $paid,
             'adjustments' => $adjustments,
             'balance' => $balance,
+            'foreign' => $foreign,
         ]);
+    }
+
+    /**
+     * البطاقات بعملات المورد إلى جانب الشيكل.
+     *
+     * ## رقمان مختلفان في طبيعتهما — ولا يُعرضان سواءً
+     *
+     * **المشتريات بعملة الفاتورة مجموعٌ حقيقي لا تحويل**: كل فاتورة تحمل قيمتها
+     * بعملتها محفوظةً منذ إنشائها (`foreign_subtotal`)، فتُجمع كما هي. هذا رقمٌ
+     * يُطابَق بكشف المورد سطرًا سطرًا.
+     *
+     * **أمّا المدفوعات والرصيد فتحويلٌ تقديري**: كلاهما مبلغٌ بالشيكل تراكم من
+     * فواتير بأسعار صرفٍ مختلفة ومن دفعاتٍ بأسعار يومها، فلا سعرَ واحد يخصّه.
+     * ويُحوَّلان بمعدّلٍ **موزون مشتقّ من فواتير هذا المورد نفسه** — لا من إعدادٍ
+     * عام ولا من سعر اليوم: الدَّين تراكم من تلك الفواتير، فمعدّلها أقرب ما
+     * يُقدَّر به. ويُوسَمان بـ«≈» فلا يُقرآن التزامًا دقيقًا.
+     *
+     * وبلا فاتورةٍ أجنبية واحدة تعود القائمة فارغة، فتبقى البطاقات بالشيكل وحده.
+     *
+     * @return array<string, mixed>
+     */
+    private function foreignSummary(Supplier $supplier, float $paid, float $balance): array
+    {
+        $invoices = PurchaseInvoice::where('supplier_id', $supplier->id)
+            ->where('status', 'posted')
+            ->where('foreign_subtotal', '>', 0)
+            ->where('usd_rate', '>', 0)
+            ->get(['currency', 'subtotal', 'foreign_subtotal', 'usd_rate']);
+
+        if ($invoices->isEmpty()) {
+            return [];
+        }
+
+        $base = round((float) $invoices->sum('subtotal'), 2);
+        $foreignSum = round((float) $invoices->sum('foreign_subtotal'), 2);
+
+        // مقام المعدّل الموزون: مجموع ما تساويه الفواتير بالدولار بأسعارها هي.
+        $usdSum = round($invoices->sum(
+            fn (PurchaseInvoice $i) => (float) $i->subtotal / (float) $i->usd_rate,
+        ), 2);
+
+        if ($base <= 0 || $foreignSum <= 0 || $usdSum <= 0) {
+            return [];
+        }
+
+        $ilsPerForeign = $base / $foreignSum;
+        $ilsPerUsd = $base / $usdSum;
+
+        return [
+            // العملة الغالبة على فواتير هذا المورد — لا تُخلط عملتان في رقم.
+            'currency' => (string) $invoices->groupBy('currency')
+                ->sortByDesc(fn ($rows) => $rows->sum('foreign_subtotal'))->keys()->first(),
+            'invoiced_foreign' => $foreignSum,          // حقيقي
+            'paid_usd' => round($paid / $ilsPerUsd, 2),         // تقديري
+            'balance_usd' => round($balance / $ilsPerUsd, 2),   // تقديري
+            'balance_foreign' => round($balance / $ilsPerForeign, 2), // تقديري
+            'ils_per_usd' => round($ilsPerUsd, 4),
+            'ils_per_foreign' => round($ilsPerForeign, 4),
+        ];
     }
 
     /**

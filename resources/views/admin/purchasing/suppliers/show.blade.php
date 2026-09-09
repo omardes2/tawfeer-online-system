@@ -46,6 +46,17 @@
                     <div class="rounded-lg bg-gray-50 p-3 text-center">
                         <div class="text-xs text-gray-500">{{ __('إجمالي المشتريات') }}</div>
                         <div class="text-base font-bold text-gray-900 tabular-nums mt-1">{{ number_format($invoiced, 2) }}</div>
+                        {{--
+                            بلا «≈»: مجموعُ ما هو محفوظ على الفواتير بعملتها، لا
+                            تحويل. وهو الرقم الذي يُطابَق بكشف المورد.
+                        --}}
+                        @if (! empty($foreign['invoiced_foreign']))
+                            <div class="text-[11px] leading-tight text-gray-500 mt-0.5 tabular-nums"
+                                 title="{{ __('مجموع قيم الفواتير بعملتها كما حُفظت — لا تحويل') }}">
+                                {{ number_format($foreign['invoiced_foreign'], 2) }}
+                                {{ $currencySymbols[$foreign['currency']] ?? $foreign['currency'] }}
+                            </div>
+                        @endif
                     </div>
                     <div class="rounded-lg bg-gray-50 p-3 text-center">
                         <div class="text-xs text-gray-500">{{ __('المدفوعات') }}</div>
@@ -63,10 +74,33 @@
                                 {{ __('تسويات') }}
                             </div>
                         @endif
+                        {{-- «≈» لأنه تحويلٌ بمعدّلٍ موزون لا مبلغٌ دُفع بالدولار فعلًا. --}}
+                        @if (! empty($foreign['paid_usd']))
+                            <div class="text-[11px] leading-tight text-gray-500 mt-0.5 tabular-nums"
+                                 title="{{ __('تقديري بسعر :r ₪ للدولار — معدّل موزون من فواتير هذا المورد', ['r' => $foreign['ils_per_usd']]) }}">
+                                ≈ {{ number_format($foreign['paid_usd'], 2) }} $
+                            </div>
+                        @endif
                     </div>
                     <div class="rounded-lg p-3 text-center {{ abs($balance) < 0.01 ? 'bg-gray-50' : 'bg-rose-50' }}">
                         <div class="text-xs text-gray-500">{{ __('الرصيد المتبقّي') }}</div>
                         <div class="text-base font-bold tabular-nums mt-1 {{ abs($balance) < 0.01 ? 'text-gray-900' : 'text-rose-600' }}">{{ number_format($balance, 2) }}</div>
+                        {{--
+                            بالعملتين تحت الشيكل: المورد يطالب بعملته، والشيكل
+                            وحده لا يُقرأ في مراسلته. و«≈» لأن الرصيد تراكم من
+                            فواتير بأسعار صرفٍ مختلفة فلا سعرَ واحد يخصّه.
+                        --}}
+                        @if (! empty($foreign['balance_foreign']))
+                            <div class="text-[11px] leading-tight text-rose-500 mt-0.5 tabular-nums"
+                                 title="{{ __('تقديري بسعر :r ₪ للوحدة — معدّل موزون من فواتير هذا المورد', ['r' => $foreign['ils_per_foreign']]) }}">
+                                ≈ {{ number_format($foreign['balance_foreign'], 2) }}
+                                {{ $currencySymbols[$foreign['currency']] ?? $foreign['currency'] }}
+                            </div>
+                            <div class="text-[11px] leading-tight text-rose-500 tabular-nums"
+                                 title="{{ __('تقديري بسعر :r ₪ للدولار — معدّل موزون من فواتير هذا المورد', ['r' => $foreign['ils_per_usd']]) }}">
+                                ≈ {{ number_format($foreign['balance_usd'], 2) }} $
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
