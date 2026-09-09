@@ -10,10 +10,13 @@ use App\Modules\Accounting\Models\JournalLine;
 use App\Modules\Purchasing\Models\PurchaseInvoice;
 use App\Modules\Purchasing\Models\Supplier;
 use App\Modules\Purchasing\Services\SupplierService;
+use App\Support\XlsxExporter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class SupplierController extends Controller
 {
@@ -120,6 +123,62 @@ class SupplierController extends Controller
             'balance' => $balance,
             'foreign' => $foreign,
         ]);
+    }
+
+    /**
+     * كشف الحساب ملفَّ Excel — بنفس سطور الشاشة ورصيدها الجاري.
+     *
+     * الرصيد يُقرأ من الكشف المبنيّ نفسه لا يُعاد حسابه: ملفٌّ يخالف الشاشة في
+     * رقمٍ واحد يُفقد الاثنين ثقتَهما، ولا يُعرف أيّهما يُصدَّق.
+     *
+     * وعملة الفاتورة في عمودٍ مستقلّ لا ملصوقةً بالرقم: الكشف يخلط ¥ و$ و₪،
+     * فرقمٌ برمزٍ داخله نصٌّ لا يُجمَع ولا يُفرَز في Excel.
+     */
+    public function exportStatement(Supplier $supplier): BinaryFileResponse
+    {
+        $this->authorize('view', $supplier);
+
+        $statement = $this->buildStatement($supplier, (float) $supplier->opening_balance);
+        $symbols = PurchaseInvoiceController::CURRENCIES;
+
+        $labels = [
+            'invoice' => __('فاتورة'), 'payment' => __('دفعة'), 'fx' => __('فرق صرف'),
+            'opening' => __('رصيد افتتاحي'),
+        ];
+
+        $head = [
+            __('التاريخ'), __('النوع'), __('البيان'),
+            __('قيمة الفاتورة بعملتها'), __('العملة'),
+            __('مدين (دفعات)'), __('دائن (فواتير)'), __('الرصيد'),
+        ];
+
+        $rows = function () use ($statement, $labels, $symbols) {
+            foreach ($statement as $row) {
+                yield [
+                    Carbon::parse($row['date'])->format('Y-m-d'),
+                    $labels[$row['type']] ?? __('حركة'),
+                    $row['ref'],
+                    empty($row['foreign']) ? '' : round((float) $row['foreign'], 2),
+                    empty($row['foreign']) ? '' : ($symbols[$row['foreign_currency']] ?? $row['foreign_currency']),
+                    (float) $row['debit'] > 0 ? round((float) $row['debit'], 2) : '',
+                    (float) $row['credit'] > 0 ? round((float) $row['credit'], 2) : '',
+                    round((float) $row['balance'], 2),
+                ];
+            }
+        };
+
+        return XlsxExporter::download(
+            'supplier-statement-'.$supplier->code.'-'.now()->format('Ymd'),
+            $head,
+            $rows,
+            [
+                // ترويسةٌ تعرّف الكشف: ملفٌّ بلا اسم مورده وحسابه لا يصلح مستندًا.
+                [__('كشف حساب مورد'), $supplier->name],
+                [__('الرمز'), $supplier->code, __('الحساب'), $supplier->glAccount()->value('code') ?? '—'],
+                [__('تاريخ التصدير'), now()->format('Y-m-d H:i')],
+                [],
+            ],
+        );
     }
 
     /**

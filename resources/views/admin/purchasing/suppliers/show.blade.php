@@ -178,7 +178,16 @@
             </div>
 
             {{-- تبويب كشف الحساب --}}
-            <div x-show="tab === 'statement'" class="overflow-x-auto" style="display:none">
+            <div x-show="tab === 'statement'" style="display:none">
+                {{-- التصدير فوق الجدول لا تحته: الكشف يطول، وزرٌّ في آخره لا يُرى. --}}
+                <div class="flex justify-end px-4 pt-4">
+                    <a href="{{ route('admin.purchasing.suppliers.statement.export', $supplier) }}"
+                       class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                        {{ __('تصدير Excel') }}
+                    </a>
+                </div>
+                <div class="overflow-x-auto">
                 <table class="min-w-full text-sm">
                     <thead class="text-gray-500 bg-gray-50 border-b border-gray-100">
                         <tr>
@@ -250,6 +259,7 @@
                         </tfoot>
                     @endif
                 </table>
+                </div>
             </div>
 
             {{-- تبويب التفاصيل --}}

@@ -318,6 +318,9 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
 
     // المشتريات (Phase 2.5)
     Route::prefix('purchasing')->name('purchasing.')->group(function () {
+        // قبل المورد نفسه: مسارٌ ثابتٌ تحت `suppliers/{supplier}` لا يلتبس بالمورد.
+        Route::get('suppliers/{supplier}/statement/export', [AdminSupplierController::class, 'exportStatement'])
+            ->name('suppliers.statement.export');
         Route::resource('suppliers', AdminSupplierController::class);
 
         Route::resource('orders', AdminPurchaseOrderController::class)->only(['index', 'create', 'store', 'show']);
