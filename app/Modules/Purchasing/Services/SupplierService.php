@@ -3,6 +3,7 @@
 namespace App\Modules\Purchasing\Services;
 
 use App\Modules\Accounting\Models\Account;
+use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Accounting\Services\AccountingService;
 use App\Modules\Purchasing\Models\PurchaseInvoice;
 use App\Modules\Purchasing\Models\Supplier;
@@ -235,6 +236,187 @@ class SupplierService
     public function delete(Supplier $supplier): void
     {
         $supplier->delete();
+    }
+
+    /** الجداول التي تحمل `supplier_id` — تُنقل كلّها عند الدمج أو لا يُدمَج. */
+    private const OWNED_TABLES = [
+        'purchase_invoices', 'financial_vouchers', 'purchase_orders',
+        'supplier_returns', 'import_shipments', 'supplier_contacts',
+    ];
+
+    /**
+     * دمج مورّدٍ مكرّر في آخر — **بلا مساس بقيدٍ مُرحّل**.
+     *
+     * ## المشكلة
+     *
+     * المورد الواحد يُدخَل مرّتين بفارق حرف («بضاعه» و«بضاعة»)، فيُفتح له حسابان
+     * فرعيّان تتوزّع حركاته بينهما، ويظهر في ميزان المراجعة مرّتين — ولا يُعرف
+     * كم يُدان له في الحقيقة إلّا بجمعٍ يدوي.
+     *
+     * ## ولماذا لا تُنقل القيود
+     *
+     * «نقل الحركات» بمعناه المباشر — تحويل `journal_lines.account_id` من حساب
+     * إلى حساب — إعادةُ كتابةٍ لدفترٍ مُرحّل. تُفسد أرصدةَ الفترات المُقفلة
+     * أثرًا رجعيًّا، وتجعل ميزان مراجعةٍ طُبع أمسِ يخالف نفسَه اليوم بلا قيدٍ
+     * يفسّر الفرق. وBR-ACC-09 يمنعها: المُرحّل يُعكس ولا يُعدَّل.
+     *
+     * ## فالنقل بقيد إعادة تصنيف
+     *
+     * قيدٌ واحد يُصفّر حساب المصدر ويضع رصيده على حساب الهدف. فالتاريخ يبقى حيث
+     * وقع، والالتزام ينتقل، والفرق مُفسَّرٌ بسطرٍ يُقرأ. وحساب المصدر يُعطَّل
+     * ولا يُحذف: حذفُ حسابٍ ذي قيود يكسر الدفتر.
+     *
+     * ## والمستندات تُنقل فعلًا
+     *
+     * الفواتير والسندات والشحنات تُسنَد للهدف — فهي بيانات تشغيلية لا قيود.
+     * وكشف الهدف يعرض بعدها حركات الحسابين معًا (`statementAccountIds`)، فيرى
+     * المستخدم تاريخه كاملًا في مكانٍ واحد بلا أن يُمسّ الدفتر.
+     *
+     * @return array{moved: array<string, int>, balance: float, entry: ?int}
+     */
+    public function merge(Supplier $source, Supplier $target, ?string $note = null): array
+    {
+        $this->assertMergeable($source, $target);
+
+        return DB::transaction(function () use ($source, $target, $note) {
+            $entry = $this->reclassifyBalance($source, $target, $note);
+            $moved = $this->moveDocuments($source, $target);
+
+            // التعطيل لا الحذف: الحساب يحمل قيودًا مُرحّلة، وحذفُه يكسر الدفتر.
+            $source->glAccount()->first()?->update(['is_active' => false]);
+
+            // سلسلة الدمج تُسطَّح: من دُمج في المصدر يُدمج في الهدف مباشرةً، فلا
+            // يحتاج قارئٌ لاحق أن يتتبّع سلسلةً ليعرف أين انتهى المورد.
+            Supplier::withTrashed()->where('merged_into_id', $source->id)
+                ->update(['merged_into_id' => $target->id]);
+
+            $source->forceFill(['merged_into_id' => $target->id, 'is_active' => false])->save();
+            $source->delete();
+
+            return [
+                'moved' => $moved,
+                'balance' => $this->ledgerBalance($target->fresh()),
+                'entry' => $entry?->id,
+            ];
+        });
+    }
+
+    /**
+     * قيد إعادة تصنيف ينقل رصيد المصدر إلى الهدف.
+     *
+     * الاتجاه من الإشارة لا يُفترض: المورد قد يكون دائنًا (نَدين له) أو مدينًا
+     * (دفعنا مقدَّمًا)، والقيد يُقلَب تبعًا لذلك.
+     */
+    private function reclassifyBalance(Supplier $source, Supplier $target, ?string $note): ?JournalEntry
+    {
+        $from = $source->glAccount()->first();
+        $to = $target->glAccount()->first();
+
+        if (! $from || ! $to) {
+            return null;
+        }
+
+        $balance = round(app(AccountingService::class)->accountBalance($from), 2);
+
+        // رصيدٌ صفر لا يحتاج قيدًا — ومحرّك القيد يرفض سطرًا صفريًّا أصلًا.
+        if (abs($balance) < 0.01) {
+            return null;
+        }
+
+        $amount = abs($balance);
+
+        // `accountBalance` تقرأ الرصيد بطبيعة الحساب: حساب المورد دائنُ الطبيعة،
+        // فموجبٌ يعني رصيدًا دائنًا أي أننا نَدين له. وتصفيرُ رصيدٍ دائن يكون
+        // بمدينٍ عليه، ويُنقل الالتزام بدائنٍ على الهدف. والسالب (دفعنا مقدَّمًا)
+        // يقلب الطرفين.
+        $lines = $balance > 0
+            ? [
+                ['account_code' => $from->code, 'debit' => $amount, 'credit' => 0],
+                ['account_code' => $to->code, 'debit' => 0, 'credit' => $amount],
+            ]
+            : [
+                ['account_code' => $to->code, 'debit' => $amount, 'credit' => 0],
+                ['account_code' => $from->code, 'debit' => 0, 'credit' => $amount],
+            ];
+
+        return app(AccountingService::class)->postEntry([
+            'entry_date' => now()->toDateString(),
+            'description' => __('نقل رصيد المورد «:from» إلى «:to» عند الدمج:n', [
+                'from' => $source->name,
+                'to' => $target->name,
+                'n' => $note ? ' — '.mb_substr($note, 0, 120) : '',
+            ]),
+            'source' => 'supplier_merge',
+            'reference_type' => 'supplier',
+            'reference_id' => $target->id,
+        ], $lines);
+    }
+
+    /**
+     * إسناد مستندات المصدر للهدف.
+     *
+     * بمُنشئ الاستعلام لا بالنماذج: تحديثٌ جماعي لا يُطلق أحداثًا ولا يُعيد
+     * حساب إجماليّات — والمستند لا يتغيّر، يتغيّر صاحبُه وحده.
+     *
+     * @return array<string, int>
+     */
+    private function moveDocuments(Supplier $source, Supplier $target): array
+    {
+        $moved = [];
+
+        foreach (self::OWNED_TABLES as $table) {
+            $moved[$table] = DB::table($table)
+                ->where('supplier_id', $source->id)
+                ->update(['supplier_id' => $target->id]);
+        }
+
+        return $moved;
+    }
+
+    /** يرفض الدمج المستحيل قبل أن يبدأ — لا نصف دمجٍ في معاملةٍ تسقط. */
+    private function assertMergeable(Supplier $source, Supplier $target): void
+    {
+        if ($source->id === $target->id) {
+            throw ValidationException::withMessages(['merge' => __('المورد نفسه لا يُدمج في نفسه.')]);
+        }
+
+        if ($source->merged_into_id || $source->trashed()) {
+            throw ValidationException::withMessages(['merge' => __('المورد المصدر مدموجٌ أو محذوف مسبقًا.')]);
+        }
+
+        if ($target->merged_into_id || $target->trashed()) {
+            throw ValidationException::withMessages(['merge' => __('المورد الهدف مدموجٌ أو محذوف — اختر مورّدًا قائمًا.')]);
+        }
+
+        // بلا حساب هدفٍ لا مكان يُنقل إليه الرصيد، فيضيع الالتزام صامتًا.
+        if (! $target->glAccount()->first() && ! $this->ensureLedgerAccount($target)) {
+            throw ValidationException::withMessages([
+                'merge' => __('لا حساب فرعيّ للمورد الهدف ولا يمكن فتحه — هيّئ دليل الحسابات أولًا.'),
+            ]);
+        }
+    }
+
+    /**
+     * الحسابات التي يُقرأ منها كشف المورد: حسابه وحسابات من دُمج فيه.
+     *
+     * فيرى المستخدم تاريخه كاملًا في كشفٍ واحد بلا أن تُنقل قيود. وقيدُ إعادة
+     * التصنيف يظهر في الكشف مرّتين بإشارتين متقابلتين فيصفو أثره — والرصيد
+     * الجاري يبقى صحيحًا.
+     *
+     * @return array<int, int>
+     */
+    public function statementAccountIds(Supplier $supplier): array
+    {
+        $ids = $supplier->gl_account_id ? [(int) $supplier->gl_account_id] : [];
+
+        $merged = Supplier::withTrashed()
+            ->where('merged_into_id', $supplier->id)
+            ->whereNotNull('gl_account_id')
+            ->pluck('gl_account_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        return array_values(array_unique([...$ids, ...$merged]));
     }
 
     /**

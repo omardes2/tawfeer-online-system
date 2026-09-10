@@ -211,12 +211,16 @@
                                     الوسم يقول نوع الحركة: الكشف يحمل الآن ما
                                     يحمله الدفتر — رصيدًا افتتاحيًّا وفروقَ صرفٍ
                                     وقيودَ تسوية، لا فواتيرَ ودفعاتٍ فقط.
+
+                                    و«إعادة التصنيف» سطران متقابلان يصفو أثرهما
+                                    على المجموع: بلا وسمٍ يقول ما هما يُقرآن ضجيجًا.
                                 --}}
                                 @php($badge = [
                                     'invoice' => ['bg-amber-50 text-amber-700', __('فاتورة')],
                                     'payment' => ['bg-emerald-50 text-emerald-700', __('دفعة')],
                                     'fx' => ['bg-sky-50 text-sky-700', __('فرق صرف')],
                                     'opening' => ['bg-violet-50 text-violet-700', __('رصيد افتتاحي')],
+                                    'merge' => ['bg-indigo-50 text-indigo-700', __('إعادة تصنيف')],
                                 ][$row['type']] ?? ['bg-gray-100 text-gray-600', __('حركة')])
                                 <td class="py-3 px-4 text-gray-800">
                                     <span class="inline-flex px-2 py-0.5 rounded-full text-xs me-1 {{ $badge[0] }}">{{ $badge[1] }}</span>

@@ -4,6 +4,7 @@ namespace App\Modules\Purchasing\Providers;
 
 use App\Modules\Purchasing\Console\AuditSupplierLedgerCommand;
 use App\Modules\Purchasing\Console\AuditVariantSplitCostsCommand;
+use App\Modules\Purchasing\Console\MergeSuppliersCommand;
 use App\Modules\Purchasing\Console\SplitInvoiceVariantsCommand;
 use App\Modules\Purchasing\Models\GoodsReceipt;
 use App\Modules\Purchasing\Models\ImportShipment;
@@ -35,6 +36,7 @@ class PurchasingServiceProvider extends ServiceProvider
                 // الفحص يقرأ ولا يكتب — يُشغَّل قبل التوزيع ليُعرف حجم الفرق.
                 AuditSupplierLedgerCommand::class,
                 AuditVariantSplitCostsCommand::class,
+                MergeSuppliersCommand::class,
                 SplitInvoiceVariantsCommand::class,
             ]);
         }

@@ -143,7 +143,7 @@ class SupplierController extends Controller
 
         $labels = [
             'invoice' => __('فاتورة'), 'payment' => __('دفعة'), 'fx' => __('فرق صرف'),
-            'opening' => __('رصيد افتتاحي'),
+            'opening' => __('رصيد افتتاحي'), 'merge' => __('إعادة تصنيف'),
         ];
 
         $head = [
@@ -257,9 +257,17 @@ class SupplierController extends Controller
      */
     private function buildStatement(Supplier $supplier, float $opening): Collection
     {
-        $account = $supplier->glAccount()->first();
+        /*
+            حساب المورد **وحسابات من دُمج فيه**: المورد المكرّر يُدمج بقيد إعادة
+            تصنيف لا بنقل قيوده — فتاريخه يبقى على حسابه القديم المعطَّل. وقراءةُ
+            الحسابين معًا تُظهر التاريخ كاملًا في كشفٍ واحد بلا أن يُمسّ الدفتر.
 
-        if (! $account) {
+            وقيدُ إعادة التصنيف يظهر بطرفيه المتقابلين فيصفو أثره على المجموع،
+            والرصيد الجاري يبقى صحيحًا.
+        */
+        $accountIds = app(SupplierService::class)->statementAccountIds($supplier);
+
+        if ($accountIds === []) {
             return $this->buildStatementFromDocuments($supplier, $opening);
         }
 
@@ -280,7 +288,7 @@ class SupplierController extends Controller
 
         return JournalLine::query()
             ->join('journal_entries as je', 'je.id', '=', 'journal_lines.journal_entry_id')
-            ->where('journal_lines.account_id', $account->id)
+            ->whereIn('journal_lines.account_id', $accountIds)
             ->where('je.status', 'posted')
             // **الافتتاحي أوّلًا مهما كان تاريخه.** قيده يُرحَّل بتاريخ اليوم الذي
             // أُدخل فيه لا بتاريخ بدء التعامل، فلو رُتّب زمنيًّا مع غيره سقط في
@@ -322,6 +330,7 @@ class SupplierController extends Controller
             'voucher' => 'payment',
             'purchase_invoice_fx' => 'fx',
             'opening_balance', 'supplier_opening' => 'opening',
+            'supplier_merge' => 'merge',
             default => 'entry',
         };
     }
