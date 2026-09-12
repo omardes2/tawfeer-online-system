@@ -3,6 +3,7 @@
 namespace App\Modules\Recommendations\Services;
 
 use App\Modules\Catalog\Models\Product;
+use App\Modules\Catalog\Models\ProductVariant;
 use App\Modules\Recommendations\Models\ProductRecommendation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -47,6 +48,30 @@ class RecommendationService
         return $this->decorate(
             $this->availableBase()->where('is_featured', true)->latest('id')->limit($limit)->get(),
             'catalog', 'featured'
+        );
+    }
+
+    /**
+     * عروض التوفير — الأصناف التي عليها خصم، أعمقُها خصمًا أوّلًا.
+     *
+     * الترتيب بنسبة الخصم لا بتاريخ الإضافة: القسم يَعِد بالتوفير، فالصفّ الأول
+     * فيه يجب أن يكون أوفر ما فيه. وبالنسبة لا بالفرق المطلق — خصمُ 50 شيكلًا
+     * على صنفٍ بمئة أعمقُ من مثله على صنفٍ بألف، وهو ما يقرأه الزبون خصمًا.
+     *
+     * والترتيب على المتغيّر الافتراضي نفسه الذي تقرأ منه البطاقة سعرها، فلا
+     * يخالف ترتيبُ القسم النسبَ المعروضة على بطاقاته.
+     */
+    public function onOffer(int $limit = 8): Collection
+    {
+        return $this->decorate(
+            $this->availableBase()->onOffer()
+                ->orderByDesc(ProductVariant::selectRaw('(1 - promo_price / retail_price)')
+                    ->whereColumn('product_variants.product_id', 'products.id')
+                    ->where('is_default', true)
+                    ->limit(1))
+                ->latest('products.id')
+                ->limit($limit)->get(),
+            'catalog', 'on_offer'
         );
     }
 

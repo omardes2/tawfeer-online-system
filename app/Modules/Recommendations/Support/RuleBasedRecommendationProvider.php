@@ -32,6 +32,11 @@ class RuleBasedRecommendationProvider implements StorefrontRecommendationProvide
         return $this->service->newArrivals($limit);
     }
 
+    public function onOffer(int $limit = 8): Collection
+    {
+        return $this->service->onOffer($limit);
+    }
+
     public function related(Product $product, int $limit = 8): Collection
     {
         return $this->service->related($product, $limit);

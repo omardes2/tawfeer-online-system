@@ -41,6 +41,11 @@ class StorefrontService
         if (! empty($filters['q'])) {
             $this->applySearch($query, (string) $filters['q']);
         }
+        // صفحة «عروض التوفير»: نفس القائمة بفلترٍ واحد، فتبقى الفلاتر والترتيب
+        // والترقيم والبحث عاملةً فوقه بلا صفحةٍ ثانية تُصان على حدة.
+        if (! empty($filters['on_offer'])) {
+            $query->onOffer();
+        }
         if (isset($filters['min']) && $filters['min'] !== '') {
             $query->where('retail_price', '>=', (float) $filters['min']);
         }

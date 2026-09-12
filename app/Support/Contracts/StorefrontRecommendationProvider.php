@@ -22,6 +22,9 @@ interface StorefrontRecommendationProvider
 
     public function newArrivals(int $limit = 8): Collection;
 
+    /** عروض التوفير — حقيقة كتالوجية (سعر ترويجي أقلّ من التجزئة)، لا توصية. */
+    public function onOffer(int $limit = 8): Collection;
+
     public function related(Product $product, int $limit = 8): Collection;
 
     public function frequentlyBoughtTogether(Product $product, int $limit = 8): Collection;

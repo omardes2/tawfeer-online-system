@@ -70,6 +70,22 @@
         :items="$bestSellers"
         :view-all="route('storefront.shop')" />
 
+    {{--
+        ══════════ عروض التوفير ══════════
+
+        تحت «الأكثر مبيعًا» مباشرةً: الزبون الذي قرأ الرائج يقرأ بعده الأوفر.
+        و«عرض الكل» يقود إلى صفحتها لا إلى المتجر كاملًا — القسم يعرض عشرة،
+        والصفحة تعرض كل صنفٍ عليه خصم بفلاترها وترتيبها وترقيمها.
+
+        ويُخفى القسم وحده إن لم يكن على شيءٍ خصم (سلوك `x-storefront.section`)،
+        فلا يظهر عنوانٌ فوق فراغ.
+    --}}
+    <x-storefront.section
+        :title="__('storefront.savings_offers')"
+        :subtitle="__('storefront.savings_offers_subtitle')"
+        :items="$onOffer"
+        :view-all="route('storefront.offers')" />
+
     {{-- ══════════ وصل حديثًا ══════════ --}}
     <x-storefront.section
         :title="__('storefront.new_arrivals')"

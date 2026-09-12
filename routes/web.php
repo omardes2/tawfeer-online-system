@@ -96,6 +96,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['storefront.locale', EnforceMaintenanceMode::class, CaptureAdAttribution::class])->group(function () {
     Route::get('/', [StorefrontController::class, 'home'])->name('storefront.home');
     Route::get('/shop', [StorefrontController::class, 'index'])->name('storefront.shop');
+    // عروض التوفير: مسارٌ قائم بذاته لا فلترٌ في الرابط — يُشارَك ويُفهرَس ويُعلَن عنه.
+    Route::get('/offers', [StorefrontController::class, 'offers'])->name('storefront.offers');
     Route::get('/search', [StorefrontController::class, 'search'])->name('storefront.search');
     // اقتراحات البحث الفوري — طلب لكل حرف، فمحدود المعدّل مثل بقية النقاط العامّة.
     Route::get('/search/suggest', [StorefrontController::class, 'suggest'])

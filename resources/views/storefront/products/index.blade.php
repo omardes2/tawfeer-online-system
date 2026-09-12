@@ -3,6 +3,20 @@
     $activeCategory = $category ?? null;
     $activeBrand = $brand ?? null;
 
+    /*
+        المسار الذي تعود إليه أدوات الصفحة (الترتيب، الرقائق، الفلاتر، «مسح الكل»).
+        كان «المتجر» ثابتًا، فكان أي ترتيبٍ أو فلترٍ على صفحة «عروض التوفير» يقذف
+        الزبون إلى المتجر كاملًا ويُسقط العروض صامتًا.
+    */
+    $listingRoute = $listingRoute ?? route('storefront.shop');
+    $listingUrl = fn (array $params = []) => $listingRoute
+        .(($p = array_filter($params, fn ($v) => $v !== null && $v !== '')) ? '?'.http_build_query($p) : '');
+
+    // صفحة العروض الفارغة ليست بحثًا خائبًا: «لا منتجات» يُقرأ عطلًا في المتجر،
+    // والصواب أن تقول إنه لا عروض الآن.
+    $emptyTitle = $emptyTitle ?? null;
+    $emptyHint = $emptyHint ?? null;
+
     if ($q) {
         $pageEvent = ['name' => 'SearchPerformed', 'payload' => ['q' => $q, 'results' => $products->total()]];
     } elseif ($activeCategory) {
@@ -52,7 +66,7 @@
         :subtitle="trans_choice('storefront.products_count', $products->total(), ['count' => $products->total()])">
 
         {{-- الترتيب: نموذج يُرسَل عند التغيير، ويحمل بقية المعاملات كي لا تضيع --}}
-        <form action="{{ route('storefront.shop') }}" method="GET" class="shrink-0">
+        <form action="{{ $listingRoute }}" method="GET" class="shrink-0">
             @foreach (['category', 'brand', 'q', 'min', 'max'] as $k)
                 @if (($filters[$k] ?? '') !== '') <input type="hidden" name="{{ $k }}" value="{{ $filters[$k] }}"> @endif
             @endforeach
@@ -81,14 +95,14 @@
     @if (count($chips))
         <div class="flex items-center gap-2 flex-wrap mb-4">
             @foreach ($chips as $chip)
-                <a href="{{ route('storefront.shop', array_filter($chip['remove'], fn ($v) => $v !== null && $v !== '')) }}"
+                <a href="{{ $listingUrl($chip['remove']) }}"
                    class="sf-badge sf-badge-soft min-h-10 ps-3.5 pe-2.5 gap-1.5 hover:bg-brand-100 transition-colors"
                    aria-label="{{ __('storefront.remove_filter', ['name' => $chip['label']]) }}">
                     {{ $chip['label'] }}
                     <x-storefront.icon name="close" class="w-3.5 h-3.5" />
                 </a>
             @endforeach
-            <a href="{{ route('storefront.shop', array_filter(['q' => $q, 'sort' => $filters['sort'] ?? null])) }}"
+            <a href="{{ $listingUrl(['q' => $q, 'sort' => $filters['sort'] ?? null]) }}"
                class="inline-flex items-center min-h-10 px-2 text-xs font-semibold text-[color:var(--sf-text-soft)] hover:text-brand-600 transition-colors">
                 {{ __('storefront.clear_all') }}
             </a>
@@ -101,7 +115,7 @@
             <div class="sf-card sf-card-pad sticky top-[7.5rem]">
                 <h2 class="font-bold mb-4 text-[color:var(--sf-text)]">{{ __('storefront.filters') }}</h2>
                 <x-storefront.filters :filters="$filters" :categories="$categories" :brands="$brands"
-                    :action="route('storefront.shop')" uid="d" />
+                    :action="$listingRoute" uid="d" />
             </div>
         </aside>
 
@@ -110,9 +124,9 @@
             @if ($products->isEmpty())
                 <x-storefront.empty-state
                     :icon="$q ? 'search' : 'box'"
-                    :title="$q ? __('storefront.no_search_results', ['q' => $q]) : __('storefront.no_products')"
-                    :description="__('storefront.no_products_hint')"
-                    :action="count($chips) || $q ? route('storefront.shop') : null"
+                    :title="$q ? __('storefront.no_search_results', ['q' => $q]) : ($emptyTitle ?: __('storefront.no_products'))"
+                    :description="$q ? __('storefront.no_products_hint') : ($emptyHint ?: __('storefront.no_products_hint'))"
+                    :action="count($chips) || $q ? $listingRoute : null"
                     :action-label="count($chips) || $q ? __('storefront.clear_all') : null" />
             @else
                 <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
@@ -151,7 +165,7 @@
             </div>
             <div class="overflow-y-auto p-4">
                 <x-storefront.filters :filters="$filters" :categories="$categories" :brands="$brands"
-                    :action="route('storefront.shop')" uid="m" />
+                    :action="$listingRoute" uid="m" />
             </div>
         </div>
     </div>

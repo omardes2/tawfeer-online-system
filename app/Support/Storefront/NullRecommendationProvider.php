@@ -31,6 +31,19 @@ class NullRecommendationProvider implements StorefrontRecommendationProvider
             ->latest('id')->limit($limit)->get();
     }
 
+    /**
+     * عروض التوفير: حقيقة كتالوجية كالمميّز والأحدث — لا تنتظر محرّك نمو، فتُخدَم
+     * هنا. وترتيبُ الأعمق خصمًا متروكٌ للمزوّد القائم على القواعد.
+     *
+     * @return Collection<int, Product>
+     */
+    public function onOffer(int $limit = 8): Collection
+    {
+        return Product::query()->active()->visible()->onOffer()
+            ->with(['primaryImage', 'defaultVariant.inventoryStocks', 'brand'])
+            ->latest('id')->limit($limit)->get();
+    }
+
     /** @return Collection<int, Product> */
     public function bestSellers(int $limit = 8): Collection
     {

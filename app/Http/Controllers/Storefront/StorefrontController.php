@@ -35,6 +35,8 @@ class StorefrontController extends Controller
             'featured' => $this->reco->featured(10),
             // «الأكثر مبيعًا» كانت موجودة في محرّك التوصيات وغير معروضة — تُعرض الآن ببيانات حقيقية.
             'bestSellers' => $this->reco->bestSellers(10),
+            // «عروض التوفير» تحت «الأكثر مبيعًا» مباشرةً، ومنها «عرض الكل» إلى صفحتها.
+            'onOffer' => $this->reco->onOffer(10),
             'newArrivals' => $this->reco->newArrivals(10),
             'categories' => $this->storefront->categories()->take(8),
             'brands' => $this->storefront->brands()->take(12),
@@ -44,6 +46,21 @@ class StorefrontController extends Controller
     public function index(Request $request): View
     {
         return $this->listing($request, __('storefront.all_products'));
+    }
+
+    /**
+     * صفحة «عروض التوفير» — كل صنفٍ عليه خصم.
+     *
+     * الفلتر يُفرض من المسار لا من الاستعلام: الصفحة تعني ما يقوله عنوانها،
+     * فلا يُفرَّغ وعدُها بمعاملٍ في الرابط.
+     */
+    public function offers(Request $request): View
+    {
+        return $this->listing($request, __('storefront.savings_offers'), [
+            'listingRoute' => route('storefront.offers'),
+            'emptyTitle' => __('storefront.no_offers'),
+            'emptyHint' => __('storefront.no_offers_hint'),
+        ], ['on_offer' => true]);
     }
 
     public function category(Request $request, string $slug): View
@@ -164,13 +181,19 @@ class StorefrontController extends Controller
         return back();
     }
 
-    /** @param array<string, mixed> $extra */
-    private function listing(Request $request, string $heading, array $extra = []): View
+    /**
+     * @param  array<string, mixed>  $extra
+     * @param  array<string, mixed>  $force  فلاتر يفرضها المسار نفسه
+     */
+    private function listing(Request $request, string $heading, array $extra = [], array $force = []): View
     {
         $filters = $request->only(['category', 'brand', 'q', 'min', 'max', 'sort']);
 
         return view('storefront.products.index', array_merge([
-            'products' => $this->storefront->list($filters),
+            // المفروض من المسار يُمرَّر للاستعلام ولا يدخل `filters`: القالب يبني
+            // منها روابط الترتيب والرقائق، فلو دخلها لظهر في كل رابطٍ معامل
+            // يقوله المسار أصلًا — ولأمكن إسقاطه بإزالة رقيقة.
+            'products' => $this->storefront->list($filters + $force),
             'heading' => $heading,
             'filters' => $filters,
             'categories' => $this->storefront->categories(),

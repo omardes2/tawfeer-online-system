@@ -27,6 +27,8 @@
         ['url' => route('storefront.home'), 'label' => __('storefront.home'), 'active' => request()->routeIs('storefront.home')],
         ['url' => route('storefront.categories'), 'label' => __('storefront.categories'), 'active' => request()->routeIs('storefront.categories', 'storefront.category')],
         ['url' => route('storefront.shop'), 'label' => __('storefront.shop'), 'active' => request()->routeIs('storefront.shop')],
+        // صفحة قائمة بذاتها الآن، فتدخل التنقّل: قسم الرئيسية يعرض عشرة منها فقط.
+        ['url' => route('storefront.offers'), 'label' => __('storefront.savings_offers'), 'active' => request()->routeIs('storefront.offers')],
         ['url' => route('storefront.shop', ['sort' => 'newest']), 'label' => __('storefront.new_arrivals'), 'active' => false],
         ['url' => route('storefront.brands'), 'label' => __('storefront.brands'), 'active' => request()->routeIs('storefront.brands', 'storefront.brand')],
     ];
@@ -411,6 +413,7 @@
                 <span class="block font-bold text-white mb-3">{{ __('storefront.footer_shop') }}</span>
                 <ul class="space-y-2">
                     <li><a href="{{ route('storefront.shop') }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.all_products') }}</a></li>
+                    <li><a href="{{ route('storefront.offers') }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.savings_offers') }}</a></li>
                     <li><a href="{{ route('storefront.categories') }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.categories') }}</a></li>
                     <li><a href="{{ route('storefront.brands') }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.brands') }}</a></li>
                     <li><a href="{{ route('storefront.shop', ['sort' => 'newest']) }}" class="inline-block py-2 hover:text-white transition-colors">{{ __('storefront.new_arrivals') }}</a></li>
